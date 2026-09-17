@@ -1857,6 +1857,107 @@ def main() -> int:
               f"留空 → {_p1[:1]} · 悬空指针 → {_p2[:1]}")
 
 
+    # ── V44（D9 执行 · 2026-09-17）源表「合规·绿」与引擎结论的一致性 ──────
+    #   背景：源表 157 条 `合规·绿` 带着 53.8% 的投放金额，其中 **0 条**是
+    #   「已查且通过」—— 55 条无文案、99 条规则够不着、3 条规则其实命中了。
+    #   D9 交付的变更请求与逐行还原账都建立在这三条断言上，所以它们必须成门。
+    #
+    #   ★ V44c 是**棘轮**，不是「必须为 0」。今天的坏值（3 条漏放 / 盲区率 43.1%）
+    #     是已登记的现状，不是本门要制造的红色；本门守的是**不许更坏**，
+    #     并在变好时提示把棘轮一起收紧。一个要求「今天立刻为 0」的门会在
+    #     修好之前一直红，然后所有人学会忽略它 —— 那就是没有门。
+    _rl_path = SKEL / "_data" / "风险等级-还原.json"
+    _rec_path = SKEL / "_data" / "records.json"
+
+    # V44a：没有可判文本的记录，不能被判成任何一种「放行」
+    _recs_raw = json.loads(_rec_path.read_text(encoding="utf-8"))
+    _no_text = [r for r in _recs_raw
+                if not S.rec_text(r).strip()
+                and any((r.get(f) or "").strip()
+                        for f in ("广告名称", "外部广告ID", "广告账号", "平台"))]
+    _bad_layer = []
+    for r in _no_text:
+        v = J.judge(S.rec_text(r), product_line=(r.get("品线") or None),
+                    ad_type=r.get("广告类型"))
+        L = v["verdict"]["layer"]["id"]
+        if L != "DP0" or v["verdict"]["disposition"] == "auto_pass_with_note":
+            _bad_layer.append(f"{r.get('广告名称') or r.get('外部广告ID')}: {L}")
+    # 反向对照 ①：空串与纯空白都必须落 DP0 —— 判据必须对「空」的各种写法一致
+    _mut = [J.judge(t)["verdict"]["layer"]["id"] for t in ("", "   ", "\n\t ")]
+    # 反向对照 ②：**有**文本但没有命中规则时**不许**落 DP0。没有这一条，
+    #   「DP0 由空文本决定」与「DP0 由没有命中决定」在只看正例时长得一模一样 ——
+    #   而后者会让所有未覆盖记录被误判成「不可审」，正好是 D9 那个病反过来犯。
+    _pos = [J.judge(t)["verdict"]["layer"]["id"]
+            for t in ("hello world", "普通文案，没有任何规则词")]
+    check("V44a", "没有可判文本的记录一律落 DP0，且**不得**出现任何形式的放行"
+                  "（对照：有文本但没命中的**不许**落 DP0）",
+          not _bad_layer and set(_mut) == {"DP0"} and "DP0" not in _pos,
+          f"{len(_no_text)} 条无文案广告全部 DP0；空串/纯空白/换行 → {sorted(set(_mut))}；"
+          f"有文本无命中 → {sorted(set(_pos))}"
+          + (f"；❌ {_bad_layer[:3]}" if _bad_layer else ""))
+
+    # V44b：还原账必须新鲜，且两个守恒等式必须闭合
+    _rl = json.loads(_rl_path.read_text(encoding="utf-8")) if _rl_path.exists() else None
+    _fp_now = hashlib.sha256(_rec_path.read_bytes()).hexdigest()
+    _fp_ok = bool(_rl) and _rl.get("source_sha256") == _fp_now
+    _t = (_rl or {}).get("totals", {})
+    _rows = (_rl or {}).get("rows", [])
+    #   ① 可审内容三值必须恰好铺满语料（少一条 = 有记录没被归类，没人会看见）
+    _part = _t.get("可审_有文案", 0) + _t.get("可审_无文案", 0) + _t.get("可审_未读到", 0)
+    #   ② 绿标三桶必须恰好等于绿标总数（这正是 D9 那个「还原出来了」的等式）
+    _buckets = (_t.get("绿标_无文案", 0) + _t.get("绿标_规则未覆盖", 0)
+                + _t.get("绿标_规则命中了", 0))
+    _cons = (_part == len(_recs_raw) == _t.get("records")
+             and _buckets == _t.get("绿标_条数"))
+    # 反向对照：把一条记录的 `可审内容` 抹掉，守恒等式**必须**当场断掉。
+    #   抽成内联函数是为了让「判据对不对」与「制品对不对」分开报 ——
+    #   否则等式恒真也看不出来（这是本项目第 5 次遇到同一个形态）。
+    def _partition_ok(rows):
+        s_ = {x.get("可审内容") for x in rows}
+        return (sum(1 for x in rows if x.get("可审内容") == "有文案")
+                + sum(1 for x in rows if x.get("可审内容") == "无文案")
+                + sum(1 for x in rows if x.get("可审内容") == "未读到")) == len(rows) \
+            and s_ <= {"有文案", "无文案", "未读到"}
+    _m_rows = [dict(x) for x in _rows]
+    if _m_rows:
+        _m_rows[0]["可审内容"] = None            # 抹掉一条
+    _m2_rows = [dict(x) for x in _rows]
+    if _m2_rows:
+        _m2_rows[0]["可审内容"] = "待定"          # 造一个第五种取值
+    _ctrl = (bool(_rows) and _partition_ok(_rows)
+             and not _partition_ok(_m_rows) and not _partition_ok(_m2_rows))
+    check("V44b", "源表绿标的逐行还原账新鲜，且两个守恒等式闭合"
+                  "（可审内容铺满语料 · 绿标三桶等于绿标总数）",
+          _fp_ok and _cons and bool(_rows) and _ctrl,
+          f"指纹{'一致' if _fp_ok else '❌对不上'}；"
+          f"可审内容 {_t.get('可审_有文案')}+{_t.get('可审_无文案')}"
+          f"+{_t.get('可审_未读到')}={_part} vs {len(_recs_raw)}；"
+          f"绿标三桶={_buckets} vs {_t.get('绿标_条数')}；"
+          f"反向对照：抹掉一条→守恒断 · 造第五种取值→守恒断 → {'成立' if _ctrl else '❌判据恒真'}",
+          )
+
+    # V44c：棘轮 —— 不许更坏；变好时提示收紧
+    _RATCHET_HIT, _RATCHET_BLIND = 3, 0.431
+    _hit, _blind = _t.get("绿标_规则命中了"), _t.get("盲区率")
+    # 反向对照：把两个坏值各推高一格，本门**必须**红 —— 否则棘轮是摆设
+    _ratchet_red = ((_hit is None or _hit + 1 > _RATCHET_HIT)
+                    and (_blind is None or _blind + 0.001 > _RATCHET_BLIND))
+    _relax = []
+    if _hit is not None and _hit < _RATCHET_HIT:
+        _relax.append(f"漏放 {_hit} < {_RATCHET_HIT}")
+    if _blind is not None and _blind < _RATCHET_BLIND:
+        _relax.append(f"盲区率 {_blind:.1%} < {_RATCHET_BLIND:.1%}")
+    check("V44c", f"棘轮：绿标漏放 ≤ {_RATCHET_HIT} 且盲区率 ≤ {_RATCHET_BLIND:.1%}"
+                  f"（只许变好；变好时必须收紧本门的阈值）",
+          (_hit is not None and _hit <= _RATCHET_HIT
+           and _blind is not None and _blind <= _RATCHET_BLIND)
+          and _ratchet_red,
+          f"漏放 {_hit}/{_RATCHET_HIT} · 盲区率 {_blind:.1%}/{_RATCHET_BLIND:.1%}"
+          f" · 反向对照：各推高一格 → {'必红' if _ratchet_red else '❌棘轮不咬'}"
+          + (f"　★ 已改善：{('；'.join(_relax))} —— 请把阈值收紧到当前值，"
+             f"否则这条门守的是一个过期的现状" if _relax else ""))
+
+
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
     if a.json:

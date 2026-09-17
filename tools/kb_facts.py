@@ -33,6 +33,7 @@ kb_facts.py —— 需求知识库的**事实数字单一来源**
 """
 
 import collections
+import hashlib
 import json
 import os
 import re
@@ -152,9 +153,40 @@ def compute(snap=None):
         except (TypeError, ValueError):
             return 0.0
 
-    no_text = [x for x in ads
-               if not ((x.get("Primary Text") or "").strip()
-                       or (x.get("Headline") or "").strip())]
+    # ★ 2026-09-17（D9 执行）：原来这里只有一句话 ——「没有 Primary Text / Headline
+    #   的就是无文案广告」。数出来 59 条。**其中 2 条根本不是广告**：所有身份字段
+    #   （广告名称 / 外部广告ID / 广告账号 / 平台）全空，是没读到的空行。
+    #   合并计数的后果很具体：「去修拉取管道」与「去改口径」这两件不相干的事
+    #   会被记成同一个数。所以「无文案」与「未读到」从今天起分开算。
+    _IDENT = ("广告名称", "外部广告ID", "广告账号", "平台")
+
+    def _is_ad(x):
+        return any((x.get(f) or "").strip() for f in _IDENT)
+
+    no_text_raw = [x for x in ads
+                   if not ((x.get("Primary Text") or "").strip()
+                           or (x.get("Headline") or "").strip())]
+    no_text = [x for x in no_text_raw if _is_ad(x)]        # 真实广告，载体无文案
+    unread = [x for x in no_text_raw if not _is_ad(x)]     # 整行没读到
+
+    # ★ 引擎侧的两个数（规则库够不够得着 / 源表绿标有没有漏放）不在这里手算 ——
+    #   它们要跑判定引擎，属于 governance 线。kb_facts 只把它们**转发**出来，
+    #   并核对制品自带的输入指纹：源表改了而账没重算 → 这里直接抛，不留一个
+    #   没人知道过期了的数字（这正是本文件开头那三个病例的同一个病）。
+    rl_p = os.path.join(load.REPO, "research", "governance", "skeleton", "_data",
+                        "风险等级-还原.json")
+    rl = json.load(open(rl_p, encoding="utf-8")) if os.path.exists(rl_p) else None
+    _FIX = "修复：python3 research/governance/audit_risk_label.py"
+    if os.path.exists(rec_p) and rl is None:
+        # 语料在、账不在 —— 不许静默降级成 None。None 会让 E2 报成
+        # 「登记 157 vs 重算 None」，读起来像是数字错了，其实是没有账。
+        raise SystemExit(f"❌ 风险等级-还原.json 不存在，而 records.json 在。{_FIX}")
+    if rl is not None:
+        want = hashlib.sha256(open(rec_p, "rb").read()).hexdigest() \
+            if os.path.exists(rec_p) else None
+        if rl.get("source_sha256") != want:
+            raise SystemExit("❌ 风险等级-还原.json 已过期（源表指纹对不上）。" + _FIX)
+    rl_t = (rl or {}).get("totals", {})
 
     prod_readable = sum(1 for m in mat.MATERIALS
                         if m.get("归属知识库") == "产品描述库" and m["可读性"] == "ok")
@@ -212,11 +244,25 @@ def compute(snap=None):
         "kb_lex_rules": n_rules,
         "kb_prod_readable": prod_readable,
         "ads_total": len(ads),
-        "ads_with_text": len(ads) - len(no_text),
+        "ads_with_text": len(ads) - len(no_text_raw),
         "ads_no_text": len(no_text),
+        # 整行没读到（不是「无文案广告」）—— 与上面分开，见 no_text 处的注释
+        "ads_unread": len(unread),
         "ads_no_text_marked_green": sum(1 for x in no_text if "绿" in str(x.get("风险等级"))),
         "ads_no_text_spend_usd": round(sum(_spend(x) for x in no_text), 2),
         "ads_total_spend_usd": round(sum(_spend(x) for x in ads), 2),
+        # ── D9 扩大口径后要用的键（源表「合规·绿」的真实构成）──────────
+        #   数字只有一个家：research/governance/skeleton/_data/风险等级-还原.json。
+        #   这里不重算，只转发 —— 重算一遍就是把同一个数写在两处，正是本文件要防的。
+        "risk_green": rl_t.get("绿标_条数"),
+        "risk_green_spend_usd": rl_t.get("绿标_投放USD"),
+        "risk_green_no_text": rl_t.get("绿标_无文案"),
+        "risk_green_uncovered": rl_t.get("绿标_规则未覆盖"),
+        "risk_green_uncovered_spend_usd": rl_t.get("绿标_规则未覆盖USD"),
+        "risk_green_rule_hit": rl_t.get("绿标_规则命中了"),
+        "risk_uncovered": rl_t.get("覆盖_未覆盖"),
+        "risk_covered": rl_t.get("覆盖_覆盖"),
+        "risk_blind_spot_rate": rl_t.get("盲区率"),
         "kb_classes_ready": sum([
             len(ext_doc.get("entries", [])) > 0,
             (len(smp_blocks) - smp_marked) > 0,

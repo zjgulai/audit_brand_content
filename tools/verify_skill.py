@@ -42,6 +42,7 @@ PROMISES = [
     ("verify_base.py", ["基座自证"]),
     ("verify_engine_contract.py", ["验收"]),
     ("verify_kb.py", ["G1", "E1"]),
+    ("audit_risk_label.py", ["还原账与生成块"]),
 ]
 
 SKIP = ("<外部广告ID>", "<url_key>", "<临时文件>")

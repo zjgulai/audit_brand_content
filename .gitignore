@@ -48,6 +48,8 @@ research/method/Kb2Agent/
 research/governance/skeleton/_data/records.json
 research/governance/skeleton/_data/rules_raw.json
 research/governance/skeleton/_data/miss_attribution.json
+# D9 执行（2026-09-17）：源表「风险等级」列的逐行还原账，由引擎跑出来，可复算
+research/governance/skeleton/_data/风险等级-还原.json
 research/landing/要素提取.json
 
 # 追加型账本：只会增长，不需要 diff 与回滚

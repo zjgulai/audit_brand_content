@@ -95,6 +95,15 @@ REGISTRY = [
      "generator": "research/governance/skeleton/build_rules.py",
      "inputs": ["PRD/内容治理需求文档.md"],
      "why": "21 条规则的原始抽取。同上。"},
+    # ★ 2026-09-17（D9 执行）：源表「风险等级」列的逐行还原账。
+    #   它是**跑引擎跑出来的**，所以语料或规则/词表任一改动都会让它过期 ——
+    #   制品自带输入指纹，V44b 与 kb_facts 都会在指纹对不上时直接报红。
+    {"rules": ["research/governance/skeleton/_data/风险等级-还原.json"],
+     "class": "derived", "adr_ref": "§三 L2 落地澄清（同 records.json，下游可复算视图）",
+     "generator": "research/governance/audit_risk_label.py",
+     "inputs": ["research/governance/skeleton/_data/records.json"],
+     "why": "157 条「合规·绿」的真实构成（55 无文案 / 99 未覆盖 / 3 漏放 / 0 已查）。"
+            "给投放侧的变更请求直接引它，所以它必须可复算而不是手写。"},
     {"rules": ["research/governance/skeleton/_data/miss_attribution.json"],
      "class": "derived", "adr_ref": "§三 L2 落地澄清（原文归 L1 字面清单，按判据改判 L2）",
      "generator": "research/governance/skeleton/attribute_misses.py",

@@ -188,29 +188,41 @@ def build(facts=None, snap=None):
         },
         {
             "id": "D9", "kind": "process",
-            "title": "没有文案可查的广告，在源表里被标成「合规·绿」",
-            "why": "B3.4 端到端演练抓到的：有 59 条广告的 Primary Text / Headline /"
-                   "落地页URL **三者全空**（Google PLA/PMax 为主），源表里其中 55 条"
-                   "标着「合规·绿 / 无需处理」。它们不是「已检查且合规」，是「没有任何"
-                   "东西可查」—— 而在表里这两种状态的写法一模一样。这正是本项目一直在防的"
-                   "「未覆盖被读成没问题」，它在引擎里防住了，却在源表取值上原样存在，"
-                   "且带着三分之一的投放金额。",
+            "title": "源表 `合规·绿` 一列扛三个正交量：157 条里 0 条是「已查且通过」",
+            "why": "B3.4 演练先看到的是「59 条无文案被标绿」。执行 D9 时把**全部 157 条"
+                   "绿标**逐行重跑引擎，洞比原来大一档：55 条无文案 + 99 条**规则库"
+                   "够不着**（引擎落 catch_all）+ 3 条**规则命中了**（源表漏放），"
+                   "而「已查且通过」是 **0 条**。这不是新提法 —— 设计文档 §4.5/§5.1 早已"
+                   "认定语义重载，R2 §2989 甚至写了「这个数字无法被还原」。**现在还原了。**"
+                   "再叠加两条实证：`检查人` 列 0/291 从未有人填写；`命中规则` 非空 132 条"
+                   "恰好等于红 91+黄 30+灰 11，非空为空 159 条恰好等于绿 157+空 2，"
+                   "**无一例外** —— 即 `合规·绿` 不是结论，是「规则没命中」这个默认值的"
+                   "显示名（见 D15）。代价是一个字段扛三个量使两个数**在数学上算不出来**："
+                   "盲区率 43.1%、未审率 53.9%。逐行还原账与给投放侧的变更请求已交付。",
             "affects": ["Q1", "Q6"],
-            "量": {"ads_no_text": facts["ads_no_text"],
-                  "ads_no_text_marked_green": facts["ads_no_text_marked_green"],
-                  "ads_no_text_spend_usd": facts["ads_no_text_spend_usd"],
-                  "ads_total_spend_usd": facts["ads_total_spend_usd"]},
-            "量说明": "无文案条数 / 其中被标绿的 / 它们的投放金额 / 全部投放金额 —— "
-                     "四个数并排，「标绿」与「没人看过」的差就是金额那一列",
+            "量": {"risk_green": facts["risk_green"],
+                  "risk_green_spend_usd": facts["risk_green_spend_usd"],
+                  "risk_green_no_text": facts["risk_green_no_text"],
+                  "risk_green_uncovered": facts["risk_green_uncovered"],
+                  "risk_green_uncovered_spend_usd": facts["risk_green_uncovered_spend_usd"],
+                  "ads_unread": facts["ads_unread"],
+                  "ads_total_spend_usd": facts["ads_total_spend_usd"],
+                  "risk_blind_spot_rate": facts["risk_blind_spot_rate"]},
+            "量说明": "绿标条数 / 它们的投放金额 / 其中无文案 / 其中规则未覆盖 / "
+                     "未覆盖那批的金额 / 整行没读到的（不是无文案广告）/ 全表投放 / "
+                     "盲区率 —— 八个数并排。**「已查且通过」那一格没有键，因为它恒为 0**，"
+                     "由 audit_risk_label.py 直接印出来。",
             "owner": "广告投放侧（creative=Roxie）+ 源表口径",
-            "status": "待确认：源表是否需要一个「无文案」取值，与「合规·绿」分开",
-            "提出方式": "给源表加一个显式的「无可审内容」取值，或让无文案记录的风险等级留空",
-            "复算": "python3 tools/kb_facts.py --check",
-            "$report": "research/governance/端到端送审-演练报告.md §三",
+            "status": "已交付变更请求（三轴拆列 + 291 行迁移表），待投放侧回："
+                      "research/governance/源表口径-风险等级-变更请求.md",
+            "提出方式": "把 `风险等级` 拆成 `可审内容`（有/无/未读到）· `覆盖状态`"
+                        "（覆盖/未覆盖/不适用）· `风险等级`（L1–L4）三列；"
+                        "`待复核·灰` 移出等级改记 `复核状态`。"
+                        "★ 不要「无文案记录留空」—— 空值在这张表里已经有主（那 2 行没读到的）",
+            "复算": "python3 research/governance/audit_risk_label.py --check",
+            "$report": "research/governance/端到端送审-演练报告.md §三/§三·补；"
+                       "research/governance/源表口径-风险等级-变更请求.md",
         },
-        # ── B3.5（2026-09-17）：外部标准库落盘时暴露的五个缺口 ──
-        #   前三条是**取证面**的：不是没做，是本机没有可复现的取法；
-        #   后两条是**法务面**的：材料在，口径没定。
         {
             "id": "D10", "kind": "evidence",
             "title": "Meta 政策页在本机无匿名取法，只能对 09-15 的钉住件核",
@@ -293,6 +305,34 @@ def build(facts=None, snap=None):
             "提出方式": "法务逐条确认",
             "复算": "python3 tools/verify_kb.py",
         },
+        {
+            "id": "D15", "kind": "data",
+            "title": "源表的规则扫描漏放 3 条：绿标里带着引擎能检出的医疗治愈类表述",
+            "why": "D9 逐行还原时掉出来的：157 条 `合规·绿` 里有 3 条的 `命中规则` 为空、"
+                   "却被引擎命中 `T1.1.medical-cure`（H01），落 DP3 转人工。三条是同一段"
+                   "文案（Savannah 吸奶器图片素材），命中的是 `treat` / `Treat yourself`"
+                   "（规则自带 `downgrade_band`，落点从 auto_reject 降到 manual_review）。"
+                   "★ 这与 D9 是**两种不同的坏法**，必须分开计：D9 是「口径把未覆盖写成了"
+                   "合规」，补一列就解决；这 3 条是**两次规则扫描结果不一致** —— 源表那次"
+                   "没检出来。而这两次扫描谁更全，今天没有任何东西在比。"
+                   "投放金额 $0（三条都没花钱），所以它不是金额风险，是**方法风险**："
+                   "在它被解释清楚之前，不能假定源表的绿标与引擎结论一致。",
+            "affects": ["Q1", "Q6"],
+            "量": {"risk_green_rule_hit": facts["risk_green_rule_hit"]},
+            "量说明": "绿标里规则实际命中的条数 —— 一个数。它的价值不在大小，"
+                      "在于它**不是 0**：源表绿标与引擎结论存在可机检的分歧。",
+            "owner": "审核侧（规则扫描口径）；投放侧配合确认源表那次扫描用的是什么规则集",
+            "status": "待确认：源表的风险等级由哪一次扫描产生、用的什么规则集；"
+                      "这 3 条需按 DP3 走人工复核并记入错题本",
+            "提出方式": "把源表那次扫描与引擎的扫描结果做一次逐条比对 —— "
+                        "今天没有任何东西在比，这 3 条是靠逐行重跑偶然掉出来的",
+            "复算": "python3 research/governance/audit_risk_label.py --check",
+            "$report": "research/governance/源表口径-风险等级-变更请求.md §六",
+        },
+
+        # ── B3.5（2026-09-17）：外部标准库落盘时暴露的五个缺口 ──
+        #   前三条是**取证面**的：不是没做，是本机没有可复现的取法；
+        #   后两条是**法务面**的：材料在，口径没定。
     ]
     return {
         "schema_version": "缺口-v1",
