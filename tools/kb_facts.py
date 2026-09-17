@@ -90,6 +90,25 @@ def compute(snap=None):
                   for t in snap.ledger_tables() for f in (t.fields or [])
                   if any(k in str(f) for k in ("开始", "启动"))]
 
+    # 正负样本的证据落盘件：★ 它自己和自己打架（抬头 returned=8，盘上 5 条）。
+    #   这里**独立解析一遍**（不复用 kb_classes 的解析器）—— E2 要在「登记表里写的数」
+    #   与「重算出来的数」之间比对，两者必须来自不同的实现，否则那条检查是恒真的。
+    smp_p = os.path.join(KB, "_evidence", "正负样本.raw.txt")
+    smp_txt = open(smp_p, encoding="utf-8").read() if os.path.exists(smp_p) else ""
+    smp_head = re.search(r"returned=(\d+)", smp_txt)
+    smp_blocks = [b for b in smp_txt.split("\n  ---") if "分类 =" in b]
+    smp_marked = sum(1 for b in smp_blocks if '备注（如处理结果/建议） = "样例"' in b)
+    ext_p = os.path.join(KB, "外部标准库-v1.json")
+    ext_doc = json.load(open(ext_p, encoding="utf-8")) if os.path.exists(ext_p) else {"entries": []}
+
+    # 4 类知识库「有没有货」：四类各自的判据都取自**不同的制品**，
+    # 这样这个数就不是某一张表的自述，而是四条独立证据的合计。
+    rules_p = os.path.join(load.REPO, "research", "governance", "skeleton", "rules-v1.json")
+    n_rules = len(json.load(open(rules_p, encoding="utf-8"))["rules"]) \
+        if os.path.exists(rules_p) else 0
+    prod_readable = sum(1 for m in mat.MATERIALS
+                        if m.get("归属知识库") == "产品描述库" and m["可读性"] == "ok")
+
     f = {
         "basis_date": basis,
         "snapshot_id": snap.snapshot_id,
@@ -116,9 +135,25 @@ def compute(snap=None):
         "demands_unmapped": ev["totals"]["demands_unmapped"],
         "empty_tables": sum(1 for t in snap.all() if t.kind == "empty"),
         "start_like_fields": len(start_like),
+        "samples_on_disk": len(smp_blocks),
+        "samples_marked_sample": smp_marked,
+        "samples_real": len(smp_blocks) - smp_marked,
+        "samples_header_returned": int(smp_head.group(1)) if smp_head else None,
+        "ext_entries": len(ext_doc.get("entries", [])),
+        "ext_ratified": sum(1 for e in ext_doc.get("entries", [])
+                            if e.get("status") == "ratified"),
         "materials_total": len(mat.MATERIALS),
         "materials_readable": readable,
         "materials_unreadable": len(mat.MATERIALS) - readable,
+        "kb_lex_rules": n_rules,
+        "kb_prod_readable": prod_readable,
+        "kb_classes_ready": sum([
+            len(ext_doc.get("entries", [])) > 0,
+            (len(smp_blocks) - smp_marked) > 0,
+            n_rules > 0,
+            prod_readable > 0,
+        ]),
+        "kb_classes_total": 4,
     }
     f["done_no_deliverable_pct"] = (f["done_no_deliverable"] / f["done"]) if f["done"] else 0.0
     f["no_evidence_pct"] = (f["demands_without_evidence"] /
@@ -155,6 +190,9 @@ def render(f):
         f"（{f['no_evidence_pct']:.0%}） |",
         f"| 材料收集可程序读取 | **{f['materials_readable']} / {f['materials_total']}**"
         f"（不可读 {f['materials_unreadable']}） |",
+        f"| 4 类知识库有货的 | **{f['kb_classes_ready']} / {f['kb_classes_total']}**"
+        f"（外部标准库 {f['ext_entries']} 条 · 真实样本 {f['samples_real']} 条 · "
+        f"规则 {f['kb_lex_rules']} 条 · 产品材料可读 {f['kb_prod_readable']} 条） |",
         "",
         END,
     ]

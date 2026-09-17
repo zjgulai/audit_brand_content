@@ -159,11 +159,15 @@ def build(facts=None, snap=None):
             "why": "业务侧表里有 8 条记录，其中 7 条备注写「样例」—— 是模板示范，"
                    "不是数据。这是 Agent 训练素材最核心的来源，也是最贵的一块。",
             "affects": ["Q10"],
-            "量_unrecomputable": "「是不是样例」写在备注文字里，没有结构化字段可判定；"
-                                 "要机器可算，须先请业务侧加一个「记录性质」字段",
+            "量": {"samples_on_disk": facts["samples_on_disk"],
+                  "samples_marked_sample": facts["samples_marked_sample"],
+                  "samples_header_returned": facts["samples_header_returned"]},
+            "量说明": "★ 三个数并排：盘上记录数 / 其中标「样例」的 / 文件头声明的条数。"
+                     "前两个相等（全是样例），第三个数更大 —— **证据落盘件自己和自己打架**，"
+                     "在重新拉取之前不许把 8 当成事实",
             "owner": "品牌张丽敏、吸奶器银舒涵、喂养 William、法务",
-            "status": "待收集",
-            "复算": "research/kb/_evidence/正负样本.raw.txt（人工判读）",
+            "status": "待收集；且需重拉证据（落盘件与抬头不一致）",
+            "复算": "python3 tools/kb_classes.py（同时打印这两个数）",
         },
         {
             "id": "D8", "kind": "evidence",
@@ -171,7 +175,10 @@ def build(facts=None, snap=None):
             "why": "R1 做了平台政策分类学研究，但没有产出可被工具调用的条款级条目 ——"
                    "调查结论不是判定依据。",
             "affects": ["Q10"],
-            "量_unrecomputable": "条目制品尚未建立（B3.2 建，建好之后此处改为可重算的键）",
+            "量": {"ext_entries": facts["ext_entries"],
+                  "ext_ratified": facts["ext_ratified"]},
+            "量说明": "已入册的条款级条目数 / 其中经法务确认的 —— 0 条不是「还没数」，"
+                     "是「还没有」。研究稿（_staging）不计入，它是候选不是条目",
             "owner": "法务 Sharon、专家 Emma、北美待定",
             "status": "待收集",
             "复算": "—",

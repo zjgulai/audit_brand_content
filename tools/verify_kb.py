@@ -290,6 +290,94 @@ def main():
               f"查询手册 {'一致' if manual_have == manual_want else '❌已过期'}"
               f"（修复：python3 tools/kb_facts.py && python3 tools/kb_query.py --md）")
 
+        # ── F 组（B3.2）· 4 类知识库实例化 ────────────────────────
+        #   守三件事：① 登记表是重算出来的（不是手抄的现状）
+        #            ② 材料的两轴分类里没有「待分类」这种混合取值
+        #            ③ 外部标准库的条目引用完整、身份标清
+        import kb_classes
+        import kb_materials_data as md
+
+        want4 = json.dumps(kb_classes.build(), ensure_ascii=False, indent=1) + "\n"
+        p4 = os.path.join(load.KB, "知识库-v1.json")
+        have4 = open(p4, encoding="utf-8").read() if os.path.exists(p4) else None
+        _c4 = json.loads(have4) if have4 else {"classes": []}
+        bad4 = [c["知识库"] for c in _c4.get("classes", [])
+                if not c.get("缺口编号") or not str(c.get("状态") or "").strip()]
+        c.add("F1", "4 类登记表可重算", have4 == want4 and not bad4,
+              (f"{len(_c4.get('classes', []))} 类 · 与重算一致 · 每类标了状态与缺口编号"
+               if have4 == want4 and not bad4 else
+               ("❌ 登记表已过期（python3 tools/kb_classes.py）" if have4 != want4
+                else f"❌ 缺状态/缺口编号：{bad4}")))
+
+        # ★ 判据抽成函数，反向对照才能对同一判据做变异（V30 的 _queue_problems 同理）
+        def _axis_problems(mats):
+            return [f"#{m['编号']} 归属知识库={m['归属知识库']!r}"
+                    for m in mats
+                    if m.get("归属知识库") in (None, "", "待分类", "未分类")
+                    or m.get("材料性质") in (None, "", "待分类", "未分类")]
+
+        _ax = _axis_problems(md.MATERIALS)
+        c.add("F2", "材料两轴分类无「待分类」",
+              not _ax,
+              f"{len(md.MATERIALS)} 条 · 材料性质 {len(set(m['材料性质'] for m in md.MATERIALS))} 类"
+              f" · 归属知识库 {len(set(m['归属知识库'] for m in md.MATERIALS))} 类"
+              f" · 待分类 {len(_ax)} 条"
+              + (f" ❌ {_ax[:3]}" if _ax else "　（「—」是完整答案：它就不是知识材料）"))
+
+        def _ext_problems(entries, src_ids):
+            bad = []
+            for e in entries:
+                eid = e.get("id", "?")
+                if e.get("source_id") not in src_ids:
+                    bad.append(f"{eid}: source_id={e.get('source_id')!r} 不在 sources 里（悬空引用）")
+                if e.get("status") == "research" and "未确认" not in str(e.get("未确认标记") or ""):
+                    bad.append(f"{eid}: status=research 却没有「未经法务确认」标记 —— 研究会被读成裁定")
+                if e.get("status") == "ratified" and not (e.get("确认人") and e.get("确认日期")):
+                    bad.append(f"{eid}: status=ratified 却没有确认人与日期")
+                if e.get("status") not in ("research", "ratified"):
+                    bad.append(f"{eid}: status={e.get('status')!r} 既不是 research 也不是 ratified")
+            return bad
+
+        _extp = os.path.join(load.KB, "外部标准库-v1.json")
+        _ext = json.load(open(_extp, encoding="utf-8")) if os.path.exists(_extp) else None
+        if _ext is None:
+            # ★ 制品不在时**不能直接红到底**：一个长期恒红的检查会被学会忽略，
+            #   和恒真一样坏。这里的纪律是「红可以变成 SKIP，但前提是这个空缺
+            #   已经被登记成缺口」—— 把 D8 从登记表里删掉，本条立刻变红。
+            _d8 = reg.get("D8")
+            c.add("F3", "外部标准库条目引用完整",
+                  bool(_d8),
+                  (f"⏭️ 制品 `外部标准库-v1.json` 未建立，但已在登记表里记为 "
+                   f"〔缺口:D8〕（{_d8.get('status') if _d8 else '—'}）—— 跳过不算通过"
+                   if _d8 else
+                   "❌ 制品不存在，**且登记表里没有 D8** —— 空缺既没做也没登记"),
+                  skipped=bool(_d8))
+        else:
+            _e_bad = _ext_problems(_ext.get("entries", []),
+                                   {x["id"] for x in _ext.get("sources", [])})
+            _n = len(_ext.get("entries", []))
+            c.add("F3", "外部标准库条目引用完整", not _e_bad,
+                  f"{_n} 条 / 来源 {len(_ext.get('sources', []))} 个"
+                  f" · research {sum(1 for e in _ext.get('entries', []) if e.get('status') == 'research')}"
+                  f" / ratified {sum(1 for e in _ext.get('entries', []) if e.get('status') == 'ratified')}"
+                  + (f" ❌ {_e_bad[:3]}" if _e_bad else "　（每条都指得出来源，身份标清）"))
+
+        # 反向对照：判据必须能红 —— 抽掉 source、抹掉未确认标记、把状态写歪，三种都要抓住
+        _probe = _ext_problems(
+            [{"id": "X1", "source_id": "S-nope", "status": "research", "未确认标记": ""},
+             {"id": "X2", "source_id": "S1", "status": "ratified"},
+             {"id": "X3", "source_id": "S1", "status": "probably-fine",
+              "未确认标记": "研究稿·未经法务确认"}],
+            {"S1"})
+        _axis_probe = _axis_problems([{"编号": "x", "材料性质": "知识材料", "归属知识库": "待分类"}])
+        #   断言用「每个变异体都被点到名」，不断言问题的条数 —— 条数是实现的副产品，
+        #   而 X2 恰好会触发不止一条理由。第一版断言了 ==3，于是它自己红了。
+        _hit = {str(x).split(":")[0] for x in _probe}
+        c.add("F4", "反向对照：F2/F3 的判据真的会红（不是恒真）",
+              _hit == {"X1", "X2", "X3"} and len(_axis_probe) == 1,
+              f"三个变异体（悬空来源 / 缺未确认标记 / 状态非法）→ 点中 {sorted(_hit)}；"
+              f"材料「待分类」→ 抓住 {len(_axis_probe)}/1")
+
         manual = os.path.join(load.KB, "查询手册.md")
         n_sec = 0
         if os.path.exists(manual):
@@ -324,6 +412,11 @@ def main():
             if i["id"].startswith("D"):
                 mark = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️ "}[i["status"]]
                 print(f"  {mark} {i['id']:<4}{i['name']:<10} {i['detail']}")
+        print("　F 组 · 4 类知识库实例化（B3.2）：")
+        for i in sorted((x for x in c.items if x["id"].startswith("F")),
+                        key=lambda x: x["id"]):
+            mark = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️ "}[i["status"]]
+            print(f"  {mark} {i['id']:<4}{i['name']:<10} {i['detail']}")
         print("　E 组 · 治理（缺口登记 / 文档可重算）：")
         for i in sorted((x for x in c.items if x["id"].startswith("E")),
                         key=lambda x: x["id"]):

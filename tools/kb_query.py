@@ -224,17 +224,30 @@ def q9(led, rs):
 
 def q10(led, rs):
     """4 类知识库各有多少条、缺什么、谁负责？"""
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from kb_materials_lark import CATEGORIES, MATERIALS
-    out = []
-    ok = sum(1 for m in MATERIALS if m["可读性"] == "ok")
-    out.append(f"材料收集 {len(MATERIALS)} 条：可读 {ok} / 不可读 {len(MATERIALS)-ok}")
-    out.append("")
-    for c in CATEGORIES:
-        out.append(f"── {c['知识库']}  【{c['状态']}】")
+    # ★ B3.2 起读**盘上的 4 类登记表**（生成物），不再读 kb_materials_lark 里
+    #   手抄的那份 CATEGORIES —— 手抄的现状会漂，而这一问的全部内容就是现状。
+    import kb_classes
+    path = os.path.join(load.KB, "知识库-v1.json")
+    doc = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else None
+    if doc is None:
+        return ["❌ **GAP：4 类登记表不存在**（`research/kb/知识库-v1.json`）",
+                "   复算：python3 tools/kb_classes.py"]
+    m = doc["材料收集"]
+    out = [f"材料收集 {m['总数']} 条：可程序读取 {m['可程序读取']} / 不可读 {m['不可读']}"
+           f"　未分类 {m['未分类']}",
+           f"  按性质：{json.dumps(m['按性质'], ensure_ascii=False)}",
+           f"  按归属：{json.dumps(m['按归属'], ensure_ascii=False)}",
+           ""]
+    for c in doc["classes"]:
+        out.append(f"── {c['知识库']}  【{c['状态']}】〔缺口:{c['缺口编号']}〕")
         out.append(f"   负责人：{c['负责人']}")
         out.append(f"   现有：  {c['本地现有条目']}")
         out.append(f"   缺口：  {c['缺口说明']}")
+    # 反向对照：登记表与现算必须一致，否则这一问在念一份过期的稿子
+    if kb_classes.build() != doc:
+        out.append("")
+        out.append("⚠️ **登记表已过期**（与 kb_classes.build() 不一致）——"
+                   "修复：python3 tools/kb_classes.py")
     return out
 
 
