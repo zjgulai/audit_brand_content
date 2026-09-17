@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "research", "kb"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import load  # noqa: E402
 
 LEDGER = os.path.join(load.KB, "台账-v1.json")
@@ -55,7 +56,7 @@ def q1(led, rs):
 
 def q2(led, rs):
     """哪些需求逾期未交付？逾期多久？"""
-    today = load.today()
+    today = load.basis_date()
     cand = [r for r in rs if r.get("date_due") and r.get("status") != "已完成"]
     over = []
     for r in cand:
@@ -65,6 +66,10 @@ def q2(led, rs):
     over.sort(key=lambda x: -x[0])
     out = [f"有计划完成日期且未完成的 {len(cand)} 条中，逾期 {len(over)} 条"
            f"（基准日 {today}）"]
+    out.append("⚠️ 基准日取**快照日**，不取墙钟今天 —— 逾期是数据的属性，不是提问"
+               "时刻的属性。否则同一条命令每天给出不同的数，而手册里写下的那个数"
+               "第二天就复现不出来（B3.0 实测：09-16 写 30 条，09-17 跑出 33 条）。"
+               "要知道今天的逾期，重新拉快照。")
     out.append("⚠️ 全量 1160 条里只有 189 条有计划完成日期 —— "
                "**逾期率只能建在这个子集上，不能外推**")
     for d, r in over[:12]:
@@ -138,11 +143,46 @@ def q7(led, rs):
         out.append(f"    {str(r['title'])[:60]}  [{r['source_table']}]")
     out.append("")
     out.append("❌ **GAP：无法回答「卡在同一状态超过 N 天」**")
-    out.append("   原因：源系统只有当前状态，没有状态变更时间戳。")
-    out.append("   没有历史就无法算停留时长 —— 用「提交日期至今」代替会把"
-               "「一直没开始」和「做到一半停住」混为一谈。")
-    out.append("   → 已登记为对源系统的数据需求：状态变更需留痕。")
+    # ★ 这句「已登记」过去是散文，没有任何落点（B3.0 抓到）。现在它是**读出来的**：
+    #   登记表里没有对应条目，这里就打「未登记」，E1 检查随之变红。
+    out.extend(_gap_lines("D1"))
+    out.append("   同一族还有一条：四个疑似「开始时间」字段的语义未确认 ——")
+    out.extend(_gap_lines("D2", indent="   "))
+    out.append("   （为什么不能用它们替代：语义未确认时把「排期没到」算成「卡住了」，"
+               "正是这个项目一直在防的那类错误。）")
     return out
+
+
+def _gap_lines(gid, indent="   "):
+    """把登记表里的一条缺口渲染成结论行。**语句由登记表决定，不由散文决定。**
+
+    ★ 未登记时**也必须打印标记**。第一版在这里返回了一句不带 `〔缺口:…〕` 的
+      「未登记」，于是悬空检查永远不会触发 —— 反向对照 RC1a 实测：把 D1 换成
+      D99，E1 仍然全绿，只有恰好也变了的 E4 报了红。**标记就是引用本身**，
+      引用不成立时更要留下能被检查的痕迹。
+    """
+    reg = _gaps()
+    g = reg.get(gid)
+    if g is None:
+        return [f"{indent}⚠️ **未登记**〔缺口:{gid}〕缺口 {gid} 不在 缺口-v1.json 里"
+                f" ——「已登记」这句话当前是假的"]
+    qty = json.dumps(g["量"], ensure_ascii=False) if "量" in g else "量不可重算（已声明理由）"
+    return [f"{indent}→ 已登记 〔缺口:{gid}〕{g['title']}　[{qty}]"
+            f"　责任人={g['owner']}　状态={g['status']}",
+            f"{indent}  复算：{g['复算']}"]
+
+
+def _gaps():
+    """读**盘上**的登记表，不是现算一份。
+
+    「已登记」指的是「写下来了」，所以必须读制品。现算一份会让这句话永远为真 ——
+    B3.0 第一版就是这样：`kb_gaps.build()` 每次现算，于是「登记表里有没有这一条」
+    这个问题被自己回答了，检查恒绿。（同一轮里 E2 也犯了同样的错，见 verify_kb。）
+    """
+    path = os.path.join(load.KB, "缺口-v1.json")
+    if not os.path.exists(path):
+        return {}
+    return {g["id"]: g for g in json.load(open(path, encoding="utf-8"))["gaps"]}
 
 
 def q8(led, rs):
@@ -212,6 +252,36 @@ QUESTIONS = [
 ]
 
 
+def render_manual(led, sections):
+    """渲染查询手册全文。**抽成函数是为了让验收器能重算一遍再逐字比对** ——
+    生成物只检查「有 10 节」是不够的：手册会腐烂，而腐烂是静默的。"""
+    md = ["# 需求知识库 · 查询手册", "",
+          f"> 快照 `{led['snapshot_id']}`　台账 "
+          f"{sum(1 for r in led['records'] if r['role'] != 'excluded')} 条",
+          f"> 基准日 `{load.basis_date()}`（= 快照日，不是今天）",
+          "> 每条问题配一条可复现命令：`python3 tools/kb_query.py <N>`",
+          "",
+          "> ⚠️ **本文件是生成物**：`python3 tools/kb_query.py --md` 重写它。",
+          "> 手改会被 `tools/verify_kb.py` 的 D4 逐字比对抓住。", ""]
+    for i, name, lines in sections:
+        md.append(f"## Q{i}. {name}")
+        md.append("")
+        md.append(f"```bash\npython3 tools/kb_query.py {i}\n```")
+        md.append("")
+        md.append("```")
+        md.extend(lines)
+        md.append("```")
+        md.append("")
+    md.append("## 一页纸速查")
+    md.append("")
+    md.append("| # | 问题 | 一句话答案 |")
+    md.append("|---|---|---|")
+    for i, name, lines in sections:
+        md.append(f"| {i} | {name} | {lines[0][:70]} |")
+    md.append("")
+    return "\n".join(md)
+
+
 def main():
     want = None
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -232,27 +302,7 @@ def main():
         sections.append((i, name, lines))
 
     if "--md" in sys.argv:
-        md = ["# 需求知识库 · 查询手册", "",
-              f"> 快照 `{led['snapshot_id']}`　台账 {len(rs)} 条",
-              "> 每条问题配一条可复现命令：`python3 tools/kb_query.py <N>`", ""]
-        for i, name, lines in sections:
-            md.append(f"## Q{i}. {name}")
-            md.append("")
-            md.append(f"```bash\npython3 tools/kb_query.py {i}\n```")
-            md.append("")
-            md.append("```")
-            md.extend(lines)
-            md.append("```")
-            md.append("")
-        # 预算：每题一行摘要
-        md.append("## 一页纸速查")
-        md.append("")
-        md.append("| # | 问题 | 一句话答案 |")
-        md.append("|---|---|---|")
-        for i, name, lines in sections:
-            md.append(f"| {i} | {name} | {lines[0][:70]} |")
-        md.append("")
-        open(MANUAL, "w", encoding="utf-8").write("\n".join(md))
+        open(MANUAL, "w", encoding="utf-8").write(render_manual(led, sections))
         print(f"→ {os.path.relpath(MANUAL, load.REPO)}")
     return 0
 

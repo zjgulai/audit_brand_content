@@ -136,6 +136,32 @@ def today():
     return datetime.now(CST).strftime("%Y-%m-%d")
 
 
+def basis_date(snap=None):
+    """**判据的基准日 = 快照日**，不是墙钟今天。
+
+    为什么必须这样（B3.0 实测）：`q2` 原本用 `today()` 当基准日，于是同一条
+    「可复现命令」在 09-16 打印「逾期 30 条」、在 09-17 打印「逾期 33 条」——
+    手册里写的那个数，第二天就复现不出来了，而且没有任何东西会发现。
+
+    区分两件事：
+      · **快照**回答「数据长什么样」—— 是数据的属性，与何时提问无关；
+      · **今天**回答「现在几点」—— 想知道今天的逾期，就重新拉一次快照。
+    把两者混在一起，任何依赖日期的判据都会悄悄漂移，而漂移是单向的、不会自愈。
+
+    本函数取快照 MANIFEST 的 `taken_at_utc`，按 Asia/Shanghai 落到日。
+    快照时间戳缺失/不可解析 → 硬失败（宁可崩，也不要一个"看起来对"的基准日）。
+    """
+    if snap is None:
+        snap = snapshot()
+    try:
+        dt = datetime.fromisoformat(str(snap.taken_at).replace("Z", "+00:00"))
+    except ValueError:
+        _die(f"快照 {snap.snapshot_id} 的 taken_at_utc 不可解析：{snap.taken_at!r}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(CST).strftime("%Y-%m-%d")
+
+
 def days_between(d1: str, d2: str):
     """两个 'YYYY-MM-DD' 之间的天数（d2 - d1）。"""
     a = datetime.strptime(d1, "%Y-%m-%d")
