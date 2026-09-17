@@ -106,6 +106,23 @@ def compute(snap=None):
     rules_p = os.path.join(load.REPO, "research", "governance", "skeleton", "rules-v1.json")
     n_rules = len(json.load(open(rules_p, encoding="utf-8"))["rules"]) \
         if os.path.exists(rules_p) else 0
+    # 存量广告语料（B3.4 演练）：有文案的 / 没文案的 / 没文案却被标绿的
+    rec_p = os.path.join(load.REPO, "research", "governance", "skeleton", "_data",
+                         "records.json")
+    ads = json.load(open(rec_p, encoding="utf-8")) if os.path.exists(rec_p) else {}
+    ads = ads.get("records", ads) if isinstance(ads, dict) else ads
+    ads = ads or []
+
+    def _spend(x):
+        try:
+            return float(x.get("_spend") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    no_text = [x for x in ads
+               if not ((x.get("Primary Text") or "").strip()
+                       or (x.get("Headline") or "").strip())]
+
     prod_readable = sum(1 for m in mat.MATERIALS
                         if m.get("归属知识库") == "产品描述库" and m["可读性"] == "ok")
 
@@ -147,6 +164,12 @@ def compute(snap=None):
         "materials_unreadable": len(mat.MATERIALS) - readable,
         "kb_lex_rules": n_rules,
         "kb_prod_readable": prod_readable,
+        "ads_total": len(ads),
+        "ads_with_text": len(ads) - len(no_text),
+        "ads_no_text": len(no_text),
+        "ads_no_text_marked_green": sum(1 for x in no_text if "绿" in str(x.get("风险等级"))),
+        "ads_no_text_spend_usd": round(sum(_spend(x) for x in no_text), 2),
+        "ads_total_spend_usd": round(sum(_spend(x) for x in ads), 2),
         "kb_classes_ready": sum([
             len(ext_doc.get("entries", [])) > 0,
             (len(smp_blocks) - smp_marked) > 0,
