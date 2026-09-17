@@ -48,7 +48,16 @@ BLOCK_TAGS = {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6",
 CLAIM_PATTERNS = {
     "certification": r"\b(FDA|CE|FCC|CPSIA|ASTM|GREENGUARD|BPA[- ]?free|HSA|FSA|IBCLC)\b",
     "medical": r"\b(hospital[- ]grade|medical[- ]grade|medical device|clinically|therapeutic|prescription)\b",
-    "absolute": r"\b(100%|never|always|guaranteed|best|#1|number one|no\.?\s?1|ultimate|perfect)\b",
+    # ★ 2026-09-17（B1）修正：原式为
+    #     r"\b(100%|never|always|guaranteed|best|#1|number one|no\.?\s?1|ultimate|perfect)\b"
+    #   末尾那个 \b 让 `100%` 与 `#1` **永远匹配不上** —— `%` 与 `#` 都是非单词字符，
+    #   它们后面紧跟空格时不存在单词边界。实测：`'100% safe'` → 不命中；`'#1 brand'` → 不命中。
+    #   真语料上：21,424 条非空 alt 里漏 7 条；**92 个页面正文里 3 个**含 `100%`/`#1`
+    #   而抽不出来。`tools/lp_consistency.py` 用的是同一个正则，所以批次 C 的
+    #   「广告文案 vs 落地页」一致性分析受同一缺陷影响 —— 见 base/README.md B1 节。
+    #   修法：把「以符号结尾」的备选从 \b 里拿出来单独写。
+    "absolute": r"(?:\b(?:never|always|guaranteed|best|number one|no\.?\s?1|ultimate|perfect)\b"
+                r"|(?<![\w%])100\s?%|(?<![\w#])#\s?1\b)",
     "performance": r"\b(\d{2,4}\s?mmHg|\d{2,3}\s?dB|\d+\s?(?:hours?|hrs?|minutes?|mins?)\b|\d+\s?(?:oz|ml)\b)",
     "comparative": r"\b(vs\.?|versus|better than|compared to|unlike|#1 brand|world'?s first|award[- ]winning)\b",
     "health": r"\b(increase milk supply|boost milk|treat|prevent|relieve|cure|pain[- ]?free|painless)\b",

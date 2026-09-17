@@ -158,6 +158,14 @@ REGISTRY = [
             "防止日后有人把 _evidence 整体提进 L1 时无人察觉。"},
 
     # ── 依赖与构建产物 ────────────────────────────────────────────
+    {"rules": [".tools/bin/"], "class": "derived",
+     "adr_ref": "§三 L2 · `.tools/bin/`（B1 补录）",
+     "generator": "base/build_ocr.sh",
+     "inputs": ["base/ocr_vision.m"],
+     "why": ("本仓自己编译的 OCR 二进制。源码与重建脚本都在 L1 —— "
+             "`bash base/build_ocr.sh` 一条命令重建。"
+             "★ 编译要指定 SDK：本机默认的 MacOSX27.0 是坏的（SDK 由 Swift 6.4 构建、"
+             "编译器是 6.3.3），脚本按「能用」顺序试而不是写死一个。")},
     {"rules": [".venv-r4/", ".pylibs/", ".vendor/", "node_modules/"],
      "class": "vendored", "adr_ref": "§三 L2 · 依赖与构建产物，可由清单重建",
      "why": "依赖与构建产物。"},

@@ -2,15 +2,16 @@
  "来源": "research/live/snapshot-20260916T050845Z.json + research/landing/要素提取.json",
  "表A_广告vs落地页": {
   "可对照的广告数": 93,
-  "至少一项广告声明未在落地页出现的广告数": 33,
-  "严格子串口径下的同一数字": 42,
+  "至少一项广告声明未在落地页出现的广告数": 35,
+  "严格子串口径下的同一数字": 44,
   "口径说明": "严格口径用 t.lower() in page，会把『45dB vs 45 dB』这类写法差异误报为内容缺失（实测假阳性率 20%）。正式口径先做规范化再比。",
-  "其中广告本身已命中规则的": 29,
+  "其中广告本身已命中规则的": 31,
   "未在落地页出现的声明计数": {
    "comparative :: Award-Winning": 5,
    "health :: Pain-Free": 5,
    "performance :: 280mmHg": 4,
    "参数_mmHg :: 280": 4,
+   "absolute :: #1": 4,
    "absolute :: Perfect": 3,
    "absolute :: perfect": 3,
    "absolute :: never": 2,
@@ -224,8 +225,14 @@
     "落地页": "ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
     "落地页tier": "ok_structured",
     "广告文案": "Amazon's #1 Breast Pump — Upgraded | Now Smarter. Still #1. | Pump at Your Desk. No One Knows. | Pump Like Baby's Latch — No Pain | Control From Your Phone | Weighs only 232g — 2/3 the size of regular pumps. Fits inside any nursing bra. | The Momcozy M5 Smart Wearable Pump features seamless app cont",
-    "声明总数": 1,
+    "声明总数": 2,
     "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
      {
       "类型": "health",
       "广告中的表述": "painless",
@@ -234,6 +241,12 @@
      }
     ],
     "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
      {
       "类型": "health",
       "广告中的表述": "painless",
@@ -707,6 +720,32 @@
     ]
    },
    {
+    "广告record_id": "recvuJYdObTUXT",
+    "广告名称": "自适应搜索广告-Jolla-Sale-Search-US",
+    "风险等级": "待复核·灰",
+    "命中规则": "U01",
+    "落地页": "momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "落地页tier": "ok_structured",
+    "广告文案": "M5 Smart Wearable Breast Pump | #1 Wearable Pump on Amazon | Under 48 dB Quiet Pumping | FSA & HSA Eligible | No Reaching Into Your Bra | Control It From Your Phone | Only 4 Parts To Clean | Patented DoubleFit Flange | Adjust It While Holding Baby | Free 1-On-1 IBCLC Session | World Breastfeeding We",
+    "声明总数": 7,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
     "广告record_id": "recvuJYdObEl6L",
     "广告名称": "自适应搜索广告-Asther-Sale-Search-C",
     "风险等级": "高危·红",
@@ -714,8 +753,14 @@
     "落地页": "ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
     "落地页tier": "ok_structured",
     "广告文案": "Momcozy® Official | Momcozy S12 Pro Quick | S12 Momcozy Breast Pump | More Milk, Less Time | -292 mmHg Strong Suction | Wearable Hands-Free Pump | Shop the S12 Pro Quick | Best-Value Wearable Pump | S12 Pro Quick On Sale | Don't Miss This Week's Deal | Whisper-Quiet under 46dB | DoubleFit™ Hybrid Fl",
-    "声明总数": 7,
+    "声明总数": 8,
     "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
      {
       "类型": "performance",
       "广告中的表述": "7 minutes",
@@ -724,6 +769,12 @@
      }
     ],
     "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
      {
       "类型": "performance",
       "广告中的表述": "46dB",
@@ -1143,6 +1194,32 @@
      {
       "类型": "参数_mmHg",
       "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYeGRHN3g",
+    "广告名称": "自适应搜索广告-Jolla-Sale-Search-US",
+    "风险等级": "审慎·黄",
+    "命中规则": "M03,U01",
+    "落地页": "momcozy.com/collections/wearable-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy® Official | Wearable Breast Pumps | Hands-Free Breast Pumps | In-Bra Fit, No Tubes | Pump Hands-Free at Work | Slim Fit Under Clothing | Compare 9 Wearable Pumps | App-Controlled Pumping | Backed by 600+ Patents | Trusted by 6M+ Moms | FSA & HSA Eligible | Find Your Fit in 30 Seconds | 30-Da",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "#1",
       "落地页是否出现_严格": false,
       "落地页是否出现": false
      }

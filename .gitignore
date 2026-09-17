@@ -28,6 +28,8 @@
 # ── L2 · 机器生成 / 可复算 / 内容寻址 / 别人管的 ─────────────────
 
 # 依赖与构建产物（可由清单重建）
+# 本仓自己编译的二进制（源码在 base/ocr_vision.m + base/build_ocr.sh，可重建）
+.tools/bin/
 .venv-r4/
 .pylibs/
 .vendor/
