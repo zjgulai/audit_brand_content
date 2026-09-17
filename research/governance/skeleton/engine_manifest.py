@@ -335,6 +335,21 @@ def check() -> tuple[bool, list[str]]:
         diffs.append(
             f"engine_version 不符 manifest={m.get('engine_version')} disk={cur['engine_version']}"
         )
+
+    # ★ 2026-09-17 补：`code_version` 此前**只写不校**。
+    #
+    #   改一个判定链上的 .py（本文件自己也是 6 个之一），`code_version` 立刻过期，
+    #   而 `--check` 照旧 exit 0 —— manifest 于是把「哪版代码判的」（agent_version）
+    #   记成假话，且没有任何东西会红。这正是 ADR-0012 §166 要防的那件事
+    #   （「改一行 judge.py，engine_version 纹丝不动」），只防住了一半：
+    #   版本分离做了，校验只做了数据那一半。
+    if m.get("code_version") != cur["code_version"]:
+        stale = [rel for rel, v in cur["code"].items()
+                 if (m.get("code") or {}).get(rel, {}).get("sha256") != v["sha256"]]
+        diffs.append(
+            f"code_version 不符 manifest={m.get('code_version')} disk={cur['code_version']}"
+            + (f"（变了的：{'、'.join(stale)}）" if stale else "")
+        )
     return (not diffs), diffs
 
 
@@ -369,9 +384,20 @@ def main() -> int:
             print("✗ 磁盘上的判定制品已偏离 manifest：", file=sys.stderr)
             for d in diffs:
                 print(f"    {d}", file=sys.stderr)
-            print("\n  处置：确认改动是有意的 → 跑 --write 重新固化；"
-                  "否则回滚制品。\n  ★ 重新固化会让所有引用旧 engine_version 的回执"
-                  "指向一份已不存在的规则集——这是特性，不是麻烦。", file=sys.stderr)
+            # ★ 这段提示原文写的是「重新固化会让所有引用旧 engine_version 的回执指向
+            #   一份已不存在的规则集——这是特性，不是麻烦」，**与 archive_previous()
+            #   的实现直接矛盾**：--write 正是先把「正要被覆盖的」manifest 追加进
+            #   `_data/manifest-history.jsonl`，resolve_version() 再按 engine_version
+            #   反查。ADR-0012 §6.1 在 2026-09-16 就记过这一条，并实测过 5 条旧回执
+            #   在四次重新固化后仍可逐条解析。
+            #   这句话 2026-09-17 改正 —— 它的代价是可量的：它让「该不该重新固化」
+            #   看起来像一次有损操作，于是**没人敢固化**，漂移就这么留了下来。
+            print("\n  处置：确认改动是有意的 → 跑 --write 重新固化；否则回滚制品。\n"
+                  "  ★ 重新固化**不会**让旧回执失效：--write 先把「正要被覆盖的」manifest\n"
+                  "    追加进 _data/manifest-history.jsonl，resolve_version() 可按\n"
+                  "    engine_version 反查历史（ADR-0012 §6.1）。\n"
+                  "  ★ 但那份账本目前**不在版本控制内**（.gitignore）—— 归档是本机唯一副本。\n"
+                  "    详见 ADR-0013 §十七 与 _data/receipts.LOSS.md。", file=sys.stderr)
         return 0 if ok else 1
 
     cur = compute()

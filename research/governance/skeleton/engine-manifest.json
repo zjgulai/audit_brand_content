@@ -1,13 +1,13 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-16T10:07:36+00:00",
-  "engine_version": "30f10be717c09e9c",
-  "code_version": "dfe688a33960bf22",
+  "generated_at": "2026-09-17T12:03:46+00:00",
+  "engine_version": "a3218e7f3245f745",
+  "code_version": "a45ef12ba540c87d",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
-      "bytes": 46726,
-      "sha256": "5d76c9c7ca7d7fca68f4d301b29edea68a733b400f206fdefa9d8027c9039ed4",
+      "bytes": 47606,
+      "sha256": "18c25d4be2ffaf0f4781971985b1fe8db66c953d2fdd2f2ad54aff162e6c9da9",
       "why": "判险词 + 规则 + 兜底通道（唯一产生命中的来源）",
       "counts": {
         "rules": 26,
@@ -51,8 +51,8 @@
     },
     "disposition_layers": {
       "file": "disposition-layers-v1.json",
-      "bytes": 26890,
-      "sha256": "a9e249e72e9acde5e7963f67f23b6feb2933f388e3567e45a87d21d239db13a2",
+      "bytes": 28582,
+      "sha256": "88d2974a49258cb8724d64d209a72d603885d497091d52b9911eb07d4faf082b",
       "why": "处置分层映射（法务所有）：判定之后「谁必须看它」",
       "counts": {
         "status": "ratified",
@@ -64,11 +64,11 @@
     },
     "product_lines": {
       "file": "product-lines-v1.json",
-      "bytes": 8630,
-      "sha256": "8d45046a1b5518dbc21244c0c57191f8cc51ef7eb69e76480b623517f5d8e8ef",
+      "bytes": 10559,
+      "sha256": "6d107c7bf855c7987a197434b9c288cf273c860fd47cef292e51350a08829bb7",
       "why": "品线取值域（产品所有）与规则→品线归属（待填）",
       "counts": {
-        "status": "proposed",
+        "status": "partially_confirmed",
         "values": 10,
         "placeholders": 2,
         "rules_scoped": 0
@@ -81,24 +81,24 @@
       "bytes": 9695
     },
     "score.py": {
-      "sha256": "86c65d2bc65815a74cb633eec901b8d7c46d76402c3e806c1675cac5dbab718a",
-      "bytes": 32658
+      "sha256": "8ff438ae59a4e6c042c328127929af71bc4c994278fc88209308bf848e42c8ea",
+      "bytes": 34263
     },
     "judge.py": {
-      "sha256": "04300bcc6a14bf08bec6917a8f98593efb5cd760fb951d7cc81e055b88e1c418",
-      "bytes": 45531
+      "sha256": "0b8a2430d8cd7bad20f7119ed2de20ba579bdd547a82898935982c2fe4e3b9ae",
+      "bytes": 53136
     },
     "vocab.py": {
-      "sha256": "01de173ceb1625033a1e0cae54d1b4ca310e06d34c43bc860c3e59d6b2c192d8",
-      "bytes": 11338
+      "sha256": "b0b938687bb53721d87e249b630b9ed1c6f937adde0a002feae38c52b4533954",
+      "bytes": 12892
     },
     "severity.py": {
       "sha256": "c60a2248763770da49d2bbd80e7a504ea3ae8dfa1483017dbd69615434853b9b",
       "bytes": 8024
     },
     "engine_manifest.py": {
-      "sha256": "09b8d3fa94f90d38406dd979971ca4eb92cce97e1fc119d82e80158d62d14056",
-      "bytes": 17961
+      "sha256": "ed55d29a771916f95b1d6f95295461ba30dde57c0bfb2dee497d2d36aba30b71",
+      "bytes": 20016
     }
   },
   "upstream": {

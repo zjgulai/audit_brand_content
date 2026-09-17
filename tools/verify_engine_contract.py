@@ -296,6 +296,18 @@ def main() -> int:
     if not a.only or a.only.startswith("V11"):
         tmp = Path(tempfile.mkdtemp()) / "skel"
         shutil.copytree(SKEL, tmp, ignore=shutil.ignore_patterns("_data", "__pycache__"))
+        # ★ 2026-09-17 补：**先建立干净基线**。
+        #
+        #   V11b 原先只断言「改动后 --check 红」。可是副本是从真目录拷的 ——
+        #   真目录一旦漂移（manifest 落后于制品），副本**拷出来就已经是红的**，
+        #   于是 V11b 在「什么都不做」时也满足判据 = **假绿**。
+        #   实测（2026-09-17，真目录 manifest 落后 3 个制品时）：副本未做任何改动，
+        #   `--check` 已是 exit=1。也就是说这个门恰好在它最该起作用的时候失效了。
+        #   修法：先 --write 固化副本，断言基线为 0，再改动。这样红才是**我这一改**造成的。
+        subprocess.run([sys.executable, "engine_manifest.py", "--write"], cwd=tmp,
+                       capture_output=True, text=True)
+        base = subprocess.run([sys.executable, "engine_manifest.py", "--check"], cwd=tmp,
+                              capture_output=True, text=True)
         v0 = subprocess.run([sys.executable, "engine_manifest.py", "--json"], cwd=tmp,
                             capture_output=True, text=True)
         e0 = json.loads(v0.stdout)["engine_version"]
@@ -310,13 +322,34 @@ def main() -> int:
                             capture_output=True, text=True)
         check("V11a", "规则内容一变，engine_version 就变",
               e0 != e1, f"{e0} → {e1}")
-        check("V11b", "manifest 与磁盘不一致时 --check 硬失败",
-              ck.returncode == 1 and "sha256 不符" in ck.stderr,
-              f"exit={ck.returncode}")
+        check("V11b", "manifest 落后于制品时 --check 硬失败（且基线已证干净）",
+              base.returncode == 0 and ck.returncode == 1 and "sha256 不符" in ck.stderr,
+              f"基线={base.returncode} 改动后={ck.returncode}")
         again = json.loads(subprocess.run([sys.executable, "engine_manifest.py", "--json"],
                                           cwd=tmp, capture_output=True, text=True).stdout)
         check("V11c", "同内容重算版本号稳定（可复现）", again["engine_version"] == e1)
         shutil.rmtree(tmp, ignore_errors=True)
+
+        # ★ 2026-09-17 加 V11d：**对真目录**跑 --check。
+        #
+        #   V11a–V11c 全部在临时副本里跑（cwd=tmp），所以它们在原理上**看不见真目录的漂移**：
+        #   副本是拷出来的，拷贝那一刻是什么状态，门就测什么状态。
+        #   实测的代价（2026-09-17）：真目录的 manifest 从 2026-09-16 18:07 起就落后
+        #   三个制品（rules / disposition_layers / product_lines 在 18:22–18:50 被改过），
+        #   而**六套验收全绿**，这个红躲了整整一天。
+        #   反向对照由上面加固后的 V11b 提供 —— 同一条命令、同一种漂移、已证能红且因果干净。
+        real = subprocess.run([sys.executable, "engine_manifest.py", "--check"], cwd=SKEL,
+                              capture_output=True, text=True)
+        # 这一条不是恒真的：它把「门检查的那份 manifest」与「引擎真的读的那份」绑在一起。
+        # 引擎是本模块从真 SKEL 导入的，所以两者必须相等 —— 一旦有人把 SKEL 指到副本、
+        # 或引擎改了取版本的路径，这里会红，而不是静默退化成 V11b 的重复。
+        real_ver = json.loads((SKEL / "engine-manifest.json").read_text(encoding="utf-8"))["engine_version"]
+        stamp = J.judge(CASES["multi"])["versions"]["engine_version"]
+        check("V11d", "**真目录**的制品与 manifest 一致，且引擎盖在判定上的版本就是它",
+              real.returncode == 0 and stamp == real_ver,
+              f"check exit={real.returncode} · manifest={real_ver} · 判定盖的={stamp}"
+              + ("" if real.returncode == 0 else
+                 "；跑 --write 重新固化并提交（ADR-0002：改判定制品必须同时冻结版本）"))
 
     # ── V12 确定性 ─────────────────────────────────────────────────
     if not a.only or a.only.startswith("V12"):

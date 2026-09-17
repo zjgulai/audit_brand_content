@@ -130,16 +130,24 @@ REGISTRY = [
      "generator": "tools/lp_extract.py",
      "inputs": ["research/landing/抓取结果.json"],
      "why": "92 个页面 / 44 个商品 JSON 的六类要素。每次重跑都会变。"},
+    # ★ 2026-09-17 改判：derived → primary。
+    #
+    #   原登记（class=derived, generator=engine_manifest.py, inputs=六个制品）**能过 B 面**
+    #   —— 因为 B 面只查「生成脚本在 L1 + 输入可追溯」，**不查「跑出来是不是同一份」**。
+    #   而 engine_manifest.py 复算不出这个账本：它只把「当前 manifest」追加一行；
+    #   账本里那些行记的是**过去**的制品字节，那些字节在任何地方都没有第二份。
+    #   §11.2 逐字警告过这件事：「如果笼统要求全部可复算，结果只会是给不可复算的东西
+    #   编一个假的生成脚本」——**这一条就是那个假脚本**，它躺在 primary 条目上方
+    #   十行处没被认出来，因为它长得和邻居一模一样。
     {"rules": ["research/governance/skeleton/_data/manifest-history.jsonl"],
-     "class": "derived", "adr_ref": "§三 L2 · `manifest-history.jsonl`",
-     "generator": "research/governance/skeleton/engine_manifest.py",
-     "inputs": ["research/governance/skeleton/rules-v1.json",
-                "research/governance/skeleton/whitelist-v1.json",
-                "research/governance/skeleton/context-guards-v1.json",
-                "research/governance/skeleton/disposition-layers-v1.json",
-                "research/governance/skeleton/product-lines-v1.json",
-                "research/governance/skeleton/topic-tree-v1.md"],
-     "why": "引擎制品版本历史。**注**：其中 topic-tree-v1.md 曾是 L2 争议项 —— 见 E 面输出。"},
+     "class": "primary",
+     "adr_ref": "§三 L2 · `manifest-history.jsonl`（2026-09-17 由 derived 改判，见 §十七）",
+     "why": ("★★ **`engine_manifest.py` 复算不出它**：账本每行记的是那一次冻结时六个制品的"
+             "真实 `sha256`，而那些字节**没有第二份** —— 飞书重拉、生成脚本、源表都拿不回 "
+             "2026-09-16 18:07 的 `rules-v1.json`。ADR-0012 §6.1 又把它当成「旧回执可反查"
+             "历史」的唯一依据，所以它恰恰是 L1 里**找不到第二份**的那类东西。"
+             "改判后 B 面不再要求它可复算 —— 但这**只说明判据不适用，不等于耐久性问题"
+             "解决了**：该账本被 `.gitignore` 忽略，目前是本机唯一副本，见 §十七。")},
 
     # ── primary：本身是账本，不可复算 ──────────────────────────────
     {"rules": ["research/governance/skeleton/_data/receipts.jsonl",
