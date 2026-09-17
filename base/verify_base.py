@@ -10,7 +10,9 @@
 六个面
 --------------------------------------------------------------------------
 
-  A 五面自证        三个模块的 --selftest 必须各自退出 0
+  A 各模块自证      **每一个交付的模块**的 --selftest 必须各自退出 0
+                   （B2 起：`media.py` 与 `text_stage.py` 也进来了 —— 在此之前
+                   B1 那 20 项自证写了，但没有任何东西会去跑它）
   B L1 自足性       ★ ADR-0013 异议一承诺的那条检查
   C 分级一致性      .gitignore 的每条规则都必须被登记表认领，且**在 ADR §三 里有出处**
   D 产物完备性      盘上实际存在的 L2 文件，要么被登记，要么命中登记的模式
@@ -215,10 +217,18 @@ def claimed_rules() -> dict[str, dict]:
 # ── 各面 ─────────────────────────────────────────────────────────
 
 def face_A(run: bool) -> list[str]:
-    """五面自证：三个模块的 --selftest 各自必须退出 0。"""
+    """各面自证：**每一个交付的模块**的 --selftest 都必须退出 0。
+
+    ★ B2 补了两行，因为这里原本漏了 `media.py`：
+      B1 交付了它、也写了 20 项自证，但**没有任何东西会去跑那 20 项**。
+      「自证写了」与「自证被跑」是两件事 —— 而漏掉的后果是静默的：
+      模块回归了没人知道，因为没人在跑。
+    """
     mods = [("contract.py", "ContentUnit 契约（B0.2）"),
             ("judge_adapter.py", "judge(unit) 适配层（B0.3）"),
-            ("sync_rules.py", "权威源单向同步（B0.4）")]
+            ("sync_rules.py", "权威源单向同步（B0.4）"),
+            ("media.py", "图片/视频进管道（B1）"),
+            ("text_stage.py", "文本两组三指标（B2）")]
     if not run:
         print("  （跳过：--no-selftests）")
         return []
@@ -389,13 +399,13 @@ def face_F() -> list[str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description="基座自证（第⑤面）")
     ap.add_argument("--no-selftests", action="store_true",
-                    help="跳过 A 面（三个模块的 --selftest），只跑仓库治理四条")
+                    help="跳过 A 面（各模块的 --selftest），只跑仓库治理四条")
     a = ap.parse_args()
 
     print("=" * 78)
     print("基座自证 · %s" % CONTRACT_VERSION)
     print("=" * 78)
-    faces = [("A 五面自证", lambda: face_A(not a.no_selftests)),
+    faces = [("A 各模块自证", lambda: face_A(not a.no_selftests)),
              ("B L1 自足性（异议一）", face_B),
              ("C 分级一致性（.gitignore ↔ ADR §三）", face_C),
              ("D 产物完备性", face_D),
@@ -428,7 +438,7 @@ def main() -> int:
             print("   " + x[:150])
         print("=" * 78)
         return 2
-    print("✓ 基座自证全绿：五面自证通过 · L1 自足性通过 · 分级与 .gitignore 一致 · 无未登记产物")
+    print("✓ 基座自证全绿：各模块自证通过 · L1 自足性通过 · 分级与 .gitignore 一致 · 无未登记产物")
     print("=" * 78)
     return 0
 
