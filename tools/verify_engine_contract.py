@@ -1944,18 +1944,111 @@ def main() -> int:
                     and (_blind is None or _blind + 0.001 > _RATCHET_BLIND))
     _relax = []
     if _hit is not None and _hit < _RATCHET_HIT:
-        _relax.append(f"漏放 {_hit} < {_RATCHET_HIT}")
+        _relax.append(f"引擎命中·源表未命中 {_hit} < {_RATCHET_HIT}")
     if _blind is not None and _blind < _RATCHET_BLIND:
         _relax.append(f"盲区率 {_blind:.1%} < {_RATCHET_BLIND:.1%}")
-    check("V44c", f"棘轮：绿标漏放 ≤ {_RATCHET_HIT} 且盲区率 ≤ {_RATCHET_BLIND:.1%}"
+    check("V44c", f"棘轮：绿标「引擎命中·源表未命中」≤ {_RATCHET_HIT} 且盲区率 ≤ {_RATCHET_BLIND:.1%}"
                   f"（只许变好；变好时必须收紧本门的阈值）",
           (_hit is not None and _hit <= _RATCHET_HIT
            and _blind is not None and _blind <= _RATCHET_BLIND)
           and _ratchet_red,
-          f"漏放 {_hit}/{_RATCHET_HIT} · 盲区率 {_blind:.1%}/{_RATCHET_BLIND:.1%}"
-          f" · 反向对照：各推高一格 → {'必红' if _ratchet_red else '❌棘轮不咬'}"
-          + (f"　★ 已改善：{('；'.join(_relax))} —— 请把阈值收紧到当前值，"
-             f"否则这条门守的是一个过期的现状" if _relax else ""))
+          f"引擎命中·源表未命中 {_hit}/{_RATCHET_HIT} · 盲区率 {_blind:.1%}/{_RATCHET_BLIND:.1%}"
+          + (" · " + (f"★ 已改善：{('；'.join(_relax))} —— 本门转红是**故意的**："
+                       f"请把阈值收紧到当前值再提交，否则这条门守的是一个过期的现状"
+                       if _relax else
+                       f"反向对照：各推高一格 → {'必红' if _ratchet_red else '❌棘轮不咬'}")))
+
+
+    # ── V45（D15/D16 执行 · 2026-09-17）规则迁移的保真度 ──────────────────
+    #   背景：D15 立案时写的是「源表的规则扫描漏放 3 条」——**那是一句错话**。
+    #   逐行对账之后真相反过来了：源表那次放行是**对的**，错的是我们自己的迁移。
+    #   旧规则 H01 有一条豁免词 `treat yourself`，旧语义是**放行**；迁移把它搬进
+    #   语境守卫表并改成**降级** —— 同一个短语，旧系统拿它免责、新系统拿它定罪。
+    #
+    #   ★ 这一门守的不是「那 3 条」，是**这类错误的形状**：
+    #     迁移错了之后，每一条规则单看都自洽，静态检查原理上看不见它。
+    #     所以判据必须建在**两份账的对账**上，而不是任何单份制品上。
+    #
+    #   ★ V45c 同样是棘轮。甲类 14 个词是已登记的现状，本门守「不许更多」。
+    _mf_path = SKEL / "_data" / "迁移保真度.json"
+    _mf = json.loads(_mf_path.read_text(encoding="utf-8")) if _mf_path.exists() else None
+    _mf_missing = _mf is None
+
+    # V45a：语义前提必须成立 + 豁免词去向守恒
+    #   ★ 轴 0 是整个结论的地基：如果旧 `exceptions` 的语义不是「放行」，
+    #     那么「迁移翻了语义」这句话本身就不成立，后面全部作废。所以它必须自己成门，
+    #     而且必须**每跑一次都重新实测**（同批次天然对照），不是抄一句文档。
+    _a0 = (_mf or {}).get("轴0_例外语义证据", {})
+    _sem_ok = bool(_a0.get("成立")) and bool(_a0.get("对照组"))
+    _d = ((_mf or {}).get("轴1_例外漂移", {}) or {}).get("去向分布", {}) or {}
+    _live = ((_mf or {}).get("totals", {}) or {}).get("旧豁免词总数")
+    _sum_dest = (_d.get("语境守卫", 0) + _d.get("白名单", 0) + _d.get("无归属", 0))
+    # 反向对照：抹掉一个去向桶，守恒必须断
+    _d2 = dict(_d)
+    if _d2:
+        _k0 = sorted(_d2)[0]
+        _d2[_k0] = max(0, _d2[_k0] - 1)
+    _sum_dest2 = (_d2.get("语境守卫", 0) + _d2.get("白名单", 0) + _d2.get("无归属", 0))
+    _ctrl_a = bool(_d) and _sum_dest2 != _live
+    check("V45a", "迁移的语义前提**每跑一次都实测**（同批次天然对照：含豁免词的绿、"
+                  "不含的红），且 94 个旧豁免词的三个去向之和等于总数",
+          (not _mf_missing) and _sem_ok and _live is not None
+          and _sum_dest == _live and _ctrl_a,
+          (f"账不在盘上 ❌（修复：python3 research/governance/audit_migration_fidelity.py）"
+           if _mf_missing else
+           f"对照 {len(_a0.get('对照组') or [])} 组 · 前提{'成立' if _sem_ok else '❌不成立（结论全部作废）'}"
+           f" · 去向 {_d.get('语境守卫', 0)}+{_d.get('白名单', 0)}+{_d.get('无归属', 0)}"
+           f"={_sum_dest} vs {_live}"
+           f" · 反向对照：减一个去向桶→守恒断 {'成立' if _ctrl_a else '❌判据恒真'}"))
+
+    # V45b：账本新鲜（5 个输入指纹）+ 逐行对账守恒
+    _fp = (_mf or {}).get("source_sha256", {}) or {}
+    _stale = []
+    for _n, _rel in [("records.json", "_data/records.json"),
+                     ("rules_raw.json", "_data/rules_raw.json"),
+                     ("rules-v1.json", "rules-v1.json"),
+                     ("whitelist-v1.json", "whitelist-v1.json"),
+                     ("context-guards-v1.json", "context-guards-v1.json")]:
+        _p = SKEL / _rel
+        if not _p.exists():
+            continue
+        if _fp.get(_n) != hashlib.sha256(_p.read_bytes()).hexdigest():
+            _stale.append(_n)
+    _a3 = (_mf or {}).get("轴3_逐行对账", {}) or {}
+    _scan_cons = (_a3.get("两次扫描一致", 0) + _a3.get("有分歧", 0)) == _a3.get("记录数")
+    _cons_ok = bool(((_mf or {}).get("守恒") or {}).get("逐行_一致加分歧等于总数"))
+    # 反向对照：把一致数减一，守恒必须断
+    _ctrl_b = (_a3.get("两次扫描一致", 0) - 1 + _a3.get("有分歧", 0)) != _a3.get("记录数")
+    check("V45b", "迁移对账账本对 5 个输入都新鲜，且逐行对账守恒"
+                  "（两次扫描一致数 + 分歧数 = 记录数）",
+          (not _mf_missing) and not _stale and _scan_cons and _cons_ok and _ctrl_b,
+          f"指纹{'全部一致' if not _stale else '❌过期：' + ','.join(_stale)}；"
+          f"一致 {_a3.get('两次扫描一致')} + 分歧 {_a3.get('有分歧')}"
+          f" = {_a3.get('记录数')}；"
+          f"反向对照：一致数减一→守恒断 {'成立' if _ctrl_b else '❌判据恒真'}")
+
+    # V45c：棘轮 —— 甲类「根本不是主张却被降级」的词数只许减不许增
+    _N_A, _N_FP = 14, 3
+    _n_a = (((_mf or {}).get("轴1_例外漂移", {}) or {}).get("甲_条数"))
+    _n_fp = (((_mf or {}).get("totals", {}) or {}).get("分歧_迁移回归_假阳性"))
+    # 反向对照：各推高一格必须红
+    _ctrl_c = ((_n_a is None or _n_a + 1 > _N_A) and (_n_fp is None or _n_fp + 1 > _N_FP))
+    _relax_mf = []
+    if _n_a is not None and _n_a < _N_A:
+        _relax_mf.append(f"甲类 {_n_a} < {_N_A}")
+    if _n_fp is not None and _n_fp < _N_FP:
+        _relax_mf.append(f"假阳性 {_n_fp} < {_N_FP}")
+    check("V45c", f"棘轮：甲类「根本不是主张却被降级」≤ {_N_A} 个、"
+                  f"迁移回归假阳性 ≤ {_N_FP} 条（只许变好；变好时必须收紧阈值）",
+          (_n_a is not None and _n_a <= _N_A
+           and _n_fp is not None and _n_fp <= _N_FP) and _ctrl_c,
+          f"甲类 {_n_a}/{_N_A} · 假阳性 {_n_fp}/{_N_FP} · "
+          + (f"★ 已改善：{('；'.join(_relax_mf))} —— 本门转红是**故意的**："
+             f"请把阈值收紧到当前值再提交，否则这条门守的是一个过期的现状"
+             if _relax_mf else
+             f"反向对照：各推高一格 → {'必红' if _ctrl_c else '❌棘轮不咬'}")
+          + "　（乙类 14 个「弱化表述」不设棘轮：它是待法务定性的政策项，"
+            "不是我们单方面该改的数）")
 
 
     ok = sum(1 for _, o, _ in RESULTS if o)

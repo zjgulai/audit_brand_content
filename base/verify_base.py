@@ -104,6 +104,21 @@ REGISTRY = [
      "inputs": ["research/governance/skeleton/_data/records.json"],
      "why": "157 条「合规·绿」的真实构成（55 无文案 / 99 未覆盖 / 3 漏放 / 0 已查）。"
             "给投放侧的变更请求直接引它，所以它必须可复算而不是手写。"},
+    # ★ 2026-09-17（D15/D16 执行）：规则迁移保真度对账账本。
+    #   它比 风险等级-还原.json 多挂四个输入（旧规则集 / 新规则 / 白名单 / 语境守卫），
+    #   任一改动都会让它过期 —— 而它的结论正是「迁移不保真」，所以账一过期，
+    #   结论就不再可信：V45b 与 kb_facts 都会在指纹对不上时直接报红。
+    {"rules": ["research/governance/skeleton/_data/迁移保真度.json"],
+     "class": "derived", "adr_ref": "§三 L2 落地澄清（同 records.json，下游可复算视图）",
+     "generator": "research/governance/audit_migration_fidelity.py",
+     "inputs": ["research/governance/skeleton/_data/records.json",
+                "research/governance/skeleton/_data/rules_raw.json",
+                "research/governance/skeleton/rules-v1.json",
+                "research/governance/skeleton/whitelist-v1.json",
+                "research/governance/skeleton/context-guards-v1.json"],
+     "why": "旧规则集（21 条 H/M/U 编号）→ 骨架 v1 的迁移对账：94 个旧豁免词的语义去向、"
+            "85 个无归属关键词、291 行的两次扫描逐行比对、源表自报片段的语料缺口。"
+            "D15/D16 与错题本 B4/B5 都引它，所以它必须可复算而不是手写。"},
     {"rules": ["research/governance/skeleton/_data/miss_attribution.json"],
      "class": "derived", "adr_ref": "§三 L2 落地澄清（原文归 L1 字面清单，按判据改判 L2）",
      "generator": "research/governance/skeleton/attribute_misses.py",

@@ -188,6 +188,31 @@ def compute(snap=None):
             raise SystemExit("❌ 风险等级-还原.json 已过期（源表指纹对不上）。" + _FIX)
     rl_t = (rl or {}).get("totals", {})
 
+    # ★ 迁移保真度对账账本（D15/D16）。与上面同一条纪律：不在这里手算，
+    #   只转发 + 核对指纹。它比 风险等级-还原.json 多挂了四个输入
+    #   （旧规则集 / 新规则 / 白名单 / 语境守卫），任一改动都会让它过期 ——
+    #   而 D15 的结论正是「迁移不保真」，所以账一旦过期，结论就不再可信。
+    mf_p = os.path.join(load.REPO, "research", "governance", "skeleton", "_data",
+                        "迁移保真度.json")
+    mf = json.load(open(mf_p, encoding="utf-8")) if os.path.exists(mf_p) else None
+    if mf is None:
+        raise SystemExit("❌ 迁移保真度.json 不存在 —— D15/D16 的量没有家。"
+                         "修复：python3 research/governance/audit_migration_fidelity.py")
+    _skel = os.path.join(load.REPO, "research", "governance", "skeleton")
+    for _n, _rel in [("records.json", os.path.join("_data", "records.json")),
+                     ("rules_raw.json", os.path.join("_data", "rules_raw.json")),
+                     ("rules-v1.json", "rules-v1.json"),
+                     ("whitelist-v1.json", "whitelist-v1.json"),
+                     ("context-guards-v1.json", "context-guards-v1.json")]:
+        _p = os.path.join(_skel, _rel)
+        if not os.path.exists(_p):
+            continue
+        _want = hashlib.sha256(open(_p, "rb").read()).hexdigest()
+        if (mf.get("source_sha256") or {}).get(_n) != _want:
+            raise SystemExit(f"❌ 迁移保真度.json 已过期（{_n} 指纹对不上）。修复："
+                             "python3 research/governance/audit_migration_fidelity.py")
+    mf_t = mf.get("totals", {})
+
     prod_readable = sum(1 for m in mat.MATERIALS
                         if m.get("归属知识库") == "产品描述库" and m["可读性"] == "ok")
 
@@ -263,6 +288,17 @@ def compute(snap=None):
         "risk_uncovered": rl_t.get("覆盖_未覆盖"),
         "risk_covered": rl_t.get("覆盖_覆盖"),
         "risk_blind_spot_rate": rl_t.get("盲区率"),
+        # ── D15/D16 的键（迁移保真度对账）────────────────────────────
+        #   同上：数字只有一个家 —— _data/迁移保真度.json，这里只转发。
+        "legacy_exception_words": mf_t.get("旧豁免词总数"),
+        "exception_wired_non_disclaimer": mf_t.get("已接线但非免责类"),
+        "regression_false_positives": mf_t.get("分歧_迁移回归_假阳性"),
+        "scan_drift_records": mf_t.get("逐行分歧"),
+        "scan_pairs_agree": (mf.get("轴3_逐行对账") or {}).get("两次扫描一致"),
+        "orphan_keywords": mf_t.get("无归属关键词"),
+        "src_fragments_total": (mf.get("轴4_语料完备性") or {}).get("片段总数"),
+        "src_fragments_not_in_corpus": mf_t.get("源表自报片段_语料里找不到"),
+        "src_fragments_missing_records": (mf.get("轴4_语料完备性") or {}).get("受影响记录数"),
         "kb_classes_ready": sum([
             len(ext_doc.get("entries", [])) > 0,
             (len(smp_blocks) - smp_marked) > 0,
