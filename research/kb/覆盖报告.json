@@ -1,0 +1,213 @@
+{
+ "snapshot_id": "20260916T071634Z",
+ "stats": {
+  "ledger_records": 1161,
+  "real_records": 1160,
+  "top": 1023,
+  "child": 137,
+  "by_system": {
+   "creative": 316,
+   "seo": 844
+  },
+  "by_role": {
+   "demand": 458,
+   "review": 702,
+   "excluded": 1
+  },
+  "by_status": {
+   "已完成": 721,
+   "未开始": 60,
+   "(源表未填状态)": 232,
+   "进行中": 146,
+   "已停滞": 1
+  },
+  "by_status_raw": {
+   "已完成": 245,
+   "未开始": 44,
+   "(空)": 232,
+   "推进中": 9,
+   "进行中": 54,
+   "已停滞": 1,
+   "待开始": 16,
+   "Done": 476,
+   "in progress": 83
+  },
+  "unnormalized_status": [],
+  "title_missing": 11,
+  "title_synthesized": 5,
+  "no_owner": 174,
+  "no_date_due": 971,
+  "source_records_total": 3251
+ },
+ "coverage": [
+  {
+   "system": "creative",
+   "table": "【创意UGC】提需表",
+   "role": "demand",
+   "source_records": 4,
+   "in_ledger": 4,
+   "top": 4,
+   "child": 0,
+   "included": true
+  },
+  {
+   "system": "creative",
+   "table": "【创意支持】项目需求",
+   "role": "demand",
+   "source_records": 117,
+   "in_ledger": 117,
+   "top": 26,
+   "child": 91,
+   "included": true
+  },
+  {
+   "system": "creative",
+   "table": "【平面】日常需求看板",
+   "role": "demand",
+   "source_records": 34,
+   "in_ledger": 34,
+   "top": 32,
+   "child": 2,
+   "included": true
+  },
+  {
+   "system": "creative",
+   "table": "【红人&社媒】支持",
+   "kind": "empty",
+   "source_records": 5,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "creative",
+   "table": "【视频】日常需求看板",
+   "role": "demand",
+   "source_records": 161,
+   "in_ledger": 161,
+   "top": 161,
+   "child": 0,
+   "included": true
+  },
+  {
+   "system": "creative",
+   "table": "产品x品线资料整理",
+   "kind": "empty",
+   "source_records": 5,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "creative",
+   "table": "产品字典",
+   "kind": "dimension",
+   "source_records": 8,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "creative",
+   "table": "优质素材-语言拓展",
+   "kind": "empty",
+   "source_records": 5,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "creative",
+   "table": "国庆前后 考勤值班计划",
+   "kind": "admin",
+   "source_records": 25,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "creative",
+   "table": "样品库",
+   "kind": "asset",
+   "source_records": 27,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "creative",
+   "table": "资源账号管理",
+   "kind": "unknown",
+   "source_records": 0,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "含敏感字段，整体排除（ADR-0003）"
+  },
+  {
+   "system": "seo",
+   "table": "PSEO专家审核总表",
+   "role": "review",
+   "source_records": 698,
+   "in_ledger": 698,
+   "top": 698,
+   "child": 0,
+   "included": true
+  },
+  {
+   "system": "seo",
+   "table": "UK站内容审核",
+   "role": "review",
+   "source_records": 4,
+   "in_ledger": 4,
+   "top": 4,
+   "child": 0,
+   "included": true
+  },
+  {
+   "system": "seo",
+   "table": "infinity+adsy",
+   "kind": "finance",
+   "source_records": 7,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "seo",
+   "table": "品线SEO任务管理系统",
+   "role": "demand",
+   "source_records": 142,
+   "in_ledger": 142,
+   "top": 98,
+   "child": 44,
+   "included": true
+  },
+  {
+   "system": "seo",
+   "table": "英语站站内blog全表",
+   "kind": "content",
+   "source_records": 1924,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "seo",
+   "table": "英语站集合页及重要产品页",
+   "kind": "content",
+   "source_records": 64,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  },
+  {
+   "system": "seo",
+   "table": "费用结算管理",
+   "kind": "finance",
+   "source_records": 21,
+   "in_ledger": 0,
+   "included": false,
+   "reason": "非需求/审核类，不进台账（仍列入覆盖报告）"
+  }
+ ]
+}

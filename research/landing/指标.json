@@ -1,0 +1,4711 @@
+{
+ "snapshot": "snapshot-20260916T080521Z",
+ "指标1_内容获取成功率": {
+  "分母": 92,
+  "成功": 92,
+  "成功率_pct": 100.0,
+  "分档": {
+   "ok": 48,
+   "ok_structured": 44
+  },
+  "失败明细": [],
+  "分域名": {
+   "momcozy.com": {
+    "分母": 41,
+    "成功": 41,
+    "成功率_pct": 100.0
+   },
+   "ca.momcozy.com": {
+    "分母": 12,
+    "成功": 12,
+    "成功率_pct": 100.0
+   },
+   "de.momcozy.com": {
+    "分母": 12,
+    "成功": 12,
+    "成功率_pct": 100.0
+   },
+   "uk.momcozy.com": {
+    "分母": 8,
+    "成功": 8,
+    "成功率_pct": 100.0
+   },
+   "fr.momcozy.com": {
+    "分母": 5,
+    "成功": 5,
+    "成功率_pct": 100.0
+   },
+   "es.momcozy.com": {
+    "分母": 4,
+    "成功": 4,
+    "成功率_pct": 100.0
+   },
+   "eu.momcozy.com": {
+    "分母": 4,
+    "成功": 4,
+    "成功率_pct": 100.0
+   },
+   "au.momcozy.com": {
+    "分母": 3,
+    "成功": 3,
+    "成功率_pct": 100.0
+   },
+   "pl.momcozy.com": {
+    "分母": 2,
+    "成功": 2,
+    "成功率_pct": 100.0
+   },
+   "www.amazon.de": {
+    "分母": 1,
+    "成功": 1,
+    "成功率_pct": 100.0
+   }
+  },
+  "分类型": {
+   "product": {
+    "分母": 48,
+    "成功": 48,
+    "成功率_pct": 100.0
+   },
+   "other": {
+    "分母": 24,
+    "成功": 24,
+    "成功率_pct": 100.0
+   },
+   "collection": {
+    "分母": 13,
+    "成功": 13,
+    "成功率_pct": 100.0
+   },
+   "page": {
+    "分母": 7,
+    "成功": 7,
+    "成功率_pct": 100.0
+   }
+  }
+ },
+ "指标2_页面素材识别完整度": {
+  "分母_成功页面": 92,
+  "有要素记录的页面": 92,
+  "声明": "完整度只在获取成功的页面上计算；失败页面不计入本指标的分母。",
+  "逐要素": {
+   "title": {
+    "达成": 92,
+    "分母": 92,
+    "覆盖率_pct": 100.0
+   },
+   "body_text": {
+    "达成": 92,
+    "分母": 92,
+    "覆盖率_pct": 100.0
+   },
+   "images": {
+    "达成": 92,
+    "分母": 92,
+    "覆盖率_pct": 100.0
+   },
+   "claims": {
+    "达成": 90,
+    "分母": 92,
+    "覆盖率_pct": 97.8
+   },
+   "links": {
+    "达成": 92,
+    "分母": 92,
+    "覆盖率_pct": 100.0
+   },
+   "locale_signals": {
+    "达成": 92,
+    "分母": 92,
+    "覆盖率_pct": 100.0
+   }
+  },
+  "完整度": {
+   "均值": 0.996,
+   "中位": 1.0,
+   "六要素齐全": 90,
+   "分母": 92
+  },
+  "正文长度": {
+   "中位": 24809,
+   "p10": 17130,
+   "max": 45457
+  }
+ },
+ "指标3_处理耗时": {
+  "HTML 路径": {
+   "n": 92,
+   "p50": 2181,
+   "p90": 5236,
+   "p95": 6251,
+   "min": 1119,
+   "max": 12462,
+   "mean": 2827
+  },
+  "结构化端点路径": {
+   "n": 44,
+   "p50": 377,
+   "p90": 1377,
+   "p95": 2496,
+   "min": 212,
+   "max": 5178,
+   "mean": 701
+  },
+  "HTML 字节": {
+   "中位": 1334397,
+   "n": 92
+  },
+  "结构化字节": {
+   "中位": 20731,
+   "n": 44
+  },
+  "抓取总墙钟秒": 711.3,
+  "说明": "耗时 = 单次 GET 的 wall time，含重定向；不含解析。",
+  "分轮次": [
+   {
+    "轮次": "full",
+    "尝试": 92,
+    "成功": 28,
+    "墙钟秒": 245.5,
+    "起始全局间隔秒": 0.0,
+    "成功_pct": 30.4,
+    "说明": "第一遍：只做同域名 1.2s 间隔，无全局节流；第 28 个 URL 起被 Cloudflare 拦截"
+   },
+   {
+    "轮次": "blocked-only",
+    "尝试": 64,
+    "成功": 64,
+    "墙钟秒": 465.8,
+    "起始全局间隔秒": 6.0,
+    "成功_pct": 100.0,
+    "说明": "续抓：全局 6s 节流 + 快速失败（--max-gap 8 --max-consecutive-fail 6）"
+   }
+  ],
+  "体积倍数_HTML/结构化": 64.4,
+  "耗时倍数_HTML/结构化": 5.8
+ },
+ "引用集中度": {
+  "广告引用总数": 204,
+  "唯一 URL 数": 92,
+  "平均每页被引用": 2.22,
+  "被引用最多的页面": [
+   {
+    "url_key": "de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+    "ad_refs": 17,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+    "ad_refs": 9,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+    "ad_refs": 8,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "ad_refs": 8,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "momcozy.com/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+    "ad_refs": 7,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "ad_refs": 6,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+    "ad_refs": 5,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "de.momcozy.com/collections/electric-breast-pump",
+    "ad_refs": 4,
+    "tier": "ok"
+   },
+   {
+    "url_key": "de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "ad_refs": 4,
+    "tier": "ok_structured"
+   },
+   {
+    "url_key": "de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+    "ad_refs": 4,
+    "tier": "ok_structured"
+   }
+  ]
+ },
+ "逐URL": [
+  {
+   "url_key": "au.momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "url": "https://au.momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "domain": "au.momcozy.com",
+   "kind": "page",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://au.momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 990837,
+     "elapsed_ms": 1128,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "db993b699e420885587fa5b209ac78401493d57f302e14ffb92d95035e01b35d",
+     "stored": "raw/html-db993b699e420885.gz",
+     "stored_bytes": 155218
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 10681,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "au.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1632574,
+     "elapsed_ms": 1625,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "166b235099719372c6a2c83253b1c147057168ccff4578c06d8c848e68738376",
+     "stored": "raw/html-166b235099719372.gz",
+     "stored_bytes": 289192
+    },
+    {
+     "label": "structured",
+     "target": "https://au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 32720,
+     "elapsed_ms": 233,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "27756cd663e2840bb1c88c8891954b19984d121ff08e358d3eaf6464366a441b",
+     "stored": "raw/structured-27756cd663e2840b.gz",
+     "stored_bytes": 5651,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 20176,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "au.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://au.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "au.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://au.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1920004,
+     "elapsed_ms": 1997,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "9ee59097a37ea29de26f3d793281aca2f0f95498f55aa163fd7efa47308ab6cd",
+     "stored": "raw/html-9ee59097a37ea29d.gz",
+     "stored_bytes": 361359
+    },
+    {
+     "label": "structured",
+     "target": "https://au.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 17677,
+     "elapsed_ms": 303,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "b28cf4b54f3a78986a7a39e89fdf2f2ffc98b015393996fa509b943a92357f2b",
+     "stored": "raw/structured-b28cf4b54f3a7898.gz",
+     "stored_bytes": 2778,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 29309,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "ca.momcozy.com/blogs/breastfeeding/how-much-milk-to-pump",
+   "url": "https://ca.momcozy.com/blogs/breastfeeding/how-much-milk-to-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/blogs/breastfeeding/how-much-milk-to-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 756448,
+     "elapsed_ms": 1452,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "c9b5bc78113d1a0ec3df34bf5a2dc45b40e1a9ce9788613ae791fc088d21712d",
+     "stored": "raw/html-c9b5bc78113d1a0e.gz",
+     "stored_bytes": 140376
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 18869,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "ca.momcozy.com/collections/electric-breast-pump",
+   "url": "https://ca.momcozy.com/collections/electric-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/collections/electric-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1156731,
+     "elapsed_ms": 1689,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "f99b47d69bb7cf4a1a5e2acd6523e8c3b68509cb3a35913f2e8555e55840c56e",
+     "stored": "raw/html-f99b47d69bb7cf4a.gz",
+     "stored_bytes": 194687
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21070,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "ca.momcozy.com/collections/wearable-breast-pump",
+   "url": "https://ca.momcozy.com/collections/wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/collections/wearable-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 805259,
+     "elapsed_ms": 1119,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "4b0ae20b669918e415e19bcba07bc0c033625f7b18b24365cd0e840c830a1d97",
+     "stored": "raw/html-4b0ae20b669918e4.gz",
+     "stored_bytes": 140493
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 31402,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "ca.momcozy.com/collections/weekly-deals-ca",
+   "url": "https://ca.momcozy.com/collections/weekly-deals-ca",
+   "domain": "ca.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/collections/weekly-deals-ca",
+     "status": 200,
+     "final_url": "https://ca.momcozy.com/pages/offer",
+     "bytes": 1043977,
+     "elapsed_ms": 2357,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "15334df81324f3782e0405b6c3224584a1cdd7905f3238950ddf2b987d859d90",
+     "stored": "raw/html-15334df81324f378.gz",
+     "stored_bytes": 141790
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 11917,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "ca.momcozy.com/fr/collections/electric-breast-pump",
+   "url": "https://ca.momcozy.com/fr/collections/electric-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/fr/collections/electric-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1158324,
+     "elapsed_ms": 1927,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "e912204d4108c7b04570fa984d093e3f29d260368f67f649ad8af424355893fb",
+     "stored": "raw/html-e912204d4108c7b0.gz",
+     "stored_bytes": 196856
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21779,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "ca.momcozy.com/fr/collections/wearable-breast-pump",
+   "url": "https://ca.momcozy.com/fr/collections/wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/fr/collections/wearable-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 815974,
+     "elapsed_ms": 1668,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "65477bd7a6efa9e04ff743e0fd23448b613e260245873c0339d6ca7571587942",
+     "stored": "raw/html-65477bd7a6efa9e0.gz",
+     "stored_bytes": 146720
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 39484,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control?variant=47796813922491",
+   "domain": "ca.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control?variant=47796813922491",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1563395,
+     "elapsed_ms": 1683,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "1ac528196b4c2dd848dd73343f839774630cbf6bb6c2c86012dc7dde4fb0b456",
+     "stored": "raw/html-1ac528196b4c2dd8.gz",
+     "stored_bytes": 281306
+    },
+    {
+     "label": "structured",
+     "target": "https://ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 19270,
+     "elapsed_ms": 390,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "8a0a9717e52436d2106032126741583b89e2bf73e2a50f2561e32603a6083cab",
+     "stored": "raw/structured-8a0a9717e52436d2.gz",
+     "stored_bytes": 2572,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 20516,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "ca.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://ca.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump?variant=47796531986619",
+   "domain": "ca.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump?variant=47796531986619",
+     "status": 200,
+     "final_url": null,
+     "bytes": 2020369,
+     "elapsed_ms": 2848,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "69109aaae786a0493cda093db52f8f6cf9f786a5f6dec4a0a1c31f5424902e94",
+     "stored": "raw/html-69109aaae786a049.gz",
+     "stored_bytes": 384648
+    },
+    {
+     "label": "structured",
+     "target": "https://ca.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 18467,
+     "elapsed_ms": 1445,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "229efb0df6be601e91816947f01acc930d894ab56bb5f24de95eeb84cedac341",
+     "stored": "raw/structured-229efb0df6be601e.gz",
+     "stored_bytes": 2852,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 28754,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump?variant=47796181303483",
+   "domain": "ca.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump?variant=47796181303483",
+     "status": 200,
+     "final_url": null,
+     "bytes": 2851543,
+     "elapsed_ms": 5171,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "e96eaf782eb51374d81485d714ec7f477138009dfafe3abb51e6bd8b45e18b6e",
+     "stored": "raw/html-e96eaf782eb51374.gz",
+     "stored_bytes": 541674
+    },
+    {
+     "label": "structured",
+     "target": "https://ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 20709,
+     "elapsed_ms": 313,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "9fedd46cbda5333a71a12ffa8fe7040027dcb2a99b77f28ed873c3138e1dac11",
+     "stored": "raw/structured-9fedd46cbda5333a.gz",
+     "stored_bytes": 2441,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 39571,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1457096,
+     "elapsed_ms": 1921,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "336cb59c5f95680d2c47ab2cce507ecf55b479597187b64fa04ccca8673f84e7",
+     "stored": "raw/html-336cb59c5f95680d.gz",
+     "stored_bytes": 283804
+    },
+    {
+     "label": "structured",
+     "target": "https://ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 23119,
+     "elapsed_ms": 766,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "f0b43f952852f777a9f039ca3c112e74c899c062a177171ce89ec94104412325",
+     "stored": "raw/structured-f0b43f952852f777.gz",
+     "stored_bytes": 3197,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 26137,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "url": "https://ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1694183,
+     "elapsed_ms": 3100,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "c5c8c126b669e29edde1c76992d7118dc1124442f04ad9eff51e287cb379adfe",
+     "stored": "raw/html-c5c8c126b669e29e.gz",
+     "stored_bytes": 313816
+    },
+    {
+     "label": "structured",
+     "target": "https://ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 10230,
+     "elapsed_ms": 375,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "4270cbfe211acf02716e815e4ef49c53f9c3829393a889bc21436d150287d74f",
+     "stored": "raw/structured-4270cbfe211acf02.gz",
+     "stored_bytes": 1949,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 23604,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1555994,
+     "elapsed_ms": 2676,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "ca5eaa316ecdc0197c1955fa24ceac192c13dff731b167e2da2a26e1545c1720",
+     "stored": "raw/html-ca5eaa316ecdc019.gz",
+     "stored_bytes": 312008
+    },
+    {
+     "label": "structured",
+     "target": "https://ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 9535,
+     "elapsed_ms": 1285,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "1a12cf0915bff7f70303e5a1d47e01e8d0c80031db066c8538872cb82b206499",
+     "stored": "raw/structured-1a12cf0915bff7f7.gz",
+     "stored_bytes": 1878,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 19387,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/collections/electric-breast-pump",
+   "url": "https://de.momcozy.com/collections/electric-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 4,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/collections/electric-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1070854,
+     "elapsed_ms": 1718,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "850b2ca22668c88ae7c1bfe3050c9ef43d8736df470f7d82afd79ec0551de8e0",
+     "stored": "raw/html-850b2ca22668c88a.gz",
+     "stored_bytes": 184310
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 24922,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "de.momcozy.com/collections/featured-breast-pumps/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://de.momcozy.com/collections/featured-breast-pumps/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/collections/featured-breast-pumps/products/v1-pro-hospital-grade-wearable-breast-pump",
+     "status": 200,
+     "final_url": "https://de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+     "bytes": 1555056,
+     "elapsed_ms": 2285,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "9e2cc03ada632a8d07706cb3abd79f8f94d04054259b9acd36e3f8da1d0f567e",
+     "stored": "raw/html-9e2cc03ada632a8d.gz",
+     "stored_bytes": 309771
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 9548,
+     "elapsed_ms": 292,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "8c2f3b462f0096db193646bbed6cf2555fc60d73b6d837ab0e25d0f0b8702816",
+     "stored": "raw/structured-8c2f3b462f0096db.gz",
+     "stored_bytes": 1919,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 22459,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/pages/breast-pump",
+   "url": "https://de.momcozy.com/pages/breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "page",
+   "ad_refs": 3,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/pages/breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 598855,
+     "elapsed_ms": 2468,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "06daeb40cad707b991d6ce0d577400dfc57111ddb6d20057c3135906ae98654a",
+     "stored": "raw/html-06daeb40cad707b9.gz",
+     "stored_bytes": 114095
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 7109,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": false,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "de.momcozy.com/pages/breast-pump-winter-sale-in-europe",
+   "url": "https://de.momcozy.com/pages/breast-pump-winter-sale-in-europe",
+   "domain": "de.momcozy.com",
+   "kind": "page",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/pages/breast-pump-winter-sale-in-europe",
+     "status": 200,
+     "final_url": null,
+     "bytes": 599247,
+     "elapsed_ms": 1532,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "72aaec941291b9d472c174f8cd04700ab2a5d911e6b8b9afeb39727e7df9a019",
+     "stored": "raw/html-72aaec941291b9d4.gz",
+     "stored_bytes": 114086
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 7101,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": false,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 4,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1594703,
+     "elapsed_ms": 1995,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "4ab0a0630fc20a27295d6f839c6e0468eac960add2d9102c05cd50c04c027dd4",
+     "stored": "raw/html-4ab0a0630fc20a27.gz",
+     "stored_bytes": 291490
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 39388,
+     "elapsed_ms": 224,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "48d62f10d81076f7677e0c40aad594a471a75f746ba33e4e79efd3cb7481c7b6",
+     "stored": "raw/structured-48d62f10d81076f7.gz",
+     "stored_bytes": 6206,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24021,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://de.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1876886,
+     "elapsed_ms": 2018,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "9f54ebd7a3ae46bc6b29f168852b37937aa4ec7a1abf44e188a81f3228067ecf",
+     "stored": "raw/html-9f54ebd7a3ae46bc.gz",
+     "stored_bytes": 357326
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 28484,
+     "elapsed_ms": 272,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "eb1f29865eb4fdf642aef369bb7ccbed8e99c9f0a52547f7252a0b1881a2905a",
+     "stored": "raw/structured-eb1f29865eb4fdf6.gz",
+     "stored_bytes": 4711,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 29181,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://de.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 2827808,
+     "elapsed_ms": 2578,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "516b99879a98b43589f9c2a480fcacc5891ff9ddd61030065355b267dd6ccfbe",
+     "stored": "raw/html-516b99879a98b435.gz",
+     "stored_bytes": 541536
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 29253,
+     "elapsed_ms": 263,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "2ff0c09be6574ea0d8ac11c89f16d3f22acb11d3d089735a98543d9a1ab57d4e",
+     "stored": "raw/structured-2ff0c09be6574ea0.gz",
+     "stored_bytes": 3257,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 44139,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 4,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1487832,
+     "elapsed_ms": 1948,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "9127acbe6fbc0f237d5a8b8744d2a9c9a9686a4f9102493ee60831286e26c1e1",
+     "stored": "raw/html-9127acbe6fbc0f23.gz",
+     "stored_bytes": 287476
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 27947,
+     "elapsed_ms": 346,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "6e91e461bea63497675c4b9c8347ae96375d4ff14b02bca59bb825e3ff09a6bd",
+     "stored": "raw/structured-6e91e461bea63497.gz",
+     "stored_bytes": 3776,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 28266,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "url": "http://de.momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "http://de.momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+     "status": 200,
+     "final_url": "https://de.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+     "bytes": 1756827,
+     "elapsed_ms": 2590,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "4be6b72b6f860a3ced2d79349ef6e1ccedbd2483efacd3801c43f2544b460f1c",
+     "stored": "raw/html-4be6b72b6f860a3c.gz",
+     "stored_bytes": 318516
+    },
+    {
+     "label": "structured",
+     "target": "http://de.momcozy.com/products/momcozy-s12-pro-wearable-breast-pump.js",
+     "status": 404,
+     "final_url": null,
+     "bytes": 0,
+     "elapsed_ms": 289,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 28677,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "url": "http://de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "http://de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+     "status": 200,
+     "final_url": "https://de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+     "bytes": 966331,
+     "elapsed_ms": 1472,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "447ba420a6539fe7905645458e4ad68c49d09e4160b4dd7e3f666ca20d2cf6a3",
+     "stored": "raw/html-447ba420a6539fe7.gz",
+     "stored_bytes": 191283
+    },
+    {
+     "label": "structured",
+     "target": "http://de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump.js",
+     "status": 200,
+     "final_url": "https://de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump.js",
+     "bytes": 19452,
+     "elapsed_ms": 359,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "896fcd3fba7cc1a2159f13dce6e7f020ad250e9ee2b39a6c2fe708ed561f3031",
+     "stored": "raw/structured-896fcd3fba7cc1a2.gz",
+     "stored_bytes": 3103,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 17212,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 17,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1268205,
+     "elapsed_ms": 1672,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "07a20945f3265d58fac373daf6887491cbbfbeaf0dc0c6cefbb56cf518d259c7",
+     "stored": "raw/html-07a20945f3265d58.gz",
+     "stored_bytes": 247731
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 9625,
+     "elapsed_ms": 235,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "0589edfdac26e4996edef2a12713eca79906518cb1f4406102f3fdefddf0d4d8",
+     "stored": "raw/structured-0589edfdac26e499.gz",
+     "stored_bytes": 1549,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24333,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1555056,
+     "elapsed_ms": 2015,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "f6f13bbe61e03b236230cdef805a08b427a9a6a020df3f051d25be9dd9414bff",
+     "stored": "raw/html-f6f13bbe61e03b23.gz",
+     "stored_bytes": 309769
+    },
+    {
+     "label": "structured",
+     "target": "https://de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump.js",
+     "status": 200,
+     "final_url": null,
+     "bytes": 9548,
+     "elapsed_ms": 301,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "sha256": "8c2f3b462f0096db193646bbed6cf2555fc60d73b6d837ab0e25d0f0b8702816",
+     "stored": "raw/structured-8c2f3b462f0096db.gz",
+     "stored_bytes": 1919,
+     "json_ok": true,
+     "json_keys": [
+      "available",
+      "compare_at_price",
+      "compare_at_price_max",
+      "compare_at_price_min",
+      "compare_at_price_varies",
+      "created_at",
+      "description",
+      "featured_image",
+      "handle",
+      "id",
+      "images",
+      "media",
+      "options",
+      "price"
+     ]
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 22459,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "es.momcozy.com/collections/electric-breast-pump",
+   "url": "https://es.momcozy.com/collections/electric-breast-pump",
+   "domain": "es.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://es.momcozy.com/collections/electric-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1228682,
+     "elapsed_ms": 3770,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "3e560a5fcf2d34c3d894f62dea428cd839b32554805f8a2e37c1794bb2e5deb2",
+     "stored": "raw/html-3e560a5fcf2d34c3.gz",
+     "stored_bytes": 207476
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 32152,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "es.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://es.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "es.momcozy.com",
+   "kind": "product",
+   "ad_refs": 4,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://es.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1571769,
+     "elapsed_ms": 6807,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "33c160cbf76937656066f5ad4bf57b7d128c509d83c89086e78b2af535750eaa",
+     "stored": "raw/html-33c160cbf7693765.gz",
+     "stored_bytes": 284368
+    },
+    {
+     "label": "structured",
+     "target": "https://es.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 34196,
+     "elapsed_ms": 650,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "6da2e548914e838c2cef4d8ccdad423d8d42f5ae6b9fd1f1c7ac58342ff4d4c8",
+     "stored": "raw/structured-6da2e548914e838c.gz",
+     "stored_bytes": 6196,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24513,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "es.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1468747,
+     "elapsed_ms": 5528,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "3042b2ea363c807b915ad632e7e4e1ac812764dad6f581685ce691457c0525b7",
+     "stored": "raw/html-3042b2ea363c807b.gz",
+     "stored_bytes": 285795
+    },
+    {
+     "label": "structured",
+     "target": "https://es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 22303,
+     "elapsed_ms": 309,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "5a8528af1ce4f7ef2c6a2fdcba859ff25ae4b0cb02e018195b63546a55f15b73",
+     "stored": "raw/structured-5a8528af1ce4f7ef.gz",
+     "stored_bytes": 3009,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 28651,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "es.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://es.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "es.momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://es.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1138541,
+     "elapsed_ms": 3809,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "a578c1f5f65a5e926ddb678f5263b5149f475faa5a0270e04e58b26724fee80f",
+     "stored": "raw/html-a578c1f5f65a5e92.gz",
+     "stored_bytes": 229328
+    },
+    {
+     "label": "structured",
+     "target": "https://es.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 9626,
+     "elapsed_ms": 492,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "b5653a8f7747efda98b9ed24386c039a9d19c6bc05c0018fe6fb202196a797fd",
+     "stored": "raw/structured-b5653a8f7747efda.gz",
+     "stored_bytes": 1572,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 18473,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "eu.momcozy.com/collections/electric-breast-pump",
+   "url": "https://eu.momcozy.com/collections/electric-breast-pump",
+   "domain": "eu.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://eu.momcozy.com/collections/electric-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1118531,
+     "elapsed_ms": 4812,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "154a12a93efb0bd95dec6d5d9c864d87de5306ffe72567e89bb66a146b34924e",
+     "stored": "raw/html-154a12a93efb0bd9.gz",
+     "stored_bytes": 186136
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21212,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "eu.momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1573599,
+     "elapsed_ms": 6251,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "cc487d258283b4fdb092e5eaca37607945c62a6082448079fa3c576005c537ed",
+     "stored": "raw/html-cc487d258283b4fd.gz",
+     "stored_bytes": 280143
+    },
+    {
+     "label": "structured",
+     "target": "https://eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 32554,
+     "elapsed_ms": 2496,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "9333c076c75c9fd5854e9b70336f1f928e355a519026d5a3c545dd9a3312b63a",
+     "stored": "raw/structured-9333c076c75c9fd5.gz",
+     "stored_bytes": 5566,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 21127,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "eu.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2843054,
+     "elapsed_ms": 9465,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "9dfc64e779e14c45e9872960d6101cdccaf57a797f7c6aea05aec9897a5370e2",
+     "stored": "raw/html-9dfc64e779e14c45.gz",
+     "stored_bytes": 536559
+    },
+    {
+     "label": "structured",
+     "target": "https://eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 20334,
+     "elapsed_ms": 5178,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "dab2043d6c76607620994fd1ecae36496e06e3b89e2c2f48161b5fe7c08740b1",
+     "stored": "raw/structured-dab2043d6c766076.gz",
+     "stored_bytes": 2448,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 40195,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "eu.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://eu.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "eu.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://eu.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1476605,
+     "elapsed_ms": 5337,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "909e1afed7815c1a75ccd43f43a3ef88a08f11387a56ff79707e645b39740b76",
+     "stored": "raw/html-909e1afed7815c1a.gz",
+     "stored_bytes": 282801
+    },
+    {
+     "label": "structured",
+     "target": "https://eu.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 23037,
+     "elapsed_ms": 575,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "1c180e06c6a8dab1fe688977cd416d2f28fbdf5b81f979ff028ca523cbbcd15a",
+     "stored": "raw/structured-1c180e06c6a8dab1.gz",
+     "stored_bytes": 3185,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 25295,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "fr.momcozy.com/collections/electric-breast-pump",
+   "url": "https://fr.momcozy.com/collections/electric-breast-pump",
+   "domain": "fr.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 3,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://fr.momcozy.com/collections/electric-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1192062,
+     "elapsed_ms": 3966,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "96dd1ed7e64d9a3bfcd8e7a85923a95d7d4b13d328e3577748f25a3bff0a75d7",
+     "stored": "raw/html-96dd1ed7e64d9a3b.gz",
+     "stored_bytes": 209956
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 25616,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "fr.momcozy.com/collections/featured-breast-pumps/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://fr.momcozy.com/collections/featured-breast-pumps/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "fr.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://fr.momcozy.com/collections/featured-breast-pumps/products/momcozy-mobile-flow-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2956973,
+     "elapsed_ms": 6584,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "17403accfec738a011c645056ca03d41077d304b53538847a6ee863efed4bfc5",
+     "stored": "raw/html-17403accfec738a0.gz",
+     "stored_bytes": 562596
+    },
+    {
+     "label": "structured",
+     "target": "https://fr.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 29583,
+     "elapsed_ms": 4997,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "a224842805bb4d658000c95e81104a58f562d85872b931d3861d3ed6200bed8e",
+     "stored": "raw/structured-a224842805bb4d65.gz",
+     "stored_bytes": 3275,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 44693,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "fr.momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1713570,
+     "elapsed_ms": 5236,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "1703bf173039672bf5cdfa068fd830a05364cef20b11ef78bf2fd2e26e5b2e9b",
+     "stored": "raw/html-1703bf173039672b.gz",
+     "stored_bytes": 315712
+    },
+    {
+     "label": "structured",
+     "target": "https://fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 40149,
+     "elapsed_ms": 506,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "e259a7b4cd7fc0578ed9f60d21c65496710808f089f24d80a945a3eee9862bff",
+     "stored": "raw/structured-e259a7b4cd7fc057.gz",
+     "stored_bytes": 6360,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 26035,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "fr.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://fr.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "fr.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://fr.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1576578,
+     "elapsed_ms": 12462,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "e2d0cc8b416b07884ca565ba0b630b5277794d9a1a44cc1a841a4f06d04d5145",
+     "stored": "raw/html-e2d0cc8b416b0788.gz",
+     "stored_bytes": 309868
+    },
+    {
+     "label": "structured",
+     "target": "https://fr.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 27596,
+     "elapsed_ms": 577,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "58c21769ca5f119c24fda3fee15bcdc012a424a0f1d1a9dcba60b79ee45b3c74",
+     "stored": "raw/structured-58c21769ca5f119c.gz",
+     "stored_bytes": 3641,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 28250,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "fr.momcozy.com",
+   "kind": "product",
+   "ad_refs": 8,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1334397,
+     "elapsed_ms": 5342,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "cd0a35d7528f3138e868260f2bb891dc9c6600367f282be364326caa344c6930",
+     "stored": "raw/html-cd0a35d7528f3138.gz",
+     "stored_bytes": 266740
+    },
+    {
+     "label": "structured",
+     "target": "https://fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 9628,
+     "elapsed_ms": 414,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "b7bec86cf5f6e81db833ed4db554d03171d1a4015292449ac9a1e35ab5d7ca4c",
+     "stored": "raw/structured-b7bec86cf5f6e81d.gz",
+     "stored_bytes": 1597,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24771,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+   "url": "https://momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1056330,
+     "elapsed_ms": 4029,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "ba0a0a087c24e41018fb67e2bdf3618a80abc9d11bdb76958f37919ce7d3cfa7",
+     "stored": "raw/html-ba0a0a087c24e410.gz",
+     "stored_bytes": 177632
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 24689,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-breast-pump-for-exclusive-pumping",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-breast-pump-for-exclusive-pumping",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/best-breast-pump-for-exclusive-pumping",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1068471,
+     "elapsed_ms": 3297,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "e376fb6dfbe09b0603376d9c4ab40a599256ad7026a798b1e8adf8687430b163",
+     "stored": "raw/html-e376fb6dfbe09b06.gz",
+     "stored_bytes": 179450
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 29748,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-breast-pumps-for-twin-moms",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-breast-pumps-for-twin-moms",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/best-breast-pumps-for-twin-moms",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1061916,
+     "elapsed_ms": 3648,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "fc46575a09417a9a241198baf68ca4bffb9b9d1a2db8b760191879b923c27b93",
+     "stored": "raw/html-fc46575a09417a9a.gz",
+     "stored_bytes": 178896
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 26904,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-wearable-breast-pumps-for-busy-moms",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-wearable-breast-pumps-for-busy-moms",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/best-wearable-breast-pumps-for-busy-moms",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1050310,
+     "elapsed_ms": 2528,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "c41c5fc6d11ea762c26b4822827c631e8eafc48250a717598741c10129efc99f",
+     "stored": "raw/html-c41c5fc6d11ea762.gz",
+     "stored_bytes": 175324
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 30103,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-wearable-pump-air-1-vs-m5",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-wearable-pump-air-1-vs-m5",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/best-wearable-pump-air-1-vs-m5",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1022216,
+     "elapsed_ms": 2507,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "baf9768726f2512bb13531d5aa4c9905eeb1efea73434b8eb6ca20870b9d34c7",
+     "stored": "raw/html-baf9768726f2512b.gz",
+     "stored_bytes": 171733
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 25225,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/breast-pump-buying-guide-new-moms",
+   "url": "https://momcozy.com/blogs/breastfeeding/breast-pump-buying-guide-new-moms",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/breast-pump-buying-guide-new-moms",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1081672,
+     "elapsed_ms": 2162,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "3b24d5d09eb08fdc3fb951551068713944d908f3f8a10031c24d201bb130c8c9",
+     "stored": "raw/html-3b24d5d09eb08fdc.gz",
+     "stored_bytes": 183331
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 37265,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/heated-breast-pump-guide",
+   "url": "https://momcozy.com/blogs/breastfeeding/heated-breast-pump-guide",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/heated-breast-pump-guide",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1057133,
+     "elapsed_ms": 2175,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "13f179e19f07a699f28a3186ebf28b4f9c08d5f439878ee94fcd382cbd0b6bf9",
+     "stored": "raw/html-13f179e19f07a699.gz",
+     "stored_bytes": 173595
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21515,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/how-to-use-smart-wearable-breast-pump",
+   "url": "https://momcozy.com/blogs/breastfeeding/how-to-use-smart-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/how-to-use-smart-wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1084995,
+     "elapsed_ms": 6613,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "5a6295be45da24a212f8fac4f3314fab37f7dbfdd98719a95839dea2f8d673fd",
+     "stored": "raw/html-5a6295be45da24a2.gz",
+     "stored_bytes": 180965
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 30874,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1035865,
+     "elapsed_ms": 2450,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "0e12cc1ee089d04b6cb829ee9f9b39653b2609904782d16404fdcfaf242f8699",
+     "stored": "raw/html-0e12cc1ee089d04b.gz",
+     "stored_bytes": 173298
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21871,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1042998,
+     "elapsed_ms": 2135,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "448b7a5716f1424023a42c58f85af535f203c4954ccc0c21eeec17c14de7e557",
+     "stored": "raw/html-448b7a5716f14240.gz",
+     "stored_bytes": 176407
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 26020,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/momcozy-air-1-vs-m9-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/momcozy-air-1-vs-m9-pump-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/momcozy-air-1-vs-m9-pump-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1053491,
+     "elapsed_ms": 2648,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "c7f475c42ff04334b66efd3b9e2b3cd7f230aece5a1e0ff631999a00b3b867ec",
+     "stored": "raw/html-c7f475c42ff04334.gz",
+     "stored_bytes": 174834
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 26136,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/momcozy-breast-pump-comparison-guide",
+   "url": "https://momcozy.com/blogs/breastfeeding/momcozy-breast-pump-comparison-guide",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/momcozy-breast-pump-comparison-guide",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1113002,
+     "elapsed_ms": 1478,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "555a6a2a41f8297cf517596709ada6d1996c436881876c49d6da1644c381e0be",
+     "stored": "raw/html-555a6a2a41f8297c.gz",
+     "stored_bytes": 187680
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 43900,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/portable-breast-pump-reviews-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/portable-breast-pump-reviews-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/portable-breast-pump-reviews-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1077223,
+     "elapsed_ms": 1439,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "95ca80e472126e1d4df58057dd8ec056cf2487b76ba59daed71bdb24ca51d983",
+     "stored": "raw/html-95ca80e472126e1d.gz",
+     "stored_bytes": 179330
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 32180,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+   "url": "https://momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1042113,
+     "elapsed_ms": 1877,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "f6b8a27c0b208960152d281561cf9e1ef8f1635ca424a04991c5889fe8f58fee",
+     "stored": "raw/html-f6b8a27c0b208960.gz",
+     "stored_bytes": 174009
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 22919,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/top-breast-pumps-for-large-breasts",
+   "url": "https://momcozy.com/blogs/breastfeeding/top-breast-pumps-for-large-breasts",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/top-breast-pumps-for-large-breasts",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1056473,
+     "elapsed_ms": 2479,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "c37080b2217fea426385dadec81810b105247c76b42cd918d21bd5598ac2cdad",
+     "stored": "raw/html-c37080b2217fea42.gz",
+     "stored_bytes": 180405
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 35181,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/warm-massage-breast-pump-guide",
+   "url": "https://momcozy.com/blogs/breastfeeding/warm-massage-breast-pump-guide",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/warm-massage-breast-pump-guide",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1060687,
+     "elapsed_ms": 2009,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "2e01ecac36eb2bdadae1e77b9e20e45f6c3010b7ce89b2bf129e44ef8a2f631b",
+     "stored": "raw/html-2e01ecac36eb2bda.gz",
+     "stored_bytes": 173404
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21874,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/wearable-breast-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/wearable-breast-pump-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/wearable-breast-pump-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1029546,
+     "elapsed_ms": 1314,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "eb96dbd6817e35a9e05d75569c8aea18a4d69482c01e383acadc953d809d86f8",
+     "stored": "raw/html-eb96dbd6817e35a9.gz",
+     "stored_bytes": 173227
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 23196,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+   "url": "https://momcozy.com/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1062397,
+     "elapsed_ms": 1599,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "328db7cf411af4d836274ba8fa32cb44cc28a1cc534d3ef6a415ce9e450804d6",
+     "stored": "raw/html-328db7cf411af4d8.gz",
+     "stored_bytes": 173908
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 22711,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/wearable-pump-wellness-vs-smart",
+   "url": "https://momcozy.com/blogs/breastfeeding/wearable-pump-wellness-vs-smart",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/breastfeeding/wearable-pump-wellness-vs-smart",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1061332,
+     "elapsed_ms": 1990,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "1d2ff4566f8eb815cdeee726d5ab1e8cc235e16e345a24598a26263d5b8bdac0",
+     "stored": "raw/html-1d2ff4566f8eb815.gz",
+     "stored_bytes": 173729
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 21419,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/momcare/momcozy-m5-vs-m6-comparison",
+   "url": "https://momcozy.com/blogs/momcare/momcozy-m5-vs-m6-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/momcare/momcozy-m5-vs-m6-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1058317,
+     "elapsed_ms": 2160,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "ada8522df2b9dc449c55e1f01a4436e997f452e1d488b2264721320a29993003",
+     "stored": "raw/html-ada8522df2b9dc44.gz",
+     "stored_bytes": 177080
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 27576,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/momcare/momcozy-m5-vs-m9-comparison",
+   "url": "https://momcozy.com/blogs/momcare/momcozy-m5-vs-m9-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/momcare/momcozy-m5-vs-m9-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1083236,
+     "elapsed_ms": 1501,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "3d025d07ab518151fb24611a03fcedf1509bbdd0473ffa4d5d82d7dfd0ea46a6",
+     "stored": "raw/html-3d025d07ab518151.gz",
+     "stored_bytes": 180664
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 34883,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/blogs/momcare/momcozy-m6-vs-m9-comparison",
+   "url": "https://momcozy.com/blogs/momcare/momcozy-m6-vs-m9-comparison",
+   "domain": "momcozy.com",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/blogs/momcare/momcozy-m6-vs-m9-comparison",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1030016,
+     "elapsed_ms": 1792,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "afc98aa98c96e7aa5bf24ec4868779a5436f54278c28d71863fee5ac0eed062a",
+     "stored": "raw/html-afc98aa98c96e7aa.gz",
+     "stored_bytes": 175425
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 30973,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/collections/electric-breast-pump",
+   "url": "https://momcozy.com/collections/electric-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "collection",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/collections/electric-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1810770,
+     "elapsed_ms": 1970,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "a965af58297f3ca0a5c1a88bd894ec3f16b71afc08cfe41a27a913dc9647db44",
+     "stored": "raw/html-a965af58297f3ca0.gz",
+     "stored_bytes": 246041
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 17130,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/collections/wearable-breast-pump",
+   "url": "https://momcozy.com/collections/wearable-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/collections/wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1242633,
+     "elapsed_ms": 1771,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "a5ca99b95aaa7fd28da9bac807ec4f496dc7dce9a6314de0f397d7138412367c",
+     "stored": "raw/html-a5ca99b95aaa7fd2.gz",
+     "stored_bytes": 203319
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 20522,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/collections/wearable-breast-pump/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://momcozy.com/collections/wearable-breast-pump/products/m5-smart-wearable-breast-pump-upgraded-with-app-control?variant=45110887514310",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 4,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/collections/wearable-breast-pump/products/m5-smart-wearable-breast-pump-upgraded-with-app-control?variant=45110887514310",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2325454,
+     "elapsed_ms": 3153,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "3b36dd968e6990204fbde3d55b2083f09db35bb135b303353991a4820850902e",
+     "stored": "raw/html-3b36dd968e699020.gz",
+     "stored_bytes": 396369
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 32656,
+     "elapsed_ms": 267,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "e5dbd685da369deeb6da490ae6511985c8696a473a616e7c06037d4ea596ece4",
+     "stored": "raw/structured-e5dbd685da369dee.gz",
+     "stored_bytes": 5744,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24809,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://momcozy.com/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 7,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1682582,
+     "elapsed_ms": 2278,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "430ff36232b4dfc7910980872809acc4d05e0ed2a913d4a3a0b3668f0c84fefe",
+     "stored": "raw/html-430ff36232b4dfc7.gz",
+     "stored_bytes": 308074
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 7019,
+     "elapsed_ms": 503,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "affa4ae9fedf5f7d1dc88a693c53220db5b6c5f44d7166c7e7c752d1ffdd03b1",
+     "stored": "raw/structured-affa4ae9fedf5f7d.gz",
+     "stored_bytes": 1325,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 22908,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/en-ca/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "url": "https://momcozy.com/en-ca/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/en-ca/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": "https://momcozy.com/en-ca/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "bytes": 2280578,
+     "elapsed_ms": 2715,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "39a9f26ea633b039a5837e2a756fcac754218dfc1da59806c62e388961560b57",
+     "stored": "raw/html-39a9f26ea633b039.gz",
+     "stored_bytes": 390107
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 404,
+     "final_url": null,
+     "bytes": 0,
+     "elapsed_ms": 263,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 23995,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "page",
+   "ad_refs": 2,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1285464,
+     "elapsed_ms": 2138,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "5ddce3c6ead17439ac64afd9c119ee89e1cc6a4244b8285788b6a41e10e7e1b4",
+     "stored": "raw/html-5ddce3c6ead17439.gz",
+     "stored_bytes": 182778
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 11453,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "url": "https://momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "page",
+   "ad_refs": 3,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1261374,
+     "elapsed_ms": 1503,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "d16683b78c8092b08e881294f681c2c4537881367d47f9caa6cdb5995fc999e0",
+     "stored": "raw/html-d16683b78c8092b0.gz",
+     "stored_bytes": 190637
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 13394,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/pages/insurance-partners-in-us",
+   "url": "https://momcozy.com/pages/insurance-partners-in-us",
+   "domain": "momcozy.com",
+   "kind": "page",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/pages/insurance-partners-in-us",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1016383,
+     "elapsed_ms": 1278,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "16b42cc4841d1cd730f7484258e53cc4e12b15b120e5f29cc39c80d07ae11d01",
+     "stored": "raw/html-16b42cc4841d1cd7.gz",
+     "stored_bytes": 167623
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 10758,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/pages/vpro-series",
+   "url": "https://momcozy.com/pages/vpro-series",
+   "domain": "momcozy.com",
+   "kind": "page",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/pages/vpro-series",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1068000,
+     "elapsed_ms": 1749,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "26a0fdf37050e723b69e496f9e7de86f7dffe3ee713ee386be2c8ca0a6c70c26",
+     "stored": "raw/html-26a0fdf37050e723.gz",
+     "stored_bytes": 173582
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 12156,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "url": "https://momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": "https://momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "bytes": 2334346,
+     "elapsed_ms": 2758,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "6917b8c7f0c345c42683cb12c038ecd748496b3e2562499468b615e821c4677a",
+     "stored": "raw/html-6917b8c7f0c345c4.gz",
+     "stored_bytes": 399157
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 404,
+     "final_url": null,
+     "bytes": 0,
+     "elapsed_ms": 391,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 24740,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 8,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2334346,
+     "elapsed_ms": 1885,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "4fe97a48182939d9ddcdb5f8e376f094377fd8909a50bca317334b035746251a",
+     "stored": "raw/html-4fe97a48182939d9.gz",
+     "stored_bytes": 399155
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 32656,
+     "elapsed_ms": 359,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "e5dbd685da369deeb6da490ae6511985c8696a473a616e7c06037d4ea596ece4",
+     "stored": "raw/structured-e5dbd685da369dee.gz",
+     "stored_bytes": 5744,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24740,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 5,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2432906,
+     "elapsed_ms": 2438,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "cd0788a55193224f8938b9f0084d9a94dd22ba572ad6510f08d0cf35ca19ad9a",
+     "stored": "raw/html-cd0788a55193224f.gz",
+     "stored_bytes": 439064
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 22862,
+     "elapsed_ms": 228,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "bcbe51853c93ed37bc1e6c477b8e03a4d3e9e1aa5213245b7319f37aa48a2d48",
+     "stored": "raw/structured-bcbe51853c93ed37.gz",
+     "stored_bytes": 3978,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 33190,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 3289144,
+     "elapsed_ms": 3038,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "af9e6c676bb7857af75cd8077542a44c4579c65386cb36eb056427fbced1ed3a",
+     "stored": "raw/html-af9e6c676bb7857a.gz",
+     "stored_bytes": 605279
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 24543,
+     "elapsed_ms": 243,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "793f8eb6da6037eb43591bd7902c96ec113de420797adf75abff24adc1bac5a7",
+     "stored": "raw/structured-793f8eb6da6037eb.gz",
+     "stored_bytes": 3663,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 45457,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2038276,
+     "elapsed_ms": 2099,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "b197119e27fb9b618862cf08fb33245a57b8fcd4a77622373d05b36c3936adf0",
+     "stored": "raw/html-b197119e27fb9b61.gz",
+     "stored_bytes": 367633
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 21334,
+     "elapsed_ms": 226,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "d2cd0d8f84dfbdfc7bfad4c1953782bfaabd024c60ffebb4d4fb366266fc5977",
+     "stored": "raw/structured-d2cd0d8f84dfbdfc.gz",
+     "stored_bytes": 3122,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 30598,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": "https://momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+     "bytes": 2185402,
+     "elapsed_ms": 2439,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "1023b82b660359d39e27a6ce81894c46a54349d3af39a202bdceb368818596d8",
+     "stored": "raw/html-1023b82b660359d3.gz",
+     "stored_bytes": 381318
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-s12-pro-wearable-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 404,
+     "final_url": null,
+     "bytes": 0,
+     "elapsed_ms": 216,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 27331,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1461780,
+     "elapsed_ms": 1555,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "6500271db6e902186b9760f3f583b5a4f0630d71aaf7665892d92c444edbe567",
+     "stored": "raw/html-6500271db6e90218.gz",
+     "stored_bytes": 261670
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-s9-pro-wearable-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 12553,
+     "elapsed_ms": 1377,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "95f6d15d561f8e41332ab51c8047b9d2d8770bf563cb74c4c6d37137a2e0fca5",
+     "stored": "raw/structured-95f6d15d561f8e41.gz",
+     "stored_bytes": 2272,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 20682,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 9,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1681367,
+     "elapsed_ms": 2181,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "423ff5e9fa76a442da0744d846f9e641711a8de6bafa4020b3eb440337d55cfc",
+     "stored": "raw/html-423ff5e9fa76a442.gz",
+     "stored_bytes": 307613
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 7019,
+     "elapsed_ms": 262,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "affa4ae9fedf5f7d1dc88a693c53220db5b6c5f44d7166c7e7c752d1ffdd03b1",
+     "stored": "raw/structured-affa4ae9fedf5f7d.gz",
+     "stored_bytes": 1325,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 22898,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "url": "https://momcozy.com/products/s12-pro-quick-wearable-breast-pump?variant=45528303861958",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/s12-pro-quick-wearable-breast-pump?variant=45528303861958",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2185448,
+     "elapsed_ms": 2411,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "51c6f0fe1fffeba6d192fc261be1b2a5a7d1ebb8939d64f4d1132f1a168a8212",
+     "stored": "raw/html-51c6f0fe1fffeba6.gz",
+     "stored_bytes": 381763
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/s12-pro-quick-wearable-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 12595,
+     "elapsed_ms": 212,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "59191f447bb3af042094c5e3f50bcec451ce857732666484fdbf97e5867f7d53",
+     "stored": "raw/structured-59191f447bb3af04.gz",
+     "stored_bytes": 2157,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 27331,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2017467,
+     "elapsed_ms": 2068,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "f8f016abccae7d471cd30d3fa5080955f9743fbeba342e2ab8795615ff07b08e",
+     "stored": "raw/html-f8f016abccae7d47.gz",
+     "stored_bytes": 377913
+    },
+    {
+     "label": "structured",
+     "target": "https://momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 9566,
+     "elapsed_ms": 215,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "d9e5aa4fe2bdcbdfd4caba48d7e684ad84099caf1953dd3b6de246490bceb297",
+     "stored": "raw/structured-d9e5aa4fe2bdcbdf.gz",
+     "stored_bytes": 1908,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 26024,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "pl.momcozy.com",
+   "kind": "product",
+   "ad_refs": 6,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1579745,
+     "elapsed_ms": 2715,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "a520e6ca17ab4d1d880ff4b14bf2f282b404d947237adc18dee487f0e37a95e7",
+     "stored": "raw/html-a520e6ca17ab4d1d.gz",
+     "stored_bytes": 282399
+    },
+    {
+     "label": "structured",
+     "target": "https://pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 39631,
+     "elapsed_ms": 381,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "6820c5b8f1a6ca6e5e96e540f98343418537cee65922f7373c8c0ff762c97945",
+     "stored": "raw/structured-6820c5b8f1a6ca6e.gz",
+     "stored_bytes": 6250,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 25074,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "url": "https://pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "domain": "pl.momcozy.com",
+   "kind": "product",
+   "ad_refs": 4,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1729181,
+     "elapsed_ms": 3743,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "fa04bf7cc8ee17949ec2eeef0521dc71a86732e18f988a02e80efb0032857086",
+     "stored": "raw/html-fa04bf7cc8ee1794.gz",
+     "stored_bytes": 310643
+    },
+    {
+     "label": "structured",
+     "target": "https://pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 20520,
+     "elapsed_ms": 382,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "7fe8e26f097cbac3ff824a3d3854533db9f6a594f13a8d1c1585826c52fa55fe",
+     "stored": "raw/structured-7fe8e26f097cbac3.gz",
+     "stored_bytes": 2899,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 28771,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "uk.momcozy.com/collections/electric-breast-pump",
+   "url": "https://uk.momcozy.com/collections/electric-breast-pump",
+   "domain": "uk.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/collections/electric-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 924252,
+     "elapsed_ms": 1852,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "1097d2b68f7438262059e7698791522560204d07cc5e82283b90aeb36fe27de4",
+     "stored": "raw/html-1097d2b68f743826.gz",
+     "stored_bytes": 154925
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 19864,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "uk.momcozy.com/collections/wearable-breast-pump",
+   "url": "https://uk.momcozy.com/collections/wearable-breast-pump",
+   "domain": "uk.momcozy.com",
+   "kind": "collection",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/collections/wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 717604,
+     "elapsed_ms": 2039,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "43cecf05626591f23e5ba306cfe0f80533806e8178d5305fdfacc1ad7acfed86",
+     "stored": "raw/html-43cecf05626591f2.gz",
+     "stored_bytes": 139195
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 16587,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  },
+  {
+   "url_key": "uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "uk.momcozy.com",
+   "kind": "product",
+   "ad_refs": 3,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1602464,
+     "elapsed_ms": 2688,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "e08c0352ea3e750b1cac9f2359547cf0f57d37b7b1e7917512c19adce3208e22",
+     "stored": "raw/html-e08c0352ea3e750b.gz",
+     "stored_bytes": 299273
+    },
+    {
+     "label": "structured",
+     "target": "https://uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 32314,
+     "elapsed_ms": 488,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "dd1d067c5cbe6ef9dbf956acadcd4fd08563940e4f3500a0e77b4d044f19d576",
+     "stored": "raw/structured-dd1d067c5cbe6ef9.gz",
+     "stored_bytes": 5854,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 21053,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://uk.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "uk.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2023400,
+     "elapsed_ms": 2989,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "ae8711ec93a63fe582396d4f8e86dc61e64747f73d34f301494475b58a1edead",
+     "stored": "raw/html-ae8711ec93a63fe5.gz",
+     "stored_bytes": 376124
+    },
+    {
+     "label": "structured",
+     "target": "https://uk.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 18469,
+     "elapsed_ms": 504,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "3b9ba981cb8df1c8ca383e148ab180a6f6d2bd699f66da9c578e22acc7090a42",
+     "stored": "raw/structured-3b9ba981cb8df1c8.gz",
+     "stored_bytes": 2856,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 27302,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://uk.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "uk.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 2864527,
+     "elapsed_ms": 4613,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "bedd9cccf471e8c062d798caf101800598d9ba17af8d2650df9cf6e5daec2ff4",
+     "stored": "raw/html-bedd9cccf471e8c0.gz",
+     "stored_bytes": 552623
+    },
+    {
+     "label": "structured",
+     "target": "https://uk.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 20731,
+     "elapsed_ms": 407,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "00547e7efc8a329aa8462384bc2dc6ed7c4328b6d711f1a32035899f213cebf6",
+     "stored": "raw/structured-00547e7efc8a329a.gz",
+     "stored_bytes": 2404,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 40424,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://uk.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "uk.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1495755,
+     "elapsed_ms": 1719,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "77b9db2d5eecdd1cb88ee2cafd70949ac437fc22b58886d331940a06919502cd",
+     "stored": "raw/html-77b9db2d5eecdd1c.gz",
+     "stored_bytes": 298771
+    },
+    {
+     "label": "structured",
+     "target": "https://uk.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 23126,
+     "elapsed_ms": 377,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "f1e10acdbfe80005211b0e187dbe0a50988318306eba5e036d5c87f7ee4fe3b8",
+     "stored": "raw/structured-f1e10acdbfe80005.gz",
+     "stored_bytes": 3207,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 25719,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "uk.momcozy.com",
+   "kind": "product",
+   "ad_refs": 1,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1275427,
+     "elapsed_ms": 1686,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "8d473c388cb636ba2a8459d554213fcb3b3fa98ace970159ff185d1f899a530d",
+     "stored": "raw/html-8d473c388cb636ba.gz",
+     "stored_bytes": 257798
+    },
+    {
+     "label": "structured",
+     "target": "https://uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 9629,
+     "elapsed_ms": 483,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "c6901b45d54bdc655a15ab2bd5a2dca2cc5179e23b2ddb42791d08a47ee55e64",
+     "stored": "raw/structured-c6901b45d54bdc65.gz",
+     "stored_bytes": 1556,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 21828,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "uk.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://uk.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "uk.momcozy.com",
+   "kind": "product",
+   "ad_refs": 2,
+   "tier": "ok_structured",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://uk.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 1584235,
+     "elapsed_ms": 1670,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "4999656c6aa57deca3c6360edb97e326c42bddafbfa6102f538c04bdbe615722",
+     "stored": "raw/html-4999656c6aa57dec.gz",
+     "stored_bytes": 324566
+    },
+    {
+     "label": "structured",
+     "target": "https://uk.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump.js",
+     "retries": 0,
+     "challenged": false,
+     "status": 200,
+     "final_url": null,
+     "bytes": 9542,
+     "elapsed_ms": 355,
+     "error": null,
+     "content_type": "text/javascript",
+     "truncated": false,
+     "retry_after": null,
+     "sha256": "2fac98fedb8215d6d131fd3ce97401111787f1e8310b3fa5505d476147e2d14a",
+     "stored": "raw/structured-2fac98fedb8215d6.gz",
+     "stored_bytes": 1917,
+     "json_ok": true
+    }
+   ],
+   "fetch_tier_raw": "ok_structured",
+   "html_chars": 24546,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": true
+  },
+  {
+   "url_key": "www.amazon.de/dp/B0G1MW5TB6",
+   "url": "https://www.amazon.de/dp/B0G1MW5TB6/",
+   "domain": "www.amazon.de",
+   "kind": "other",
+   "ad_refs": 1,
+   "tier": "ok",
+   "attempts": [
+    {
+     "label": "html",
+     "target": "https://www.amazon.de/dp/B0G1MW5TB6/",
+     "status": 200,
+     "final_url": null,
+     "bytes": 1567574,
+     "elapsed_ms": 3137,
+     "error": null,
+     "content_type": "text/html",
+     "truncated": false,
+     "sha256": "9c0e697102f21e8457a4d44b3bb81aadd1bd542158dccc351804fe72702feafe",
+     "stored": "raw/html-9c0e697102f21e84.gz",
+     "stored_bytes": 303191
+    }
+   ],
+   "fetch_tier_raw": "ok_html",
+   "html_chars": 40422,
+   "six": {
+    "title": true,
+    "body_text": true,
+    "images": true,
+    "claims": true,
+    "links": true,
+    "locale_signals": true
+   },
+   "structured": false
+  }
+ ]
+}

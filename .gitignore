@@ -1,0 +1,68 @@
+# ═══════════════════════════════════════════════════════════════════
+#  .gitignore —— 仓库三层分级（依据 ADR-0013 · D7）
+#
+#  判据不是「大不大」，是：
+#    L1 入历史        人写的、会被改的、改了要能回滚的
+#    L2 入盘不入历史  机器生成的、可复算的、内容寻址的、别人管的
+#    L3 永不入盘      凭据、会话数据
+#
+#  ★ 本文件只写 L2 / L3。其余一律入历史。
+#  ★ 改动本文件 = 改动分级 = 需回到 ADR-0013 §三 同步，否则台账与制品会漂移。
+# ═══════════════════════════════════════════════════════════════════
+
+# ── L3 · 永不入盘 ────────────────────────────────────────────────
+# 凭据：已于 2026-09-17 按 D8 移出项目目录（~/.dsh/credentials/）。
+# 下面两行是**结构性防线**，防止日后有人把凭据放回来。
+**/SecretKey*.csv
+**/*secret*.csv
+**/*credential*.json
+**/*.pem
+**/id_rsa*
+
+# 浏览器会话数据（含 Trust Tokens / Cookies / Local Storage）。
+# 它们已被下面的 `**/_evidence/` 覆盖，此处**显式再列一次** ——
+# ADR-0013 §三要求显式列出，否则日后有人把 _evidence 整体提进 L1 时无人察觉。
+**/_cfprof*/
+**/_chromeprof*/
+
+# ── L2 · 机器生成 / 可复算 / 内容寻址 / 别人管的 ─────────────────
+
+# 依赖与构建产物（可由清单重建）
+.venv-r4/
+.pylibs/
+.vendor/
+node_modules/
+
+# 第三方技能库与克隆（各自有自己的 .git；纳管会变成 gitlink 或重复纳管）
+skills/
+research/repos/
+research/method/codex_research/
+research/method/Kb2Agent/
+
+# 证据目录：内容寻址（文件名即指纹），不可变、自证，本就不需要版本历史
+**/_evidence/
+
+# 机器产物：源表在 PRD（L1）+ 生成脚本（L1）+ 飞书可重拉
+research/governance/skeleton/_data/records.json
+research/governance/skeleton/_data/rules_raw.json
+research/governance/skeleton/_data/miss_attribution.json
+research/landing/要素提取.json
+
+# 追加型账本：只会增长，不需要 diff 与回滚
+research/governance/skeleton/_data/receipts.jsonl
+research/governance/skeleton/_data/receipts.chain.json
+research/governance/skeleton/_data/pushed.selftest.jsonl
+research/governance/skeleton/_data/manifest-history.jsonl
+
+# 一次性迁移备份与弃用制品
+research/governance/skeleton/_data/backup-batchD/
+research/governance/skeleton/_data/backup-migration/
+research/governance/skeleton/_data/deprecated/
+
+# 运行时日志与守护进程状态
+PMO/logs/
+PMO/shouheng-state/
+
+# macOS
+.DS_Store
+**/.DS_Store

@@ -1,0 +1,196 @@
+{
+  "$schema_version": "product-lines-v1",
+  "status": "partially_confirmed",
+  "authority": "产品",
+  "decided_by": "产品（经 Owner 转达）",
+  "decided_at": "2026-09-16",
+  "$why": [
+    "品线不是合规概念，是**产品结构**概念 —— 所以它的 Owner 是产品，不是法务。",
+    "（法务在 2026-09-16 明确不裁定这一项：「不知道，这个要看产品本身」。见 legal-decisions-v1.json · D4。）",
+    "本文件回答一个问题：**`product_lines` 这个字段允许写哪些取值。**",
+    "它不回答「哪些规则适用哪些品线」—— 那是填在规则文件里的，且默认是「适用全部」。",
+    "★ status=proposed：下面的取值域是从**现有业务表**归纳出来的，不是任何人确认过的权威表。",
+    "  产品确认（增/删/改名）之前，它只用于**挡住错字**，不得当作公司品线体系的定论。",
+    "★ status=partially_confirmed（2026-09-16 · D16）：**只确认了「吸奶器」一个取值**，其余 9 个仍待产品确认。用一个中间状态而不是把它标成 confirmed —— 「确认过一部分」与「确认过」在 schema 里长得一样时，下一个人会按后者用。"
+  ],
+  "$what_this_field_does": [
+    "本文件有两块：`values`（允许写哪些品线值，产品确认）与 `assignments`（哪条规则在哪些品线上生效，产品填）。",
+    "`assignments` 是品线归属的**唯一**书写位置。引擎在装载时会把它灌进规则对象，行为等同于在规则里写 `product_lines`；",
+    "但**不要在 `rules-v1.json` 里写** —— 引擎遇到会硬失败并指向这里（两处真相是本项目反复在治的病，见 ADR-0008/0009/0012）。",
+    "不填 → **适用全部品线**（默认，也是今天 26 条规则的实际状态）。",
+    "★ 因此填它是**收窄**动作，不是标注动作：写错一个值，这条规则会在**所有**品线上消失，",
+    "  包括它本该生效的那条 —— 结果是漏报，且没有任何提示。",
+    "  这正是 `values` 必须存在的理由：有了取值域，错字才检得出来（见 $unknown_value_policy）。",
+    "★ 行为机制（引擎侧）：`score.Engine._apply_line_assignments()` 应用归属；",
+    "  `Engine.rules_for()` 过滤；`Engine.line_filter()` 产出可复核报告；判定结果里逐字写明「到底滤没滤、为什么没滤」。"
+  ],
+  "$demonstrated_motivation": {
+    "what": "品线维度不是记账字段，它对应一个**可以现场演示**的精度问题。",
+    "reproduce": "python3 judge.py --text \"超强吸水，柔软亲肤的四件套\" --product-line 家纺",
+    "observed": "判 `T2.2.suction-claim`（吸力夸大）· manual_review · 命中词 `超强`",
+    "same_rule_other_lines": [
+      "家纺「超强吸水」→ 吸力夸大",
+      "家居「静音风扇」→ 噪音 / 吸力",
+      "婴幼儿「极致呵护」→ 吸力夸大",
+      "护肤「超强补水」→ 吸力夸大"
+    ],
+    "reading": "`超强` / `静音` / `极致` 是**跨品线通用**的营销词，但规则是为吸奶器写的。于是不同品线上的同形词被判成了同一条规则。",
+    "two_ways_to_fix": [
+      "A 品线限定（本文件 + 规则里的 `product_lines`）：把规则收窄到会真的出现该主张的品线。粗但立刻可做，且不改词表。",
+      "B 规则补宾语（法务改词）：`超强` → `超强吸力`。更精确，但会漏掉「超强档位」这类不带宾语的写法，且属改判定语义。",
+      "★ 两者不互斥。A 是本文件要产品回答的；B 属法务。"
+    ]
+  },
+  "$provenance": {
+    "$note": "取值域来自现有业务表的**归纳**，不是任何一份权威表 —— 公司里今天没有那份表。逐表计数如下（快照 snapshot-20260916T071634Z）。",
+    "sources": [
+      {
+        "table": "creative__产品字典.json",
+        "records": 8
+      },
+      {
+        "table": "creative__创意UGC_提需表.json",
+        "records": 4
+      },
+      {
+        "table": "creative__创意支持_项目需求.json",
+        "records": 117
+      },
+      {
+        "table": "creative__平面_日常需求看板.json",
+        "records": 34
+      },
+      {
+        "table": "creative__视频_日常需求看板.json",
+        "records": 161
+      },
+      {
+        "table": "seo__品线SEO任务管理系统.json",
+        "records": 142
+      },
+      {
+        "table": "seo__英语站集合页及重要产品页.json",
+        "records": 64
+      },
+      {
+        "table": "seo__费用结算管理.json",
+        "records": 21
+      },
+      {
+        "table": "research/live/snapshot-20260916T050845Z.json · 广告文案明细（合规语料）",
+        "records": 291
+      }
+    ],
+    "encoding_inconsistency": "同一件事在不同表里编码不同：标量（`\"家纺\"`）、数组（`[\"家居\",\"家纺\"]`）、以及占位符（`\"无法归结到品线\"`）。**这也是没有权威表的证据之一。**"
+  },
+  "values": [
+    {
+      "value": "吸奶器",
+      "seen_in_tables": 9,
+      "occurrences": 389,
+      "$note": "唯一有合规语料的品线：291 条广告里 289 条是它。",
+      "$confirmed": {
+        "by": "产品（经 Owner 转达）",
+        "at": "2026-09-16",
+        "$decision": "D16 · 回答 Q10（选项 B）",
+        "what": "「吸奶器」是真实品线取值；且在这一条品线上，26 条规则**全部适用**（`assignments` 不填 = 适用全部，这是现行默认）。",
+        "$what_this_does_not_say": "★ 它**不**说「其余品线不适用这些规则」。收窄是危险动作（写错一个值，规则在整条品线上消失 = 漏报），而其余品线的语料为零 —— 没有样本时收窄等于凭想象删规则。所以 `assignments` 保持为空。"
+      }
+    },
+    {
+      "value": "婴幼儿",
+      "seen_in_tables": 7,
+      "occurrences": 109
+    },
+    {
+      "value": "家纺",
+      "seen_in_tables": 7,
+      "occurrences": 105
+    },
+    {
+      "value": "家居",
+      "seen_in_tables": 6,
+      "occurrences": 73
+    },
+    {
+      "value": "喂养",
+      "seen_in_tables": 4,
+      "occurrences": 42
+    },
+    {
+      "value": "服纺",
+      "seen_in_tables": 4,
+      "occurrences": 39
+    },
+    {
+      "value": "喂养电器",
+      "seen_in_tables": 2,
+      "occurrences": 37
+    },
+    {
+      "value": "多品线",
+      "seen_in_tables": 2,
+      "occurrences": 21,
+      "$note": "不是一条品线，是一个**跨品线**标记。若规则要收窄，这一项需要产品给出确切含义。"
+    },
+    {
+      "value": "功能性服纺",
+      "seen_in_tables": 2,
+      "occurrences": 20,
+      "$note": "与 `服纺` 的关系未确认（子集？并列？）。**不要由开发者猜** —— 猜错会让规则在整条品线上失效。"
+    },
+    {
+      "value": "护肤",
+      "seen_in_tables": 2,
+      "occurrences": 12
+    }
+  ],
+  "$placeholders_excluded": [
+    {
+      "value": "无法归结到品线",
+      "seen_in_tables": 1,
+      "occurrences": 30,
+      "why": "占位符，不是品线。"
+    },
+    {
+      "value": "无匹配类别",
+      "seen_in_tables": 2,
+      "occurrences": 3,
+      "why": "占位符，不是品线。"
+    }
+  ],
+  "$open_for_product": [
+    "Q-P1 `功能性服纺` 与 `服纺` 是什么关系？（子集 / 并列 / 已废弃）",
+    "Q-P2 `喂养` 与 `喂养电器` 是什么关系？`喂养` 是否包含 `吸奶器`？",
+    "Q-P3 `多品线` 在规则收窄里应该怎么处理？（= 全部适用？还是不允许用于收窄？）",
+    "Q-P4 这份取值域缺了哪些品线？或哪些已废弃、应删？",
+    "Q-P5 落地页/广告文案的品线字段，**将来以哪张表为准**？（今天有 3 套编码，谁都不是权威）",
+    "Q-P6（D16 新增）其余 9 个品线取值何时确认？确认前它们按「未按品线过滤」跑，语料为零。"
+  ],
+  "$unknown_value_policy": {
+    "caller_passes_unknown_value": {
+      "behavior": "**不过滤**（保留全部规则），并在判定结果的 `boundary_statement` 里显式写明「传入的品线不在取值域内，本次未按品线过滤」。",
+      "why": "未知取值若按「不在任何规则的 product_lines 里」处理，会让**所有**声明了品线的规则静默消失 —— 一个拼写错误变成一次大规模漏报。宁可不过滤，也不能静默少判。"
+    },
+    "rule_declares_unknown_value": {
+      "behavior": "判定结果里带 `unknown_declared_product_lines`（规则 → 它声明的、不在取值域内的值），且 `tools/verify_engine_contract.py` 会红。",
+      "why": "这是收窄时的错字，后果是该规则在预期品线上不生效 = 漏报。必须在合入前挡住，而不是等漏报发生。"
+    }
+  },
+  "assignments": {
+    "$authoritative": "★ 这里是品线归属的**唯一**书写位置（Owner：产品）。不要在 rules-v1.json 里写 `product_lines` —— 引擎遇到会硬失败并指向这里。",
+    "$fill_guide": "键 = rule_key，值 = 该规则**生效**的品线列表。只写「这条规则在该品线上根本不可能出现」的例外，不要重述「适不适用」（那是法务的问题，已在规则里定过）。",
+    "$example": "{\"T2.2.suction-claim\": [\"吸奶器\", \"喂养电器\"]} → 吸力夸大规则只在吸奶器与喂养电器品线上生效",
+    "$how": "填完跑：python3 tools/verify_engine_contract.py --only V23（核对取值域与漏报风险）",
+    "$pending": "待产品确认 —— 见 research/governance/品线维度-待产品确认.md 与 品线确认表.csv"
+  },
+  "$confirmed_scope": [
+    "★ 已确认：`吸奶器`（289/291 条存量语料）。",
+    "★ 未确认：其余 9 个取值 —— 婴幼儿 / 家纺 / 家居 / 喂养 / 服纺 / 喂养电器 /",
+    "  多品线 / 功能性服纺 / 护肤。它们的语料为零，且其中两条语义本身未定",
+    "  （`多品线` 是跨品线标记、`功能性服纺` 与 `服纺` 关系未确认）。",
+    "★ 未确认的取值在判定里**不过滤**（$unknown_value_policy），且边界声明会写明",
+    "  「未按品线过滤」—— 即「留 unknown」不是「静默按没声明处理」。"
+  ],
+  "$pending_note": "D16 之后本表的待办收窄为：9 个取值的确认。机制侧（未知值不过滤、错值显形、单一书写位置）已齐备并有 V23 守着。"
+}

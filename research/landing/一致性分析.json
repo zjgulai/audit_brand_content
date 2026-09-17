@@ -1,0 +1,2030 @@
+{
+ "来源": "research/live/snapshot-20260916T050845Z.json + research/landing/要素提取.json",
+ "表A_广告vs落地页": {
+  "可对照的广告数": 93,
+  "至少一项广告声明未在落地页出现的广告数": 33,
+  "严格子串口径下的同一数字": 42,
+  "口径说明": "严格口径用 t.lower() in page，会把『45dB vs 45 dB』这类写法差异误报为内容缺失（实测假阳性率 20%）。正式口径先做规范化再比。",
+  "其中广告本身已命中规则的": 29,
+  "未在落地页出现的声明计数": {
+   "comparative :: Award-Winning": 5,
+   "health :: Pain-Free": 5,
+   "performance :: 280mmHg": 4,
+   "参数_mmHg :: 280": 4,
+   "absolute :: Perfect": 3,
+   "absolute :: perfect": 3,
+   "absolute :: never": 2,
+   "comparative :: World's First": 2,
+   "health :: boost milk": 2,
+   "medical :: Hospital Grade": 2,
+   "performance :: 130 mins": 2,
+   "performance :: 285 mmHg": 1,
+   "参数_mmHg :: 285": 1,
+   "health :: painless": 1,
+   "performance :: 45dB": 1,
+   "performance :: 180ml": 1,
+   "performance :: 300 mmHg": 1,
+   "performance :: 300mmHg": 1,
+   "参数_mmHg :: 300": 1,
+   "medical :: clinically": 1,
+   "performance :: 48dB": 1,
+   "absolute :: Ultimate": 1,
+   "performance :: 48 dB": 1,
+   "performance :: 8 oz": 1,
+   "absolute :: Never": 1,
+   "performance :: 500 hours": 1,
+   "performance :: 7 minutes": 1,
+   "medical :: Hospital-Grade": 1,
+   "health :: Increase milk supply": 1
+  },
+  "逐条": [
+   {
+    "广告record_id": "recvuJYdObm8DM",
+    "广告名称": "自适应搜索广告-Gelsey-Sale-Search-欧",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M03,U03,M05,M07",
+    "落地页": "uk.momcozy.com/collections/wearable-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy® Wearable Pumps | Hands-Free Pumping | Best-Selling Wireless Pumps | Freedom to Pump Anywhere | Efficient Wearable Pumping | Pump Hands-Free & Cord-Free | Hands-Free & Discreet | More Milk, Less Stress | Portable Pumping for Mums | momcozy breast pump | Discreet & Quiet Pumping | Hospital-Gr",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObeVsZ",
+    "广告名称": "自适应搜索广告-Asther-Sale-Search-C",
+    "风险等级": "审慎·黄",
+    "命中规则": "M01,M02",
+    "落地页": "ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy® Official | Best Breast Pump For You | Find Your Perfect Flow | Whisper-Quiet Under 42dB | Cozy Motherhood With Momcozy® | Momcozy M9 Wearable Pump | -300mmHg Strong Suction | 2M+ Global Mom's Choice | Pump More in Less Time | 5 Sessions Per Charge | Track Milk Output in App | Momcozy CA | A",
+    "声明总数": 7,
+    "页面上没有的": [
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObopiv",
+    "广告名称": "整体效果",
+    "风险等级": "合规·绿",
+    "命中规则": "",
+    "落地页": "momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy Official | Track, Control, and Pump Smarter | Shop Momcozy Air 1 Ultra-slim Pump | Great Price at $369.99 | Smart Pumping, Track, Control, and Pump Smarter With the Momcozy App. | Great Price at $369.99, Pay In 4 Intallments, Interest Free, Shop Today | Powerful Suction Of Up to -280mmHg, Wi",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObUrEa",
+    "广告名称": "自适应搜索广告-Asther-Sale-Search-C",
+    "风险等级": "合规·绿",
+    "命中规则": "",
+    "落地页": "ca.momcozy.com/collections/weekly-deals-ca",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy® Official | Best Breast Pump For You | 20% Off {KeyWord:momcozy pump} | Extra 20% Off on Purchases | Cozy Motherhood With Momcozy® | Use Code:MOMCA20 | Bring Joy To Breastfeeding | 2M+ Global Mom's Choice | Best Mom&Baby's Product | {Keyword:Momcozy} Special Offer | Momcozy M5 Smart | Momcoz",
+    "声明总数": 3,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "285 mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "285",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "285 mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "285",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObrjds",
+    "广告名称": "自适应搜索广告-Gelsey-Sale-Search-欧",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M03,U03,M05",
+    "落地页": "uk.momcozy.com/collections/electric-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy® Wearable Pumps | Hands-Free Pumping | Best-Selling Wireless Pumps | Freedom to Pump Anywhere | Efficient Wearable Pumping | Pump Hands-Free & Cord-Free | Hands-Free & Discreet | More Milk, Less Stress | Portable Pumping for Mums | momcozy breast pump | Discreet & Quiet Pumping | Hospital-Gr",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObBmKV",
+    "广告名称": "视频-M5Smart-使用前后对比-26031602_ZZ二创EN_ZZNONE-长期授权",
+    "风险等级": "高危·红",
+    "命中规则": "H07",
+    "落地页": "ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "落地页tier": "ok_structured",
+    "广告文案": "Amazon's #1 Breast Pump — Upgraded | Now Smarter. Still #1. | Pump at Your Desk. No One Knows. | Pump Like Baby's Latch — No Pain | Control From Your Phone | Weighs only 232g — 2/3 the size of regular pumps. Fits inside any nursing bra. | The Momcozy M5 Smart Wearable Pump features seamless app cont",
+    "声明总数": 1,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "painless",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "painless",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObV6eR",
+    "广告名称": "自适应搜索广告-Jolla-Sale-Search-US",
+    "风险等级": "高危·红",
+    "命中规则": "H04,M03,U01",
+    "落地页": "momcozy.com/collections/electric-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Quiet Wearable Breast Pump | Breast Pumps for Work | Pump Quietly at Work | Under 45dB Quiet Pumping | Won't Interrupt a Meeting | The 2.4-Inch Wearable Pump | Invisible Under Your Shirt | Only 260g Per Cup | Slim Under Work Clothes | No Tubes, No Cords | Up to 15 Sessions With Case | Fits in Your W",
+    "声明总数": 5,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "45dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "45dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObDPRw",
+    "广告名称": "W1-UGC-YS自制_UGC视频_Kerstin M",
+    "风险等级": "高危·红",
+    "命中规则": "H09",
+    "落地页": "momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "The Warm-Massage Breast Pump | Pumping That Feels Like Care | Warmth Meets Comfort | World's First Warm Pump | Feel the Difference, Mom | 360° wraparound warmth + rhythmic massage. Pumping has never felt this good. | App-controlled, 10 sessions per charge. Designed for real mom life. | SoftPulse mas",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "never",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "World's First",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "never",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "World's First",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObfmhq",
+    "广告名称": "W1二创视频-26050702_ZZ二创EN_ZZNONE-长期授权-英语-38s-无折扣",
+    "风险等级": "高危·红",
+    "命中规则": "H09",
+    "落地页": "momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "The Warm-Massage Breast Pump | Pumping That Feels Like Care | Warmth Meets Comfort | World's First Warm Pump | Feel the Difference, Mom | 360° wraparound warmth + rhythmic massage. Pumping has never felt this good. | App-controlled, 10 sessions per charge. Designed for real mom life. | SoftPulse mas",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "never",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "World's First",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "never",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "World's First",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObZKFa",
+    "广告名称": "超薄&隐蔽",
+    "风险等级": "审慎·黄",
+    "命中规则": "M07",
+    "落地页": "momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy Official | Momcozy® Air 1 Ultra-slim Breast Pump | Great Price at $369.99 | Momcozy® 2026 Brand New Pump | Track, Control, Pump Smarter | Smart Pumping, Track, Control, and Pump Smarter With the Momcozy App. | Double-sealed skin-friendly flange ensures a comfy fit while preventing leakage | ",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObIJvQ",
+    "广告名称": "视频-M6-6021802_ZZ二创EN_ZZNONE-长期授权",
+    "风险等级": "高危·红",
+    "命中规则": "H02",
+    "落地页": "ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy Canada Official | More Milk. Less Time. Hands-Free. | Stronger Pump. Fuller Sessions. | Struggling With Milk Supply? | Best for New Moms. Here's Why. | 295 mmHg suction, 6 sessions per charge, DoubleFit silicone flange. Hands-free. Cord-free. | Momcozy M6 — optimal pumping rhythm proven to b",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "180ml",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "180ml",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObLR6F",
+    "广告名称": "自适应搜索广告-Asther-Sale-Search-C",
+    "风险等级": "审慎·黄",
+    "命中规则": "M01,M05,U03",
+    "落地页": "ca.momcozy.com/fr/collections/electric-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy | Tire-lait Mains Libres | Tire-lait Sans Fil Momcozy | Tirez Votre Lait Partout | Qualité Hospitalière -300mmHg | Ultra-fin et Discret | Sans Tubes ni Câbles | Tirez au Bureau en Silence | Contrôle via Application | Économisez 15 % - MOMCA15 | Confort et Liberté Totale | Tire-Lait Ultra-Fin",
+    "声明总数": 3,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "300 mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "300mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "300",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "300 mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "300mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "300",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdOb1fOj",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M07",
+    "落地页": "momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+    "落地页tier": "ok_html",
+    "广告文案": "Pump More Easily & Efficiently | {KeyWord:pump for low milk supply} | Cozy Power By Momcozy | Momcozy® Official | Momcozy® With Moms Always | Momcozy Official | {KeyWord:best breast pump} | {KeyWord:increase breast milk supply} | Breast Pumps for Milk Supply | Top Pumps for More Milk | Best Breast P",
+    "声明总数": 5,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "boost milk",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "boost milk",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObLAH7",
+    "广告名称": "自适应搜索广告-Asther-Sale-Search-C",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M03,U03,M05,M02",
+    "落地页": "ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy® Official | Hospital-Grade at Home | -300 mmHg Strong Suction | True Hospital-Strength Power | Wearable Hospital Pump | 3rd-Gen Motor Performance | Shop the V1 Pro Today | Empty Faster, Pump Less | Boost Your Milk Supply | 28% More Milk With DoubleFit™ | Lean Back & Pump in Comfort | Momcozy",
+    "声明总数": 8,
+    "页面上没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "clinically",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "48dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "clinically",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "300 mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": true
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "48dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObzUa2",
+    "广告名称": "大促-2026BDMS活动-吸奶器M9-20%OFF",
+    "风险等级": "高危·红",
+    "命中规则": "H07",
+    "落地页": "eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy Mobile Flow Breast Pump | Big Member Sale: 20% Off Pump | Mobile Flow Pump 20% Off | Code BDMS20 Saves 20% | Pain-Free Wearable Pump | Big Member Sale: Get 20% Off Momcozy Mobile Flow Hands-Free Pump with Code BDMS20 | Express Milk Comfortably On the Go & Save 20% on Momcozy Mobile Flow with",
+    "声明总数": 1,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObE8HQ",
+    "广告名称": "自适应搜索广告-Gelsey-Sale-Search-欧",
+    "风险等级": "审慎·黄",
+    "命中规则": "U03,M05",
+    "落地页": "eu.momcozy.com/collections/electric-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "momcozy breast pump | momcozy pump | Hands-Free Breast Pumps | Portable Breast Pumps | Wearable Electric Pumps | Wireless Pumping Freedom | Hospital-Grade Pumps | Breastfeeding Made Easy | Pumping On The Go | Shop Momcozy Wearable Pumps | Pumping Made Easy & Efficient | Shop Our Smart App Pumps | Co",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Ultimate",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Ultimate",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObBgjg",
+    "广告名称": "自适应搜索广告-Jolla-Sale-Search-US",
+    "风险等级": "审慎·黄",
+    "命中规则": "M03,M05,M07,U01,U03",
+    "落地页": "momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Hospital-Strength Suction | Momcozy V series Breast Pump | Motor Goes in Your Pocket | Trusted by 6 Million+ Moms | See Your Milk as It Flows | 9 Sessions Per Charge | Closed Anti-Backflow System | Free 1-on-1 IBCLC Session | Quiet 48 dB Operation | Up to -300 mmHg Suction | Hospital Grade Wearable ",
+    "声明总数": 10,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "48 dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "8 oz",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "300 mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": true
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "48 dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "8 oz",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObc4kp",
+    "广告名称": "自适应搜索广告-Jolla-Sale-Search-US",
+    "风险等级": "审慎·黄",
+    "命中规则": "M07,U01",
+    "落地页": "momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Set It Down. It Won't Spill. | Mobile Style™ Breast Pumps M6 | Built To Stay Leak-Free | -295 mmHg, Still Under 50dB | Still Only 4 Parts To Wash | {KeyWord:Momcozy} Official | Quiet Enough For A Meeting | 30 Days To Change Your Mind | Free 1-On-1 IBCLC Session | Yes, You Can Pump At Work | Start Wi",
+    "声明总数": 11,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Never",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "500 hours",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Never",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "500 hours",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "50dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": true
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObz5mN",
+    "广告名称": "自适应搜索广告-Gelsey-Sale-Search-欧",
+    "风险等级": "高危·红",
+    "命中规则": "H07,M07",
+    "落地页": "uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy Wellness 1 | Wellness 1 Breast Pump | Warm Massage Breast Pump | Industry-First Warming Pump | Pain-Free Warm Massage Pump | Cordless Warm Massage Pump | Breast Pump with Massage | Pre-order: 20% Off & Free Gift | Save £60 + Free £29.99 Gift | Early Bird Breast Pump Deal | Save 20% | Code: D",
+    "声明总数": 1,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObEl6L",
+    "广告名称": "自适应搜索广告-Asther-Sale-Search-C",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M01,M03,M04,M02",
+    "落地页": "ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy® Official | Momcozy S12 Pro Quick | S12 Momcozy Breast Pump | More Milk, Less Time | -292 mmHg Strong Suction | Wearable Hands-Free Pump | Shop the S12 Pro Quick | Best-Value Wearable Pump | S12 Pro Quick On Sale | Don't Miss This Week's Deal | Whisper-Quiet under 46dB | DoubleFit™ Hybrid Fl",
+    "声明总数": 7,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "7 minutes",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "46dB",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": true
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "7 minutes",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObopeN",
+    "广告名称": "自适应搜索广告-Gelsey-Sale-Search-欧",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M03,U03,M05",
+    "落地页": "uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy® Wearable Pumps | Hands-Free Pumping | Best-Selling Wireless Pumps | Freedom to Pump Anywhere | Efficient Wearable Pumping | Pump Hands-Free & Cord-Free | Hands-Free & Discreet | More Milk, Less Stress | Portable Pumping for Mums | momcozy breast pump | Discreet & Quiet Pumping | Hospital-Gr",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "Hospital-Grade",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "Hospital-Grade",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "comparative",
+      "广告中的表述": "Award-Winning",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObZhZx",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H07",
+    "落地页": "momcozy.com/blogs/momcare/momcozy-m5-vs-m6-comparison",
+    "落地页tier": "ok_html",
+    "广告文案": "Compare M5 & M6 Features | Cozy Designs Born from Love | Explore M5 & M6 Pump Styles | Momcozy Pumps for Every Mom | Find Your Cozy Pump Style | Explore M5 & M6 With Momcozy | Smart Choices, Cozy Support | Gentle Tech, Thoughtful Care | Momcozy Pumping Options | Momcozy M5 & M6 Features | Compare Mo",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObJwyY",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H05,H07",
+    "落地页": "momcozy.com/blogs/momcare/momcozy-m5-vs-m9-comparison",
+    "落地页tier": "ok_html",
+    "广告文案": "Cozy Designs Born from Love | Pump Your Way: Explore M5 & M9 | Compare Functions: M5 & M9 | Key Functions of M5 & M9 Pumps | M5 vs M9: Features at a Glance | Choose Your Perfect Pump Today | {KeyWord:momcozy m9 vs m5} | Smart Hands-Free Pump M9 | Momcozy M9 App-Controlled Pump | Momcozy M5 Pain-Free",
+    "声明总数": 5,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObE80Z",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H05",
+    "落地页": "momcozy.com/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+    "落地页tier": "ok_html",
+    "广告文案": "Cozy Designs Born from Love | Momcozy Official | Cozy Power By Momcozy | {KeyWord:momcozy pump m5 smart vs m6} | Choose Your Perfect Pump Today | momcozy m5 smart vs m6 | M5 Smart Vs M6 | Momcozy M5 Smart vs M6 | Momcozy® Official | Momcozy® Pumping Options | Momcozy® With Moms Always | For Moms Who",
+    "声明总数": 5,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "Perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObLnyQ",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H02,M07",
+    "落地页": "momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+    "落地页tier": "ok_html",
+    "广告文案": "Pump More Easily & Efficiently | {KeyWord:pump for low milk supply} | Cozy Power By Momcozy | Momcozy® Official | Momcozy® With Moms Always | Momcozy Official | {KeyWord:best breast pump} | {KeyWord:increase breast milk supply} | Breast Pumps for Milk Supply | Top Pumps for More Milk | Best Breast P",
+    "声明总数": 5,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "boost milk",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "boost milk",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObKvVy",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H05",
+    "落地页": "momcozy.com/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy® Official | Momcozy M5 Smart vs M9 | Find Your Cozy Pump Style | Compare Momcozy Breast Pumps | App Control More Comfort | M5 Smart Vs M9 | M5 Smart vs M9 Differences | Wearable Pump Picks for Moms | Find Ideal Pump for Your Needs | Smart Pump with App Control | {KeyWord:momcozy breast pump}",
+    "声明总数": 4,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdOblbCM",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H05",
+    "落地页": "momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Wearable Pump vs. Budget App | Compare Momcozy Breast Pumps | {KeyWord:momcozy m5 smart vs air 1} | Momcozy M5 Smart | Hands‑Free Pumping Solutions | Momcozy Air 1 Breast Pump | Momcozy Air 1 Ultra‑Slim Pump | Slim Pump vs Budget Pump | Momcozy Air 1 | {KeyWord:momcozy air 1 vs m5 smart} | Slim Wear",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdObNa32",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H05",
+    "落地页": "momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Wearable Pump vs. Budget App | Compare Momcozy Breast Pumps | {KeyWord:momcozy m5 smart vs air 1} | Momcozy M5 Smart | Hands‑Free Pumping Solutions | Momcozy Air 1 Breast Pump | Momcozy Air 1 Ultra‑Slim Pump | Slim Pump vs Budget Pump | Momcozy Air 1 | {KeyWord:momcozy air 1 vs m5 smart} | Slim Wear",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "absolute",
+      "广告中的表述": "perfect",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYdOb61lT",
+    "广告名称": "自适应搜索广告-tina-Sale-Search-US-",
+    "风险等级": "高危·红",
+    "命中规则": "H02,H07,H09",
+    "落地页": "momcozy.com/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy® Official | Momcozy W1 vs Air 1 | Find Your Cozy Pump Style | Compare Momcozy Breast Pumps | Find Ideal Pump for Your Needs | Momcozy Wellness 1 | Heated Breast Pump | Breast Pump with Heat | Heated Wearable Breast Pump | Shop Momcozy Wearable Pumps | Pain-Free Breast Pumping | Warm Massage ",
+    "声明总数": 3,
+    "页面上没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Increase milk supply",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "health",
+      "广告中的表述": "Increase milk supply",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "health",
+      "广告中的表述": "Pain-Free",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYeGRNKlW",
+    "广告名称": "S12 Pro",
+    "风险等级": "审慎·黄",
+    "命中规则": "M05,M07,U03",
+    "落地页": "momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy Official | S12 Pro Wearable Breast Pump | Wireless & Portable & Hospital Grade | Momcozy Hands Free Breast Pump - S12 Pro | S12 Pro Breast Pump From $74.99 | Momcozy Official - S12 Pro Wearable Breast Pump From $74.99 | Wireless & Portable & Hospital Grade & High Efficiency | With an upgrade",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "Hospital Grade",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "130 mins",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "Hospital Grade",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "130 mins",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYeGRNQ4L",
+    "广告名称": "S12 Pro",
+    "风险等级": "审慎·黄",
+    "命中规则": "M05,M07,U03",
+    "落地页": "momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+    "落地页tier": "ok_html",
+    "广告文案": "Momcozy Official | S12 Pro Wearable Breast Pump | Wireless & Portable & Hospital Grade | Momcozy Hands Free Breast Pump - S12 Pro | S12 Pro Breast Pump From $74.99 | Momcozy Official - S12 Pro Wearable Breast Pump From $74.99 | Wireless & Portable & Hospital Grade & High Efficiency | With an upgrade",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "Hospital Grade",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "130 mins",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "medical",
+      "广告中的表述": "Hospital Grade",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "performance",
+      "广告中的表述": "130 mins",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYeGRL96i",
+    "广告名称": "整体效果",
+    "风险等级": "合规·绿",
+    "命中规则": "",
+    "落地页": "momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Momcozy Official | Track, Control, and Pump Smarter | Shop Momcozy Air 1 Ultra-slim Pump | Great Price at $369.99 | Momcozy® Brand New Breast Pump | Momcozy Official Brand New - Air 1 Ultra-slim Breast Pump | Smart Pumping, Track, Control, and Pump Smarter With the Momcozy App. | Great Price at $369",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   },
+   {
+    "广告record_id": "recvuJYeGRYqFY",
+    "广告名称": "用户证言素材",
+    "风险等级": "合规·绿",
+    "命中规则": "",
+    "落地页": "momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+    "落地页tier": "ok_structured",
+    "广告文案": "Trust By 4.5M+ Moms Worldwide | Awards Winner Wearable Breast Pump Air 1 | Momcozy® Air 1 Ultra-slim Breast Pump | Momcozy® New Air 1 Ultra-thin Pump | Great Price at $369.99 | Momcozy Official - Awards Winner Air 1 Ultra-slim Breast Pump | Momcozy® Air 1 Ultra-thin Breast Pump, For A Truly Discreet",
+    "声明总数": 2,
+    "页面上没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ],
+    "严格口径下没有的": [
+     {
+      "类型": "performance",
+      "广告中的表述": "280mmHg",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     },
+     {
+      "类型": "参数_mmHg",
+      "广告中的表述": "280",
+      "落地页是否出现_严格": false,
+      "落地页是否出现": false
+     }
+    ]
+   }
+  ]
+ },
+ "表B_跨locale一致性": {
+  "跨 locale 产品数": 9,
+  "参数或认证不一致的产品数": 4,
+  "逐产品": [
+   {
+    "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+    "locale数": 9,
+    "地区站": [
+     "au.momcozy.com",
+     "ca.momcozy.com",
+     "de.momcozy.com",
+     "es.momcozy.com",
+     "eu.momcozy.com",
+     "fr.momcozy.com",
+     "momcozy.com",
+     "pl.momcozy.com",
+     "uk.momcozy.com"
+    ],
+    "逐站": {
+     "au.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy M5 Smart Wearable Breast Pump – App Control | AUPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMute",
+      "正文长度": 20176,
+      "tier": "ok_structured"
+     },
+     "ca.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy M5 Smart Wearable Pump – Bluetooth App Control | CAPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayM",
+      "正文长度": 20516,
+      "tier": "ok_structured"
+     },
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "M5 Smart Tragbare Milchpumpe – Mit App-Steuerung aufgerüstetPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlay",
+      "正文长度": 24021,
+      "tier": "ok_structured"
+     },
+     "es.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "Sacaleches portátil M5 Smart – versión mejorada con control por appPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopCl",
+      "正文长度": 24513,
+      "tier": "ok_structured"
+     },
+     "eu.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy M5 Smart Breast Pump | App-Controlled Tracking | Shop EUPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClose",
+      "正文长度": 21127,
+      "tier": "ok_structured"
+     },
+     "fr.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "Tire-lait portable et connecté Momcozy M5 Smart - Amélioré avec contrôPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareSho",
+      "正文长度": 26035,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "M5 Smart Wearable Breast Pump – Upgraded with App ControlPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMut",
+      "正文长度": 24740,
+      "tier": "ok_structured"
+     },
+     "pl.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "Nowość | M5 Smart Laktator Muszlowy – Ulepszony Sterowanie przez AplikPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareSho",
+      "正文长度": 25074,
+      "tier": "ok_structured"
+     },
+     "uk.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285"
+       ],
+       "dB": [
+        "48"
+       ]
+      },
+      "认证": [],
+      "title": "M5 Smart Wearable Breast Pump | Upgraded with App ControlPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMut",
+      "正文长度": 21053,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": []
+   },
+   {
+    "handle": "momcozy-mobile-style-hands-free-breast-pump",
+    "locale数": 7,
+    "地区站": [
+     "ca.momcozy.com",
+     "de.momcozy.com",
+     "es.momcozy.com",
+     "eu.momcozy.com",
+     "fr.momcozy.com",
+     "momcozy.com",
+     "uk.momcozy.com"
+    ],
+    "逐站": {
+     "ca.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "Momcozy M6 Mobile Style™ Wearable Breast Pump | Shop CAPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteU",
+      "正文长度": 26137,
+      "tier": "ok_structured"
+     },
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "Momcozy M6 Milchpumpe: Freihändig, Effizient & MobilPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteUnmu",
+      "正文长度": 28266,
+      "tier": "ok_structured"
+     },
+     "es.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "Sacaleches portátil M6 Momcozy | Potencia y confortPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteUnmut",
+      "正文长度": 28651,
+      "tier": "ok_structured"
+     },
+     "eu.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "Momcozy M6 Mobile Style™ Hands-Free Pump | Elegant Choice EUPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlay",
+      "正文长度": 25295,
+      "tier": "ok_structured"
+     },
+     "fr.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "Momcozy Mobile Tire-lait mains libres M6 | Puissance & confortPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePl",
+      "正文长度": 28250,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "M6 Mobile Hands-free Breast Pump | Efficient & More MilkPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMute",
+      "正文长度": 30598,
+      "tier": "ok_structured"
+     },
+     "uk.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295",
+        "300"
+       ],
+       "dB": [
+        "50"
+       ],
+       "认证词": [
+        "GREENGUARD"
+       ]
+      },
+      "认证": [
+       "GREENGUARD"
+      ],
+      "title": "M6 Mobile Hands-free Breast Pump | Efficient & More MilkPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMute",
+      "正文长度": 25719,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": []
+   },
+   {
+    "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+    "locale数": 6,
+    "地区站": [
+     "ca.momcozy.com",
+     "de.momcozy.com",
+     "eu.momcozy.com",
+     "fr.momcozy.com",
+     "momcozy.com",
+     "uk.momcozy.com"
+    ],
+    "逐站": {
+     "ca.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ],
+       "dB": [
+        "42"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "Momcozy M9 Mobile Flow™ Wearable Breast Pump | Shop Momcozy CAPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePl",
+      "正文长度": 39571,
+      "tier": "ok_structured"
+     },
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ],
+       "dB": [
+        "42"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "Momcozy M9 freihändige Milchpumpe: 15 Stufen & App-SteuerungPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlay",
+      "正文长度": 44139,
+      "tier": "ok_structured"
+     },
+     "eu.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ],
+       "dB": [
+        "42"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "M9 Mobile Hands-free Breast Pump | Personalised Pumping - EUPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlay",
+      "正文长度": 40195,
+      "tier": "ok_structured"
+     },
+     "fr.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ],
+       "dB": [
+        "42",
+        "48"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "Tire-lait mobile mains libres M9 | Personnalisé et efficacePlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayM",
+      "正文长度": 44693,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ],
+       "dB": [
+        "48"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "M9 Mobile Hands-free Breast Pump | Personalised PumpingPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteU",
+      "正文长度": 45457,
+      "tier": "ok_structured"
+     },
+     "uk.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ],
+       "dB": [
+        "42"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "M9 Mobile Hands-free Breast Pump | Personalised PumpingPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteU",
+      "正文长度": 40424,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": [
+     {
+      "参数": "dB",
+      "各地区取值": {
+       "ca.momcozy.com": [
+        "42"
+       ],
+       "de.momcozy.com": [
+        "42"
+       ],
+       "eu.momcozy.com": [
+        "42"
+       ],
+       "fr.momcozy.com": [
+        "42",
+        "48"
+       ],
+       "momcozy.com": [
+        "48"
+       ],
+       "uk.momcozy.com": [
+        "42"
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+    "locale数": 5,
+    "地区站": [
+     "de.momcozy.com",
+     "es.momcozy.com",
+     "fr.momcozy.com",
+     "momcozy.com",
+     "uk.momcozy.com"
+    ],
+    "逐站": {
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295"
+       ],
+       "认证词": [
+        "CE"
+       ]
+      },
+      "认证": [
+       "CE"
+      ],
+      "title": "Momcozy Wellness 1 Tragbare Milchpumpe mit WärmemassageAmerican ExpressApple PayDiscoverGoogle PayJCBKlarnaMaestroMaster",
+      "正文长度": 24333,
+      "tier": "ok_structured"
+     },
+     "es.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295"
+       ],
+       "认证词": [
+        "CE"
+       ]
+      },
+      "认证": [
+       "CE"
+      ],
+      "title": "Sacaleches Momcozy Wellness 1: Masaje Térmico e InalámbricoAmerican ExpressApple PayDiscoverGoogle PayJCBKlarnaMaestroMa",
+      "正文长度": 18473,
+      "tier": "ok_structured"
+     },
+     "fr.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295"
+       ],
+       "dB": [
+        "45"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "Momcozy Wellness 1 - Tire-lait chauffant mains libres et massantAmerican ExpressApple PayDiscoverGoogle PayJCBKlarnaMaes",
+      "正文长度": 24771,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295"
+       ],
+       "认证词": [
+        "FDA"
+       ]
+      },
+      "认证": [
+       "FDA"
+      ],
+      "title": "Momcozy W1 Warm-Massage Breast Pump | Wearable, Heated & CordlessAmerican ExpressApple PayDiscoverGoogle PayJCBKlarnaMae",
+      "正文长度": 22898,
+      "tier": "ok_structured"
+     },
+     "uk.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "295"
+       ],
+       "认证词": [
+        "CE"
+       ]
+      },
+      "认证": [
+       "CE"
+      ],
+      "title": "Momcozy Wellness 1 | Wearable Breast Pump with Warmth & MassageAmerican ExpressApple PayDiscoverGoogle PayJCBKlarnaMaest",
+      "正文长度": 21828,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": [
+     {
+      "参数": "认证词",
+      "各地区取值": {
+       "de.momcozy.com": [
+        "CE"
+       ],
+       "es.momcozy.com": [
+        "CE"
+       ],
+       "fr.momcozy.com": [
+        "FDA"
+       ],
+       "momcozy.com": [
+        "FDA"
+       ],
+       "uk.momcozy.com": [
+        "CE"
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "handle": "momcozy-air-1-ultra-slim-breast-pump",
+    "locale数": 5,
+    "地区站": [
+     "au.momcozy.com",
+     "ca.momcozy.com",
+     "de.momcozy.com",
+     "momcozy.com",
+     "uk.momcozy.com"
+    ],
+    "逐站": {
+     "au.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285",
+        "295",
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy Air 1 Ultra Slim Breast Pump | Invisible Fit | Shop AUPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePl",
+      "正文长度": 29309,
+      "tier": "ok_structured"
+     },
+     "ca.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285",
+        "295",
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy Air 1 Ultra-slim Wearable Breast Pump | Momcozy CAPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMu",
+      "正文长度": 28754,
+      "tier": "ok_structured"
+     },
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285",
+        "295",
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy Air 1 Ultraflache Milchpumpe | Offizieller ShopPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteU",
+      "正文长度": 29181,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285",
+        "295",
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy Air 1 Wearable Breast Pump - Ultra-Slim On-the-Go SolutionPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClo",
+      "正文长度": 33190,
+      "tier": "ok_structured"
+     },
+     "uk.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "285",
+        "295",
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy Air 1 Wearable Breast Pump - Ultra-Slim On-the-Go SolutionPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClo",
+      "正文长度": 27302,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": []
+   },
+   {
+    "handle": "v1-pro-hospital-grade-wearable-breast-pump",
+    "locale数": 4,
+    "地区站": [
+     "ca.momcozy.com",
+     "de.momcozy.com",
+     "momcozy.com",
+     "uk.momcozy.com"
+    ],
+    "逐站": {
+     "ca.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "V1 Pro Hospital-Grade Wearable Breast Pump | Hands-Free CAPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMu",
+      "正文长度": 19387,
+      "tier": "ok_structured"
+     },
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "V1 Pro Freihändige Milchpumpe | KrankenhausqualitätPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteUnmut",
+      "正文长度": 22459,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "V1 Pro Hands-Free Breast Pump | Hospital-gradePlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteUnmuteShar",
+      "正文长度": 26024,
+      "tier": "ok_structured"
+     },
+     "uk.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "288",
+        "300"
+       ]
+      },
+      "认证": [],
+      "title": "V1 Pro Hands-Free Breast Pump | Hospital-strengthPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMuteUnmuteS",
+      "正文长度": 24546,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": [
+     {
+      "参数": "mmHg",
+      "各地区取值": {
+       "ca.momcozy.com": [
+        "300"
+       ],
+       "de.momcozy.com": [
+        "300"
+       ],
+       "momcozy.com": [
+        "300"
+       ],
+       "uk.momcozy.com": [
+        "288",
+        "300"
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "handle": "s12-pro-quick-wearable-breast-pump",
+    "locale数": 3,
+    "地区站": [
+     "ca.momcozy.com",
+     "momcozy.com",
+     "pl.momcozy.com"
+    ],
+    "逐站": {
+     "ca.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "292"
+       ],
+       "dB": [
+        "46"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy S12 Pro Quick Breast Pump | More Milk, Faster CleanPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayM",
+      "正文长度": 23604,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "292"
+       ],
+       "dB": [
+        "46"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy S12 Pro Quick Wearable Breast Pump | Easy Setup & Gentle CarePlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShop",
+      "正文长度": 27331,
+      "tier": "ok_structured"
+     },
+     "pl.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "292"
+       ],
+       "dB": [
+        "46"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy S12 Pro Quick Laktator Muszlowy | Komfort i SwobodaPlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayM",
+      "正文长度": 28771,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": []
+   },
+   {
+    "handle": "momcozy-s12-pro-wearable-breast-pump",
+    "locale数": 2,
+    "地区站": [
+     "de.momcozy.com",
+     "momcozy.com"
+    ],
+    "逐站": {
+     "de.momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "292",
+        "295"
+       ],
+       "dB": [
+        "46"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy S12 Pro Quick Tragbare Milchpumpe – Sanfte PflegePlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShopClosePlayMut",
+      "正文长度": 28677,
+      "tier": "ok_html"
+     },
+     "momcozy.com": {
+      "参数": {
+       "mmHg": [
+        "292"
+       ],
+       "dB": [
+        "46"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy S12 Pro Quick Wearable Breast Pump | Easy Setup & Gentle CarePlayMuteUnmuteShareShopClosePlayMuteUnmuteShareShop",
+      "正文长度": 27331,
+      "tier": "ok_html"
+     }
+    },
+    "参数或认证不一致": [
+     {
+      "参数": "mmHg",
+      "各地区取值": {
+       "de.momcozy.com": [
+        "292",
+        "295"
+       ],
+       "momcozy.com": [
+        "292"
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "handle": "momcozy-s9-pro-wearable-breast-pump",
+    "locale数": 2,
+    "地区站": [
+     "de.momcozy.com",
+     "momcozy.com"
+    ],
+    "逐站": {
+     "de.momcozy.com": {
+      "参数": {
+       "dB": [
+        "45",
+        "50"
+       ]
+      },
+      "认证": [],
+      "title": "Momcozy S9 Pro Milchpumpe: Freihändig, Kabellos & Lange Akkulaufzeit",
+      "正文长度": 17212,
+      "tier": "ok_structured"
+     },
+     "momcozy.com": {
+      "参数": {
+       "dB": [
+        "45",
+        "50"
+       ]
+      },
+      "认证": [],
+      "title": "S9 Pro Wearable Breast Pump Upgraded: Long Battery Life",
+      "正文长度": 20682,
+      "tier": "ok_structured"
+     }
+    },
+    "参数或认证不一致": []
+   }
+  ]
+ }
+}

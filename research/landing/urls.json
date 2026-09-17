@@ -1,0 +1,1793 @@
+{
+ "generated_from": "research/live/snapshot-20260916T050845Z.json",
+ "total_ad_refs": 204,
+ "unique_urls": 92,
+ "by_kind": {
+  "page": 7,
+  "product": 48,
+  "other": 24,
+  "collection": 13
+ },
+ "by_domain": {
+  "au.momcozy.com": 3,
+  "ca.momcozy.com": 12,
+  "de.momcozy.com": 12,
+  "es.momcozy.com": 4,
+  "eu.momcozy.com": 4,
+  "fr.momcozy.com": 5,
+  "momcozy.com": 41,
+  "pl.momcozy.com": 2,
+  "uk.momcozy.com": 8,
+  "www.amazon.de": 1
+ },
+ "urls": [
+  {
+   "url_key": "au.momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "url": "https://au.momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "domain": "au.momcozy.com",
+   "path": "/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "kind": "page",
+   "handle": "brand-new-wellness-1-warm-massage-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObap8j"
+   ]
+  },
+  {
+   "url_key": "au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "au.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObynhy"
+   ]
+  },
+  {
+   "url_key": "au.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://au.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "au.momcozy.com",
+   "path": "/products/momcozy-air-1-ultra-slim-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-air-1-ultra-slim-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObiHYe"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/blogs/breastfeeding/how-much-milk-to-pump",
+   "url": "https://ca.momcozy.com/blogs/breastfeeding/how-much-milk-to-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/blogs/breastfeeding/how-much-milk-to-pump",
+   "kind": "other",
+   "handle": "how-much-milk-to-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObWZ2t"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/collections/electric-breast-pump",
+   "url": "https://ca.momcozy.com/collections/electric-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObN3eh"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/collections/wearable-breast-pump",
+   "url": "https://ca.momcozy.com/collections/wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/collections/wearable-breast-pump",
+   "kind": "collection",
+   "handle": "wearable-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObv3UM",
+    "recvuJYdObQzFZ"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/collections/weekly-deals-ca",
+   "url": "https://ca.momcozy.com/collections/weekly-deals-ca",
+   "domain": "ca.momcozy.com",
+   "path": "/collections/weekly-deals-ca",
+   "kind": "collection",
+   "handle": "weekly-deals-ca",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObUrEa"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/fr/collections/electric-breast-pump",
+   "url": "https://ca.momcozy.com/fr/collections/electric-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/fr/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObLR6F"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/fr/collections/wearable-breast-pump",
+   "url": "https://ca.momcozy.com/fr/collections/wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/fr/collections/wearable-breast-pump",
+   "kind": "collection",
+   "handle": "wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb2Qdw"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://ca.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control?variant=47796813922491",
+   "domain": "ca.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObBmKV"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://ca.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump?variant=47796531986619",
+   "domain": "ca.momcozy.com",
+   "path": "/products/momcozy-air-1-ultra-slim-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-air-1-ultra-slim-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObMX8Q"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump?variant=47796181303483",
+   "domain": "ca.momcozy.com",
+   "path": "/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObeVsZ"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://ca.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb2foq",
+    "recvuJYdObIJvQ"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "url": "https://ca.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/products/s12-pro-quick-wearable-breast-pump",
+   "kind": "product",
+   "handle": "s12-pro-quick-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObEl6L"
+   ]
+  },
+  {
+   "url_key": "ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://ca.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "ca.momcozy.com",
+   "path": "/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "kind": "product",
+   "handle": "v1-pro-hospital-grade-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "加拿大"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObLAH7"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/collections/electric-breast-pump",
+   "url": "https://de.momcozy.com/collections/electric-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 4,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObm7Dz",
+    "recvuJYdObIPpF",
+    "recvuJYeGRpxID",
+    "recvuJYeGREusl"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/collections/featured-breast-pumps/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://de.momcozy.com/collections/featured-breast-pumps/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/collections/featured-breast-pumps/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "kind": "product",
+   "handle": "v1-pro-hospital-grade-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRlglf"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/pages/breast-pump",
+   "url": "https://de.momcozy.com/pages/breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/pages/breast-pump",
+   "kind": "page",
+   "handle": "breast-pump",
+   "ad_refs": 3,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObLJw8",
+    "recvuJYdObSL8s",
+    "recvuJYdObSUez"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/pages/breast-pump-winter-sale-in-europe",
+   "url": "https://de.momcozy.com/pages/breast-pump-winter-sale-in-europe",
+   "domain": "de.momcozy.com",
+   "path": "/pages/breast-pump-winter-sale-in-europe",
+   "kind": "page",
+   "handle": "breast-pump-winter-sale-in-europe",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb1u94"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://de.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "de.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 4,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb8ymj",
+    "recvuJYdObBXtD",
+    "recvuJYdOb51ix",
+    "recvuJYeGRP4oA"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://de.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/products/momcozy-air-1-ultra-slim-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-air-1-ultra-slim-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObJVnS"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://de.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObjggC",
+    "recvuJYeGRm1Pq"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://de.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 4,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObwXfX",
+    "recvuJYdObUxlz",
+    "recvuJYdObSZox",
+    "recvuJYdObieEH"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "url": "http://de.momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/products/momcozy-s12-pro-wearable-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-s12-pro-wearable-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObQOl1",
+    "recvuJYdObVAnS"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "url": "http://de.momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/products/momcozy-s9-pro-wearable-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-s9-pro-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRVwRF"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://de.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "de.momcozy.com",
+   "path": "/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "kind": "product",
+   "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "ad_refs": 17,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRtG6S",
+    "recvuJYeGRzBBe",
+    "recvuJYeGRBwTy",
+    "recvuJYeGRXyHn",
+    "recvuJYeGRvoTz",
+    "recvuJYeGRyk65",
+    "recvuJYeGRb3HR",
+    "recvuJYeGRiftv",
+    "recvuJYeGR6D6R",
+    "recvuJYeGR8nZJ",
+    "recvuJYeGR60tN",
+    "recvuJYeGRqcTN",
+    "recvuJYeGRX9jR",
+    "recvuJYeGRVWpR",
+    "recvuJYeGRr2Ve",
+    "recvuJYeGROyc4",
+    "recvuJYeGRZ9Nb"
+   ]
+  },
+  {
+   "url_key": "de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://de.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "de.momcozy.com",
+   "path": "/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "kind": "product",
+   "handle": "v1-pro-hospital-grade-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObTQn7"
+   ]
+  },
+  {
+   "url_key": "es.momcozy.com/collections/electric-breast-pump",
+   "url": "https://es.momcozy.com/collections/electric-breast-pump",
+   "domain": "es.momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "西班牙"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObUDHi",
+    "recvuJYdObxlCc"
+   ]
+  },
+  {
+   "url_key": "es.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://es.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "es.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 4,
+   "regions": [
+    "西班牙"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObsLNZ",
+    "recvuJYdObaAf0",
+    "recvuJYdOb5YAe",
+    "recvuJYdOb9FMH"
+   ]
+  },
+  {
+   "url_key": "es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "es.momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "西班牙"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb6MLx",
+    "recvuJYdObxeKs"
+   ]
+  },
+  {
+   "url_key": "es.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://es.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "es.momcozy.com",
+   "path": "/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "kind": "product",
+   "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "ad_refs": 3,
+   "regions": [
+    "西班牙"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb5nyG",
+    "recvuJYdObPJzY",
+    "recvuJYdObK3Tx"
+   ]
+  },
+  {
+   "url_key": "eu.momcozy.com/collections/electric-breast-pump",
+   "url": "https://eu.momcozy.com/collections/electric-breast-pump",
+   "domain": "eu.momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObE8HQ"
+   ]
+  },
+  {
+   "url_key": "eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "eu.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 3,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObL82h",
+    "recvuJYdObxdWG",
+    "recvuJYdObAYlI"
+   ]
+  },
+  {
+   "url_key": "eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://eu.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "eu.momcozy.com",
+   "path": "/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObzUa2"
+   ]
+  },
+  {
+   "url_key": "eu.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://eu.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "eu.momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObhG8S",
+    "recvuJYdObwo8G"
+   ]
+  },
+  {
+   "url_key": "fr.momcozy.com/collections/electric-breast-pump",
+   "url": "https://fr.momcozy.com/collections/electric-breast-pump",
+   "domain": "fr.momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 3,
+   "regions": [
+    "法国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb5q3i",
+    "recvuJYdObljap",
+    "recvuJYdObdUlb"
+   ]
+  },
+  {
+   "url_key": "fr.momcozy.com/collections/featured-breast-pumps/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://fr.momcozy.com/collections/featured-breast-pumps/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "fr.momcozy.com",
+   "path": "/collections/featured-breast-pumps/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "法国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObIwQE"
+   ]
+  },
+  {
+   "url_key": "fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "fr.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 3,
+   "regions": [
+    "法国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb4mFS",
+    "recvuJYdObUqiF",
+    "recvuJYdObP1co"
+   ]
+  },
+  {
+   "url_key": "fr.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://fr.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "fr.momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "法国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObBjxJ",
+    "recvuJYdObNnmA"
+   ]
+  },
+  {
+   "url_key": "fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://fr.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "fr.momcozy.com",
+   "path": "/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "kind": "product",
+   "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "ad_refs": 8,
+   "regions": [
+    "法国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObOwzK",
+    "recvuJYdObfMKS",
+    "recvuJYdObBEgd",
+    "recvuJYdObRytd",
+    "recvuJYdObjyfK",
+    "recvuJYdObsngh",
+    "recvuJYdObqBGG",
+    "recvuJYdObcQY0"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+   "url": "https://momcozy.com/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/8-best-pumps-to-increase-milk-supply",
+   "kind": "other",
+   "handle": "8-best-pumps-to-increase-milk-supply",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb1fOj",
+    "recvuJYdObLnyQ"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-breast-pump-for-exclusive-pumping",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-breast-pump-for-exclusive-pumping",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/best-breast-pump-for-exclusive-pumping",
+   "kind": "other",
+   "handle": "best-breast-pump-for-exclusive-pumping",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOba56n"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-breast-pumps-for-twin-moms",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-breast-pumps-for-twin-moms",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/best-breast-pumps-for-twin-moms",
+   "kind": "other",
+   "handle": "best-breast-pumps-for-twin-moms",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObGM2P"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-wearable-breast-pumps-for-busy-moms",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-wearable-breast-pumps-for-busy-moms",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/best-wearable-breast-pumps-for-busy-moms",
+   "kind": "other",
+   "handle": "best-wearable-breast-pumps-for-busy-moms",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObLqqs"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/best-wearable-pump-air-1-vs-m5",
+   "url": "https://momcozy.com/blogs/breastfeeding/best-wearable-pump-air-1-vs-m5",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/best-wearable-pump-air-1-vs-m5",
+   "kind": "other",
+   "handle": "best-wearable-pump-air-1-vs-m5",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObGB9q"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/breast-pump-buying-guide-new-moms",
+   "url": "https://momcozy.com/blogs/breastfeeding/breast-pump-buying-guide-new-moms",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/breast-pump-buying-guide-new-moms",
+   "kind": "other",
+   "handle": "breast-pump-buying-guide-new-moms",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObqNcs"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/heated-breast-pump-guide",
+   "url": "https://momcozy.com/blogs/breastfeeding/heated-breast-pump-guide",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/heated-breast-pump-guide",
+   "kind": "other",
+   "handle": "heated-breast-pump-guide",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObroBd"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/how-to-use-smart-wearable-breast-pump",
+   "url": "https://momcozy.com/blogs/breastfeeding/how-to-use-smart-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/how-to-use-smart-wearable-breast-pump",
+   "kind": "other",
+   "handle": "how-to-use-smart-wearable-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb76BS",
+    "recvuJYdObLDw5"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/m5-smart-vs-m6-breast-pump-comparison",
+   "kind": "other",
+   "handle": "m5-smart-vs-m6-breast-pump-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObE80Z"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/m5-smart-vs-m9-wearable-pump-comparison",
+   "kind": "other",
+   "handle": "m5-smart-vs-m9-wearable-pump-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObKvVy"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/momcozy-air-1-vs-m9-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/momcozy-air-1-vs-m9-pump-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/momcozy-air-1-vs-m9-pump-comparison",
+   "kind": "other",
+   "handle": "momcozy-air-1-vs-m9-pump-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb64oU"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/momcozy-breast-pump-comparison-guide",
+   "url": "https://momcozy.com/blogs/breastfeeding/momcozy-breast-pump-comparison-guide",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/momcozy-breast-pump-comparison-guide",
+   "kind": "other",
+   "handle": "momcozy-breast-pump-comparison-guide",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObrd44",
+    "recvuJYdObFeLc"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/portable-breast-pump-reviews-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/portable-breast-pump-reviews-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/portable-breast-pump-reviews-comparison",
+   "kind": "other",
+   "handle": "portable-breast-pump-reviews-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObUuTZ"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+   "url": "https://momcozy.com/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/slim-wearable-pump-vs-budget-app-pump",
+   "kind": "other",
+   "handle": "slim-wearable-pump-vs-budget-app-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOblbCM",
+    "recvuJYdObNa32"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/top-breast-pumps-for-large-breasts",
+   "url": "https://momcozy.com/blogs/breastfeeding/top-breast-pumps-for-large-breasts",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/top-breast-pumps-for-large-breasts",
+   "kind": "other",
+   "handle": "top-breast-pumps-for-large-breasts",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObU7Hb"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/warm-massage-breast-pump-guide",
+   "url": "https://momcozy.com/blogs/breastfeeding/warm-massage-breast-pump-guide",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/warm-massage-breast-pump-guide",
+   "kind": "other",
+   "handle": "warm-massage-breast-pump-guide",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObCu5l",
+    "recvuJYdObCYOh"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/wearable-breast-pump-comparison",
+   "url": "https://momcozy.com/blogs/breastfeeding/wearable-breast-pump-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/wearable-breast-pump-comparison",
+   "kind": "other",
+   "handle": "wearable-breast-pump-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb1B8v"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+   "url": "https://momcozy.com/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/wearable-pump-warm-massage-vs-app",
+   "kind": "other",
+   "handle": "wearable-pump-warm-massage-vs-app",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb61lT"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/breastfeeding/wearable-pump-wellness-vs-smart",
+   "url": "https://momcozy.com/blogs/breastfeeding/wearable-pump-wellness-vs-smart",
+   "domain": "momcozy.com",
+   "path": "/blogs/breastfeeding/wearable-pump-wellness-vs-smart",
+   "kind": "other",
+   "handle": "wearable-pump-wellness-vs-smart",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObaaPH"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/momcare/momcozy-m5-vs-m6-comparison",
+   "url": "https://momcozy.com/blogs/momcare/momcozy-m5-vs-m6-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/momcare/momcozy-m5-vs-m6-comparison",
+   "kind": "other",
+   "handle": "momcozy-m5-vs-m6-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObZhZx"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/momcare/momcozy-m5-vs-m9-comparison",
+   "url": "https://momcozy.com/blogs/momcare/momcozy-m5-vs-m9-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/momcare/momcozy-m5-vs-m9-comparison",
+   "kind": "other",
+   "handle": "momcozy-m5-vs-m9-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObJwyY"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/blogs/momcare/momcozy-m6-vs-m9-comparison",
+   "url": "https://momcozy.com/blogs/momcare/momcozy-m6-vs-m9-comparison",
+   "domain": "momcozy.com",
+   "path": "/blogs/momcare/momcozy-m6-vs-m9-comparison",
+   "kind": "other",
+   "handle": "momcozy-m6-vs-m9-comparison",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObQ0x2"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/collections/electric-breast-pump",
+   "url": "https://momcozy.com/collections/electric-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObV6eR",
+    "recvuJYdObvEQK"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/collections/wearable-breast-pump",
+   "url": "https://momcozy.com/collections/wearable-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/collections/wearable-breast-pump",
+   "kind": "collection",
+   "handle": "wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRHN3g"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/collections/wearable-breast-pump/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://momcozy.com/collections/wearable-breast-pump/products/m5-smart-wearable-breast-pump-upgraded-with-app-control?variant=45110887514310",
+   "domain": "momcozy.com",
+   "path": "/collections/wearable-breast-pump/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 4,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObrFCs",
+    "recvuJYdOb0Jfx",
+    "recvuJYeGRjngu",
+    "recvuJYeGR8ld1"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://momcozy.com/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "momcozy.com",
+   "path": "/collections/wearable-breast-pump/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "kind": "product",
+   "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "ad_refs": 7,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObeNIS",
+    "recvuJYdObEkcQ",
+    "recvuJYdOb1Rm1",
+    "recvuJYdObJ9Yu",
+    "recvuJYdOb8iq3",
+    "recvuJYeGR0SAO",
+    "recvuJYeGR6ra6"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/en-ca/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "url": "https://momcozy.com/en-ca/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "domain": "momcozy.com",
+   "path": "/en-ca/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "kind": "product",
+   "handle": "all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRFs0N",
+    "recvuJYeGRNiOr"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://momcozy.com/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/pages/brand-new-momcozy-air-1-ultra-slim-breast-pump",
+   "kind": "page",
+   "handle": "brand-new-momcozy-air-1-ultra-slim-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObopiv",
+    "recvuJYdObZKFa"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "url": "https://momcozy.com/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/pages/brand-new-wellness-1-warm-massage-breast-pump",
+   "kind": "page",
+   "handle": "brand-new-wellness-1-warm-massage-breast-pump",
+   "ad_refs": 3,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObdd0k",
+    "recvuJYdObDPRw",
+    "recvuJYdObfmhq"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/pages/insurance-partners-in-us",
+   "url": "https://momcozy.com/pages/insurance-partners-in-us",
+   "domain": "momcozy.com",
+   "path": "/pages/insurance-partners-in-us",
+   "kind": "page",
+   "handle": "insurance-partners-in-us",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRzKkO"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/pages/vpro-series",
+   "url": "https://momcozy.com/pages/vpro-series",
+   "domain": "momcozy.com",
+   "path": "/pages/vpro-series",
+   "kind": "page",
+   "handle": "vpro-series",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGR8FEr"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "url": "https://momcozy.com/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "domain": "momcozy.com",
+   "path": "/products/all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "kind": "product",
+   "handle": "all-in-one-m5-wearable-breast-pump-painless-to-pump",
+   "ad_refs": 3,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGR9DAV",
+    "recvuJYeGRhsaS",
+    "recvuJYeGROaz8"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 8,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObpg4Q",
+    "recvuJYdOb5V3B",
+    "recvuJYdObHNts",
+    "recvuJYdObttao",
+    "recvuJYdObTUXT",
+    "recvuJYeGRDtZE",
+    "recvuJYeGRbttZ",
+    "recvuJYeGRyStK"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/products/momcozy-air-1-ultra-slim-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-air-1-ultra-slim-breast-pump",
+   "ad_refs": 5,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb8QBT",
+    "recvuJYeGRzVDz",
+    "recvuJYeGRL96i",
+    "recvuJYeGRYqFY",
+    "recvuJYeGRjCpf"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObgLvb",
+    "recvuJYeGRhWj0"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 3,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb02Rt",
+    "recvuJYdObdOOR",
+    "recvuJYdObc4kp"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-s12-pro-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/products/momcozy-s12-pro-wearable-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-s12-pro-wearable-breast-pump",
+   "ad_refs": 3,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRNKlW",
+    "recvuJYeGRNQ4L",
+    "recvuJYeGRg9rD"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "url": "https://momcozy.com/products/momcozy-s9-pro-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/products/momcozy-s9-pro-wearable-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-s9-pro-wearable-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRdUud",
+    "recvuJYeGR6F4W"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "momcozy.com",
+   "path": "/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "kind": "product",
+   "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "ad_refs": 9,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObM1TS",
+    "recvuJYdObcuiE",
+    "recvuJYdObtq4P",
+    "recvuJYdObjnGl",
+    "recvuJYdObkQXU",
+    "recvuJYeGRiCQ6",
+    "recvuJYeGRSWpw",
+    "recvuJYeGRcgCk",
+    "recvuJYeGRFaIB"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "url": "https://momcozy.com/products/s12-pro-quick-wearable-breast-pump?variant=45528303861958",
+   "domain": "momcozy.com",
+   "path": "/products/s12-pro-quick-wearable-breast-pump",
+   "kind": "product",
+   "handle": "s12-pro-quick-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYeGRmnEV"
+   ]
+  },
+  {
+   "url_key": "momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "momcozy.com",
+   "path": "/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "kind": "product",
+   "handle": "v1-pro-hospital-grade-wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObBgjg"
+   ]
+  },
+  {
+   "url_key": "pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://pl.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "pl.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 6,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObeIX3",
+    "recvuJYdOb5izK",
+    "recvuJYdObyp59",
+    "recvuJYdObGHhO",
+    "recvuJYdObY7at",
+    "recvuJYdObTef0"
+   ]
+  },
+  {
+   "url_key": "pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "url": "https://pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump",
+   "domain": "pl.momcozy.com",
+   "path": "/products/s12-pro-quick-wearable-breast-pump",
+   "kind": "product",
+   "handle": "s12-pro-quick-wearable-breast-pump",
+   "ad_refs": 4,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObauGC",
+    "recvuJYdOb6R4r",
+    "recvuJYdOb9ugG",
+    "recvuJYdObaNEN"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/collections/electric-breast-pump",
+   "url": "https://uk.momcozy.com/collections/electric-breast-pump",
+   "domain": "uk.momcozy.com",
+   "path": "/collections/electric-breast-pump",
+   "kind": "collection",
+   "handle": "electric-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObrjds"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/collections/wearable-breast-pump",
+   "url": "https://uk.momcozy.com/collections/wearable-breast-pump",
+   "domain": "uk.momcozy.com",
+   "path": "/collections/wearable-breast-pump",
+   "kind": "collection",
+   "handle": "wearable-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObm8DM"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "url": "https://uk.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "domain": "uk.momcozy.com",
+   "path": "/products/m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "kind": "product",
+   "handle": "m5-smart-wearable-breast-pump-upgraded-with-app-control",
+   "ad_refs": 3,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObd0Z5",
+    "recvuJYdOb5hlP",
+    "recvuJYdObopeN"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "url": "https://uk.momcozy.com/products/momcozy-air-1-ultra-slim-breast-pump",
+   "domain": "uk.momcozy.com",
+   "path": "/products/momcozy-air-1-ultra-slim-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-air-1-ultra-slim-breast-pump",
+   "ad_refs": 1,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObS79O"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "url": "https://uk.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "domain": "uk.momcozy.com",
+   "path": "/products/momcozy-mobile-flow-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-flow-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObPDSd",
+    "recvuJYdObh46F"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "url": "https://uk.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump",
+   "domain": "uk.momcozy.com",
+   "path": "/products/momcozy-mobile-style-hands-free-breast-pump",
+   "kind": "product",
+   "handle": "momcozy-mobile-style-hands-free-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdOb6Fgr",
+    "recvuJYdObHV0W"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "url": "https://uk.momcozy.com/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "domain": "uk.momcozy.com",
+   "path": "/products/momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "kind": "product",
+   "handle": "momcozy-wellness-1-warm-massage-wearable-breast-pump-w1",
+   "ad_refs": 1,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObz5mN"
+   ]
+  },
+  {
+   "url_key": "uk.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "url": "https://uk.momcozy.com/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "domain": "uk.momcozy.com",
+   "path": "/products/v1-pro-hospital-grade-wearable-breast-pump",
+   "kind": "product",
+   "handle": "v1-pro-hospital-grade-wearable-breast-pump",
+   "ad_refs": 2,
+   "regions": [
+    "英国"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObjwvt",
+    "recvuJYdObx5aF"
+   ]
+  },
+  {
+   "url_key": "www.amazon.de/dp/B0G1MW5TB6",
+   "url": "https://www.amazon.de/dp/B0G1MW5TB6/",
+   "domain": "www.amazon.de",
+   "path": "/dp/B0G1MW5TB6/",
+   "kind": "other",
+   "handle": "B0G1MW5TB6",
+   "ad_refs": 1,
+   "regions": [
+    "其他"
+   ],
+   "platforms": [
+    "Google"
+   ],
+   "ad_record_ids": [
+    "recvuJYdObXFn4"
+   ]
+  }
+ ]
+}

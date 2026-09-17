@@ -1,0 +1,175 @@
+{
+  "schema_version": "v1",
+  "built_for": "需求知识库 · 本地分析账本",
+  "authority": {
+    "content_authority": "飞书源系统（本台账是投影，不是副本；冲突以源为准）",
+    "decision_record": "ADR-0010",
+    "design_doc": "research/kb/需求知识库-建设方案.md",
+    "loader": "research/kb/load.py（唯一装载层）"
+  },
+
+  "record_key": "{source_system}:{source_table_id}:{source_record_id}",
+  "fingerprint_fields": ["title", "product_line", "sku", "status_raw", "priority_raw",
+                         "owner", "requester", "date_submitted", "date_due", "date_done"],
+
+  "normalized_fields": [
+    {"name": "record_key",        "type": "string", "note": "台账主键，稳定，由溯源三元组拼成"},
+    {"name": "source_system",     "type": "enum",   "values": ["creative", "seo"]},
+    {"name": "source_table",      "type": "string", "note": "源表名（中文原名，不翻译）"},
+    {"name": "source_table_id",   "type": "string"},
+    {"name": "source_record_id",  "type": "string", "note": "飞书 record_id"},
+    {"name": "fingerprint",       "type": "string", "note": "sha256(fingerprint_fields)，用于判断'还是不是同一条'"},
+    {"name": "level",             "type": "enum",   "values": ["top", "child"], "note": "由源表关联字段判定"},
+    {"name": "parent_record_id",  "type": "string", "nullable": true},
+    {"name": "parent_title",      "type": "string", "nullable": true},
+    {"name": "title",             "type": "string"},
+    {"name": "title_source",      "type": "enum",   "values": ["verbatim", "synthesized"],
+     "note": "synthesized 表示源表没有标题字段，标题由本表自身字段拼出（不引入外部信息）"},
+    {"name": "category",          "type": "string", "nullable": true, "note": "需求类别/类型/性质/品类"},
+    {"name": "product_line",      "type": "string", "nullable": true},
+    {"name": "sku",               "type": "string", "nullable": true},
+    {"name": "status_raw",        "type": "string", "nullable": true, "note": "源系统原文，永不丢弃"},
+    {"name": "status",            "type": "enum",   "values": ["未开始", "进行中", "已完成", "已停滞"],
+     "nullable": true, "note": "归一后；无法归一保持 null 并计入 unnormalized_status"},
+    {"name": "priority_raw",      "type": "string", "nullable": true},
+    {"name": "priority_scale",    "type": "enum",   "values": ["P0P1P2", "eisenhower", null],
+     "note": "两套体系互不相容，保留来源标记"},
+    {"name": "priority",          "type": "string", "nullable": true, "note": "不跨体系比较"},
+    {"name": "requester",         "type": "string", "nullable": true, "note": "提需人/需求人/需求方"},
+    {"name": "owner",             "type": "string", "nullable": true, "note": "承接人/剪辑师/跟进人/执行人/专家"},
+    {"name": "date_submitted",    "type": "date",   "nullable": true, "note": "Asia/Shanghai"},
+    {"name": "date_due",          "type": "date",   "nullable": true},
+    {"name": "date_done",         "type": "date",   "nullable": true},
+    {"name": "due_source",        "type": "enum",   "values": ["planned", "flagged", null],
+     "note": "planned=自己算；flagged=源系统已判定（仅 SEO 的「是否延期」）"},
+    {"name": "deliverable",       "type": "string", "nullable": true},
+    {"name": "notes",             "type": "string", "nullable": true},
+    {"name": "extras",            "type": "object", "note": "未被上面消费的源字段，原样保留"}
+  ],
+
+  "status_normalization": {
+    "未开始": ["未开始", "待开始", "未開始", "Not Started", "not started", "TODO"],
+    "进行中": ["进行中", "推进中", "in progress", "In Progress", "In progress", "进行"],
+    "已完成": ["已完成", "Done", "done", "DONE", "完成"],
+    "已停滞": ["已停滞", "停滞", "阻塞", "Blocked"]
+  },
+  "status_normalization_notes": [
+    "「推进中」与「进行中」是同一状态的不同叫法，合并。",
+    "「已停滞」单独成态：只有 1 条，但它是唯一需要干预的状态，并入「进行中」会让它消失。",
+    "未在表内的取值一律 status=null 并在验收报告里列出，不静默丢弃、不猜测。"
+  ],
+
+  "tables": [
+    {
+      "system": "creative", "name": "【视频】日常需求看板", "table_id": "tblfPePSlv697mR1",
+      "include": true, "role": "demand", "hierarchy": null,
+      "map": {
+        "title": "任务名", "product_line": "品线", "sku": "SKU",
+        "status_raw": "进度", "priority_raw": "优先级", "priority_scale": "P0P1P2",
+        "requester": "提需人", "owner": "剪辑师",
+        "date_submitted": "提需日期", "date_due": "预期交付", "date_done": "完成日期",
+        "category": "需求类别", "deliverable": "成片位置", "notes": "需求详情描述"
+      }
+    },
+    {
+      "system": "creative", "name": "【平面】日常需求看板", "table_id": "tbl3CDFvq6BflwdY",
+      "include": true, "role": "demand", "hierarchy": ["父记录", "父记录 2"],
+      "map": {
+        "title": "任务名", "product_line": "品线", "sku": "SKU",
+        "status_raw": "进度", "priority_raw": "优先级", "priority_scale": "P0P1P2",
+        "requester": "需求人", "owner": "承接人",
+        "date_submitted": "需求提交时间", "date_due": "期待完成时间", "date_done": "交付时间",
+        "category": "渠道", "deliverable": "共享盘位置", "notes": "设计需求-描述要求和想法"
+      }
+    },
+    {
+      "system": "creative", "name": "【创意支持】项目需求", "table_id": "tbluDYBMG70MvtWH",
+      "include": true, "role": "demand", "hierarchy": ["Parent items"],
+      "map": {
+        "title": "需求内容", "product_line": "品线", "sku": "产品SKU",
+        "status_raw": "状态", "priority_raw": "需求优先级判断", "priority_scale": "P0P1P2",
+        "requester": "需求方", "owner": "跟进人",
+        "date_submitted": "具体日期", "date_due": "结束时间", "date_done": null,
+        "category": "需求类型", "deliverable": "需求说明&文档", "notes": null
+      }
+    },
+    {
+      "system": "creative", "name": "【创意UGC】提需表", "table_id": "tbl0OyDalGoGADcg",
+      "include": true, "role": "demand", "hierarchy": null,
+      "map": {
+        "title": null, "product_line": "品线", "sku": "产品SKU",
+        "status_raw": "进度", "priority_raw": "优先级", "priority_scale": "P0P1P2",
+        "requester": null, "owner": "优化师",
+        "date_submitted": "需求提交时间", "date_due": null, "date_done": null,
+        "category": "渠道", "deliverable": null, "notes": "备注"
+      },
+      "title_synthesis": "[UGC] {产品SKU} · {渠道} · {归属月份}",
+      "title_synthesis_note": "源表无标题字段。用该记录自身的 SKU/渠道/月份拼出可识别的标识，不引入外部信息。"
+    },
+    {
+      "system": "seo", "name": "品线SEO任务管理系统", "table_id": "tbl1VOG649Q9Godx",
+      "include": true, "role": "demand", "hierarchy": ["父记录"],
+      "map": {
+        "title": "任务描述", "product_line": "品线", "sku": null,
+        "status_raw": "进展", "priority_raw": "重要紧急程度", "priority_scale": "eisenhower",
+        "requester": null, "owner": "任务执行人",
+        "date_submitted": "开始日期", "date_due": "预计完成日期", "date_done": "实际完成日期",
+        "category": "性质", "deliverable": "备注 & 资料", "notes": "最新进展记录"
+      },
+      "extra_flag": {"field": "是否延期", "meaning": "源系统已判定的延期标记", "maps_to": "due_source=flagged"}
+    },
+    {
+      "system": "seo", "name": "PSEO专家审核总表", "table_id": "tblYPT5EBTYORwPz",
+      "include": true, "role": "review", "hierarchy": null,
+      "map": {
+        "title": "文章链接", "product_line": "品类", "sku": null,
+        "status_raw": "审核状态", "priority_raw": null, "priority_scale": null,
+        "requester": null, "owner": "专家",
+        "date_submitted": null, "date_due": null, "date_done": null,
+        "category": null, "deliverable": "文章链接", "notes": null
+      },
+      "extra_columns": ["是否已结算", "国内or国外"]
+    },
+    {
+      "system": "seo", "name": "UK站内容审核", "table_id": "tblJ3cjTXEZsWeYI",
+      "include": true, "role": "review", "hierarchy": null,
+      "map": {
+        "title": "关键字", "product_line": "品类", "sku": null,
+        "status_raw": "审核状态", "priority_raw": null, "priority_scale": null,
+        "requester": null, "owner": "专家",
+        "date_submitted": "提交时间", "date_due": null, "date_done": null,
+        "category": null, "deliverable": "文章链接", "notes": null
+      },
+      "extra_columns": ["负责人", "是否已结算"]
+    }
+  ],
+
+  "excluded_tables": [
+    {"system": "creative", "name": "资源账号管理", "table_id": "tbl8ynEG0hJQzcMO",
+     "reason": "含「密码」字段，按 ADR-0003 与建设方案 §三 整体排除",
+     "placeholder": "在台账里保留一条'存在但未纳管'记录，避免读者以为这张表不存在"}
+  ],
+
+  "not_in_ledger": {
+    "content_asset": [
+      {"system": "seo", "name": "英语站站内blog全表", "records": 1924},
+      {"system": "seo", "name": "英语站集合页及重要产品页", "records": 64}
+    ],
+    "asset": [{"system": "creative", "name": "样品库", "records": 27}],
+    "dimension": [{"system": "creative", "name": "产品字典", "records": 8}],
+    "admin": [{"system": "creative", "name": "国庆前后 考勤值班计划", "records": 25}],
+    "finance": [
+      {"system": "seo", "name": "费用结算管理", "records": 21},
+      {"system": "seo", "name": "infinity+adsy", "records": 7}
+    ],
+    "empty_shell": [
+      {"system": "creative", "name": "【红人&社媒】支持", "records": 5,
+       "finding": "表名承诺内容，实际 5 条 × 1 字段全空"},
+      {"system": "creative", "name": "优质素材-语言拓展", "records": 5,
+       "finding": "同上"},
+      {"system": "creative", "name": "产品x品线资料整理", "records": 5,
+       "finding": "同上"}
+    ],
+    "note": "这些表不进需求台账，但**必须在覆盖报告里出现** —— 否则读者无法区分「没有需求」与「需求没被记录」。"
+  }
+}

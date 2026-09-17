@@ -1,0 +1,119 @@
+{
+  "$schema_version": "engine-manifest-v1",
+  "generated_at": "2026-09-16T10:07:36+00:00",
+  "engine_version": "30f10be717c09e9c",
+  "code_version": "dfe688a33960bf22",
+  "artifacts": {
+    "rules": {
+      "file": "rules-v1.json",
+      "bytes": 46726,
+      "sha256": "5d76c9c7ca7d7fca68f4d301b29edea68a733b400f206fdefa9d8027c9039ed4",
+      "why": "判险词 + 规则 + 兜底通道（唯一产生命中的来源）",
+      "counts": {
+        "rules": 26,
+        "enabled": 25,
+        "is_modifier": 1,
+        "with_escalation": 1,
+        "catch_all": 1
+      }
+    },
+    "whitelist": {
+      "file": "whitelist-v1.json",
+      "bytes": 12744,
+      "sha256": "4dc9e4b99d196836869e8431890e7c264fa1fe0f87fa4dcc5601d6a7f78515a0",
+      "why": "放行词（豁免目标须落 auto_pass 带）",
+      "counts": {
+        "words": 30,
+        "active": 26,
+        "quarantined": 4
+      }
+    },
+    "context_guards": {
+      "file": "context-guards-v1.json",
+      "bytes": 57801,
+      "sha256": "f52595f8d1211d0a98980d32b3ab7e0c7677ec6240e1e749038c2db09595cf88",
+      "why": "语境守卫词（取消/弱化主张，绝不放行）",
+      "counts": {
+        "words": 85,
+        "active": 46,
+        "wired": 46,
+        "pending": 39
+      }
+    },
+    "topic_tree": {
+      "file": "topic-tree-v1.md",
+      "bytes": 21647,
+      "sha256": "e61cf3eb9f8b804949853abb2388729ffafd91faa33904e0141cacf9f09203b3",
+      "why": "主题树（Engine._validate_topics 的校验基准）",
+      "counts": {
+        "nodes": 43
+      }
+    },
+    "disposition_layers": {
+      "file": "disposition-layers-v1.json",
+      "bytes": 26890,
+      "sha256": "a9e249e72e9acde5e7963f67f23b6feb2933f388e3567e45a87d21d239db13a2",
+      "why": "处置分层映射（法务所有）：判定之后「谁必须看它」",
+      "counts": {
+        "status": "ratified",
+        "layers": 5,
+        "mappings": 5,
+        "escalations": 3,
+        "escalations_enabled": 2
+      }
+    },
+    "product_lines": {
+      "file": "product-lines-v1.json",
+      "bytes": 8630,
+      "sha256": "8d45046a1b5518dbc21244c0c57191f8cc51ef7eb69e76480b623517f5d8e8ef",
+      "why": "品线取值域（产品所有）与规则→品线归属（待填）",
+      "counts": {
+        "status": "proposed",
+        "values": 10,
+        "placeholders": 2,
+        "rules_scoped": 0
+      }
+    }
+  },
+  "code": {
+    "matcher.py": {
+      "sha256": "c1ce4251144404c497dcde0a824b4cc730045dd87d8e76e35aac2d53e2eeabe4",
+      "bytes": 9695
+    },
+    "score.py": {
+      "sha256": "86c65d2bc65815a74cb633eec901b8d7c46d76402c3e806c1675cac5dbab718a",
+      "bytes": 32658
+    },
+    "judge.py": {
+      "sha256": "04300bcc6a14bf08bec6917a8f98593efb5cd760fb951d7cc81e055b88e1c418",
+      "bytes": 45531
+    },
+    "vocab.py": {
+      "sha256": "01de173ceb1625033a1e0cae54d1b4ca310e06d34c43bc860c3e59d6b2c192d8",
+      "bytes": 11338
+    },
+    "severity.py": {
+      "sha256": "c60a2248763770da49d2bbd80e7a504ea3ae8dfa1483017dbd69615434853b9b",
+      "bytes": 8024
+    },
+    "engine_manifest.py": {
+      "sha256": "09b8d3fa94f90d38406dd979971ca4eb92cce97e1fc119d82e80158d62d14056",
+      "bytes": 17961
+    }
+  },
+  "upstream": {
+    "integrity": "declared",
+    "note": "以下上游引用**未经校验**：whitelist/context-guards 里有 source.snapshot 文件名，rules-v1.json 连文件名都没有。把它们当证明用等于把声明洗成证明。升级为证明需要可复算的构建链（ADR-0012 后续项）。",
+    "snapshot": "snapshot-20260916T050845Z.json",
+    "captured_at_utc": "2026-09-16T05:08:45.473112+00:00",
+    "feishu_content_sha256": {
+      "ad_copy": "0927fd58b0f8bf104b5e8f9a1c4dd356ea4f509b45fba38db4207c2efd6c31f6",
+      "boundary_rules": "2a1a219a7e76b459e6a7c846559fedd9023f8b6e08f146feadda85ad312c34bb",
+      "w1_claims": "494caaf569a781620e7c1c917959f090d1e8329ca6770f6c7c32d14de34829fc",
+      "rewrite_lib": "bc1aa46519a860836265188020c74b0257c04d8351327d2171b0e5fbe4eddf1f",
+      "kb_materials": "6460ec5b5fb0f8821237a22a74a8137f358ebf9edecab436e34f505e24728336",
+      "kb_samples": "edc06d151b034228aa6a14cbbab217eaac357529ec32e0e3ef6ba64e88939ea1"
+    },
+    "_found": true
+  }
+}

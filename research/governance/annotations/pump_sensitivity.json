@@ -1,0 +1,90 @@
+{
+ "hypothesis_activity": {
+  "red": 36,
+  "yellow": 13
+ },
+ "hypothesis_device": {
+  "red": 49,
+  "yellow": 0
+ },
+ "flipped": [
+  {
+   "blind_id": "B003",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B009",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B018",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B044",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B045",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B052",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B053",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B054",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B056",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B057",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B058",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B059",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  },
+  {
+   "blind_id": "B060",
+   "lang": "英语",
+   "act": "黄 L2",
+   "dev": "红 L4"
+  }
+ ]
+}

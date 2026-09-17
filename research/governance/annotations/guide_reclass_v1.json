@@ -1,0 +1,760 @@
+[
+ {
+  "blind_id": "B000",
+  "lang": "法语",
+  "buckets": [
+   "B5"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B5",
+    "text": "Tire-Lait Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B001",
+  "lang": "法语",
+  "buckets": [
+   "B1"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B1",
+    "text": "Pompage efficace et indolore. Augmente la production de lait réduit les blocages"
+   }
+  ]
+ },
+ {
+  "blind_id": "B003",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B005",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Momcozy - Erstklassige Freihändige Milchpumpe - Schmerzfrei Pumpen"
+   }
+  ]
+ },
+ {
+  "blind_id": "B006",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B007",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B008",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B009",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B010",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Pump Like Baby's Latch — No Pain"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Smart's 105° flange + micro-vibration = painless pumping. 4 flange sizes."
+   }
+  ]
+ },
+ {
+  "blind_id": "B011",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Experience Strong Suction with Zero Pain Using the Upgraded Momcozy M5 Smart Pump"
+   }
+  ]
+ },
+ {
+  "blind_id": "B012",
+  "lang": "西语",
+  "buckets": [
+   "B5"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B5",
+    "text": "Extrae Leche Sin Dolor"
+   }
+  ]
+ },
+ {
+  "blind_id": "B013",
+  "lang": "法语",
+  "buckets": [
+   "B5"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B5",
+    "text": "Tire Lait Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B014",
+  "lang": "法语",
+  "buckets": [
+   "B5"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B5",
+    "text": "Tire-Lait Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B015",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfrei Abpumpen"
+   },
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B017",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfrei Pumpen"
+   },
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B018",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B019",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B020",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B021",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Pain-Free Wearable Pump"
+   }
+  ]
+ },
+ {
+  "blind_id": "B022",
+  "lang": "德语",
+  "buckets": [
+   "B1"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B1",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Entlastung bei verstopfter Milch"
+   }
+  ]
+ },
+ {
+  "blind_id": "B023",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B024",
+  "lang": "法语",
+  "buckets": [
+   "B1",
+   "B4"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Meilleur Tire-Lait Portable, Pompage efficace et indolore."
+   },
+   {
+    "bucket": "B1",
+    "text": "Pompage efficace et indolore. Augmente la production de lait/réduit les blocages"
+   }
+  ]
+ },
+ {
+  "blind_id": "B025",
+  "lang": "西语",
+  "buckets": [
+   "B5"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B5",
+    "text": "Extrae Leche Sin Dolor"
+   }
+  ]
+ },
+ {
+  "blind_id": "B026",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B029",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Pain-Free Warm Massage Pump"
+   }
+  ]
+ },
+ {
+  "blind_id": "B030",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B031",
+  "lang": "法语",
+  "buckets": [
+   "B5"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B5",
+    "text": "Tire-Lait Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B033",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B036",
+  "lang": "法语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Tirage Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B037",
+  "lang": "法语",
+  "buckets": [
+   "B1",
+   "B4"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Meilleur Tire-Lait Portable, Pompage efficace et indolore."
+   },
+   {
+    "bucket": "B1",
+    "text": "Pompage efficace et indolore. Augmente la production de lait/réduit les blocages"
+   }
+  ]
+ },
+ {
+  "blind_id": "B038",
+  "lang": "法语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Tirage Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B040",
+  "lang": "法语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Tirage Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B041",
+  "lang": "法语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Tirage Sans Douleur"
+   }
+  ]
+ },
+ {
+  "blind_id": "B044",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Momcozy M5 Pain-Free Pump"
+   }
+  ]
+ },
+ {
+  "blind_id": "B045",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Momcozy M5 Pain-Free Pump"
+   }
+  ]
+ },
+ {
+  "blind_id": "B046",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Pain-Free Breast Pumping"
+   }
+  ]
+ },
+ {
+  "blind_id": "B047",
+  "lang": "德语",
+  "buckets": [
+   "B1"
+  ],
+  "level": "红 L4",
+  "segments": [
+   {
+    "bucket": "B1",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Entlastung bei verstopfter Milch"
+   }
+  ]
+ },
+ {
+  "blind_id": "B048",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Momcozy - Erstklassige Freihändige Milchpumpe - Schmerzfrei Pumpen"
+   }
+  ]
+ },
+ {
+  "blind_id": "B049",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B050",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Schmerzfrei Pumpen"
+   },
+   {
+    "bucket": "B4",
+    "text": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses"
+   }
+  ]
+ },
+ {
+  "blind_id": "B051",
+  "lang": "德语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Momcozy - Erstklassige Freihändige Milchpumpe - Schmerzfrei Pumpen"
+   }
+  ]
+ },
+ {
+  "blind_id": "B052",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B053",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B054",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B056",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B057",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B058",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B059",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B060",
+  "lang": "英语",
+  "buckets": [
+   "B4"
+  ],
+  "level": "黄 L2",
+  "segments": [
+   {
+    "bucket": "B4",
+    "text": "Painlessly Pump With High Efficiency"
+   },
+   {
+    "bucket": "B4",
+    "text": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency"
+   }
+  ]
+ },
+ {
+  "blind_id": "B062",
+  "lang": "英语",
+  "buckets": [],
+  "level": "—",
+  "segments": []
+ },
+ {
+  "blind_id": "B063",
+  "lang": "英语",
+  "buckets": [],
+  "level": "—",
+  "segments": []
+ }
+]

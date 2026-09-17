@@ -1,0 +1,125 @@
+/**
+ * config.mjs —— 守衡的配置与凭据装载
+ *
+ * 凭据来源（按优先级）：
+ *   1. 环境变量
+ *   2. ~/.dsh/credentials/shouheng-lark.json   （飞书应用）
+ *   3. ~/.dsh/.credentials.yaml                （DSH 凭据库，取其 LLM key）
+ *
+ * 设计原则：凭据只在内存中流转，任何日志、任何落盘都不打印明文。
+ */
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const AGENT_DIR = path.dirname(fileURLToPath(import.meta.url));
+export const TOOLS_DIR = path.resolve(AGENT_DIR, '..');
+export const REPO_ROOT = path.resolve(TOOLS_DIR, '..');
+export const LOG_DIR   = path.join(REPO_ROOT, 'PMO', 'logs');
+// 状态目录：惰性解析，让 SHOUHENG_STATE_DIR 在测试里改了就能生效。
+// 写成 import 时常量的话，一旦别的模块先加载了本文件，
+// 后面再改环境变量就不会有任何效果 —— 而这种失效是静默的。
+export function stateDir() {
+  return process.env.SHOUHENG_STATE_DIR
+    ? path.resolve(process.env.SHOUHENG_STATE_DIR)
+    : path.join(REPO_ROOT, 'PMO', 'shouheng-state');
+}
+export const STATE_DIR = stateDir();   // 兼容既有引用；需要可覆盖语义时用 stateDir()
+
+/**
+ * 确保目录存在。失败只警告，不抛。
+ *
+ * 原来这里是 import 期无保护的 `fs.mkdirSync(...)`：只要状态目录的路径被一个
+ * 同名**文件**占住（残留、误创建、磁盘异常都可能），mkdirSync 抛 EEXIST，
+ * 整个进程在加载配置时就直接死掉 —— 守衡会彻底起不来，
+ * 而报错指向 config.mjs，跟真实原因（一个占了位的文件）毫无关系。
+ *
+ * 目录建不出来不该阻止「读取配置」这件只读的事。
+ * 真正需要写入的地方（flushSeen）会自己再 mkdir 一次，那里的失败是局部的、可报的。
+ */
+export function ensureDir(dir) {
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    return true;
+  } catch (e) {
+    if (e.code !== 'EEXIST') {
+      console.warn(`[cfg] 目录不可用（${dir}）：${e.code ?? e.message}`);
+    }
+    return false;
+  }
+}
+
+ensureDir(LOG_DIR);
+ensureDir(STATE_DIR);
+
+/** 从 DSH 凭据库取一个 ref 的值（形如 `  KEY: value`） */
+function readDshCredential(name) {
+  const p = path.join(os.homedir(), '.dsh', '.credentials.yaml');
+  let txt;
+  try {
+    txt = fs.readFileSync(p, 'utf8');
+  } catch (e) {
+    // 只有「文件不存在」才算正常的「这里没有」。
+    // 权限错误、路径是目录等异常必须冒出来 —— 否则会被伪装成
+    // 「Key 没配」，而真正的原因是读不到，排查方向会被带偏。
+    if (e.code === 'ENOENT') return null;
+    throw new Error(`读取凭据文件失败（${p}）：${e.code ?? e.message}`);
+  }
+  const m = txt.match(new RegExp(`^\\s*${name}:\\s*(\\S+)\\s*$`, 'm'));
+  return m?.[1] ?? null;
+}
+
+function loadLarkCred() {
+  const p = path.join(os.homedir(), '.dsh', 'credentials', 'shouheng-lark.json');
+  const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+  if (!j.app_id || !j.app_secret) throw new Error('飞书凭据不完整：缺少 app_id / app_secret');
+  return { appId: j.app_id, appSecret: j.app_secret };
+}
+
+function loadLlmKey() {
+  return process.env.DEEPSEEK_API_KEY
+      || readDshCredential('DEEPSEEK_API_KEY')
+      || (() => { throw new Error('未找到 DEEPSEEK_API_KEY（环境变量与 DSH 凭据库均无）'); })();
+}
+
+export const config = {
+  lark: loadLarkCred(),
+  llm: {
+    apiKey: loadLlmKey(),
+    baseUrl: process.env.SHOUHENG_LLM_BASE_URL || 'https://api.deepseek.com',
+    // deepseek-flash：快且便宜，适合群聊高频对话；复杂任务可切 deepseek-v4-pro
+    model: process.env.SHOUHENG_LLM_MODEL || 'deepseek-flash',
+    /** 单会话保留的最大历史轮数（超出后由记忆层压缩） */
+    maxTurns: Number(process.env.SHOUHENG_MAX_TURNS || 24),
+    /**
+     * 单次回复上限。
+     * 注意：DeepSeek 的 max_tokens 同时覆盖**思维链 + 正文**（usage.completion_tokens_details.reasoning_tokens）。
+     * 实测 1600/4000 会被思维链吃光 —— finish_reason=length 且正文 0 字。
+     * 所以这个值必须给足，且必须配合 finishReason 检查（见 truncate.mjs）。
+     */
+    maxTokens: Number(process.env.SHOUHENG_MAX_TOKENS || 8000),
+    /** 工具循环最多迭代几次（防失控） */
+    maxToolIters: Number(process.env.SHOUHENG_MAX_TOOL_ITERS || 6),
+  },
+  /** 允许守衡响应的群（空数组 = 不限制）。目前只放打通验证过的那个群。 */
+  allowedChats: (process.env.SHOUHENG_ALLOWED_CHATS || '').split(',').map(s => s.trim()).filter(Boolean),
+  /** 被 @ 才响应（群聊里避免刷屏）；私聊一律响应 */
+  requireMentionInGroup: process.env.SHOUHENG_REQUIRE_MENTION !== '0',
+};
+
+/** 安全摘要，任何日志都可放心调用 */
+export function describeConfig() {
+  return {
+    larkAppId: config.lark.appId,
+    llmModel: config.llm.model,
+    llmBaseUrl: config.llm.baseUrl,
+    llmKeyLen: config.llm.apiKey.length,
+    allowedChats: config.allowedChats.length ? config.allowedChats : '(不限)',
+    requireMentionInGroup: config.requireMentionInGroup,
+    maxTurns: config.llm.maxTurns,
+    // maxTokens 必须进启动横幅：它是「回复被腰斩」的直接成因，
+    // 之前 1600 这个值无处可见，事故发生时没人能一眼看出来。
+    maxTokens: config.llm.maxTokens,
+  };
+}

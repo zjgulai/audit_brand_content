@@ -1,0 +1,36 @@
+{
+  "latest": "snapshot-20260916T050845Z.json",
+  "captured_at_utc": "2026-09-16T05:08:45.473112+00:00",
+  "sources": {
+    "ad_copy": {
+      "read_count": 291,
+      "api_total": 291,
+      "content_sha256": "0927fd58b0f8bf104b5e8f9a1c4dd356ea4f509b45fba38db4207c2efd6c31f6"
+    },
+    "boundary_rules": {
+      "read_count": 21,
+      "api_total": 21,
+      "content_sha256": "2a1a219a7e76b459e6a7c846559fedd9023f8b6e08f146feadda85ad312c34bb"
+    },
+    "w1_claims": {
+      "read_count": 19,
+      "api_total": 19,
+      "content_sha256": "494caaf569a781620e7c1c917959f090d1e8329ca6770f6c7c32d14de34829fc"
+    },
+    "rewrite_lib": {
+      "read_count": 52,
+      "api_total": 52,
+      "content_sha256": "bc1aa46519a860836265188020c74b0257c04d8351327d2171b0e5fbe4eddf1f"
+    },
+    "kb_materials": {
+      "read_count": 15,
+      "api_total": 15,
+      "content_sha256": "6460ec5b5fb0f8821237a22a74a8137f358ebf9edecab436e34f505e24728336"
+    },
+    "kb_samples": {
+      "read_count": 8,
+      "api_total": 8,
+      "content_sha256": "edc06d151b034228aa6a14cbbab217eaac357529ec32e0e3ef6ba64e88939ea1"
+    }
+  }
+}

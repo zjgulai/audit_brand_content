@@ -1,0 +1,1065 @@
+[
+ {
+  "blind_id": "B000",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Tire-Lait Sans Douleur",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B3 疼痛词修饰【器械名词】（Tire-Lait）→ 对象未写出"
+    ]
+   },
+   {
+    "seg": "2026 Meilleur tire-lait portable. Design douillet, Né pour l'amour. Acheter maintenant.",
+    "leaf": "—(场景描述)",
+    "level": "不判",
+    "chain": [
+     "C 承诺=否〔消除性=— / 裸主张=—〕",
+     "B3 疼痛词修饰【器械名词】（tire-lait）→ 对象未写出",
+     "C 非承诺（纯场景描述）→ 不出违规结论，记 context"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B001",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "2026 Meilleur tire-lait portable. Design douillet, Né pour l'amour. Acheter maintenant.",
+    "leaf": "—(场景描述)",
+    "level": "不判",
+    "chain": [
+     "C 承诺=否〔消除性=— / 裸主张=—〕",
+     "B3 疼痛词修饰【器械名词】（tire-lait）→ 对象未写出",
+     "C 非承诺（纯场景描述）→ 不出违规结论，记 context"
+    ]
+   },
+   {
+    "seg": "Pompage efficace et indolore. Augmente la production de lait réduit les blocages",
+    "leaf": "T1.5/T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=indolore〕",
+     "B1 病理名词限定（blocages）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B003",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B005",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Momcozy - Erstklassige Freihändige Milchpumpe - Schmerzfrei Pumpen",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfrei〕",
+     "B2 疼痛词修饰【动作名词】（Pumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B006",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B007",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B008",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B009",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B010",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Pump Like Baby's Latch — No Pain",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=No Pain〕",
+     "B3 疼痛词修饰【器械名词】（Pump）→ 对象未写出"
+    ]
+   },
+   {
+    "seg": "M5 Smart's 105° flange + micro-vibration = painless pumping. 4 flange sizes.",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=painless〕",
+     "B2 疼痛词修饰【动作名词】（pumping）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B011",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Experience Strong Suction with Zero Pain Using the Upgraded Momcozy M5 Smart Pump",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Zero Pain〕",
+     "B3 同形消解：疼痛词修饰器械名词（Zero Pain Using the Upgraded Momcozy M5 Smart Pump）→ 对象未写出"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B012",
+  "lang": "西语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Extrae Leche Sin Dolor",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sin Dolor〕",
+     "B4 无名词可依 → 对象未写出，默认保守（举证责任倒置）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B013",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Tire Lait Sans Douleur",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B3 疼痛词修饰【器械名词】（Tire Lait）→ 对象未写出"
+    ]
+   },
+   {
+    "seg": "2026 Meilleur tire-lait portable. Design douillet, Né pour l'amour. Acheter maintenant.",
+    "leaf": "—(场景描述)",
+    "level": "不判",
+    "chain": [
+     "C 承诺=否〔消除性=— / 裸主张=—〕",
+     "B3 疼痛词修饰【器械名词】（tire-lait）→ 对象未写出",
+     "C 非承诺（纯场景描述）→ 不出违规结论，记 context"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B014",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Tire-Lait Sans Douleur",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B3 疼痛词修饰【器械名词】（Tire-Lait）→ 对象未写出"
+    ]
+   },
+   {
+    "seg": "2026 Meilleur tire-lait portable. Design douillet, Né pour l'amour. Acheter maintenant.",
+    "leaf": "—(场景描述)",
+    "level": "不判",
+    "chain": [
+     "C 承诺=否〔消除性=— / 裸主张=—〕",
+     "B3 疼痛词修饰【器械名词】（tire-lait）→ 对象未写出",
+     "C 非承诺（纯场景描述）→ 不出违规结论，记 context"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B015",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfrei Abpumpen",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfrei〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   },
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B017",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfrei Pumpen",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfrei〕",
+     "B2 疼痛词修饰【动作名词】（Pumpen）"
+    ]
+   },
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B018",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B019",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B020",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B021",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Pain-Free Wearable Pump",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Pain-Free〕",
+     "B3 同形消解：疼痛词修饰器械名词（Pain-Free Wearable Pump）→ 对象未写出"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B022",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Entlastung bei verstopfter Milch",
+    "leaf": "T1.5/T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=Entlastung / 裸主张=Schmerzfreies〕",
+     "B1 病理名词限定（verstopfter Milch）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B023",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B024",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Meilleur Tire-Lait Portable, Pompage efficace et indolore.",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=indolore〕",
+     "B2 疼痛词修饰【动作名词】（Pompage）"
+    ]
+   },
+   {
+    "seg": "Pompage efficace et indolore. Augmente la production de lait/réduit les blocages",
+    "leaf": "T1.5/T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=indolore〕",
+     "B1 病理名词限定（blocages）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B025",
+  "lang": "西语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Extrae Leche Sin Dolor",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sin Dolor〕",
+     "B4 无名词可依 → 对象未写出，默认保守（举证责任倒置）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B026",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B029",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Pain-Free Warm Massage Pump",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Pain-Free〕",
+     "B3 同形消解：疼痛词修饰器械名词（Pain-Free Warm Massage Pump）→ 对象未写出"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B030",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B031",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Tire-Lait Sans Douleur",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B3 疼痛词修饰【器械名词】（Tire-Lait）→ 对象未写出"
+    ]
+   },
+   {
+    "seg": "2026 Meilleur tire-lait portable. Design douillet, Né pour l'amour. Acheter maintenant.",
+    "leaf": "—(场景描述)",
+    "level": "不判",
+    "chain": [
+     "C 承诺=否〔消除性=— / 裸主张=—〕",
+     "B3 疼痛词修饰【器械名词】（tire-lait）→ 对象未写出",
+     "C 非承诺（纯场景描述）→ 不出违规结论，记 context"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B033",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B036",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Tirage Sans Douleur",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B2 疼痛词修饰【动作名词】（Tirage）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B037",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Meilleur Tire-Lait Portable, Pompage efficace et indolore.",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=indolore〕",
+     "B2 疼痛词修饰【动作名词】（Pompage）"
+    ]
+   },
+   {
+    "seg": "Pompage efficace et indolore. Augmente la production de lait/réduit les blocages",
+    "leaf": "T1.5/T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=indolore〕",
+     "B1 病理名词限定（blocages）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B038",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Tirage Sans Douleur",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B2 疼痛词修饰【动作名词】（Tirage）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B040",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Tirage Sans Douleur",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B2 疼痛词修饰【动作名词】（Tirage）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B041",
+  "lang": "法语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Tirage Sans Douleur",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Sans Douleur〕",
+     "B2 疼痛词修饰【动作名词】（Tirage）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B044",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Momcozy M5 Pain-Free Pump",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Pain-Free〕",
+     "B 同形消解 D3：`pump` 前是「M5」（非段首/破折号）→ 名词短语中心语 → 器械名词",
+     "B3 同形消解：疼痛词修饰器械名词（Pain-Free Pump）→ 对象未写出"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B045",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Momcozy M5 Pain-Free Pump",
+    "leaf": "T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Pain-Free〕",
+     "B 同形消解 D3：`pump` 前是「M5」（非段首/破折号）→ 名词短语中心语 → 器械名词",
+     "B3 同形消解：疼痛词修饰器械名词（Pain-Free Pump）→ 对象未写出"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B046",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Pain-Free Breast Pumping",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Pain-Free〕",
+     "B2 疼痛词修饰【动作名词】（Pumping）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B047",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "红 L4",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Entlastung bei verstopfter Milch",
+    "leaf": "T1.5/T1.4",
+    "level": "红 L4",
+    "chain": [
+     "C 承诺=是〔消除性=Entlastung / 裸主张=Schmerzfreies〕",
+     "B1 病理名词限定（verstopfter Milch）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B048",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Momcozy - Erstklassige Freihändige Milchpumpe - Schmerzfrei Pumpen",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfrei〕",
+     "B2 疼痛词修饰【动作名词】（Pumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B049",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B050",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Schmerzfrei Pumpen",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfrei〕",
+     "B2 疼痛词修饰【动作名词】（Pumpen）"
+    ]
+   },
+   {
+    "seg": "Schmerzfreies Abpumpen mit hoher Effizienz, Auswahl zur Förderung des Milchflusses",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfreies〕",
+     "B2 疼痛词修饰【动作名词】（Abpumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B051",
+  "lang": "德语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Momcozy - Erstklassige Freihändige Milchpumpe - Schmerzfrei Pumpen",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Schmerzfrei〕",
+     "B2 疼痛词修饰【动作名词】（Pumpen）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B052",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B053",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B054",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B056",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B057",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B058",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B059",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B060",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   },
+   {
+    "seg": "M5 Hands Free Breast Pump - Painlessly Pump With High Efficiency",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=— / 裸主张=Painlessly〕",
+     "B2 同形消解 D1+D3：`pump` 位于段首/破折号后（- Painlessly Pump）→ 动词原形 → 动作名词"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B062",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Say goodbye to cold, painful pumping and endless dishwashing! 🙅‍♀️✨ Momcozy Wellness 1 combines 360° soothing Warmth & 5-zone Massage with ultra-easy cleanup: Only 5 parts to wash and a quick One-Press Release! 🧼  Less time scrubbing, more time relaxing. 🌸 👉 Tap the link for details and easy checkout on Amazon! 🛍️",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=Say goodbye to / 裸主张=—〕",
+     "B2 疼痛词修饰【动作名词】（pumping）"
+    ]
+   },
+   {
+    "seg": "Say goodbye to cold, painful pumping and endless dishwashing! 🙅‍♀️✨ Momcozy Wellness 1 combines 360° soothing Warmth & 5-zone Massage with ultra-easy cleanup: Only 5 parts to wash and a quick One-Press Release! 🧼  Less time scrubbing, more time relaxing. 🌸 👉 Tap the link for details and easy checkout on Amazon! 🛍️",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=Say goodbye to / 裸主张=—〕",
+     "B2 疼痛词修饰【动作名词】（pumping）"
+    ]
+   }
+  ]
+ },
+ {
+  "blind_id": "B063",
+  "lang": "英语",
+  "legacy_level": "高危·红",
+  "guide_level": "黄 L2",
+  "segments": [
+   {
+    "seg": "Say goodbye to cold, painful pumping and endless dishwashing! 🙅‍♀️✨ Momcozy Wellness 1 combines 360° soothing Warmth & 5-zone Massage with ultra-easy cleanup: Only 5 parts to wash and a quick One-Press Release! 🧼  Less time scrubbing, more time relaxing. 🌸 👉 Tap the link for details and easy checkout on Amazon! 🛍️",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=Say goodbye to / 裸主张=—〕",
+     "B2 疼痛词修饰【动作名词】（pumping）"
+    ]
+   },
+   {
+    "seg": "Say goodbye to cold, painful pumping and endless dishwashing! 🙅‍♀️✨ Momcozy Wellness 1 combines 360° soothing Warmth & 5-zone Massage with ultra-easy cleanup: Only 5 parts to wash and a quick One-Press Release! 🧼  Less time scrubbing, more time relaxing. 🌸 👉 Tap the link for details and easy checkout on Amazon! 🛍️",
+    "leaf": "T2.2.2",
+    "level": "黄 L2",
+    "chain": [
+     "C 承诺=是〔消除性=Say goodbye to / 裸主张=—〕",
+     "B2 疼痛词修饰【动作名词】（pumping）"
+    ]
+   }
+  ]
+ }
+]

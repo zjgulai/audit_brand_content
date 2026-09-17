@@ -1,0 +1,1301 @@
+{
+  "$schema_version": "rules-v1",
+  "$note": [
+    "可执行规则库 v1。由 21 条现行规则（_data/rules_raw.json）重写而来。",
+    "重写规则见 _data/REWRITE_NOTES.md。本文件是手工维护的判定源，score.py 只读不写。",
+    "topic 字段必须与 topic-tree-v1.md 的节点名逐字一致，score.py 会校验。"
+  ],
+  "qualifier_axes": {
+    "$note": "§0.3 的正交轴：修饰性极端词不占主题节点，单独标记。",
+    "enum": [
+      "safety",
+      "performance",
+      "quantity",
+      "time",
+      "exclusivity",
+      "comparison",
+      "none"
+    ]
+  },
+  "detection_layers": {
+    "$note": [
+      "detection_layer 记录这条规则的关键词是怎么来的 —— 这是本骨架的可审计点。",
+      "native    = 现行规则表里本来就有",
+      "codified  = 现行规则表里没有，但**人工复核记录里已经在用**（把人的知识显式化）",
+      "added     = 骨架新增（必须标注依据，否则不许加）"
+    ],
+    "enum": [
+      "native",
+      "codified",
+      "added"
+    ]
+  },
+  "rules": [
+    {
+      "rule_key": "T1.1.medical-cure",
+      "parent_rule": "H01",
+      "topic": "T1.1",
+      "topic_label": "疾病治疗 / 治愈",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "treat",
+          "cure",
+          "heal",
+          "remedy",
+          "diagnos",
+          "治疗",
+          "治愈",
+          "诊断",
+          "疗法",
+          "根治"
+        ],
+        "patterns": [
+          "\\b(treat|cure|heal|remedy|diagnos)\\w*\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "$note": "豁免词 = 降级信号，不是放行信号（设计文档 §F：免责声明不是许可证）",
+        "keywords": [],
+        "effect": "auto_reject → manual_review",
+        "$moved_to": "context-guards-v1.json",
+        "$moved_note": [
+          "★ ADR-0009：本规则的降级词表已移出规则文件，改由 vocab.load_vocab() 组装。",
+          "原 12 词 → context-guards-v1.json（语境守卫表）；其中属白名单隔离词者（gentle/comfort）仍由 whitelist-v1.json 提供。",
+          "理由与白名单同：词表留在规则文件里，任何『扫一遍所有关键词』的动作",
+          "都会把降级词当成判险词 —— 而 `豁免词` 这份字段里还混着 10 个白名单词。",
+          "本规则只保留 `effect` —— 它声明自己的通道落点，不含词。"
+        ]
+      },
+      "evidence_required": "regulatory_clearance_or_clinical",
+      "source_legacy": "W1卖点表达边界 + 吸奶器广告文案审计_红绿灯.xlsx",
+      "detection_layer": "native"
+    },
+    {
+      "rule_key": "T1.2.medical-prevent",
+      "parent_rule": "H02",
+      "topic": "T1.2",
+      "topic_label": "疾病预防",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "prevent mastitis",
+          "prevents mastitis",
+          "prevent clogged",
+          "prevent plugged",
+          "stop mastitis",
+          "乳腺炎",
+          "预防乳腺炎"
+        ],
+        "patterns": [],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "auto_reject → manual_review",
+        "$moved_to": "context-guards-v1.json",
+        "$moved_note": [
+          "★ ADR-0009：本规则的降级词表已移出规则文件，改由 vocab.load_vocab() 组装。",
+          "原 5 词 → context-guards-v1.json（语境守卫表）；其中属白名单隔离词者（gentle/comfort）仍由 whitelist-v1.json 提供。",
+          "理由与白名单同：词表留在规则文件里，任何『扫一遍所有关键词』的动作",
+          "都会把降级词当成判险词 —— 而 `豁免词` 这份字段里还混着 10 个白名单词。",
+          "本规则只保留 `effect` —— 它声明自己的通道落点，不含词。"
+        ]
+      },
+      "evidence_required": "regulatory_clearance_or_clinical",
+      "source_legacy": "H02 边界内容第一段",
+      "detection_layer": "native"
+    },
+    {
+      "rule_key": "T1.5.duct-unclog",
+      "parent_rule": "H01",
+      "topic": "T1.5",
+      "topic_label": "疏通 / 阻塞类病理叙事",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "unclog",
+          "unclog ducts",
+          "unblock ducts",
+          "clear clogged",
+          "clear blocked",
+          "fix clogged",
+          "treat clogged",
+          "treat plugged",
+          "treat engorgement",
+          "cure engorgement",
+          "cure mastitis",
+          "treat mastitis",
+          "clogged duct treatment",
+          "plugged duct treatment",
+          "engorgement treatment",
+          "堵奶",
+          "通乳"
+        ],
+        "patterns": [
+          "\\bunclog\\w*\\b",
+          "(say )?goodbye to [^.!?|]*clog\\w*",
+          "\\bno more clog\\w*\\b",
+          "\\b(clear|fix)\\b (a |the |your )?(clogged|blocked)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "auto_reject → manual_review",
+        "$moved_to": "context-guards-v1.json",
+        "$moved_note": [
+          "★ ADR-0009：本规则的降级词表已移出规则文件，改由 vocab.load_vocab() 组装。",
+          "原 3 词 → context-guards-v1.json（语境守卫表）；其中属白名单隔离词者（gentle/comfort）仍由 whitelist-v1.json 提供。",
+          "理由与白名单同：词表留在规则文件里，任何『扫一遍所有关键词』的动作",
+          "都会把降级词当成判险词 —— 而 `豁免词` 这份字段里还混着 10 个白名单词。",
+          "本规则只保留 `effect` —— 它声明自己的通道落点，不含词。"
+        ]
+      },
+      "evidence_required": "regulatory_clearance_or_clinical",
+      "source_legacy": "H01 边界内容",
+      "detection_layer": "native"
+    },
+    {
+      "rule_key": "T2.1.1.milk-supply",
+      "parent_rule": "H02",
+      "topic": "T2.1.1",
+      "topic_label": "奶量提升",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "more milk",
+          "催乳",
+          "下奶",
+          "追奶",
+          "回奶",
+          "增奶",
+          "增产",
+          "提升奶量",
+          "追奶量",
+          "增加奶量",
+          "提高奶量",
+          "奶量增长",
+          "催奶",
+          "发奶",
+          "增多奶量",
+          "trigger oxytocin",
+          "release oxytocin",
+          "oxytocin release",
+          "boost oxytocin",
+          "increase oxytocin",
+          "stimulate oxytocin",
+          "long-term milk supply",
+          "long term milk supply",
+          "increase long-term supply",
+          "augmente la production de lait",
+          "plus de lait",
+          "mehr milch",
+          "más leche",
+          "producción de leche",
+          "easier letdown",
+          "easier let-down",
+          "faster let-down",
+          "support faster let-down"
+        ],
+        "patterns": [
+          "(increase|boost|double|triple|more)\\s+milk\\s+(supply|production|output)",
+          "(increase|boost|double|triple)\\s+supply",
+          "increas\\w+\\s+milk\\s+(supply|production|output)",
+          "295\\s?mmhg[^.!?|]*(more milk|better|faster)"
+        ],
+        "languages": [
+          "en",
+          "zh",
+          "fr",
+          "de",
+          "es"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "auto_reject → manual_review",
+        "$moved_to": "context-guards-v1.json",
+        "$moved_note": [
+          "★ ADR-0009：本规则的降级词表已移出规则文件，改由 vocab.load_vocab() 组装。",
+          "原 6 词 → context-guards-v1.json（语境守卫表）；其中属白名单隔离词者（gentle/comfort）仍由 whitelist-v1.json 提供。",
+          "理由与白名单同：词表留在规则文件里，任何『扫一遍所有关键词』的动作",
+          "都会把降级词当成判险词 —— 而 `豁免词` 这份字段里还混着 10 个白名单词。",
+          "本规则只保留 `effect` —— 它声明自己的通道落点，不含词。"
+        ]
+      },
+      "evidence_required": "rct_or_clinical",
+      "source_legacy": "H02 边界内容第二段",
+      "detection_layer": "native"
+    },
+    {
+      "rule_key": "T2.1.2.pain-relief",
+      "parent_rule": "H07",
+      "topic": "T2.1.2",
+      "topic_label": "疼痛缓解（人体结果）",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "eliminates pain",
+          "pain-free",
+          "no pain ever",
+          "completely painless",
+          "100% pain",
+          "完全不痛",
+          "零疼痛",
+          "无痛",
+          "无痛吸奶",
+          "painlessly",
+          "painless",
+          "pain relief",
+          "relieve pain",
+          "relieves pain",
+          "relieved pain",
+          "relief from pain",
+          "stop the pain",
+          "stops pain",
+          "stop pain",
+          "kill pain",
+          "ends pain",
+          "end pain",
+          "less pain",
+          "reduce pain",
+          "reduces pain",
+          "reduced pain",
+          "pain solution",
+          "solve pain",
+          "pain gone",
+          "缓解疼痛",
+          "schmerzfrei",
+          "sans douleur",
+          "indolore",
+          "sin dolor"
+        ],
+        "patterns": [
+          "\\b(pain.?free|no\\s+pain|zero\\s+pain)\\b",
+          "\\bwithout (the |any |much )?pain\\b",
+          "(say )?goodbye to [^.!?|]*pain\\w*",
+          "\\bno more pain\\w*\\b"
+        ],
+        "languages": [
+          "en",
+          "zh",
+          "de",
+          "fr",
+          "it",
+          "es"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "auto_reject → manual_review",
+        "$moved_to": "context-guards-v1.json",
+        "$moved_note": [
+          "★ ADR-0009：本规则的降级词表已移出规则文件，改由 vocab.load_vocab() 组装。",
+          "原 14 词 → context-guards-v1.json（语境守卫表）；其中属白名单隔离词者（gentle/comfort）仍由 whitelist-v1.json 提供。",
+          "理由与白名单同：词表留在规则文件里，任何『扫一遍所有关键词』的动作",
+          "都会把降级词当成判险词 —— 而 `豁免词` 这份字段里还混着 10 个白名单词。",
+          "本规则只保留 `effect` —— 它声明自己的通道落点，不含词。"
+        ]
+      },
+      "evidence_required": "clinical",
+      "source_legacy": "H07 关键词/正则（英文部分）",
+      "detection_layer": "native",
+      "$codified_note": [
+        "★ 后 4 个关键词是 codified，不是 native：它们**不在**现行 H07 的关键词列，也不在其正则里。",
+        "依据：现行 291 条记录中，人工复核已用 `H07:sans douleur` / `H07:schmerzfrei` / `H07:indolore` /",
+        "`H07:sin dolor` 判定了 31 条，且 31/31 条的 `修改建议` 里显式写着这几个词（见 score.py 的 --audit-channel）。",
+        "本骨架把这条**已经在运行但未入库的检测通道**显式化。这是 Q3 的答案，不是猜测。"
+      ]
+    },
+    {
+      "rule_key": "T2.1.3.milk-flow",
+      "parent_rule": "M07",
+      "topic": "T2.1.3",
+      "topic_label": "排空 / 奶阵 / 奶流",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "reduce milk leakage",
+          "reduces milk leakage",
+          "reduce leakage",
+          "leakage",
+          "leak",
+          "leak-proof pumping",
+          "leak proof",
+          "leak none",
+          "higher pumping efficiency",
+          "improve pumping efficiency",
+          "improved pumping efficiency",
+          "milk removal",
+          "improve milk removal",
+          "improved milk removal",
+          "faster milk flow",
+          "quicker milk flow",
+          "improve milk flow",
+          "better milk flow",
+          "smoother milk flow",
+          "smooth milk flow",
+          "support milk flow",
+          "减少漏奶",
+          "防漏奶",
+          "提升吸乳效率",
+          "提高吸乳效率",
+          "吸乳效率",
+          "移除量",
+          "奶量移除",
+          "排乳更顺",
+          "短时奶流",
+          "奶流更顺",
+          "前几分钟排乳",
+          "排乳效率",
+          "排乳更顺畅"
+        ],
+        "patterns": [
+          "(higher|better|improve\\w*|increase\\w*|boost\\w*)[^.!?|]*(pumping efficiency|milk removal|milk flow|milk expression)",
+          "(reduce|stop|prevent|anti)[^.!?|,]*leak\\w*",
+          "leak none|no (more )?leak\\w*|leak-?proof",
+          "(减少|防止|降低|杜绝)[^.!?|]*(漏奶)"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "w1_self_controlled_data",
+      "source_legacy": "M07（原关键词横跨 T2.1.3 与 T2.2.1）",
+      "detection_layer": "native",
+      "$added_note": "原 M02 有 8 关键词 0 正则，本骨架补 2 条正则。",
+      "$codified_note": "M02 的 8 次漏报：英文 `strong suction`(3)、西语 `succión potente`(2)、意语记录中的英文词(3)。原表 8 词 0 正则，且只有最高级 `strongest suction` —— 漏了原级 `strong suction`。这是「规则只写最高级、不写原级」的结构性缺陷，与语种无关。",
+      "$split_note": "★ 原 M07 的 32 个关键词含两族：`pumping efficiency`/`milk removal`/`milk flow`（过程侧）与 `reduce milk leakage`（生理侧）。原表把它们压在一条规则里且**无主题归属**，导致这 16 次命中在新模型下无处可挂。本骨架收拢到 T2.1.3。"
+    },
+    {
+      "rule_key": "T3.1.clinical-endorsement",
+      "parent_rule": "H03",
+      "topic": "T3.1",
+      "topic_label": "临床 / 科学背书",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "clinically proven",
+          "clinically tested",
+          "clinically validated",
+          "clinical studies show",
+          "scientifically proven",
+          "临床证明",
+          "临床验证",
+          "临床试验证实",
+          "医学证明"
+        ],
+        "patterns": [
+          "\\b(clinically|scientifically)\\s+(proven|tested|validated)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "registered_clinical_study",
+      "source_legacy": "H03",
+      "detection_layer": "added",
+      "$added_note": "正则为本骨架新增（原表 H03 有 9 个关键词但 0 条正则）。同族 H04 亦然。"
+    },
+    {
+      "rule_key": "T3.2.expert-endorsement",
+      "parent_rule": "H04",
+      "topic": "T3.2",
+      "topic_label": "专家 / 个人背书",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "doctor recommended",
+          "recommended by doctors",
+          "pediatrician recommended",
+          "医生推荐",
+          "医师推荐",
+          "儿科医生推荐",
+          "专家推荐",
+          "recommended by experts",
+          "expert recommended",
+          "ob-gyn recommended",
+          "ibclc-recommended",
+          "recommended by 100+ experts"
+        ],
+        "patterns": [
+          "\\b(doctor|pediatrician|ob-?gyn|expert)s?\\s+recommended\\b",
+          "\\brecommended by [^.!?|]*(doctor|expert|pediatrician|ob-?gyn)"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "named_endorser_consent",
+      "source_legacy": "H04",
+      "detection_layer": "added"
+    },
+    {
+      "rule_key": "T3.3.institution-grade",
+      "parent_rule": "M05",
+      "topic": "T3.3",
+      "topic_label": "机构 / 等级背书",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "military grade",
+          "medical grade silicone",
+          "hospital grade",
+          "医疗级",
+          "医用级",
+          "军用级",
+          "hospital-grade",
+          "qualité hospitalière"
+        ],
+        "patterns": [
+          "\\b(medical|hospital|military)[\\s-]+grade\\b"
+        ],
+        "languages": [
+          "en",
+          "zh",
+          "fr"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "certification_document",
+      "source_legacy": "M05",
+      "detection_layer": "native",
+      "$codified_note": "`hospital-grade` 与 `qualité hospitalière` 为 codified：M05 的 15 次命中里有 10 次是这两个片段，但原表关键词/正则都复现不了（原正则要求 `hospital grade` 带空格，实际文案是连字符；法语完全无覆盖）。"
+    },
+    {
+      "rule_key": "T7.1.hospital-scenario",
+      "parent_rule": "U03",
+      "topic": "T7.1",
+      "topic_label": "医疗场景",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "manual_only",
+      "match": {
+        "keywords": [
+          "hospital",
+          "NICU",
+          "nicu grade",
+          "医院",
+          "新生儿",
+          "krankenhaus"
+        ],
+        "patterns": [
+          "\\b(NICU|hospital)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh",
+          "de"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "clinical_applicability",
+      "source_legacy": "U03（原挂 T3.3 + T7.1，本骨架拆为 T7.1）",
+      "detection_layer": "codified",
+      "$codified_note": "U03 的 `krankenhaus`(de)。原表 U03 关键词已含 `hospital`，正则 \\b(NICU|hospital)\\b 本应命中 —— 其中 1 次实为字段范围问题，此处一并收口。",
+      "$split_note": "★ 原 U03 跨 T3.3 与 T7.1 两个主题。本骨架拆开：`hospital grade`（等级主张，要认证文件）留在 T3.3；`hospital`/`NICU` 场景描述（要在医院用过的真实性）走 T7.1。两者证据要求不同 —— 这是设计文档 §2.2.1 一对一映射表没体现的一处。",
+      "$renamed_from": "T3.3.hospital-scenario"
+    },
+    {
+      "rule_key": "T6.1.regulatory-status",
+      "parent_rule": "H06",
+      "topic": "T6.1",
+      "topic_label": "监管状态",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "FDA approved",
+          "FDA certified",
+          "FDA 认证",
+          "FDA 批准",
+          "FDA 通过"
+        ],
+        "patterns": [
+          "\\bFDA\\s+(approved|certified)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [
+          "FDA cleared",
+          "FDA-cleared",
+          "FDA registered",
+          "FDA 注册"
+        ],
+        "effect": "auto_reject → auto_pass",
+        "keyword_effect_overrides": {
+          "downgrade": {
+            "FDA registered": "auto_reject → manual_review",
+            "FDA 注册": "auto_reject → manual_review"
+          }
+        },
+        "$override_shape": [
+          "★ 2026-09-16（D18 · 回答 Q12）：键从「词」改成「通道 → 词」。",
+          "  落点是三级的（规则 → 词 → 表），而覆盖原先只按词寻址 ——",
+          "  若同一个词将来在两个通道各有一条覆盖，取哪条只能靠 dict 遍历次序，",
+          "  表现为「同样的输入两次跑出不同落点」。实测今天没有跨通道重复词",
+          "  （downgrade_band 共 12 词，覆盖 2 条），所以这是把一个隐式的顺序依赖",
+          "  改成显式的结构约束：行为零变化，但冲突不再可能悄悄发生。",
+          "  ★ 旧形状（值是字符串）在 `score.band_hits` 里**硬失败**，不兼容 ——",
+          "    两套写法都活着时，读代码的人无法判断哪一套在生效。"
+        ],
+        "$note": "★ 本规则是唯一例外：豁免词落回的是 auto_pass 而非 manual_review。理由：`FDA cleared` 是**事实正确**的表述，不是免责声明。依据 21 CFR 807.97（R5 已逐字独立复核）。",
+        "$decision": "D2 · 法务 2026-09-16：**放行**（同现即放行，确认维持原语义）。同时记录：带是文本级的 —— 带词出现在同段文本的**任何位置**即生效，因此 `FDA approved breast pump. FDA cleared.` 判 auto_pass。",
+        "$decision_scope": "本注释不改变行为；行为由上一行 `effect` 字符串决定。",
+        "$override_decision": "D9 · Owner 2026-09-16（回答 Q6）：`FDA registered` / `FDA 注册` **移出放行带**，改为降级 `auto_reject → manual_review`。",
+        "$override_why": [
+          "两个词说的是**不同对象**，所以强度不可互换：",
+          "  `FDA cleared`  = 510(k) 实质性等同，**器械层**状态，可查 K 号；",
+          "  `FDA registered` = establishment registration，**企业/设施层**状态，可查注册号。",
+          "FDA 自己的注册与列名数据库声明写明：注册**不表示**对该机构或其器械的批准、许可或授权",
+          "（并见 21 CFR 807.97 对误导性表述的规定）。",
+          "所以「同一段里写了 FDA 注册」证明不了作者分得清 approved 与 cleared ——",
+          "它证明的是这家工厂注册过。而 D2 放行的理由恰恰是「作者写出了 cleared，说明他知道区别」。",
+          "把 registered 留在同一个放行带，等于用一个关于工厂的事实去为一个关于器械的主张背书。"
+        ],
+        "$override_effect": "改动后：`FDA approved … FDA cleared` → auto_pass（D2 语义逐字不变）；`FDA approved … FDA 注册` → manual_review（从 auto_pass 收紧）。",
+        "$override_cost": "存量 291 条里含这两个词的记录 **0 条** —— 今天的行为差异为零。它是一个**前瞻性**决定：防的是下一次有人写「FDA approved device. FDA registered facility.」。",
+        "$override_conflict_with_D3": "★ 需要点明的一处张力：D3（同一天）把 `FDA 注册` 从守卫表迁进了白名单表，理由是它状态 misrouted、声明了却取不到。D9 现在让它**回到降级通道**。这不是推翻 D3 —— D3 修的是「登记在哪张表」（登记错了），D9 定的是「它该在哪个通道」（语义归属）。两次改动叠加后的状态是：词仍在白名单表里（可独立复核为真：注册号可查），但它的通道是降级。这正是 W3 早就写明的边界 —— 「放行与降级是两个通道，不是一件事」。",
+        "$conflict_resolution_note": "若只看 D3 的 diff，会以为这个词「被放行了」；只看 D9 的 diff，会以为 D3 被撤销了。**两个 diff 都对，合起来才是完整语义** —— 所以这一条必须同时留在词表和规则两处，不能只留一处。"
+      },
+      "evidence_required": "510k_number",
+      "source_legacy": "H06",
+      "detection_layer": "native",
+      "$renamed_from": "T3.5.regulatory-status"
+    },
+    {
+      "rule_key": "T4.1.named-comparison",
+      "parent_rule": "H08",
+      "topic": "T4.1",
+      "topic_label": "与具名/可识别竞品的对比",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "10x better",
+          "10x more",
+          "better than medela",
+          "better than willow",
+          "better than elvie",
+          "beats medela",
+          "beats willow",
+          "完胜",
+          "秒杀",
+          "碾压"
+        ],
+        "patterns": [
+          "\\b\\d+x\\s+(better|more)\\s+than\\b",
+          "\\b(better|beats?)\\s+than\\s+(medela|willow|elvie|spectra|baby?buddha)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "head_to_head_test",
+      "source_legacy": "H08",
+      "detection_layer": "native",
+      "$removed_note": "★ 原 H08 的 `比.*好` 被移除：它是**一条含 `.*` 的伪关键词**，实际是正则却写在关键词列，且会匹配任意长度文本（含 HTML）。依据：设计文档 §2.5 记录的「75 个关键词只有单通道」问题。`秒杀` 保留但见下。"
+    },
+    {
+      "rule_key": "T4.2.industry-comparison",
+      "parent_rule": "M06",
+      "topic": "T4.2",
+      "topic_label": "与行业基准的模糊对比",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "better than",
+          "vs competitors",
+          "compared to other",
+          "比同类",
+          "比市面",
+          "优于"
+        ],
+        "patterns": [
+          "\\bbetter\\s+than\\b",
+          "\\b\\d+%\\s+\\w+\\s+than\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "comparative_test",
+      "source_legacy": "M06",
+      "detection_layer": "native"
+    },
+    {
+      "rule_key": "T5.1.safety-claim",
+      "parent_rule": "H05",
+      "topic": "T5.1",
+      "topic_label": "无害 / 无副作用",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "safest",
+          "most safe",
+          "100% safe",
+          "100% painless",
+          "zero risk",
+          "guaranteed safe",
+          "最安全",
+          "唯一",
+          "百分百安全",
+          "零风险",
+          "guaranteed no damage",
+          "no damage guaranteed",
+          "cannot damage",
+          "won't damage nipples",
+          "一定不损伤",
+          "绝不损伤",
+          "perfect pump"
+        ],
+        "patterns": [
+          "\\bthe\\s+(only|safest)\\b",
+          "\\b100%\\s+(safe|painless)\\b",
+          "\\bzero\\s+risk\\b",
+          "\\b(the\\s+)?(only|safest)\\s+(pump|breast\\s*pump|choice|option|way|brand|wearable)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "qualifier_axis": "safety"
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "none_possible",
+      "source_legacy": "H05 第一段",
+      "detection_layer": "codified",
+      "$scope_note": "★ 原 H05 的「适合所有胸型」族（fits all breast shapes / one size fits all / 适合所有妈妈）**已从本规则移出**，因为它是 T2.2（机器性能/适体性）而非 T5（安全性）。按 2026-09-09 口径排名最高级已放开，但放开的是表达、不是主题 —— 见 topic-tree-v1.md §0.3。",
+      "$codified_note": "★ `perfect pump` **本来就在原表 H05 关键词里**，是本骨架第一版的转录遗漏。12 次漏报全部由此产生 —— 这是**我们自己的错误**，记在案，不推给数据。"
+    },
+    {
+      "rule_key": "T2.2.fit-all-claim",
+      "parent_rule": "H05",
+      "topic": "T2.2",
+      "topic_label": "机器性能声明 · 适体性",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "fits all breast shapes",
+          "fits every breast",
+          "all breast shapes",
+          "every breast shape",
+          "one size fits all",
+          "fits all moms",
+          "universal fit",
+          "适合所有乳房",
+          "适合所有胸型",
+          "各种胸型",
+          "所有乳房形态",
+          "适合所有妈妈"
+        ],
+        "patterns": [
+          "\\b(fits?|suitable for)\\s+(all|every|any)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "qualifier_axis": "exclusivity"
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "fit_test_data",
+      "source_legacy": "H05 第二段（本骨架从 H05 拆出）",
+      "detection_layer": "native",
+      "$renamed_from": "T5.3.fit-all-claim"
+    },
+    {
+      "rule_key": "T2.2.mimic-claim",
+      "parent_rule": "H09",
+      "topic": "T2.2",
+      "topic_label": "机器性能声明 · 智能仿生",
+      "modality": "prohibit",
+      "severity": "L4",
+      "disposition": "auto_reject",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "auto-detects rhythm",
+          "automatically detects your rhythm",
+          "automatically finds the best rhythm",
+          "detects the best rhythm",
+          "smart rhythm detection",
+          "mimics your baby",
+          "mimics a nursing baby",
+          "mimics baby",
+          "mimics nursing",
+          "copies your baby",
+          "simulates your baby",
+          "simulates a nursing baby",
+          "baby fullness feedback",
+          "fullness feedback",
+          "reduces milk supply anxiety",
+          "ease milk supply anxiety",
+          "milk supply anxiety",
+          "自动识别最佳节奏",
+          "自动识别节奏",
+          "自动识别节律",
+          "智能识别节奏",
+          "模拟宝宝",
+          "模拟婴儿",
+          "复制宝宝",
+          "模仿宝宝吃奶",
+          "饱腹反馈",
+          "模拟饱腹",
+          "降低奶量焦虑",
+          "缓解奶量焦虑",
+          "减少奶量焦虑"
+        ],
+        "patterns": [
+          "mimic\\w* [^.!?|]*(baby|nursing|breastfeed)",
+          "(cop|copies|copy|simulate\\w*|imitates?|replicates?)[^.!?|]*(baby|nursing|infant)",
+          "(auto|automatic|smart)[^.!?|]*(detect|find|identif|recogniz)\\w*[^.!?|]*(rhythm|pattern|let-?down|pace)",
+          "(fullness|satiety) feedback"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "auto_reject → manual_review",
+        "$moved_to": "context-guards-v1.json",
+        "$moved_note": [
+          "★ ADR-0009：本规则的降级词表已移出规则文件，改由 vocab.load_vocab() 组装。",
+          "原 8 词 → context-guards-v1.json（语境守卫表）；其中属白名单隔离词者（gentle/comfort）仍由 whitelist-v1.json 提供。",
+          "理由与白名单同：词表留在规则文件里，任何『扫一遍所有关键词』的动作",
+          "都会把降级词当成判险词 —— 而 `豁免词` 这份字段里还混着 10 个白名单词。",
+          "本规则只保留 `effect` —— 它声明自己的通道落点，不含词。"
+        ]
+      },
+      "evidence_required": "algorithm_documentation",
+      "source_legacy": "H09",
+      "detection_layer": "native",
+      "$severity_note": "★ 原 H09 在现行表里是「高危·红」（L4），设计文档 §2.2.1 的映射表却把它写成 L3。本骨架取 **L4**（以现行表的实际等级为准）。这是一处设计文档与源数据的数字不一致，已记录。"
+    },
+    {
+      "rule_key": "T2.2.quiet-claim",
+      "parent_rule": "M01",
+      "topic": "T2.2.2",
+      "topic_label": "噪音 / 吸力",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "silent",
+          "whisper quiet",
+          "zero noise",
+          "noiseless",
+          "几乎静音",
+          "完全静音",
+          "零噪音",
+          "静音",
+          "cicha",
+          "silencieux",
+          "silenciosa",
+          "silencioso",
+          "whisper-quiet",
+          "whisper"
+        ],
+        "patterns": [
+          "\\b(silent|noiseless|whisper.?quiet)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh",
+          "de",
+          "fr",
+          "pl",
+          "es"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [
+          "low noise",
+          "quiet mode",
+          "low-decibel",
+          "silent mode",
+          "静音模式"
+        ],
+        "effect": "manual_review → auto_pass"
+      },
+      "evidence_required": "decibel_test",
+      "source_legacy": "M01",
+      "detection_layer": "codified",
+      "$codified_note": "M01 的 `Whisper-Quiet`：原表正则要求 whisper 后接 quiet，但连字符形式 `Whisper-Quiet` 不匹配已列为关键词的 `whisper quiet`（空格版）。**连字符/空格不归一化**是原表的一处系统性缺陷。"
+    },
+    {
+      "rule_key": "T2.2.suction-claim",
+      "parent_rule": "M02",
+      "topic": "T2.2.2",
+      "topic_label": "吸力夸大",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "super strong",
+          "ultra powerful",
+          "max suction",
+          "strongest suction",
+          "超强",
+          "极致",
+          "无敌",
+          "超级",
+          "strong suction",
+          "succión potente",
+          "maximum suction",
+          "absaugleistung"
+        ],
+        "patterns": [
+          "\\b(ultra|super)[\\s-]+(strong|powerful)\\b",
+          "\\b(strongest|max(imum)?)\\s+suction\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [
+          "suction level",
+          "suction settings",
+          "adjustable suction"
+        ],
+        "effect": "manual_review → auto_pass"
+      },
+      "evidence_required": "suction_test",
+      "source_legacy": "M02",
+      "detection_layer": "added",
+      "$added_note": "原 M02 有 8 关键词 0 正则，本骨架补 2 条正则。",
+      "$codified_note": "M02 的 8 次漏报：英文 `strong suction`(3)、西语 `succión potente`(2)、意语记录中的英文词(3)。原表 8 词 0 正则，且只有最高级 `strongest suction` —— 漏了原级 `strong suction`。这是「规则只写最高级、不写原级」的结构性缺陷，与语种无关。"
+    },
+    {
+      "rule_key": "T2.3.sourced-data",
+      "parent_rule": "M03",
+      "topic": "T2.3.1",
+      "topic_label": "效果数据声明（有来源）",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "bestseller",
+          "best-selling",
+          "hotseller",
+          "top rated",
+          "top-rated",
+          "trusted by 6 million",
+          "trusted by 6m"
+        ],
+        "patterns": [
+          "\\b\\d+%\\s+(more|faster|higher|greater|stronger|quieter)\\b(?!\\s*(off|less|savings?|discount))",
+          "\\b\\d+%\\s+(increase|improvement|boost|efficiency|milk|output|flow|removal|suction)\\b",
+          "\\b\\d+x\\s+(faster|more|better|stronger)\\b(?!\\s*(off|less))",
+          "(increase|improve|boost|reduce)\\w*\\s+\\w*\\s*by\\s+\\d+%"
+        ],
+        "languages": [
+          "en"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "source_citation",
+      "source_legacy": "M03 第一段",
+      "detection_layer": "native",
+      "$split_note": "★ 原 M03 同时管「有来源」与「无来源」两种数据声明，但**判定所需的证据不同**（前者要求出示来源，后者是兜底规则直接判红）。本骨架拆为 T2.3.1 / T2.3.2 两条。",
+      "$pattern_fix_note": "★ 原 M03 正则 `\\b\\d+%\\s+(more|faster|less|better)\\b` 在实测中**误报真实折扣文案**：\n  `Big Member Sale: 20% Off | Code BDMS20 Saves 20%` 与 `20% Less via Code BDMS20` 都被判成效果数据声明。\n  第一版修正只是加了折扣词黑名单，仍然漏掉了 `less`（因为 `less` 同时是合法的效果比较级）。\n  第二版改为**白名单**：只有 `%` 后接性能/效果名词或明确比较级才命中，并显式排除折扣语境。\n  这是本骨架跑出来的第四处缺陷 —— 也是「黑名单修不干净、白名单才收得住」的一个实例。"
+    },
+    {
+      "rule_key": "T2.3.unsourced-data",
+      "parent_rule": "M03",
+      "topic": "T2.3.2",
+      "topic_label": "效果数据声明（无来源）",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "30% more milk",
+          "20% faster",
+          "2x faster",
+          "3x more",
+          "吸力提升",
+          "效率提升",
+          "快一倍",
+          "多30%"
+        ],
+        "patterns": [],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "claim_evidence_on_file",
+      "source_legacy": "M03 第二段",
+      "detection_layer": "native"
+    },
+    {
+      "rule_key": "T8.1.anxiety-pressure",
+      "parent_rule": "M04",
+      "topic": "T8.1",
+      "topic_label": "制造焦虑 / 恐吓",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto_then_manual",
+      "match": {
+        "keywords": [
+          "don't miss",
+          "不买后悔",
+          "错过即无",
+          "奶量下降",
+          "supply drop",
+          "don't let your"
+        ],
+        "patterns": [
+          "\\bdon'?t\\s+(let|miss)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "none",
+      "source_legacy": "M04 第一段",
+      "detection_layer": "added",
+      "$added_note": "原 M04 的 `don't miss` 只有一词，本骨架补 3 个词 + 1 条正则以覆盖「恐吓式」子类（原表的 11 个词全部是「限时/稀缺」类，**焦虑类实际无覆盖**）。"
+    },
+    {
+      "rule_key": "T8.2.urgency-scarcity",
+      "parent_rule": "M04",
+      "topic": "T8.2",
+      "topic_label": "限时 / 稀缺",
+      "modality": "review",
+      "severity": "L1",
+      "disposition": "auto_pass_with_note",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "last chance",
+          "limited time",
+          "final hours",
+          "act now",
+          "hurry",
+          "限时",
+          "最后机会",
+          "手慢无"
+        ],
+        "patterns": [
+          "\\b(limited time|last chance|final hours|act now)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "none",
+      "source_legacy": "M04 第二段",
+      "detection_layer": "native",
+      "$split_note": "★ 原 M04 把「焦虑」与「限时」压成一条，但**两者严重度不同** —— 促销紧迫性是行业常规（IAB/GARM 均不视为风险），制造焦虑才是。本骨架拆为 T8.1(L2) / T8.2(L1)。"
+    },
+    {
+      "rule_key": "T3.2.lactation-consultant",
+      "parent_rule": "U01",
+      "topic": "T3.2",
+      "topic_label": "专家 / 个人背书 · 头衔",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "manual_only",
+      "match": {
+        "keywords": [
+          "lactation consultant",
+          "ibclc",
+          "母乳指导",
+          "泌乳顾问",
+          "expert-tuned",
+          "expert tuned",
+          "expert program",
+          "expert-designed",
+          "expert designed",
+          "expert-designed program",
+          "专家调校",
+          "专家程序",
+          "专家设计程序",
+          "专家设计"
+        ],
+        "patterns": [
+          "\\b(IBCLC|lactation consultant)\\b",
+          "\\bexpert[\\s-]*(tuned|designed|program)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "consultant_engagement_contract",
+      "source_legacy": "U01",
+      "detection_layer": "native",
+      "$note": "U01 是唯一 15/15 全部可机械复现的规则 —— 因为它的关键词全部是**英文头衔**，没有小语种暴露。这个反例恰好印证了语种缺口的解释。"
+    },
+    {
+      "rule_key": "T7.2.pain-scenario",
+      "parent_rule": "U04",
+      "topic": "T7.2",
+      "topic_label": "痛点场景描述",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "manual_only",
+      "match": {
+        "keywords": [
+          "sore nipples",
+          "sore breasts",
+          "sore breast",
+          "painful pumping",
+          "clogged ducts",
+          "plugged ducts",
+          "clogged milk duct",
+          "乳头疼痛",
+          "乳房胀痛",
+          "乳房疼痛"
+        ],
+        "patterns": [],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "none",
+      "source_legacy": "U04",
+      "detection_layer": "native",
+      "$escalation_note": "★ 原 U04 写着「与 goodbye/no more/not anymore/relieve 等消除性表述连用应升级 H01/H07」。**这条升级逻辑在原表里只是一句文字，无法执行。** 本骨架把它变成 escalation 块（见下）。这是设计文档 §2.2.1 「规则要从文档变成可执行」最具体的一处。",
+      "escalation": {
+        "when_cooccurring_with": [
+          "T1.5.duct-unclog",
+          "T2.1.2.pain-relief"
+        ],
+        "to_severity": "L4",
+        "to_disposition": "auto_reject",
+        "reason": "场景名词 + 消除性动词 = 功效承诺，不是场景描述"
+      }
+    },
+    {
+      "rule_key": "T9.objective-parameter",
+      "parent_rule": "安全词",
+      "topic": "T9",
+      "topic_label": "产品参数（客观可测）",
+      "modality": "permit",
+      "severity": "L0",
+      "disposition": "auto_pass",
+      "evaluability": "manual_only",
+      "is_modifier": true,
+      "match": {
+        "keywords": [],
+        "patterns": [],
+        "languages": [
+          "en"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "product_spec",
+      "source_legacy": "安全词白名单（26 词中的 22 个）",
+      "detection_layer": "native",
+      "$quarantined": {
+        "$note": "★ 以下 4 个词**从安全词里隔离**，不进入本规则。理由见 R5-E：安全词的判别标准只有一条 —— **能否被第三方独立复核为真/假**。这 4 个词不满足。",
+        "words": [
+          "reduces pain",
+          "less pain",
+          "gentle",
+          "comfort"
+        ],
+        "moved_to": [
+          "T2.1.2.pain-relief 的 downgrade_band"
+        ],
+        "evidence": "R5 实测：`reduces pain` / `less pain` 是 H07 的关键词（= 违规词），却在安全词白名单里（= 放行词）。同一条文案命中两者时，现行表无法决定放行还是拦截。本骨架把判定权交给 H07 的 downgrade_band（→ manual_review），而不是放行。"
+      },
+      "topic_only": true,
+      "$topic_only_note": [
+        "★ ADR-0008：本节点是**主题**，不持有词表，不产生命中。",
+        "原 22 个白名单词已迁出至 whitelist-v1.json（独立表）。",
+        "设计文档 §2.2.1：「T9 是一个主题，不是一张白名单」。",
+        "此前用 is_modifier 在运行时兜住 —— 那是开关不是结构：词仍在同表同字段，",
+        "任何 `SELECT 检测关键词` 仍会取到它们，本项目 56/57 条误报即由此而来。"
+      ]
+    },
+    {
+      "rule_key": "T6.3.reimbursement",
+      "parent_rule": "U02",
+      "topic": "T6.3",
+      "topic_label": "报销资质",
+      "modality": "review",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "manual_only",
+      "enabled": false,
+      "disabled_reason": "站点报销资质已具备（2026-09-09 用户确认）—— 停用的是**规则**，不是主题。见 topic-tree-v1.md §1-T6 注与缺口 G-SCOPE-1。",
+      "match": {
+        "keywords": [
+          "insurance eligible",
+          "HSA",
+          "FSA",
+          "insurance covered",
+          "保险",
+          "医保"
+        ],
+        "patterns": [
+          "\\b(HSA|FSA)[\\s/-]*(eligible|covered)\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ]
+      },
+      "downgrade_band": {
+        "keywords": [],
+        "effect": "none"
+      },
+      "evidence_required": "site_reimbursement_qualification",
+      "source_legacy": "U02（现行表已停用）",
+      "detection_layer": "native"
+    }
+  ],
+  "catch_all": {
+    "rule_key": "CATCH-ALL-01",
+    "topic": "L0",
+    "topic_label": "未覆盖",
+    "modality": "escalate",
+    "severity": "L0",
+    "disposition": "manual_review",
+    "evaluability": "n/a",
+    "trigger": "no_rule_matched",
+    "reason": "未命中 ≠ 合规。不拆 `未覆盖` 与 `合规`，盲区率在数学上不可观测。",
+    "evidence": "设计文档 §5.1 / §B（四个体系 + 一个平台层全部举证责任倒置）；NIST AI RMF MEASURE 3.2；Ofcom Step 2",
+    "$note": "★ 这是 P0-1 的落地实现。它与「命中了但结论是通过」的责任归属完全不同。"
+  }
+}

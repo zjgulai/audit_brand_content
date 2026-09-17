@@ -1,0 +1,34 @@
+﻿规则编号,规则名,现行处置,吸奶器侧命中,其他品线命中,命中词,出处（主推品/分类）,标题
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Swaddle, Pajama / baby swaddle",Arms-Out Swaddling: A Comfortable Solution for Your Newborn’s Sleep Needs
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Sound Machine, Pajama / baby sleep",Can a Baby Sleep Too Much? Understanding Normal Sleep Patterns in Newborns
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,Swaddle / baby swaddle,9 Best Swaddles for Newborn
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,Natural Bath Bombs / bath baby,Creating a Calming Bath Experience: Finding the Right Newborn Bath Temp
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Sound Machine, BM04 / baby sleep",Decoding Newborn Tired Cues for Better Baby Sleep
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Baby wipe warmer, water wipes / Bottle & Feeding",Why Do Newborns Spit Bubbles And The Reasons Behind It
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Baby wipe warmer, water wipes / Bottle & Feeding",Why Is My Baby Spitting Up Blood? A Parent’s Guide
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Sound Machine, Pajama / baby sleep",Newborn Sleep Schedule: How to Manage Sleep For Your Infant
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Sound Machine, Pajama / baby sleep",The Complete Guide to Active Sleep in Newborns: Understanding Your Baby's Mysterious Sleep
+T7.1.hospital-scenario,医疗场景,manual_review,27,64,新生儿,"Sound Machine, BM04 / baby sleep",How to Lay Newborns to Sleep: Expert Safety Guidelines
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,treat,"Finger Toothbrush,Baby Toothbrush / baby teeth","The 2-Year Molars Explained: Timing, Symptoms, and Treatment."
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,"BS03, Food maker / Bottle & Feeding",1-Year-Old Feeding Schedule: A Complete Guide for Healthy Eating Habits
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,"Weight Scale, Belly band,YB003 / pregnancy",Chart for Healthy Body Mass Index for Pregnant Women
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,"Weight Scale, YN08,yb003 瑜伽球 / pregnancy","Plus-Size Pregnancy 101: Health, Wellness, and Support"
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,RB001 / recovery belly band,What to Expect of Your Postpartum Belly: Tips for a Healthy Recovery
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,"RB001, Postpartum Underwear / recovery belly band",How Do C-Section Scars Heal? Your Complete Guide to Recovery and Care
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,RB001 / recovery belly band,"Second Time C-Section Recovery: What to Expect, How to Heal, and Feel Like Yourself Again"
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,treat,"Sound Machine, BM04 / baby sleep","Can Babies Have Insomnia? Signs, Causes & Treatment Guide"
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,treat,"RB001, Postpartum Underwear / recovery belly band","Numbness After C-Section: Causes, Timeline, and Treatment Guide"
+T1.1.medical-cure,疾病治疗 / 治愈,auto_reject,15,36,heal,"BM04, sound machine / baby cry",3-Week-Old Sleep Schedule: Establish Healthy Habits Early
+T2.1.2.pain-relief,疼痛缓解（人体结果）,auto_reject,1,3,pain relief,yb003 / 竞品内容缺项,First Trimester Lower Back Ache: Your Complete Guide to Early Pregnancy Pain Relief
+T2.1.2.pain-relief,疼痛缓解（人体结果）,auto_reject,1,3,pain relief,pregnancy pillow / 科普类,How to Use a Pregnancy Pillow for Back Pain Relief: A Complete Guide
+T2.1.2.pain-relief,疼痛缓解（人体结果）,auto_reject,1,3,relieve pain,(未标),"How to Relieve Pain After Vaccination in Babies: Tips, Ointments & Fever Care"
+T5.1.safety-claim,无害 / 无副作用,auto_reject,0,1,safest,baby monitor / 科普类,"FHSS Technology: Is It the Safest Choice for Your Baby Monitor in 2026?
+"
+T3.2.lactation-consultant,专家 / 个人背书 · 头衔,manual_review,1,1,ibclc,nipple cream / nipple cream,IBCLC：Postpartum Care & Early Feeding
+T2.1.1.milk-supply,奶量提升,auto_reject,8,0,,,
+T8.1.anxiety-pressure,制造焦虑 / 恐吓,manual_review,2,0,,,
+T1.2.medical-prevent,疾病预防,auto_reject,5,0,,,
+T1.5.duct-unclog,疏通 / 阻塞类病理叙事,auto_reject,2,0,,,
+T7.2.pain-scenario,痛点场景描述,manual_review,8,0,,,
+T2.1.3.milk-flow,排空 / 奶阵 / 奶流,manual_review,5,0,,,
+T3.3.institution-grade,机构 / 等级背书,manual_review,1,0,,,

@@ -1,0 +1,1229 @@
+{
+  "$schema_version": "legal-decisions-v1",
+  "authority": "法务",
+  "channel": "经 Owner 在会话中逐条回答（2026-09-16）",
+  "recorded_by": "开发",
+  "$note": [
+    "★ 本文件是**决定台账**：法务就判定引擎做的每一个语义决定，连同它的后果、",
+    "  义务与验证方式记在这里。ADR-0012 §决策台账 是它的散文版。",
+    "★ 本文件**不参与 `engine_version`** —— 引擎不读它，它是记录不是输入。",
+    "  把它算进版本会让「改一句记录」看起来像「改了判定逻辑」。",
+    "★ 但它必须与制品**一致**：每条决定都写明它改了哪些文件、用什么命令验证。",
+    "  `tools/verify_engine_contract.py` 的 V20 组逐条核对 —— 台账说迁了、文件里没迁，",
+    "  或者文件里迁了、台账没记，都会红。**台账与制品不一致，比没有台账更坏。**"
+  ],
+  "decisions": [
+    {
+      "id": "D1",
+      "asked_at": "2026-09-16",
+      "question": "`auto_reject` 是否允许**机器独立拦截**？（291 条存量语料上本档规则级 precision 0.970，即约 3% 误报会被自动拦下）",
+      "answer": "允许",
+      "answered_by": "法务",
+      "answered_at": "2026-09-16",
+      "effect": "`disposition-layers-v1.json` 的 `mapping.auto_reject.machine_may_finalize` 由**开发者的提议**升为**法务确认**。机器可以在无人复核的情况下拦下一条内容。",
+      "quantified_consequence": {
+        "records_machine_blocked": 67,
+        "records_total": 291,
+        "share": 0.23,
+        "note": "另有 13 条同样判 `auto_reject`，但被 `ESC-002`（evaluability=manual_only）升到 L4，人工仍会看到。合计 `auto_reject` 80 条（27.5%）。",
+        "expected_wrong_blocks": "约 2 条/批（67 × 3%）—— 依据是本档规则级 precision 0.970，且该数字来自**规则级**而非记录级，是近似值"
+      },
+      "accepted_risk": "误拦的代价是少发一条广告（fail-safe 方向），法务已接受。**未被接受的是误拦后无声** —— 见 obligations。",
+      "obligations": [
+        {
+          "id": "D1-O1",
+          "what": "可解释：拦截必须带规则编号、命中位置、降级证据与所需证明材料",
+          "status": "met",
+          "evidence": "`judge()` 的 `hits[].rule_key` / `matched[].position` / `band.evidence[]` / `evidence_required`；由 verify 的 V2 / V9 / V21 机检"
+        },
+        {
+          "id": "D1-O2",
+          "what": "可计数：每一次机器独立拦截都留回执，且回执能把结论钉住",
+          "status": "met",
+          "evidence": "`_data/receipts.jsonl`（含 `verdict_digest`：不只钉输入，还钉结论）"
+        },
+        {
+          "id": "D1-O3a",
+          "what": "可申诉·政策：被机器拦下的内容，提交人必须知道**找谁**、**多久**、**凭什么**能撤销",
+          "status": "met",
+          "decided_by": "Owner",
+          "decided_at": "2026-09-16",
+          "evidence": "D10 定案并落在 `disposition-layers-v1.json` 的 `mapping.auto_reject.outbound.appeal`：入口=回复回执（回执 run_id 即案件号）· 责任人=内容审核员（DP3）· 时限=2 个工作日 · 撤销须附书面理由并入回执留痕 · 争议指向规则本身才转 DP4。由 V28a 机检。",
+          "$why_split": "★ 「政策已定」与「送达已实现」是两件事，必须分开记账。把两者合并，就等于宣布：写了申诉方式 = 被误拦的人能申诉。而这恰好是这次要治的那个病 —— 把声明当成事实。"
+        },
+        {
+          "id": "D1-O3b",
+          "what": "可申诉·送达：拦截回执必须真的**送到提交人手上**（否则申诉政策只是一份没人读到的文档）",
+          "status": "met",
+          "owner": "投放 / 审核系统负责人（已答：见 D19）",
+          "why_it_matters": "67 条/批会被机器独立拦下，其中约 2 条是误拦。★ 2026-09-16（D14）之后，缺的东西变了：**管道已经有了**（`tools/push_receipts.py`，预演为默认、幂等、缺路由即硬失败），**回执也带上了可解析的路由键**（`obligations.route`）。现在唯一缺的是 `_data/account-owners.csv` 里的责任人 —— 12 个广告账号一个都没有归属人，其中一个账号字段本身为空（29 条记录）。所以状态仍是 unmet：**「管道已写」不等于「送达已实现」**。这正是把 D1-O3 拆成两条记账要守住的东西。",
+          "decided_by": "Owner",
+          "decided_at": "2026-09-16",
+          "evidence": "D19：`_data/account-owners.csv` 12 行全部填齐（责任人 = Roxie（余玉珊），飞书open_id 取自 KB 快照的**人员字段**，而该快照由**本应用**（cli_aa2243de0438dcd7）读取，故该 open_id 对本应用有效 —— 不是猜的）。语料 291 条一条不漏地可路由：262 条按账号名、29 条按「空账号兜底」行（兜底每次都被打印并计数）。端到端实测（临时账本，不碰生产账本）：真记录判定 → 回执 `route.kind=ad_account` / `key=Momcozy-Angel-FR` → 解析到 Roxie + 投递地址 → 预演打印出收件地址。由 V39a–V39d 机检，含三条反向对照：清空责任人 / 有责任人但无地址 / 地址形状不对，三种都必须硬失败（退出码 2）。",
+          "$what_this_does_not_claim": "★ 它证明的是「**送得出去**」：人、地址、管道、闸门四样齐备，且机器可反复验证。它**不**证明「已经送过」—— 生产账本里至今没有一条回执真的发出过（唯一一条存量回执是 D10 之前的产物，连 `obligations` 块都没有）。这两件事分开记账，见 D1-O3c。",
+          "$residual": "① Rikka（独立站）只有姓名、**没有投递地址**（见 Q16）—— 独立站侧今天不可送达；② `www.amazon.de` 这一个 URL 的页面责任人未定（显式写「未定」，不留空）；③ 29 条源记录的 `广告账号` 字段为空，需回填（责任人已定，不需要新决定）。"
+        },
+        {
+          "id": "D1-O3c",
+          "what": "可申诉·**已送达过**：至少有一条真回执真的发出去过（不是「能发」）",
+          "status": "unmet",
+          "owner": "Owner —— Q14 已答（D21：先自检）；闭合条件＝下一次真批次产出可送达的真回执",
+          "why_it_matters": "★ 与本轮反复治的病同形：把「能送达」记成「送达过」，和把「写了申诉方式」记成「被误拦的人能申诉」是同一个错，只差一层。管道一旦存在，最危险的状态就是**看起来在用**：`--status` 印出「待送 0」时，读的人会以为一切正常，而真相是一条都没发过。所以这次顺手把那个假安静拆了 —— D10 之前的旧回执（没有 `obligations` 块，连「该不该送」都没写）现在被单独计数并打印。",
+          "evidence_of_gap": "① 自检**已实发并成功**（D21）：2026-09-16 用真记录的真回执 + 临时账本 + 重定向，飞书返回 `code 0`，留痕在 `_data/pushed.selftest.jsonl`（带 `$selftest` 标记，不混进真实送达，V39g）；② 但**没有任何一条回执到过提交人手上** —— 生产账本里唯一那条回执（jr-a2cbfa4a97）是 D10 之前的产物，没有 `obligations` 块，工具现在把它单独计数并打印（V39e）。★ 自检**不证明** Roxie 可达：自检收件人是 app 创建者，按定义在应用可用范围内。",
+          "why_not_implemented_here": "发消息是**对外动作且不可撤回**：D14 定的规矩就是「预演默认、真发要显式 --apply」。对谁发、发几条，是 Owner 的取舍（Q14），不是开发能替答的。"
+        }
+      ],
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V20"
+    },
+    {
+      "id": "D2",
+      "asked_at": "2026-09-16",
+      "question": "`FDA approved` 与 `FDA cleared` **同现**时放行，对不对？",
+      "answer": "放行",
+      "answered_by": "法务",
+      "answered_at": "2026-09-16",
+      "effect": "确认 `T6.1.regulatory-status` 的 `downgrade_band.effect = \"auto_reject → auto_pass\"` 维持不变。规则保持「唯一例外」的地位：豁免词落回的是 `auto_pass` 而非 `manual_review`。",
+      "citation_check": {
+        "cited": "21 CFR 807.97",
+        "checked_at": "2026-09-16",
+        "finding": "引用成立。807.97 的原文是：依 510(k) 提交并获实质性等同认定，**不表示**官方对该器械的批准（\"does not in any way denote official approval\"），任何造成「因符合上市前通知要求而获官方批准」印象的表述属误导。",
+        "reading": "该条支持的正是本规则的方向：`cleared` 与 `approved` 是**两个不同的法定状态**，把 cleared 说成 approved 才是违规。所以 `FDA cleared` 作为放行词有依据。"
+      },
+      "quantified_consequence": {
+        "corpus_records_containing_T6.1_claim_words": 0,
+        "corpus_records_total": 291,
+        "note": "★ 存量 291 条语料里**没有一条**含 T6.1 的判险词（`FDA approved` / `FDA certified` / `FDA 认证` / `FDA 批准` / `FDA 通过`），现网标注命中 H06 的也是 0 条。所以本条决定在现有语料上**无可测量的效果** —— 它是面向未来文案的规则。"
+      },
+      "residual_risk": {
+        "what": "带是**文本级**的：只要带词出现在同一段文本的**任何位置**，该规则的命中的落点就变成 `auto_pass`。因此下面这些串今天全部判放行：",
+        "demonstrated_strings": [
+          "FDA approved breast pump. FDA cleared.  → auto_pass",
+          "FDA approved. Our factory holds FDA registration (FDA 注册).  → auto_pass",
+          "FDA registered facility. FDA approved device.  → auto_pass"
+        ],
+        "why_recorded": "法务确认的是「同现即放行」这一语义；上面三行是它的**字面后果**。记在这里不是异议，是为了让这个后果有具体形状 —— 否则「同现即放行」听起来像「两句话都说清楚时才放行」。",
+        "possible_mitigation_not_implemented": "邻近窗口：要求带词与命中词的距离在 N 字符内，才允许放行。**未实现** —— 它会改变法务刚刚确认的语义，属于需要法务另行决定的事项（Q6/Q7）。",
+        "worked_example_for_legal": "`FDA approved and FDA cleared` 与 `FDA approved. Also, our factory is FDA cleared.` 在今天的实现里**结果完全相同**。若法务认为这不可接受，改法是加邻近窗口，不是改词表。"
+      },
+      "changed_artifacts": [
+        "research/governance/skeleton/rules-v1.json（仅注释，行为未变）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V22"
+    },
+    {
+      "id": "D3",
+      "asked_at": "2026-09-16",
+      "question": "4 个走错通道的词（`FDA 注册` / `silent mode` / `静音模式` / `suction settings`）迁入白名单表，还是从词表删除？",
+      "answer": "迁",
+      "answered_by": "法务",
+      "answered_at": "2026-09-16",
+      "effect": "4 个词从 `context-guards-v1.json`（status=misrouted）迁入 `whitelist-v1.json`（status=active，`exempts_rule_keys` 指向原规则）。`lint_context_guards.py` 的 G3 违反 4 → 0；`lint_whitelist.py` 新增的 W5a 死声明 4 → 0。",
+      "why_they_were_wrong": "按 `context-guards-v1.json` 自己的判别式（「白名单证成主张 → 落 auto_pass 带；守卫取消或弱化主张 → 落 manual_review 带」），这 4 个词证成主张（监管状态标签 / 功能名），本就属于白名单表。",
+      "latent_bug_fixed": "★ 迁移前这 4 个词是**死的**：三条规则的 `downgrade_band.keywords` 声明了它们，但运行时放行带取词取自白名单表 —— 声明了取不到，行为与没声明完全一样，且无任何提示。",
+      "quantified_consequence": {
+        "corpus_records_changed": 0,
+        "corpus_records_total": 291,
+        "why_zero": "放行词只能在规则**已经命中**时起作用。存量语料里出现这 4 个词的只有 2 条（含 `nine suction settings`），两条都**没有命中**对应规则（它们命中的是 M03 的定量来源主张），所以带词没有机会生效。",
+        "positive_controls": {
+          "note": "★ 存量语料零变化，所以这个修复的正确性**只能靠构造用例证明**。四个词各一条：",
+          "table": [
+            {
+              "word": "FDA 注册",
+              "bare_claim": "auto_reject → auto_reject",
+              "claim_plus_word": "auto_reject → auto_pass"
+            },
+            {
+              "word": "silent mode",
+              "bare_claim": "manual_review → manual_review",
+              "claim_plus_word": "manual_review → auto_pass"
+            },
+            {
+              "word": "静音模式",
+              "bare_claim": "manual_review → manual_review",
+              "claim_plus_word": "manual_review → auto_pass"
+            },
+            {
+              "word": "suction settings",
+              "bare_claim": "manual_review → manual_review",
+              "claim_plus_word": "manual_review → auto_pass"
+            }
+          ],
+          "reading": "左列「改动前后一致」= 没有把裸主张判松；右列「改动前后不同」= 这 4 个词从死变活。两列一起才说明这次迁移只做了它该做的事。"
+        }
+      },
+      "new_exposure": "`FDA approved … FDA 注册` 现在是 `auto_pass`（迁移前是 `auto_reject`）。这与 D2 同源：`FDA 注册` 是**最弱**的监管状态（企业注册，FDA 明确「注册不表示批准/许可」）。已作为 Q6 单独提出。",
+      "changed_artifacts": [
+        "research/governance/skeleton/whitelist-v1.json（26 → 30 词）",
+        "research/governance/skeleton/context-guards-v1.json（89 → 85 词）",
+        "research/governance/skeleton/lint_whitelist.py（新增 W5 带登记不变量）",
+        "research/governance/skeleton/migrate_misrouted_guards.py（迁移脚本本身）"
+      ],
+      "rollback": "`python3 migrate_misrouted_guards.py` 的备份在 `_data/backup-migration/`；`_data/backup-batchD/` 是本次全部改动前的基线。回滚后 `lint_whitelist.py` 的 W5a 会重新变红 —— 这是正确的：那 4 个词会重新变成死声明。",
+      "verification": "python3 tools/verify_engine_contract.py --only V20 && python3 lint_whitelist.py",
+      "deployment_state": {
+        "engine": "已生效 —— `vocab.load_vocab()` 直接读本地 JSON（whitelist-v1.json / context-guards-v1.json），守衡的 judge_copy 与全部验收都跑在新词表上。",
+        "feishu_word_tables": "★ **尚未同步**。`tools/verify_vocab_lark.py`（只读回读）当前报出的差异**恰好只有这 4 个词**：守卫表「仅飞书有」4、白名单表「仅本地有」4，字段不符 0。",
+        "one_command": "python3 tools/migrate_vocab_to_lark.py --apply",
+        "why_not_run_here": "这是对**业务可见的词表 Base** 的写操作（法务与审核员会看到这两张表）。开发把决定落进引擎，把「让业务看见」留给 Owner 一句话确认 —— 与 D1-O3 同一个理由：不替别人制造一个没人负责的状态变化。",
+        "verify_after": "python3 tools/verify_vocab_lark.py   # 期望：仅本地有 0 / 仅飞书有 0 / 字段不符 0",
+        "csv_note": "`白名单导入-飞书.csv`（26 行）/ `语境守卫导入-飞书.csv`（89 行）是 ADR-0008 时期的**手工导入基线**，现已落后于骨架（30/85）。**不手工改它们** —— 两条导入路径能互相矛盾，正是本项目反复在治的那个病。以 JSON→飞书 工具为唯一通路。"
+      }
+    },
+    {
+      "id": "D4",
+      "asked_at": "2026-09-16",
+      "question": "哪些规则**只对特定品线**成立？（需要给规则加 `product_lines: [...]`）",
+      "answer": "不知道，这个要看产品本身",
+      "answer_kind": "不裁定 —— 转产品",
+      "answered_by": "法务",
+      "answered_at": "2026-09-16",
+      "effect": "品线维度的 Owner 由法务改为**产品**。机制保持「已就绪、数据未填」状态，未擅自填入任何取值。",
+      "why_legal_declined_makes_sense": "「这条规则在这个品线上会不会出现」不是法务能单独回答的：法务定义**表达的风险**，产品知道**这个品线上会不会出现这个表达**。两者都必要。",
+      "blocking_facts_found": [
+        "★ 存量语料**是单品的**：291 条里 289 条品线=吸奶器、2 条为空。所以「按品线过滤」这个能力**在现有语料上无法被验证**，也无法被证伪。",
+        "★ 公司里**没有一份权威品线表**：6 张业务表各有一套取值（吸奶器/婴幼儿/喂养/喂养电器/家纺/服纺/功能性服纺/家居/护肤/多品线/无匹配类别/无法归结到品线/翼果未分类），且编码方式不一致（标量 vs 数组 vs 占位符）。",
+        "★ 因此今天填 `product_lines` 是**有下行风险、没有上行收益**：对 289 条吸奶器不产生任何影响，却可能在别的品线上因一个错字**静默删掉一条规则**（见下方 failure_mode）。"
+      ],
+      "failure_mode_guarded": {
+        "what": "`rules_for()` 的过滤是「未声明 = 适用全部品线；声明了但当前品线不在其中 = 该规则消失」。所以一个错字（`\"吸奶器 \"` 带尾空格）会让这条规则在**所有**品线上消失，包括它本该生效的那条 —— 静默、无提示、结果是漏报。",
+        "guard": "两条硬检查：① 规则声明的品线值必须在 `product-lines-v1.json` 的取值域内；② 调用方传入的品线值不在取值域内时，**不过滤**并显式声明「本次未按品线过滤」。见 V23。"
+      },
+      "next_action": {
+        "owner": "产品",
+        "artifact": "research/governance/品线维度-待产品确认.md（含可填矩阵）",
+        "ask": "只需回答一件事：**哪些 (规则, 品线) 组合里，这条规则在该品线上根本不可能出现**。默认（不回答）= 适用全部品线。不要回答「这条规则适不适用」——那是法务的问题，已经在规则里定过了。"
+      },
+      "changed_artifacts": [
+        "research/governance/skeleton/product-lines-v1.json（新建，status=proposed，取值域来自 6 张业务表）",
+        "research/governance/skeleton/score.py（品线取值校验，未知值不再静默过滤）",
+        "research/governance/skeleton/judge.py（边界声明加「本判定未按品线过滤」）",
+        "research/governance/品线维度-待产品确认.md（新建）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V23"
+    },
+    {
+      "id": "D5",
+      "asked_at": "2026-09-16",
+      "question": "catch_all（零命中）159 条落 DP3 人工复核，还是 DP4 法务终审？",
+      "answer": "落点维持 DP3，但**拆成两路**：有文案 → DP3 + 空白清单；无文案 → PRE-001 路由到 DP0，不进空白清单、不占法务产能",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`disposition-layers-v1.json` 新增 `preconditions.PRE-001` 与层级 `DP0 不可判（无文案格式）`；`mapping.catch_all.enters_blank_register=true`、`PRE-001.enters_blank_register=false`。判定路径由 `judge.resolve_layer(has_text=…)` 实施。",
+      "quantified_consequence": {
+        "records_total": 291,
+        "catch_all_total": 159,
+        "routed_to_DP3_with_text": 100,
+        "routed_to_DP0_no_text": 59,
+        "blank_register_share": 0.344,
+        "was_reported_as": 0.546,
+        "spend_on_DP0_records_usd_7d": 15747,
+        "note": "59 条无文案记录**全部**是 Google `产品广告`（PLA / 商品 Feed 广告，结构上不含 Primary Text / Headline）；其余 7 类广告类型 0 条空文本。其中 57 条仍 ENABLED。"
+      },
+      "why_it_matters": "原先「空白清单压力 54.6%」这个数字里，有 37% 是引擎结构上不可判的格式。把它算进规则缺口率，分母虚高、缺口率被系统性低估；把 159 条压给 DP4，则会把法务单量从 31 推到 190（6.1 倍），而其中 59 条没有文案可读。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json",
+        "research/governance/skeleton/judge.py"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V26"
+    },
+    {
+      "id": "D6",
+      "asked_at": "2026-09-16",
+      "question": "`auto_pass` 落 DP1（退回提交人自审）是否符合「机器不替人过门」？存量 0 条落此层。",
+      "answer": "落点维持 DP1，但**回执必须显式送达提交人**：机器说的是「未发现拦截理由」，不是「通过」",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`mapping.auto_pass.outbound` 新增（required / must_reach / notice_template / must_not_say）；`judge()` 在 `verdict.layer.outbound` 与 `receipt.obligations` 两处输出。",
+      "quantified_consequence": {
+        "records_landing_DP1": 0,
+        "records_total": 291,
+        "note": "★ 本项在存量语料上**零影响** —— 正因如此必须配构造正对照（V25a–V25e），否则「接好了」与「这条路没人走过」看不出区别。"
+      },
+      "why_it_matters": "`human_must_see=false` 的原意是「发布前不需要人再看一眼」，但它与「提交人根本收不到任何回执」在今天事实上等价。机器不说「我拦了你」，也不说「我没找到理由」，提交人收到的就是沉默 —— 而沉默会被读成默许。ADR-0005 约束 2 要防的正是机器替人过门，沉默放行是它最隐蔽的形态：不写「通过」两个字，效果一样。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json",
+        "research/governance/skeleton/judge.py"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V25"
+    },
+    {
+      "id": "D7",
+      "asked_at": "2026-09-16",
+      "question": "`ESC-003`（跨一级主题共现 → 法务终审）要不要启用？",
+      "answer": "不启用，维持关闭",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`escalate_if[ESC-003].$enabled` 维持 false，并把**推翻其立论的实测**写进 `$measurement_that_keeps_it_off`。",
+      "quantified_consequence": {
+        "records_triggering": 28,
+        "records_total": 291,
+        "already_DP4_anyway": 23,
+        "net_new_DP4": 5,
+        "DP4_before": 31,
+        "DP4_after_if_enabled": 36,
+        "note": "★ 真正让它关闭的不是成本（+5 单，+16%），是**它抓错了东西**：跨主题组合实测为 T2+T3+T7 ×12、T2+T3 ×5、T2+T5 ×4、T2+T7 ×3、T3+T7 ×2、T2+T8 ×1、T5+T7 ×1；纯新增的 5 条样例是「效果声明 + 促销紧迫性」这类普通多主题广告，不是新表达模式。一条广告同时说效果和打折就会触发它。"
+      },
+      "why_it_matters": "规则缺口该由空白清单（DP3 的 100 条有文案 catch_all）去测，不该由主题计数的代理指标去猜。代理指标两个方向都要付代价：漏掉真正的空白（新表达往往只命中 1 个主题），又给 DP4 塞进归类噪声。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V27"
+    },
+    {
+      "id": "D8",
+      "asked_at": "2026-09-16",
+      "question": "四个层级名与 `L1–L4` 这个 ID 要不要改？",
+      "answer": "ID 由 `L1–L4` 改为 `DP1–DP4`（新增 `DP0`）；四个名称**全部保留**",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`disposition-layers-v1.json` 的 `layers[].id` / `mapping.*.layer_id` / `escalate_if.*.to_layer_id` / `preconditions[].layer_id` 全部改用 `DP` 前缀；`judge.py` 不硬编码层级名，自动跟随。",
+      "why_it_matters": "同一份判定结果里同时出现两个「L」命名空间：`verdict.severity = \"L4\"`（规则风险等级，severity.py 的 L0–L5）与 `verdict.layer.id = \"L2\"`（处置层）。两者**语义相反** —— severity=L4 是「这条规则最危险」，layer=L2 是「机器可以自己拦」，而一条 severity=L4 的红线规则产出的正是 layer=L2。字段都叫 L、数字还不一样，任何按字符串匹配的下游都可能取错，取错的后果是双向的：把 L4 当 severity 会以为法务已看过，把 L2 当 severity 会以为风险很低。",
+      "measured": "`DP` 前缀在 rules / whitelist / guards / ADR / 工具中实测出现 0 次（`L` 前缀被风险等级与层级同时占用；`P` 前缀与 REWRITE_NOTES 的任务编号 P1-5/P2-2 弱冲突）。",
+      "what_did_NOT_change": "★ 风险等级 `severity` 的 `L0–L5` **一字未动** —— 它来自 `规范-审核规则库完整设计.md` §4.2.1 的六档校准，且写进了 26 条规则，改它才是贵的那个。改的是新加入的处置层。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json",
+        "research/governance/skeleton/judge.py",
+        "tools/verify_engine_contract.py"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V16"
+    },
+    {
+      "id": "D9",
+      "asked_at": "2026-09-16",
+      "question": "`FDA registered` / `FDA 注册` 与 `FDA cleared` 是否应同处一个放行带？",
+      "answer": "移出放行带，改为降级：`auto_reject → manual_review`",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "legal_basis": "两个词说的是不同对象，所以强度不可互换：`FDA cleared` = 510(k) 实质性等同，**器械层**状态（可查 K 号）；`FDA registered` = establishment registration，**企业/设施层**状态。FDA 的注册与列名数据库声明写明注册**不表示**对机构或其器械的批准、许可或授权，并见 21 CFR 807.97 对误导性表述的规定。D2 放行的理由是「作者写出了 cleared，说明他分得清 approved 与 cleared」——而「同一段里写了 FDA 注册」证明不了这件事，它证明的是这家工厂注册过。",
+      "effect": "`rules-v1.json` 的 `T6.1.regulatory-status.downgrade_band` 新增 `keyword_effect_overrides`；`vocab.band_target(rule, word)`、`vocab.load_vocab` 逐词路由、`score.band_hits` 双带取词（降级优先）三处随之改动。",
+      "quantified_consequence": {
+        "records_containing_either_word": 0,
+        "records_total": 291,
+        "note": "★ 存量影响 **0/291** —— 这是一个**前瞻性**决定，防的是下一次有人写「FDA approved device. FDA registered facility.」。也正因如此必须配构造正对照（V29b–V29e）。"
+      },
+      "known_tension": "★ 与 D3 的关系必须点明：D3（同一天）把 `FDA 注册` 从守卫表迁入白名单表，理由是它 status=misrouted、声明了却取不到。D9 让它**回到降级通道**。这不是推翻 D3 —— D3 修的是「登记在哪张表」（登记错了），D9 定的是「它该在哪个通道」（语义归属）。叠加后的状态：词仍在白名单表（可独立复核为真：注册号可查），但通道是降级。这正是白名单不变量 W3 早就写明的边界 ——「放行与降级是两个通道，不是一件事」。只看 D3 的 diff 会以为这个词被放行了；只看 D9 的 diff 会以为 D3 被撤销了。**两个 diff 都对，合起来才是完整语义。**",
+      "changed_artifacts": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/skeleton/vocab.py",
+        "research/governance/skeleton/score.py",
+        "research/governance/skeleton/lint_whitelist.py"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V29 && python3 research/governance/skeleton/lint_whitelist.py",
+      "pending_legal_review": "本条属法律判断，但由 Owner 依 FDA 原文（认证级证据，非裁量）先行决定；建议法务复核一眼。"
+    },
+    {
+      "id": "D10",
+      "asked_at": "2026-09-16",
+      "question": "被机器拦错的人，找谁、多久、凭什么撤销？（D1 授权里唯一没付的账，约 2 条误拦/批）",
+      "answer": "回执送达提交人 + 内容审核员（DP3）受理；2 个工作日时限；撤销须附理由留痕；涉及规则本身才转 DP4",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`mapping.auto_reject.outbound.appeal` 新增（channel / owner / owner_layer_id / sla_workdays / submitter_must_provide / overturn_requires / escalate_to_layer_id / escalate_when）；`build_receipt()` 新增 `obligations` 块，把出口与申诉随回执一起留痕。",
+      "quantified_consequence": {
+        "blocked_per_batch": 67,
+        "expected_wrong_blocks_per_batch": 2,
+        "expected_appeals_per_batch": 2,
+        "note": "申诉量按误拦量估 ≈ 2 单/批 —— 这是把受理放在 DP3（审核员）而非 DP4（法务）的量化理由：量级可承受，且审核员本来就该同时看到「机器拦了什么」与「有人说拦错了」。"
+      },
+      "closes": "D1-O3a（可申诉·政策）。**未**关闭 D1-O3b（可申诉·送达）—— 见 D1.obligations。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json",
+        "research/governance/skeleton/judge.py"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V28"
+    },
+    {
+      "id": "D11",
+      "asked_at": "2026-09-16",
+      "question": "飞书那两张词表（白名单 / 语境守卫）要不要同步？",
+      "answer": "同步",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`tools/migrate_vocab_to_lark.py --apply` 把本地骨架的 30 词白名单 / 85 词守卫推送到飞书；`tools/verify_vocab_lark.py` 回读比对。两份手工导入 CSV 归档到 `_data/deprecated/`。",
+      "why_it_matters": "引擎直接读本地 JSON，所以 D1–D10 **已经生效**；但业务可见的那两张飞书表在同步前仍是旧的 26/89 词。**「引擎已生效」与「业务看到的表已更新」是两件事** —— 不同步就会长期存在一份与引擎行为不一致的对外词表，而下次核对时无法区分「没同步」与「同步失败」。",
+      "changed_artifacts": [
+        "research/governance/skeleton/whitelist-v1.json（飞书侧）",
+        "research/governance/skeleton/context-guards-v1.json（飞书侧）"
+      ],
+      "verification": "python3 tools/verify_vocab_lark.py"
+    },
+    {
+      "id": "D12",
+      "asked_at": "2026-09-16",
+      "question": "预留 / 未决事项以什么形态交付给 Owner？",
+      "answer": "一律以「选择题 + 推荐选项」逐个交付；未决事项只有一个书写位置（本文件的 `$decision_queue`），其他制品只放指针与 ID 索引。",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`$decision_queue` 取代原 `$open_questions_for_legal`：每一项必须带 `owner`、≥2 个带 `impact` 的选项、**恰好一个**推荐项、以及 `default_if_unanswered`。`disposition-layers-v1.json` 不再自带问题副本，只留 `$decision_queue_ref` 与 `$decision_queue_ids`。",
+      "why_it_matters": "它治两个病，第二个已经真实发生：①散文式罗列多个问题 —— 读的人要自己解析、排序、估算代价，于是问题被推迟；②同一组问题写在两个文件里 —— 本文件只留了 Q7，disposition-layers 里却留着 Q1–Q7，两处状态已经开始不一致（Q1–Q6 在一处是 answered，在另一处根本不存在）。本项目已经因为「同一件事两份来源」出过三次事，这是第 4 次。",
+      "changed_artifacts": [
+        "research/governance/skeleton/legal-decisions-v1.json（新增 $decision_queue）",
+        "research/governance/skeleton/disposition-layers-v1.json（删副本，留指针）",
+        "research/governance/skeleton/disposition-layers-v1.json（更正 ESC-002 的 $latent_trap）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V30"
+    },
+    {
+      "id": "D13",
+      "asked_at": "2026-09-16",
+      "question": "ESC-002 的升级面：`T7.1`/`T3.2`/`T7.2` 三条规则的命中要不要全部走 DP4 法务终审？（Q7 重写后）",
+      "answer": "分层：`T7.1` 维持 DP4，`T3.2` / `T7.2` 落回各自原生层（DP2 或 DP3）",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`disposition-layers-v1.json` 的 `escalate_if[ESC-002]` 新增 `exempt_rule_keys`；`judge.resolve_layer` 读取它，并**在结果里显形**为 `layer.exemptions_applied`。实测：DP4 31 → 18（-42%），DP3 131 → 141，DP2 70 → 73。",
+      "why_it_matters": "ESC-002 把「规则声明机器不可采信」（规则级语义）当成了「必须法务终审」（处置决定）。实测两者绑在一起时，DP4 的 31 条 100% 由它产生，其中 13 条原生是 `auto_reject` —— **升级还暂停了自动拦截**。分层之后，法务保留 hospital 口径这一 P0 信号，而 IBCLC 背书与疼痛场景交给人工复核（它们的动作是改文案，不是定政策）。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json（ESC-002 · exempt_rule_keys）",
+        "research/governance/skeleton/judge.py（例外生效 + exemptions_applied 显形）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V31",
+      "$residual": "★ 2 条 T7.2 记录仍落 DP4，但走的是 **ESC-001**（场景名词 + 消除性动词 = 功效承诺），不是 ESC-002。即「疼痛场景」单独的命中不再升，而「疼痛场景 + 消除性表述」仍然升 —— 这正是两条升级规则本来的分工。"
+    },
+    {
+      "id": "D14",
+      "asked_at": "2026-09-16",
+      "question": "被机器拦下的回执走哪条渠道送达提交人？（Q8 · `D1-O3b`）",
+      "answer": "飞书机器人推送；回执由此必须带**可解析的路由键**",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "① `judge()` 新增 `ad_account` 入参，回执的 `obligations.route` 写入路由键；② 新增 `tools/push_receipts.py`（预演为默认、`--apply` 真发、已推送 run_id 记账保证幂等）；③ 新增 `_data/account-owners.csv`（12 个广告账号，责任人待填）。",
+      "why_it_matters": "在此之前回执的 `to` 写的是「文案提交人」—— 一个**角色**，不是一个人、也不是一个渠道。所以缺的从来不只是推送程序：**数据上就没有「送给谁」这一项**，5 条存量回执一个都没带。没有路由键的送达义务只能是一句愿望。",
+      "changed_artifacts": [
+        "research/governance/skeleton/judge.py（ad_account → obligations.route）",
+        "tools/push_receipts.py（新增）",
+        "research/governance/skeleton/_data/account-owners.csv（新增，责任人待填）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V36 && python3 tools/push_receipts.py --status",
+      "$still_open": "★ **`D1-O3b` 仍是 unmet**，但原因变了：从「没有管道」变成「管道已就绪、12 个广告账号的责任人没人填」。未填时推送工具**硬失败**（退出码 2），不静默跳过 —— 见新遗留 **Q13**。把「管道已写」当成「送达已实现」，就是这一轮反复在治的那个病。"
+    },
+    {
+      "id": "D15",
+      "asked_at": "2026-09-16",
+      "question": "四个层级名是否与业务现行叫法一致？其中「人工复核」同名反义。（Q9）",
+      "answer": "只把 DP3 改名「内容审核员复核」，另三个名称保留",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`disposition-layers-v1.json` 的 `layers[DP3].name` 由「人工复核」改为「内容审核员复核」；原值记在 `$former_name`。",
+      "why_it_matters": "旧规则库里「人工复核」是**边界类型**的一个取值，对应 DP4 法务终审；本表用同一个词命名 DP3（内容审核员）。同一个词在同一套流程里指向两个相反的处置 —— 按名字对接必然取错层。ID 冲突早已由 D8 解决，这次解决的是**名字**。",
+      "changed_artifacts": [
+        "research/governance/skeleton/disposition-layers-v1.json（layers[DP3]）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V34",
+      "$near_miss": "★ 实施时差点漏掉：`$rename` 说明写进去了、`name` 字符串没改 —— 「声明了没生效」这一类病又出现了一次。V34 因此断言 `name` 本身，不只断言注释。"
+    },
+    {
+      "id": "D16",
+      "asked_at": "2026-09-16",
+      "question": "品线取值域 70 格由谁填、什么时候填？（Q10 · D4 的作业面）",
+      "answer": "先只确认「吸奶器」一个取值（覆盖 289/291），其余 9 个显式留 unknown",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`product-lines-v1.json` 的 `status` 由 `proposed` 改为 `partially_confirmed`，`decided_by/decided_at` 落名，`values[吸奶器]` 带 `$confirmed`，新增 `$confirmed_scope` 写清「确认了什么、没确认什么」。`assignments` **保持为空**。",
+      "why_it_matters": "`assignments` 不填 = 适用全部，所以保持为空就是**不收窄**。其余品线语料为零，没有样本时收窄等于凭想象删规则 —— 而收窄写错一个值的后果是规则在整条品线上静默消失（漏报）。未确认的取值仍按「未知值不过滤」跑，且边界声明会写明「未按品线过滤」。",
+      "changed_artifacts": [
+        "research/governance/skeleton/product-lines-v1.json"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V35"
+    },
+    {
+      "id": "D17",
+      "asked_at": "2026-09-16",
+      "question": "`escalation.within_chars` 声明了但从未被读 —— 补实现还是删声明？（Q11）",
+      "answer": "删掉声明（今天的行为就是「共现即升级」）",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`rules-v1.json` 的 `T7.2.pain-scenario.escalation.within_chars` 已删；新增机检「声明必须被读」。",
+      "why_it_matters": "一个声明了却没有任何一行读取的字段，与「没声明」在行为上完全一样，但在阅读上完全不一样 —— 下一个人会以为邻近窗口已经生效。实测全仓 `within_chars` 只命中那行 JSON 自己。",
+      "changed_artifacts": [
+        "research/governance/skeleton/rules-v1.json（删除声明）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V32",
+      "$lost_intent": "★ 邻近窗口（60 字符）这个意图本身没有丢，记在这里：若将来要让升级只在「近邻」生效，正确的形状是先测出它会把升级量变成多少，再作为一条语义改动走法务 —— 而不是先把字段放进规则文件。"
+    },
+    {
+      "id": "D18",
+      "asked_at": "2026-09-16",
+      "question": "`downgrade_band` 的名字与 `keyword_effect_overrides` 的键结构要不要现在改？（Q12）",
+      "answer": "只改键（通道 → 词），字段名留待大改",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "`keyword_effect_overrides` 由 `{词: 落点}` 改为 `{通道: {词: 落点}}`；`score.band_hits` 按通道查表且对旧形状**硬失败**；`vocab.band_target` 与 OV 族、`lint_whitelist` 的 W6 同步；新增 OV0 抓旧形状。",
+      "why_it_matters": "落点是三级的（规则 → 词 → 表），而覆盖原先只按词寻址 —— 若同一个词将来在两个通道各有一条覆盖，取哪条只能靠 dict 遍历次序，表现为「同样的输入两次跑出不同落点」。今天没有跨通道重复词（实测 12 词 / 2 条覆盖），所以这是把隐式的顺序依赖改成显式的结构约束：行为零变化。",
+      "changed_artifacts": [
+        "research/governance/skeleton/rules-v1.json（T6.1 覆盖结构 + $override_shape）",
+        "research/governance/skeleton/score.py（按通道查 + 旧形状硬失败）",
+        "research/governance/skeleton/vocab.py（band_target + OV0/OV1 通道化）",
+        "research/governance/skeleton/lint_whitelist.py（band_target + W6）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V33",
+      "$residual": "字段名 `downgrade_band` 仍不准确（它现在装放行词、降级词与逐词覆盖的混合体），按 Q12 的选择留待大改。"
+    },
+    {
+      "id": "D19",
+      "asked_at": "2026-09-16",
+      "question": "Q13：12 个广告账号的责任人分别是谁（送达的最后一块）？—— 作答时 Owner 一并给了独立站侧的负责人。",
+      "answer": "广告账号负责人 = **Roxie（余玉珊）**；独立站（momcozy.com 及 9 个地区站）负责人 = **Rikka（林建纯）**",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "① `_data/account-owners.csv` 12 行填齐（责任人 + 飞书open_id + **责任人证据**列：写清这个地址是从哪读来的，因为「谁负责」不是代码能推断的，必须有据）；② 新增 `_data/site-owners.csv`：语料里出现的 10 个落地页域名 → Rikka（含一个显式「未定」）；③ `tools/push_receipts.py` 新增两类硬失败（有责任人但无地址 / 地址形状不对）、空账号兜底可见、旧回执单独计数；④ `D1-O3b` unmet → met，并新增 `D1-O3c`（已送达过）。",
+      "identified_people": {
+        "Roxie": {
+          "name": "余玉珊（Roxie）",
+          "email": "r***@rootglobal.net",
+          "open_id": "ou_dd3f9a2e79d23eecaf7c963659d6149a",
+          "$evidence": "research/kb/_evidence/snapshot-20260916T071634Z/creative__平面_日常需求看板.json · records[4].fields.需求人[0]；同一 id 另见该快照的 4 个文件（创意支持_项目需求 / 视频_日常需求看板 / 国庆前后_考勤值班计划 等）。★ 关键：这份快照由**本应用**（cli_aa2243de0438dcd7 守衡）读取，open_id 是**应用内**唯一标识 —— 换个应用读到的会是另一个值，所以「从别处抄来的 open_id」不能直接用。",
+          "address_status": "有据可用"
+        },
+        "Rikka": {
+          "name": "林建纯（Rikka）",
+          "email": null,
+          "open_id": null,
+          "$evidence": "tools/kb_materials_lark.py:144/147 与 research/live/snapshot-20260916T050845Z.json（材料收集表 From = 林建纯（Rikka））—— 只出现在**文本**字段里，不是人员字段，所以没有 open_id。31 个已读 open_id 里没有她。",
+          "address_status": "★ 未定 —— 应用缺 `contact:user.id:readonly` 权限，无法按邮箱/姓名现查（实测：batch_get_id 返回 99991672）。见 Q16。"
+        }
+      },
+      "where": "research/governance/skeleton/_data/account-owners.csv · site-owners.csv",
+      "quantified_consequence": {
+        "ad_accounts": 12,
+        "records_routed_by_account_name": 262,
+        "records_routed_by_empty_account_fallback": 29,
+        "records_unroutable": 0,
+        "landing_domains": 10,
+        "note": "291 条存量语料**一条不漏**地可路由到人。送达面因此第一次是完整的：在此之前不是「管道不通」，是**数据上没有「送给谁」这一项**。"
+      },
+      "changed_artifacts": [
+        "research/governance/skeleton/_data/account-owners.csv（12 行填齐 + 责任人证据列）",
+        "research/governance/skeleton/_data/site-owners.csv（新增：10 个域名 → Rikka）",
+        "tools/push_receipts.py（两类新硬失败 + 兜底可见 + 旧回执计数 + 可注入路径）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V39",
+      "$closes": "D1-O3b（可申诉·送达）unmet → met。**未**关闭 D1-O3c（已送达过）—— 见 Q14。",
+      "$residual": "① Rikka 的投递地址（Q16）② 独立站侧的整改落点（Q15）③ 29 条源记录账号字段待回填 ④ www.amazon.de 页面责任人未定"
+    },
+    {
+      "id": "D20",
+      "asked_at": "2026-09-16",
+      "question": "Q15：C 批查出 93 条可对照广告里 33 条有声明未在落地页出现、9 个跨 locale 产品里 4 个自报参数/认证互相矛盾。找到之后谁改、改哪边？",
+      "answer": "**分两路**：跨 locale 参数/认证不一致 → 页面侧核实（Rikka）；「广告有、页面无」→ 先交法务判定是否构成问题，不预设以谁为准。",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "新增 `tools/route_landing_findings.py`，把 C 批的发现变成**两份带收件人的待办**：① 页面侧 4 条 → `research/landing/整改路由-页面侧.csv`（收件人从 `site-owners.csv` 读，路由目标只有一处书写位置）② 法务侧 33 条 → `research/landing/整改路由-待法务判定.csv`（带声明明细与待答问题，不改任何东西）③ 机器可读 `整改路由.json`。**两路的分界不是严重程度，是「要不要先判」** —— 同一产品在不同地区站自报不同取值，无论以谁为准都至少有一个站是错的，不需要法务先判；而「广告有页面无」两种解释都成立。",
+      "quantified_consequence": {
+        "可对照广告数": 93,
+        "送法务判定": 33,
+        "页面侧核实": 4,
+        "跨locale产品数": 9,
+        "未检出不一致的产品": 5,
+        "note": "★ 那 5 个产品是**未发现**，不是**已核实一致** —— 本批只比了 mmHg / dB / 认证词三类，这个区别写在路由 JSON 的 `$其余产品` 里，避免下一个人把「没报」读成「没事」。"
+      },
+      "changed_artifacts": [
+        "tools/route_landing_findings.py（新增：判据不重写，直接读 一致性分析.json）",
+        "research/landing/整改路由.json",
+        "research/landing/整改路由-页面侧.csv",
+        "research/landing/整改路由-待法务判定.csv"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V41",
+      "$residual": "① 页面侧**暂不可送达**：Rikka 有名字、没有投递地址（Q16），路由表里逐行写着「★ 不可送达」；② 法务侧的判定会本身没有排期；③ 「未发现」与「已核实」的区别只写进了路由 JSON，没有写进法务侧那张表。"
+    },
+    {
+      "id": "D21",
+      "asked_at": "2026-09-16",
+      "question": "Q14：送达的最后一步 —— 第一次真发怎么发？",
+      "answer": "先发一条**端到端自检**给 Owner 自己（app 创建者），不打扰任何其他人；真实送达不另开动作，等下一次真批次自然发生。",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "已执行：用**真语料里真被机器拦下的一条记录**（自适应搜索广告-Angel-Sale-Search-欧洲 · Momcozy-Angel-FR · 规则 H07 · 案件号 GG-9994d5764db8）生成真回执，在**临时账本**上走完整链路（不碰生产账本），飞书返回 `code 0` —— 消息真的送到了。留痕 `_data/pushed.selftest.jsonl`，带 `$selftest: true` 与 `$why`，明确标注「收件人不是责任人本人，因此不计入真实送达」。`push_receipts.py` 的重定向模式同步加了这个标记 —— **一份会被当作「有没有真的发过」的证据的留痕，混进真实送达里就等于伪造一次送达。**",
+      "quantified_consequence": {
+        "自检条数": 1,
+        "飞书返回": "code 0（成功）",
+        "真实送达条数": 0,
+        "生产账本变化": "0 行（临时账本 + 临时幂等文件）"
+      },
+      "$what_this_does_not_prove": "★ 自检收件人**是 app 创建者**，按定义就在应用可用范围内。所以它证明的是「**管道通**」：取 token、发消息、飞书受理，三环都真跑了；它**不证明**「Roxie 在应用可用范围内」—— 那一点只有真发给她才知道，至今未验证。这正是 D1-O3c 仍记 unmet 的原因，而不是一句客套。",
+      "changed_artifacts": [
+        "tools/push_receipts.py（重定向自检：留痕带 code 与 $selftest 标记）",
+        "research/governance/skeleton/_data/pushed.selftest.jsonl（自检实发留痕）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V39g"
+    },
+    {
+      "id": "D22",
+      "asked_at": "2026-09-16",
+      "question": "Q16 的追问：Owner 给的是**姓名**（林建纯）—— 姓名能不能当投递地址用？",
+      "answer": "不能。姓名不是地址。本轮把「按姓名找 open_id」的通道**逐条实测穷举**（8 条），全部被拒或为空，并把结论做成可复跑的工具 `tools/lark_people.py`：**阴性结论必须先过阳性对照**，字典为空时拒绝作答。",
+      "answered_by": "Owner（以「她的名字是：林建纯」触发本次追问）",
+      "answered_at": "2026-09-16",
+      "effect": "已执行：新增 `tools/lark_people.py`（只读）。它对 8 个底座 41 张表 5042 条记录做**值形状**扫描（不猜字段类型），采集出本应用唯一能同时拿到「姓名+邮箱+open_id」的通道 —— **人员字段**，得到 35 人字典，写进 `_data/lark-visible-people.csv`（含采集时间与 app id）。她**不在**这个字典里：她只出现在**文本**字段（材料收集表「来源人」= 林建纯（Rikka）），而文本字段没有 id。工具的核心不是检索而是**先证明自己看得见**：`verify_resolver()` 要求锚点（余玉珊 → ou_dd3f9a2e…）可解析且字典 ≥20 人；不满足就返回 unverifiable（退出码 1），**绝不说「查无此人」**。",
+      "quantified_consequence": {
+        "穷举通道": 8,
+        "被拒通道": "contact 系列 4 个端点（99991672 缺通讯录权限）· search/v1/user（99991634 需 user token）· im 群仅 1 个 3 人 · created_by/last_modified_by（响应恒为 null）· drive owner_id（只有 id 没有姓名）",
+        "可用通道": "1（人员字段）",
+        "可见人员字典": "35 人（8 底座 / 41 表 / 5042 条记录）",
+        "她在字典中": false,
+        "site-owners.csv 地址": "（未定）—— 10 行仍为硬失败",
+        "新增验收": "V42a–V42c"
+      },
+      "$retracted": "★ 撤回一条我自己写的**恒真扫描**：上一轮我用 created_by / last_modified_by 在全库 6000+ 条记录里找她，报「零命中」。做阳性对照时才发现这两个字段在 list records 响应里**恒为 null** —— 扫描根本没有输入，那个「零命中」什么也没证明。撤回理由与修正都写进了工具：字典为空时**无论调用方传什么**都返回 unverifiable，不许返回 not_found（V42c 就是这一条的反向对照）。这是本会话第 6 次同类错误（检查在验证自己），前 5 次是 V30e / V38c / V36d / V39 的反向对照 / V40b 的假绿。",
+      "$what_this_does_not_prove": "★ 它**不证明**「公司里没有她的 open_id」—— 只证明**本应用**拿不到。飞书里当然有她的 open_id；缺的是应用侧读取权限（或一次可观测信号）。把「本应用看不见」说成「此人不可送达」是两回事：前者可修，后者是结论。",
+      "changed_artifacts": [
+        "tools/lark_people.py（新增：投递地址解析器，带强制阳性对照）",
+        "research/governance/skeleton/_data/lark-visible-people.csv（新增：可见人员字典 35 人）",
+        "research/governance/skeleton/_data/site-owners.csv（10 行证据/备注改为穷举结论）",
+        "tools/verify_engine_contract.py（V42a–V42c）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V42"
+    },
+    {
+      "id": "D23",
+      "asked_at": "2026-09-16",
+      "question": "Q17：让 Rikka 可送达的四条路（拉进群 / 她发一句话 / 授权通讯录只读 / 暂不填）选哪条？",
+      "answer": "**选 D：暂不填。站点侧只记录、不送达。**",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "已执行：`site-owners.csv` 的「飞书open_id」保持「（未定）」，但**语义从「待办」改成「决定」** —— 10 行备注与两张路由制品全部改写：`整改路由-页面侧.csv` 4 行逐行写「★ 不可送达（**已决定，非待办**）」，`整改路由.json` 新增 `$delivery_mode` 一节，专门写清**两路的送达状态不一样**（法务侧经 Owner 转达=可送达 33 条；站点侧只记录=不送达 4 条），免得下一个人把「站点侧没收到」读成遗漏。判据一字未改：V41b 仍要求地址不可用时逐行写出「不可送达」—— 变的是它的含义，不是它的判据。",
+      "quantified_consequence": {
+        "站点侧派发": "0 条（4 条发现只落表，不派出）",
+        "法务侧派发": "33 条（经 Owner 转达，不受本条影响）",
+        "地址列": "「（未定）」× 9 行（另 1 行 www.amazon.de 责任人本身未定，见 Q18）",
+        "推送工具行为": "真需要发时硬失败（退出码 2）并点名「有责任人但无投递地址」—— 绝不静默跳过",
+        "新增决定": "0 条判定的变化（本决定只改「送不送」，不改「判没判」）"
+      },
+      "$what_this_costs": "★ 代价要说在前面：那 4 条跨 locale 不一致（`momcozy-mobile-flow-…` 的 dB 在 ca/de/eu/uk 写 42、momcozy.com 写 48；`momcozy-wellness-1-…` 的认证词 de/es/uk 写 CE、fr 与主站写 FDA）**不会被任何人收到**。它们的价值只剩「记录在案 + 谁要看都能查到」，而没有「有人被通知到」。这一条不是抱怨，是这次选择的实际后果 —— 写在这里，免得下个月有人问「为什么这些没人修」。",
+      "$reversible": "★ 可逆且成本极低：把地址填进 `site-owners.csv` 的「飞书open_id」列（或让 Q17 的 A/B/C 任一发生）即自动恢复送达 —— `route_landing_findings.py` 的 `deliverable` 判据只看地址形状，改完重跑一次就变「可送达」。不需要改代码，也不需要新的决定。",
+      "changed_artifacts": [
+        "research/governance/skeleton/_data/site-owners.csv（10 行备注：待办 → 决定）",
+        "tools/route_landing_findings.py（送达状态文案 + 新增 `$delivery_mode`）",
+        "research/landing/整改路由.json / 整改路由-页面侧.csv（重新生成）"
+      ],
+      "verification": "python3 tools/route_landing_findings.py && python3 tools/verify_engine_contract.py --only V41"
+    },
+    {
+      "id": "D24",
+      "asked_at": "2026-09-16",
+      "question": "Q18：`www.amazon.de`（亚马逊站内商品页，1 条 URL）的责任人归谁？",
+      "answer": "**选 B：归独立站侧 Rikka（林建纯）。**",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "effect": "已执行：`site-owners.csv` 第 10 行的责任人由「（未定）」改为 **Rikka（林建纯）**，并写明归口依据（D19 只定了「广告账号 → Roxie、独立站 → Rikka」，亚马逊站内商品页两边都不完全对口；Q18 由 Owner 定归独立站侧）。★ 于是**全表 10 行首次全部有主**（1 种责任人），地址列仍全部是「（未定）」（按 D23：只记录、不送达）。新增验收 V43a/V43b：**每一个路由目标要么有责任人，要么这个空缺必须是可决策的未决项**（写「（未定）」+ 指向队列里真实存在的题号）—— 把地址列已有的纪律（V40b）原样搬到责任人口径上。",
+      "quantified_consequence": {
+        "有主行数": "10 / 10（D24 之前 9 / 10）",
+        "责任人种类": 1,
+        "地址列": "（未定）× 10（按 D23）",
+        "本决定影响的派发": "0 条（今天没有发现指向该域名；归口的意义是真出现时不必临时找人）",
+        "新增验收": "V43a–V43b"
+      },
+      "$why_this_check_matters": "★ 一行「（未定）」如果**没指向任何未决项**，它不是「等决定」，是**没人接又没人登记** —— 它在表里安静地待着，谁都不会去催。V43a 抓的就是这个形状。这不是假想：把该行临时还原成 D24 之前的样子再跑一次，V43a **真的红了**（`www.amazon.de: 责任人「（未定）」却没指向任何未决项`），恢复后立刻变绿 —— 这说明这条检查不是为现状定制的装饰品。",
+      "changed_artifacts": [
+        "research/governance/skeleton/_data/site-owners.csv（第 10 行：责任人 + 证据 + 备注）",
+        "tools/verify_engine_contract.py（V43a–V43b）"
+      ],
+      "verification": "python3 tools/verify_engine_contract.py --only V43"
+    }
+  ],
+  "$decision_queue_note": [
+    "★ 未决 / 预留事项的**唯一书写位置**（D12）。其他制品只放指针。",
+    "★ 每一项必须是**可选的题**，不是一段叙述：`options` ≥2、每个选项写清代价、",
+    "  **恰好一个** `recommended`、并且写明 `default_if_unanswered` ——",
+    "  「沉默等于哪个选项」必须答得出来。没有默认值的未决项不是未决，是遗忘。",
+    "★ `status=answered` 的项必须点名 `record` 里的决定编号，且该编号在 `decisions` 里真实存在。",
+    "★ Q1–Q6 提出于 D12 之前，当时没有选项结构（约定自 Q7 起适用）—— 保留原样以便追溯。",
+    "★ 检查：`python3 tools/verify_engine_contract.py --only V30`",
+    "★ 2026-09-16 第三批：Q7–Q12 已由 Owner 逐条作答（D13–D18）；作答过程本身暴露了一个新的未决项 —— **Q13**（责任人映射表）。**未决项会随作答而增加，这是机制在正常工作，不是没做完。**",
+    "★ 2026-09-16 第四批：Q13 已由 Owner 作答（→ D19）。作答同时带出两个新事实：**广告账号负责人 = Roxie（余玉珊）**、**独立站负责人 = Rikka（林建纯）** —— 后者不是本题问的，但既然给了，就落在 `site-owners.csv` 里，并顺带暴露出她自己缺投递地址。于是未决项 Q14–Q16：送达的最后一步（谁发）/ 落地页侧整改落点 / Rikka 的地址。**未决项会随作答而增加，这是机制在正常工作，不是没做完。**",
+    "★ 2026-09-16 第五批：Q14、Q15 已由 Owner 作答（→ D21 自检实发 · D20 两路整改）；Q16 的方式已定（Owner 直接给地址）、值未到，仍记 open 并附 `$progress`。本轮新增决定 D19–D21，验收 140 → 151。",
+    "★ 2026-09-16 第六批（D22）：Owner 就 Q16 给的是**姓名**，于是派生出 Q17（让 Rikka 送得到的四条路）；穷举过程顺带暴露 `www.amazon.de` 这一行**没有责任人**，记 Q18。同一轮撤回了一条恒真扫描（created_by 恒为 null），并把「阴性结论必须先有阳性对照」做成工具约束（`tools/lark_people.py` + V42a–V42c）。**未决项会随作答而增加，这是机制在正常工作，不是没做完。**",
+    "★ 2026-09-16 第七批（D23）：Q16、Q17 均由 Owner 结案 —— 站点侧**只记录、不送达**（选 D）。落地时把「（未定）」的语义从**待办**改成**决定**（10 行备注 + 两张路由制品 + `$delivery_mode` 一节），并把代价写下来：那 4 条跨 locale 不一致不会被任何人收到。未决项只剩 **Q18**（`www.amazon.de` 那一行的责任人）。",
+    "★ 2026-09-16 第八批（D24）：Q18 由 Owner 结案 —— `www.amazon.de` 归独立站侧（选 B）。落地时把「不许有静默空缺」从地址列（V40b）搬到责任人口径（V43a/V43b），并用**临时还原 D24 之前那一行**的方式证明它会红。**队列清空：18 项全部 answered，0 项 open** —— 下一次作答会带来新的未决项，这是机制在正常工作。"
+  ],
+  "$decision_queue": [
+    {
+      "id": "Q1",
+      "status": "answered",
+      "answered_at": "2026-09-16",
+      "answered_by": "法务（经 Owner 转达）",
+      "answer": "允许",
+      "record": "legal-decisions-v1.json · D1（含已接受的量化后果与三项义务；「可申诉」由 D10 补齐政策）",
+      "question": "auto_reject 是否真的允许机器独立拦截？实测 precision 0.970，即约 3% 误报会被自动拦下。若不可接受，改 DP3。",
+      "kind": "legal_question",
+      "owner": "法务（经 Owner 转达）",
+      "$note": "本项在 D12 之前提出，当时没有选项结构 —— 约定自 Q7 起适用。"
+    },
+    {
+      "id": "Q2",
+      "status": "answered",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "落点维持 DP3，但拆两路：有文案进 DP3 + 空白清单；无文案走 PRE-001 → DP0，不进空白清单、不占法务产能",
+      "record": "legal-decisions-v1.json · D5",
+      "question": "catch_all 落 DP3（54.6% 存量）还是 DP4？落 DP4 需先确认法务产能。",
+      "kind": "legal_question",
+      "owner": "Owner",
+      "$note": "本项在 D12 之前提出，当时没有选项结构 —— 约定自 Q7 起适用。"
+    },
+    {
+      "id": "Q3",
+      "status": "answered",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "维持 DP1，但回执必须显式送达提交人（机器说的是「未发现拦截理由」，不是「通过」）",
+      "record": "legal-decisions-v1.json · D6",
+      "question": "auto_pass 落 DP1（退回提交人）是否符合你们对「机器不替人过门」的理解？",
+      "kind": "legal_question",
+      "owner": "Owner",
+      "$note": "本项在 D12 之前提出，当时没有选项结构 —— 约定自 Q7 起适用。"
+    },
+    {
+      "id": "Q4",
+      "status": "answered",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "不启用，维持关闭 —— 实测推翻了它的立论（净新增仅 5 单，且都是普通多主题广告）",
+      "record": "legal-decisions-v1.json · D7",
+      "question": "ESC-003（跨主题共现 → 法务）要不要启用？它是本表里唯一会主动给法务加单的规则。",
+      "kind": "legal_question",
+      "owner": "Owner",
+      "$note": "本项在 D12 之前提出，当时没有选项结构 —— 约定自 Q7 起适用。"
+    },
+    {
+      "id": "Q5",
+      "status": "answered",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "层级 ID 由 L1–L4 改为 DP1–DP4（避开与风险等级 L0–L5 的同名冲突）；四个名称全部保留",
+      "record": "legal-decisions-v1.json · D8（其中「名称是否与你们现行叫法一致」仍建议法务/业务过一眼）",
+      "question": "层级名（业务自审 / 工具预审 / 人工复核 / 法务终审）是否与你们现有流程的叫法一致？不一致请直接改字符串，代码会跟随。",
+      "kind": "legal_question",
+      "owner": "Owner（措辞部分属业务）",
+      "$note": "本项在 D12 之前提出，当时没有选项结构 —— 约定自 Q7 起适用。"
+    },
+    {
+      "id": "Q6",
+      "status": "answered",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner（依 FDA 原文，认证级证据；建议法务复核）",
+      "answer": "`FDA registered` / `FDA 注册` 移出放行带，改为降级：auto_reject → manual_review",
+      "record": "legal-decisions-v1.json · D9",
+      "question": "`FDA registered` / `FDA 注册` 与 `FDA cleared` 是否应同处一个放行带？",
+      "kind": "legal_question",
+      "owner": "Owner（建议法务复核）",
+      "$note": "本项在 D12 之前提出，当时没有选项结构 —— 约定自 Q7 起适用。"
+    },
+    {
+      "id": "Q7",
+      "kind": "legal_question",
+      "status": "answered",
+      "owner": "法务",
+      "raised_at": "2026-09-16",
+      "title": "ESC-002 的升级面：T7.1 / T3.2 / T7.2 三条规则的命中要不要全部走法务终审",
+      "question": "ESC-002 按 `evaluability=manual_only` 无条件升到 DP4。实测承担它的只有三条规则 —— T7.1 医疗场景（`hospital` / `Krankenhaus` 系词，16 条）、T3.2 哺乳顾问（`IBCLC`，14 条）、T7.2 疼痛场景（`painful pumping`，2 条）—— 而 DP4 的 31 条**全部**来自这条升级。这三类命中需要法务终审，还是人工复核（DP3）就够？",
+      "evidence": "把 291 条存量逐条跑 `judge.judge()`，取 `verdict.layer.escalated_by` 的实测结果，见 `measured`。关掉 ESC-002 的反事实：DP4 31 → 2（-94%），DP3 131 → 149，DP2 70 → 81。",
+      "measured": {
+        "sample": "291 条存量语料（_data/records.json）",
+        "dp4_total": 31,
+        "dp4_share": "31/291 = 10.7%",
+        "esc002_share_of_dp4": "31/31 = 100%（ESC-001 只 2 条，且这 2 条同时被 ESC-002 命中）",
+        "esc002_by_rule": {
+          "T7.1.hospital-scenario": 16,
+          "T3.2.lactation-consultant": 14,
+          "T7.2.pain-scenario": 2
+        },
+        "esc002_native_disposition": {
+          "manual_review → 本应落 DP3": 18,
+          "auto_reject → 本应落 DP2（机器可独立拦截）": 13,
+          "$note": "★ 13 条的含义：升级把一个「机器可终结」的拦截动作改成了「等法务看」。ESC-002 不只把人工复核推给法务，它还**暂停了自动拦截**。"
+        },
+        "counterfactual_esc002_off": {
+          "DP0": 59,
+          "DP2": 81,
+          "DP3": 149,
+          "DP4": 2
+        },
+        "T7.1_cross_check": "16 条 T7.1 命中里花费最高的几条（$816 / $488 / $268 / $212）文案都是 `Hospital-Grade Suction Power` / `Qualité Hospitalière` / `Krankenhausqualität` —— 正是 R5 判为 **P0 立即整改**的 hospital-grade 三渠道口径冲突。"
+      },
+      "$corrected": "★ 原 Q7 问的是 `T9.objective-parameter`，**那个前提被实测推翻了**（见 `$premise_falsified`）。编号保留以便追溯：问的是同一个机制（ESC-002 的升级面），对象换成真正承担它的三条规则。",
+      "$premise_falsified": [
+        "原写法：「T9 的 evaluability=manual_only，一旦命中会被 ESC-002 升到 DP4，今天 0 命中所以无人察觉。」",
+        "实测：T9.objective-parameter 的 `match.keywords` 与 `match.patterns` **都是空数组**、",
+        "  `topic_only: true`、`is_modifier: true`。原 22 个白名单词已按 ADR-0008/0009 迁到 whitelist-v1.json。",
+        "`Engine.__init__` 把 `is_modifier` 的规则放进 `self.modifiers`、**不进 `self.rules`**；",
+        "  而命中只由 `self.rules` 产生。ESC-002 的判据是 `hit.evaluability`。",
+        "所以 T9 不是「今天恰好 0 次」—— 是**结构上不可达**：没有命中，就没有 evaluability。",
+        "「一个埋着的坑」这个描述本身是错的；真实的坑是 ESC-002 的覆盖面比任何人事先以为的都大。"
+      ],
+      "where": "disposition-layers-v1.json · escalate_if[ESC-002]",
+      "options": [
+        {
+          "key": "A",
+          "label": "维持现状：31 条全部进 DP4",
+          "recommended": false,
+          "impact": "法务每批 31 单，其中 13 单是机器本可独立拦截的（升级反而暂停了拦截）；代价可承受，且 T7.1 的 hospital 系命中正是 R5 的 P0 整改项，留在法务视野里。"
+        },
+        {
+          "key": "B",
+          "label": "三条全落 DP3：关闭 ESC-002 的推断式升级",
+          "recommended": false,
+          "impact": "DP4 归零（31 → 2，仅剩 ESC-001 的 2 条）。法务不再看到 hospital 系那 16 条 —— R5 判为 P0 的三渠道口径冲突会失去唯一的自动信号。"
+        },
+        {
+          "key": "C",
+          "label": "分层：T7.1 维持 DP4，T3.2 / T7.2 落 DP3",
+          "recommended": true,
+          "impact": "DP4 31 → 16（-48%）。hospital 口径冲突仍进法务；IBCLC 背书与疼痛场景交人工复核 —— 它们的动作是改文案，不是定政策。需要给 escalate_if 加 per-rule 例外（即选项 D 的一半机制）。"
+        },
+        {
+          "key": "D",
+          "label": "只改机制不改行为：升级从「按 evaluability 推断」改成「规则显式声明 escalate_to」",
+          "recommended": false,
+          "impact": "今天等价 A，但以后谁能升、谁不能升可以逐条查出来。ESC-003 关闭时留下的那句「正确的形状是规则显式声明」在这里同样适用。需要重跑 291 条确认零差异。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 A（维持现状）：31 条继续全部进 DP4，其中 13 条机器本可拦下的记录继续停在法务队列里等结论。",
+      "answer": "C 分层：T7.1 留 DP4，T3.2/T7.2 落回原生层",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "legal-decisions-v1.json · D13",
+      "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+    },
+    {
+      "id": "Q8",
+      "kind": "owner_decision",
+      "status": "answered",
+      "owner": "Owner（系统与责任人）",
+      "raised_at": "2026-09-16",
+      "title": "被拦下的回执走哪条渠道送达提交人",
+      "question": "D10 定了申诉政策（入口 / 责任人 / 2 个工作日时限 / 撤销须附理由），但**送达管道没有**：回执今天写在 `_data/receipts.jsonl`，没有任何程序把它推到提交人手上。67 条/批被机器拦下，读不到回执的人仍然无处可去。送达走哪条渠道？",
+      "evidence": "`disposition-layers-v1.json · mapping.auto_reject.outbound.appeal.$gap_not_implemented`；台账里拆成两条记账：`D1-O3a 政策 ✅ met` / `D1-O3b 送达 ❌ unmet`。合并成一条的话，结论会是「申诉已落地」——而写了申诉方式 ≠ 被误拦的人能申诉。 ★（以上是**提出时**的状态：当时缺的是渠道。现行状态见 `D1.obligations` —— D19 之后「送得出去」已 met，「已经送过」仍 unmet。）",
+      "where": "disposition-layers-v1.json · mapping.auto_reject.outbound.appeal",
+      "options": [
+        {
+          "key": "A",
+          "label": "飞书机器人推送到提交人 / 投放群",
+          "recommended": true,
+          "impact": "复用已有飞书通路（D11 已用它同步词表），成本最低；缺口是一张「广告账号 → 责任人」映射表 —— 今天不存在，得先建。"
+        },
+        {
+          "key": "B",
+          "label": "邮件",
+          "recommended": false,
+          "impact": "同样需要收件人映射，另加发信账号、退信与归档；比飞书多三件事要维护。"
+        },
+        {
+          "key": "C",
+          "label": "落成工单系统的一条单",
+          "recommended": false,
+          "impact": "最可追责（有时限、有状态、有留痕），但需要工单系统对接与字段约定，周期最长。"
+        },
+        {
+          "key": "D",
+          "label": "先不做管道，改为指定一个人定期去读 receipts.jsonl",
+          "recommended": false,
+          "impact": "零开发；但送达率不可测，且回到「靠人记得」的老问题 —— 正是本轮要治的那个病。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D 的事实状态（不做管道）：申诉政策继续只写在回执里，被误拦的人读不到它 —— `D1-O3b` 仍是本轮唯一没人负责的账。",
+      "answer": "A 飞书机器人推送到提交人 / 投放群",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "legal-decisions-v1.json · D14",
+      "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+    },
+    {
+      "id": "Q9",
+      "kind": "business_naming",
+      "status": "answered",
+      "owner": "业务（法务复核「人工复核」一处）",
+      "raised_at": "2026-09-16",
+      "title": "四个层级名是否与业务现行叫法一致（其中「人工复核」同名反义）",
+      "question": "层级名（业务自审 / 工具预审 / 人工复核 / 法务终审）是否与你们现有流程的叫法一致？特别是一处同名反义：旧规则库里「人工复核」是**边界类型**的一个取值，它对应的是 DP4 法务终审，而本表用同一个词命名 DP3（内容审核员）。",
+      "evidence": "ADR-0012 §6.2 #3；层级 ID 冲突已由 D8 解决（L1–L4 → DP1–DP4），名称未动。",
+      "where": "disposition-layers-v1.json · layers[].name",
+      "options": [
+        {
+          "key": "A",
+          "label": "四个名称全部沿用",
+          "recommended": false,
+          "impact": "零改动；但「人工复核」在旧表里继续同名反义，按名字对接流程会取错层 —— 一个词对应两个相反的处置。"
+        },
+        {
+          "key": "B",
+          "label": "只把 DP3 改名（如「内容审核员复核」）",
+          "recommended": true,
+          "impact": "消掉同名反义，改动面最小；需同步 ADR / 报告 / 回执模板里的措辞，验证脚本按 id 断言，不受影响。"
+        },
+        {
+          "key": "C",
+          "label": "四个名字由业务重新给字符串",
+          "recommended": false,
+          "impact": "一次对齐到底（层级名来自 JSON，代码会跟随）；代价是要业务给出确定叫法，周期最长。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 A（沿用现状）：名称不改，同名反义留在原地。",
+      "answer": "B 只把 DP3 改名「内容审核员复核」",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "legal-decisions-v1.json · D15",
+      "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+    },
+    {
+      "id": "Q10",
+      "kind": "product_task",
+      "status": "answered",
+      "owner": "产品",
+      "raised_at": "2026-09-16",
+      "title": "品线取值域的 70 格由谁填、什么时候填",
+      "question": "品线归属（26 条规则 × 品线）机制已就绪、防护齐备（未知值不静默过滤、错值不静默放行），但取值域 `status=proposed`，70 格待填。谁填、什么时候填？",
+      "evidence": "`product-lines-v1.json` · assignments；已交付 `品线确认表.csv`。存量 291 条里 289 条是「吸奶器」、2 条为空 —— 今天只有一条品线在跑。",
+      "where": "product-lines-v1.json · assignments（D4 的作业面）",
+      "options": [
+        {
+          "key": "A",
+          "label": "产品逐格确认全部品线（含未来品线），排期两周",
+          "recommended": false,
+          "impact": "一次做全；但未来品线没有样本，确认下来的是意向而不是事实，仍会被下一次新品线推翻。"
+        },
+        {
+          "key": "B",
+          "label": "先只确认「吸奶器」一行（覆盖 289/291），其余品线显式留 unknown",
+          "recommended": true,
+          "impact": "今天就能做完且可验证；未确认的品线按「未知值不过滤」跑，不会静默漏报，边界声明会写明「未按品线过滤」。"
+        },
+        {
+          "key": "C",
+          "label": "开发从 291 条实测反推草案，产品只做签认",
+          "recommended": false,
+          "impact": "产品工作量最小；但数据反推的是「历史上怎么判的」，不是「政策上该怎么分」——两者不同时，会把现状固化成一个没人决定过的政策。"
+        },
+        {
+          "key": "D",
+          "label": "不填，维持 proposed（= 什么都不做）",
+          "recommended": false,
+          "impact": "零成本；但任何品线过滤请求都继续落回「未按品线过滤」，品线维度在判定里等价于不存在 —— 把它列出来是因为「不做」也是一个选择，而它必须是一个**被选过的**选择，不是默认发生的。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（不填，维持 proposed）：机制空转，任何品线过滤请求都落回「未按品线过滤」并写进边界声明。",
+      "answer": "B 先只确认「吸奶器」一个取值",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "legal-decisions-v1.json · D16",
+      "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+    },
+    {
+      "id": "Q11",
+      "kind": "engineering_defect",
+      "status": "answered",
+      "owner": "开发（补实现或删声明）",
+      "raised_at": "2026-09-16",
+      "title": "`escalation.within_chars` 声明了但从未被读 —— 补实现还是删声明",
+      "question": "`rules-v1.json` 里 T7.2 的 `escalation.within_chars = 60`（邻近窗口）声明了，但 `_apply_escalation` 只判规则共现，全仓没有任何一行读它。补实现，还是删声明？",
+      "evidence": "全仓 `within_chars` 命中 3 处：rules-v1.json 的那一行、一份 `.bak`、以及接口盘点报告自己。`_apply_escalation`（score.py）只遍历 `when_cooccurring_with`。",
+      "where": "research/governance/引擎产品化-接口盘点.md · 四、缺口清单 #12",
+      "options": [
+        {
+          "key": "A",
+          "label": "删掉声明（今天的行为就是「共现即升级」）",
+          "recommended": true,
+          "impact": "零行为变化（它本就没被读）；代价是失去一个「本来想做邻近窗口」的线索 —— 但那句线索留在 ADR 里比留在规则文件里更安全。"
+        },
+        {
+          "key": "B",
+          "label": "补实现（按 60 字符窗口收紧升级触发）",
+          "recommended": false,
+          "impact": "会**减少**升级量 → 改变存量判定（今天 ESC-001 只 2 条），必须重跑 291 条并请法务确认 —— 这不是实现细节，是判定语义的改动。"
+        },
+        {
+          "key": "C",
+          "label": "保留声明，但在输出里显形为「已声明未实现」",
+          "recommended": false,
+          "impact": "保住线索且不撒谎；代价是规则文件继续带着一个不生效的字段，下一个人仍可能以为它生效。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 维持现状：字段继续留在规则文件里，行为等价于选项 A，但声明与实现继续不一致。",
+      "answer": "A 删掉 `within_chars` 声明",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "legal-decisions-v1.json · D17",
+      "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+    },
+    {
+      "id": "Q12",
+      "kind": "migration",
+      "status": "answered",
+      "owner": "开发",
+      "raised_at": "2026-09-16",
+      "title": "`downgrade_band` 的名字与 `keyword_effect_overrides` 的键结构要不要现在改",
+      "question": "通道落点现在是三级的（规则 → 词 → 表），承载它的字段仍叫 `downgrade_band`；而逐词覆盖的键是「词」—— 若同一个词将来在两个通道各有一条覆盖，落点只能靠代码次序决定。现在改，还是记账？",
+      "evidence": "实测今天**没有**跨通道重复词：规则的 downgrade_band 共 12 词，`keyword_effect_overrides` 只有 T6.1 的 2 条（`FDA registered` / `FDA 注册`）。所以这是前瞻问题，不是现患。",
+      "where": "ADR/ADR-0012-判定引擎产品化与处置分层.md · §6.1（字段名与键结构的历年遗留）",
+      "options": [
+        {
+          "key": "A",
+          "label": "只改键（词 + 通道），字段名留待大改",
+          "recommended": true,
+          "impact": "消掉次序依赖，改动面最小；需同步 vocab.py / score.py / lint W6 与 rules JSON，重跑 291 条验证零差异。"
+        },
+        {
+          "key": "B",
+          "label": "一并改：键改「词 + 通道」、字段改名（如 `landing_band`）",
+          "recommended": false,
+          "impact": "一次到位；但字段名出现在验证脚本、报告与 ADR 的多处，改动面大，且「改名」本身不产生任何行为收益。"
+        },
+        {
+          "key": "C",
+          "label": "记为技术债，等下批一起改",
+          "recommended": false,
+          "impact": "零改动；风险是下一个人加第二条 override 时不会想到键冲突，而那次冲突表现为「同样的输入两次跑出不同落点」。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 C（记账不动）：次序依赖继续存在，今天不触发。",
+      "answer": "A 只改键（通道 → 词），字段名留待大改",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "legal-decisions-v1.json · D18",
+      "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+    },
+    {
+      "id": "Q13",
+      "kind": "owner_decision",
+      "status": "answered",
+      "owner": "Owner（投放 / 审核系统负责人）",
+      "raised_at": "2026-09-16",
+      "title": "12 个广告账号的责任人分别是谁（送达的最后一块）",
+      "question": "D14 选了飞书推送，管道已就绪、回执已带路由键。但 `_data/account-owners.csv` 的「责任人 / 飞书open_id」列是空的 —— 12 个广告账号一个都没有归属人。谁填、谁维护？",
+      "evidence": "12 个账号来自 291 条存量语料（`广告账号` 字段）：Momcozy-Jolla(US&UK&CA&PL)—吸奶器 70 · Momcozy-Angel(DE&FR&PL其他品线） 54 · Momcozy-外部需求投放 30 · （空）29 · Momcozy-Angel-FR 26 · Momcozy-PL-1 21 · Momcozy-UK-1 19 · Momcozy-CA-1-1 14 · Momcozy-EU-1 11 · Momcozy-ES-1-1 11 · Momcozy-AU-1-1 3 · Momcozy-IT-1-1 3。★ 其中 **29 条记录的账号字段是空的** —— 这 29 条连「谁的广告」都答不出来，它们无法被路由，push_receipts 会为此拒绝发送（退出码 2）。",
+      "where": "research/governance/skeleton/_data/account-owners.csv",
+      "options": [
+        {
+          "key": "A",
+          "label": "由投放负责人一次性填全 12 个账号的责任人",
+          "recommended": true,
+          "impact": "一次做完，D1-O3b 从 unmet 走到 met；代价是需要投放侧给出人与 open_id，且此后账号新增时要有人维护这张表。"
+        },
+        {
+          "key": "B",
+          "label": "按账号建飞书群，责任人 = 群（而不是个人）",
+          "recommended": false,
+          "impact": "换人不需要改表，送达率更稳；代价是「谁该看」变成「群里谁看都行」，责任不如指向个人清晰。"
+        },
+        {
+          "key": "C",
+          "label": "只填有语料的 11 个账号，空账号的 29 条单独处置",
+          "recommended": false,
+          "impact": "先解决 262/291 条的送达；但那 29 条仍然无处可去 —— 它们的合规问题不是「找不到人」，是**记录本身缺字段**。"
+        },
+        {
+          "key": "D",
+          "label": "不填，维持「送不出去」的现状",
+          "recommended": false,
+          "impact": "零成本；但 D1-O3b 会一直 unmet，而推送工具会一直以退出码 2 拒绝运行 —— 这是设计好的：送不出去必须响，不能安静。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（不填）：`_data/account-owners.csv` 保持空责任人，推送工具持续以退出码 2 拒绝发送，`D1-O3b` 持续 unmet。",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "12 个广告账号的责任人全部是 **Roxie（余玉珊）**；空账号那一桶（29 条）也归她。另：**独立站负责人 = Rikka（林建纯）**。",
+      "record": "legal-decisions-v1.json · D19（含两个人的取证过程与地址状态）"
+    },
+    {
+      "id": "Q14",
+      "kind": "owner_decision",
+      "status": "answered",
+      "owner": "Owner",
+      "raised_at": "2026-09-16",
+      "title": "送达的最后一步：谁发、发给谁（D1-O3c 的唯一缺口）",
+      "question": "D19 之后，送达面齐了 —— 人有、地址有、管道有、闸门有，语料 291 条一条不漏地可路由。但**一条都没真的发出去过**：生产账本里唯一那条回执是 D10 之前的产物，没有 obligations 块，连「该不该送」都没写。第一次真发怎么发？",
+      "evidence": "`python3 tools/push_receipts.py --status` → 待送 0 · ★ 不可送达的旧回执 1 条。端到端预演（临时账本）已跑通：真记录「自适应搜索广告-Angel-Sale-Search-欧洲」（Momcozy-Angel-FR · 规则 H07 · DP2 工具预审）判 auto_reject → 回执 route=ad_account → 解析到 Roxie + 地址。要发的那条消息全文可在 `--apply` 之前用预演看。",
+      "where": "tools/push_receipts.py",
+      "options": [
+        {
+          "key": "A",
+          "label": "先发一条**端到端自检**给 Owner 自己的飞书（app 创建者）",
+          "recommended": true,
+          "impact": "管道真的跑一次，且能暴露只在真发时才现形的问题（应用可用范围 / 收件人不在可见范围）——本项目有一次同形教训：控制台显示成功、实际没生效。不打扰任何其他人。代价：自检对象不是提交人，所以它证明的是「送得出去」，D1-O3c 仍只能记「已实发、待真单」。"
+        },
+        {
+          "key": "B",
+          "label": "直接给 Roxie 真发一条真回执（用 291 条里那条真记录）",
+          "impact": "最贴近生产：一次真判定、一个真人、一条真申诉入口，D1-O3c 直接闭合。代价：Roxie 会收到一条她没预期的消息，而且这条记录是 2026-09-09 的存量、不是今天的活单 —— 她会先问「为什么现在发我这个」。"
+        },
+        {
+          "key": "C",
+          "label": "A + B 都做（先自检再真发）",
+          "impact": "顺序上先排掉工程故障再打扰人，两次都有留痕。代价：Roxie 仍会收到消息，且同一条链路发两次，第二次的价值只在于「对象换成了真提交人」。"
+        },
+        {
+          "key": "D",
+          "label": "都不发，D1-O3c 维持 unmet",
+          "impact": "零打扰。代价：送达链的最后一环永远只有**配置证据** —— 而配置证据正是本项目反复证明不足的那一类（「写了申诉方式」≠「能申诉」，「控制台显示成功」≠「已生效」）。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（都不发）：D1-O3c 维持 unmet，推送工具保持「预演默认、真发要显式 --apply」，生产账本不会新增任何真实送达记录。",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "先自检：发一条端到端自检给 Owner 自己（不打扰他人），真实送达等下一次真批次自然发生。**已执行，飞书 code 0。**",
+      "record": "legal-decisions-v1.json · D21（含「自检不证明什么」的边界）"
+    },
+    {
+      "id": "Q15",
+      "kind": "legal_question",
+      "status": "answered",
+      "owner": "法务（33 条是否构成问题）+ Owner（路由）",
+      "raised_at": "2026-09-16",
+      "title": "「广告文案 vs 落地页」不一致的整改落点：改文案、改页面，还是先判",
+      "question": "C 批把 204 个落地页抓了下来并做了对照：93 条可对照的广告里 **33 条**至少有一项声明没在落地页出现（严格子串口径 42 条，其中约 20% 是「45dB vs 45 dB」这类写法差异）；另外 9 个跨 locale 产品里 **4 个**在自报参数/认证上互相不一致。找到之后谁改、改哪边？",
+      "evidence": "research/landing/一致性分析.json · 表A/表B；research/landing/内容获取实测报告.md。★ C 批报告自己写明：「广告有、页面无」是否构成问题**由法务判断** —— 所以这里问的不是「对不对」，是「谁来接」。",
+      "where": "research/landing/一致性分析.json",
+      "options": [
+        {
+          "key": "A",
+          "label": "分两路：跨 locale 不一致 → Rikka（页面侧核实）；「广告有页面无」→ 先交法务判",
+          "recommended": true,
+          "impact": "不预设结论，同时把**已经确定是错的**那一类立刻派出去 —— 同一产品在 de./fr./uk. 站自报不同 mmHg/dB，无论以谁为准，至少有一个站是错的，不需要法务先判。代价：33 条要占一次法务判定会。"
+        },
+        {
+          "key": "B",
+          "label": "一律以页面为准 → 改广告文案（Roxie）",
+          "impact": "单向、可批量执行。代价：把「页面漏写」当成「文案夸大」处理，会把本来正确的广告改错 —— 而 33 条里有多少属于这种，今天不知道（未抽检）。"
+        },
+        {
+          "key": "C",
+          "label": "一律以文案为准 → 改页面（Rikka）",
+          "impact": "同样单向。代价相反：若某些广告确实夸大，改页面等于把违规**复制**到更多地区站，而落地页的传播面比广告更大。"
+        },
+        {
+          "key": "D",
+          "label": "只留报告，不路由",
+          "impact": "零成本。代价：C 批产出的是「能查出不一致」这个能力，而不是处置 —— 没有任何人会被通知去改，报告放三个月就没人记得它说了什么。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（只留报告）：33 条与 4 个产品的不一致不进任何人的待办，C 批能力保持「可查不可派」。",
+      "answered_at": "2026-09-16",
+      "answered_by": "Owner",
+      "answer": "分两路：跨 locale 不一致 → 页面侧核实（Rikka）；「广告有、页面无」→ 先交法务判定，不预设以谁为准。",
+      "record": "legal-decisions-v1.json · D20（33 条 / 4 个产品的路由落点）"
+    },
+    {
+      "id": "Q16",
+      "kind": "owner_decision",
+      "status": "answered",
+      "owner": "Owner",
+      "raised_at": "2026-09-16",
+      "title": "Rikka 的投递地址（独立站侧现在送不到）",
+      "question": "`_data/site-owners.csv` 里 10 行责任人都写了 Rikka（林建纯），但「飞书open_id」是**（未定）**：她只出现在文本字段里（材料收集表的 From），不在任何人员字段中；31 个已读 open_id 里没有她；应用又缺 `contact:user.id:readonly` 权限，按邮箱现查被拒（实测返回 99991672）。地址从哪来？",
+      "evidence": "`python3 tools/lark_people.py --find 林建纯` → **退出码 2**（本应用结构性看不见她，附 8 条被拒通道的实测码）；同一命令 `--find 余玉珊` → **退出码 0**（阳性对照：证明这不是「搜不到」而是「看不见」）。可见人员字典 `_data/lark-visible-people.csv`（35 人 · 8 底座 · 5042 条记录）。`python3 tools/push_receipts.py --status` 对「有责任人但无地址」硬失败（退出码 2）—— 这一行是显式缺口，不是已备好的通道。",
+      "where": "research/governance/skeleton/_data/site-owners.csv",
+      "options": [
+        {
+          "key": "A",
+          "label": "由 Owner 提供 Rikka 的飞书 open_id（从飞书里取一次）",
+          "recommended": true,
+          "impact": "一次给全，独立站侧立刻可送达。代价：需要人工取一次，且**必须是本应用能用的那个 open_id** —— open_id 是应用内唯一标识，从别的应用/工具抄来的值不一定能用（D19 里 Roxie 的地址之所以可用，正是因为那份快照由本应用读取）。"
+        },
+        {
+          "key": "B",
+          "label": "建一个「独立站内容整改」群，责任人 = 群",
+          "impact": "换人不用改表，且群成员本应用可见（可读群成员拿 open_id），送达面更稳。代价：「谁该看」变成「群里谁看都行」，责任不如指向个人清晰。"
+        },
+        {
+          "key": "C",
+          "label": "给应用开通 contact:user.id:readonly 权限，之后按邮箱解析",
+          "impact": "一劳永逸，覆盖以后所有新增责任人，且以后不必再手工取 id。代价：要动应用的权限并**发版**（本项目踩过一次：控制台改了权限没发版，事件订阅一直没生效，排查了两轮）。"
+        },
+        {
+          "key": "D",
+          "label": "暂不填，独立站侧先只记录不送达",
+          "impact": "零成本。代价：站点侧任何通知都发不出去（工具硬失败），Q15 若选「页面侧改」也没有地方可派 —— 责任人写了名字，但消息到不了她手上。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（暂不填）：`site-owners.csv` 的 open_id 保持「（未定）」，独立站侧的所有送达请求继续硬失败，Q15 的页面侧路由事实上无法执行。",
+      "$progress": "2026-09-16：Owner 给出姓名 → D22（8 条通道穷举 + 撤回恒真扫描 + 强制阳性对照）；→ Q17（四条路）→ Owner 选 D → **D23**。本条结案：地址按决定保持「（未定）」，站点侧只记录不送达；不是遗忘，也不是待办。",
+      "$asked_at": "2026-09-16（已就选项问过一次；缺的是值，不是选择）",
+      "answer": "由 Owner 直接提供；实际给到的是**姓名**（林建纯）。姓名不是地址 → 派生 Q17；Q17 已选 D（D23），故本条以「按决定留空」结案。",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "D23"
+    },
+    {
+      "id": "Q17",
+      "kind": "owner_decision",
+      "status": "answered",
+      "owner": "Owner",
+      "raised_at": "2026-09-16",
+      "title": "让 Rikka 变成「送得到」的人：四条路选一条",
+      "question": "Owner 给的是**姓名**，不是地址（Q16 的追问见 D22）。本应用**没有按姓名找人的能力**（8 条通道逐条实测被拒），唯一能拿到 open_id 的通道是人员字段，而她只出现在文本字段里。要让 `site-owners.csv` 那 10 行不再是硬失败，四条路选一条 —— 只有 `open_id` 落到表里，页面侧那 4 条整改发现才能真正派出去。",
+      "evidence": "`python3 tools/lark_people.py --find 林建纯` → 退出码 2，附 8 条被拒通道的实测码；`python3 tools/lark_people.py --find 余玉珊` → 退出码 0（阳性对照，证明不是「搜不到」而是「看不见」）。字典与采集口径见 `_data/lark-visible-people.csv`。",
+      "where": "research/governance/skeleton/_data/site-owners.csv",
+      "options": [
+        {
+          "key": "A",
+          "label": "把 Rikka 拉进机器人所在的群「内容治理-守衡Agent-测试」（她自己不用做任何事）",
+          "recommended": true,
+          "impact": "**您一个人就能做完**：零权限、不惊动管理员、不依赖她配合。我读一次群成员就能同时拿到 **open_id 与真名**（现有 3 名成员就是这样读出来的：刘华丽 / 李倩怡 / 周健）—— 姓名可核对，不是凭一个 id 信任。代价：她会看到这个测试群的历史消息；若以后用该群做自检发送，她会收到噪音（可另建群规避）。"
+        },
+        {
+          "key": "B",
+          "label": "让 Rikka 在飞书里给机器人（守衡）发一句话，我从事件回调里取她的 open_id",
+          "impact": "零权限、不打扰任何第三人，且**她自己证明了她能触达这个机器人**（事件里同时带回 sender open_id 与消息内容）。代价：需要她动手一次；若她不回消息，这一路就停在那里（今天就要发的话，耦合在别人身上）。"
+        },
+        {
+          "key": "C",
+          "label": "给应用开通通讯录只读（contact:contact.base:readonly），之后按姓名/邮箱直接解析",
+          "impact": "**唯一的结构解**：一劳永逸，以后每来一个新责任人（下一批可能是法务、可能是店铺运营）都不必重演本轮这套穷举。代价：要动应用权限并需管理员审批，本项目**踩过一次**「控制台改了权限没发版、事件订阅一直没生效，排查两轮」—— 落地时间不由我们控制。建议与 A 并行推进（A 解今天，C 解以后）。"
+        },
+        {
+          "key": "D",
+          "label": "暂不填，独立站侧继续「只记录、不送达」",
+          "impact": "零成本、零风险。代价：页面侧那 4 条跨 locale 不一致（dB 42 vs 48、CE vs FDA 等）**发不出去**，D20 的两路整改只剩法务那一路在跑；工具每次都会硬失败（退出码 2），这是设计如此，不是坏了。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（暂不填）：`site-owners.csv` 的「飞书open_id」保持「（未定）」，`整改路由-页面侧.csv` 逐行继续写「★ 不可送达」，独立站侧的任何送达请求继续硬失败（退出码 2）。有名字 ≠ 送得到。",
+      "$progress": "2026-09-16：Owner 选 D。站点侧 4 条发现落表不派出；地址列保持「（未定）」但语义改为「已决定」；`整改路由.json` 新增 `$delivery_mode` 写明两路送达状态不同。可逆：填上地址即自动恢复，不需要新决定。A/B/C 三条路仍在，随时可换。",
+      "answer": "选项 D：暂不填，站点侧继续「只记录、不送达」。",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "D23"
+    },
+    {
+      "id": "Q18",
+      "kind": "owner_decision",
+      "status": "answered",
+      "owner": "Owner",
+      "raised_at": "2026-09-16",
+      "title": "`www.amazon.de` 这一行的责任人是谁（现在写的是「（未定）」）",
+      "question": "`site-owners.csv` 覆盖了语料里出现的每一个落地页域名，其中 `www.amazon.de`（1 条 URL，`https://www.amazon.de/dp/B0G1MW5TB6/` —— Momcozy M5 的亚马逊商品页）的**责任人是「（未定）」**：D19 只定了「广告账号 → Roxie、独立站 → Rikka」，亚马逊站内商品页两边都不完全对口。目前没有发现指向它，所以不阻塞；但它是一行**没有主**的路由目标。",
+      "evidence": "`_data/site-owners.csv` 第 10 行；该域名来自 `research/landing/要素提取.json` 的 `url_key=www.amazon.de/dp/B0G1MW5TB6`（1 条 URL）。",
+      "where": "research/governance/skeleton/_data/site-owners.csv",
+      "options": [
+        {
+          "key": "A",
+          "label": "归 Roxie（账号侧）",
+          "recommended": true,
+          "impact": "亚马逊商品页与广告账号是同一渠道，且这个页面本来就是广告的落地页；D19 已把「账号字段为空的那批」兜底给 Roxie，口径一致。代价：若实际改页面的是别的岗位，会派错人（但至少有人接，而不是无人接）。"
+        },
+        {
+          "key": "B",
+          "label": "归 Rikka（独立站侧）",
+          "impact": "她是内容/站点侧负责人，页面文案归她口径统一。代价：亚马逊商品页不是她管的店（`momcozy.com` 与 8 个地区站），权责可能不符。"
+        },
+        {
+          "key": "C",
+          "label": "归店铺运营/别的岗位，由您给名字",
+          "impact": "最准确。代价：要多给一个人 + 多解一次地址（若选 Q17 的 A/C 路，地址问题顺带解决）。"
+        },
+        {
+          "key": "D",
+          "label": "暂不指定，等真有发现指向该域名时再定",
+          "impact": "零成本。代价：真出现指向 `www.amazon.de` 的发现时，那一行会是「有名字才怪」的状态 —— 路由表会写出「★ 不可送达：责任人（未定）」，等于少派一条。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = 选项 D（暂不指定）：该行责任人保持「（未定）」，一旦有发现落在 `www.amazon.de` 上，它不会被派给任何人 —— 会在路由表里显式写成「责任人（未定）」而不是被默默吞掉。",
+      "answer": "选项 B：归独立站侧 Rikka（林建纯）。",
+      "answered_by": "Owner",
+      "answered_at": "2026-09-16",
+      "record": "D24",
+      "$progress": "2026-09-16：Owner 选 B。该行责任人落为 Rikka，全表 10 行首次全部有主；新增 V43a/V43b（路由目标不许有静默空缺，含双向反向对照 + 对 D24 之前状态的真实复现）。"
+    }
+  ]
+}

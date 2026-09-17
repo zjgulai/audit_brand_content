@@ -1,0 +1,443 @@
+{
+  "$schema_version": "whitelist-v1",
+  "$note": [
+    "★ ADR-0008：本表是独立白名单，**不得与判定规则同表混放**。",
+    "现网把白名单塞在规则库第 18 行，`检测关键词` 字段与判险规则同名，",
+    "导致任何『读规则库拼词表』的动作都会让『安全』去证明『有风险』。",
+    "本表唯一用途：为 `exempts` 列出的规则的 downgrade_band 提供放行词。",
+    "不产生任何命中（没有 hit 语义）。这一点与规则的区别是结构性的，",
+    "不依赖任何 `is_modifier` 之类的运行时开关。"
+  ],
+  "admission_criterion": {
+    "rule": "能否被第三方独立复核为真/假（R5-E）",
+    "note": "不满足者进入 quarantined，不参与放行。这是唯一判别标准，不再有第二套。"
+  },
+  "invariants": [
+    "W1 disjointness ｜ active 词的 word 不得出现在任何判定规则的 match.keywords 中",
+    "W2 attribution ｜ 每个 active 词必须有非空 exempts（否则是死重：加了不生效）",
+    "W3 quarantine  ｜ quarantined 词不得进入任何「放行通道」",
+    "   ★ W3 的边界：隔离词**可以**进入 downgrade_band（降级 ≠ 放行）。",
+    "     gentle/comfort 正是如此 —— 它们不给 H07 放行，但把 H07 从 auto_reject",
+    "     降到 manual_review。放行与降级是两个通道，不是一件事。"
+  ],
+  "source": {
+    "snapshot": "snapshot-20260916T050845Z.json",
+    "legacy_rule_id": "安全词",
+    "legacy_record_id": "recvuJP2Ot474u",
+    "legacy_boundary_type": "安全词白名单"
+  },
+  "stats": {
+    "total": 30,
+    "active": 26,
+    "quarantined": 4,
+    "orphans_in_live": 14
+  },
+  "words": [
+    {
+      "word": "suction level",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M02"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.suction-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "suction levels",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "adjustable suction",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M02"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.suction-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "9 levels",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "10 levels",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "hands-free",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "wearable",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "portable",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "rechargeable",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "wireless",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "BPA-free",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "food-grade silicone",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "food grade",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "FDA cleared",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "H06"
+      ],
+      "exempts_rule_keys": [
+        "T6.1.regulatory-status"
+      ],
+      "evidence_required": "certificate",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "FDA-cleared",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "H06"
+      ],
+      "exempts_rule_keys": [
+        "T6.1.regulatory-status"
+      ],
+      "evidence_required": "certificate",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "FDA registered",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "H06"
+      ],
+      "exempts_rule_keys": [
+        "T6.1.regulatory-status"
+      ],
+      "evidence_required": "certificate",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "easy to clean",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "dishwasher safe",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "dishwasher-safe",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "quiet mode",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M01"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.quiet-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "low noise",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M01"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.quiet-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "low-decibel",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M01"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.quiet-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "reduces pain",
+      "lang": "en",
+      "status": "quarantined",
+      "quarantine_reason": "主张疗效（= H07 判险词），不可独立复核为客观参数；且已被 H07 判险，放行会与 H07 直接冲突",
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [
+        "H07"
+      ],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "less pain",
+      "lang": "en",
+      "status": "quarantined",
+      "quarantine_reason": "主张疗效（= H07 判险词），同上",
+      "exempts": [],
+      "exempts_rule_keys": [],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [
+        "H07"
+      ],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "gentle",
+      "lang": "en",
+      "status": "quarantined",
+      "quarantine_reason": "主观感受词，无客观量纲，第三方无法复核真/假",
+      "exempts": [
+        "H07"
+      ],
+      "exempts_rule_keys": [
+        "T2.1.2.pain-relief"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "comfort",
+      "lang": "en",
+      "status": "quarantined",
+      "quarantine_reason": "主观感受词，无客观量纲，第三方无法复核真/假",
+      "exempts": [
+        "H07"
+      ],
+      "exempts_rule_keys": [
+        "T2.1.2.pain-relief"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "安全词"
+    },
+    {
+      "word": "FDA 注册",
+      "lang": "mixed",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "H06"
+      ],
+      "exempts_rule_keys": [
+        "T6.1.regulatory-status"
+      ],
+      "evidence_required": "certificate",
+      "live_clash_with_detection": [],
+      "source_legacy": "H06",
+      "channel": "pass",
+      "$migrated_from": "context-guards-v1.json（原 status=misrouted）",
+      "$why": "监管状态的事实标签（可查注册号）；与同带的 `FDA registered` 同族。",
+      "$decision": "D3 · 法务 2026-09-16：走错通道词迁入白名单表"
+    },
+    {
+      "word": "silent mode",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M01"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.quiet-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "M01",
+      "channel": "pass",
+      "$migrated_from": "context-guards-v1.json（原 status=misrouted）",
+      "$why": "模式名（一个可查的档位），不是「静音」这一主张本身。",
+      "$decision": "D3 · 法务 2026-09-16：走错通道词迁入白名单表"
+    },
+    {
+      "word": "静音模式",
+      "lang": "zh",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M01"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.quiet-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "M01",
+      "channel": "pass",
+      "$migrated_from": "context-guards-v1.json（原 status=misrouted）",
+      "$why": "同上，中文写法。注意它**包含**判险词 `静音`：短语级豁免是带机制的设计意图。",
+      "$decision": "D3 · 法务 2026-09-16：走错通道词迁入白名单表"
+    },
+    {
+      "word": "suction settings",
+      "lang": "en",
+      "status": "active",
+      "quarantine_reason": null,
+      "exempts": [
+        "M02"
+      ],
+      "exempts_rule_keys": [
+        "T2.2.suction-claim"
+      ],
+      "evidence_required": "product_spec",
+      "live_clash_with_detection": [],
+      "source_legacy": "M02",
+      "channel": "pass",
+      "$migrated_from": "context-guards-v1.json（原 status=misrouted）",
+      "$why": "功能名（可调的档位设置），与同带的 `suction level` / `adjustable suction` 同族。",
+      "$decision": "D3 · 法务 2026-09-16：走错通道词迁入白名单表"
+    }
+  ]
+}

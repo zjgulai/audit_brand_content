@@ -1,0 +1,13 @@
+const PORT = process.env.CDP_PORT || '9223';
+const expr = process.argv[2];
+const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+let target = list.find(t => t.type === 'page');
+const ws = new WebSocket(target.webSocketDebuggerUrl);
+let id=0; const pending=new Map();
+const send=(m,p={})=>new Promise((res,rej)=>{const i=++id;pending.set(i,{res,rej});ws.send(JSON.stringify({id:i,method:m,params:p}))});
+await new Promise(r=>ws.onopen=r);
+ws.onmessage=e=>{const m=JSON.parse(e.data); if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.rej(new Error(JSON.stringify(m.error))):p.res(m.result)}};
+await send('Runtime.enable');
+const r = await send('Runtime.evaluate',{expression:expr,awaitPromise:true,returnByValue:true});
+console.log(JSON.stringify(r.result?.value ?? r.result, null, 1));
+ws.close(); process.exit(0);

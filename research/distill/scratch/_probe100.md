@@ -1,0 +1,100 @@
+# S1 · ad-review-agent 资产卡（13 张）
+
+> 源码核对基于 `research/repos/` 下仓库快照（2026-09-15 抓取），
+> ad-review-agent commit 见 `research/repos/ad-review-agent/`，行号口径 `splitlines()`。
+
+仓库快照内没有 `.git` 目录，无法给出 commit sha；仓库内文件时间戳统一为 2026-03-30。
+本片所有引用均为实读核实，代码块与源文件逐字节一致。
+
+---
+
+## 零、开工前核实的三件事（影响后续所有引用）
+
+### 0.1 `CLAUDE.md` 不是符号链接，是逐字节相同副本
+
+`ls -la` 的权限位：`AGENTS.md` 与 `CLAUDE.md` 均为 `-rw-r--r--`（普通文件，链接位为空）。
+inode 分别是 4347388 与 4347389（不同 inode，排除硬链接）。两者 `md5` 相同：
+`1f2b8bc99f1851c432a13a93d6483e81`；`diff AGENTS.md CLAUDE.md` 无输出。两份都是 495 行。
+
+`AGENTS.md` 的目标结构一节把它写成链接：
+
+```127:129:ad-review-agent/AGENTS.md
+ad-review-agent/
+├── AGENTS.md                      ← 你正在读的文件（AHF 三段式）
+├── CLAUDE.md                      ← 指向 AGENTS.md 的 symlink
+```
+
+快照里没有链接。真实原因记在 `progress.txt` 的 Known Issues：
+
+```44:44:ad-review-agent/progress.txt
+  - Windows 环境下 ln -s 无法创建真正的 symlink
+```
+
+本片全部引用指向 `ad-review-agent/AGENTS.md`。引用 `CLAUDE.md` 会得到同样内容，
+但入库时应只保留一份，避免两份副本各自漂移（核对时两份 MD5 相同，说明此刻尚未漂移）。
+
+### 0.2 `harness/` 下 5 个 YAML，只有 2 个被代码读取
+
+| 文件 | 行数 | 代码引用点 |
+|---|---|---|
+| `constraints.yaml` | 198 | `src/harness/constraint_loader.py:15` 读取 |
+| `model_router.yaml` | 208 | `src/harness/model_router.py:34` 读取 |
+| `tool_masks.yaml` | 229 | 零处（`grep -rn "tool_masks" src/ evals/ scripts/` 无命中） |
+| `observability.yaml` | 148 | 零处（`grep -rn "observability" src/ evals/ scripts/` 无命中） |
+
+`constraints.yaml` 内部还分两半：`decision_thresholds` 与 `confidence_strategy` 两个段被
+`DecisionEngine` 真实读取；`early_termination`、`tool_execution`、
+`qualification_required_categories` 三个段只在启动时被检查「键存在」，取值从未被消费
+（`constraint_loader.py:47` 只做 `s not in config` 判断）。这条区分贯穿 S1-01、S1-04、S1-11。
+
+### 0.3 前一份报告的三处路径错误，实读核实结果
+
+`research/star-lists-audit-report.md` 写的路径与快照不符，逐条核实如下。
+
+- 它写 `ad-review-agent/decision_engine.py`。实际是 `ad-review-agent/src/agents/decision_engine.py`（190 行）。
+- 它写 `ad-review-agent/rules_loader.py`。实际是 `ad-review-agent/src/rules_loader.py`（134 行）。
+- 它写 `cbi/backend/src/rules/ruleBasedReview.js`（据大纲转述）。该文件在快照中不存在，
+  与 S1 分片无关，此处仅登记已核实的一条：`cbi/backend/src/rules/` 下只有 4 个文件，
+  分别是 `categoryRuleUtils.js`（85 行）、`categoryRules.js`（140 行）、
+  `platformRuleUtils.js`（85 行）、`platformRules.js`（294 行）。
+
+---
+
+## S1-01 阈值集中声明式外部化
+
+- **出处**：`ad-review-agent/harness/constraints.yaml:1-15`、`ad-review-agent/harness/constraints.yaml:34-58`、
+  `ad-review-agent/src/harness/constraint_loader.py:17-24`、`ad-review-agent/src/harness/constraint_loader.py:27-51`、
+  `ad-review-agent/src/agents/decision_engine.py:26-38`（已实读核实）
+- **一句话**：所有决策阈值收敛到一个 YAML，文件头写明「改阈值 → 改版本号 → 跑 eval 防回归」三步规程，
+  并在每个键上方用注释标注它对应的源码位置与源码表达式。
+
+- **原文（文件头规程与版本号）**：
+
+```1:15:ad-review-agent/harness/constraints.yaml
+# =============================================================================
+# constraints.yaml — 广告素材合规审核 Agent 声明式约束配置
+# =============================================================================
+#
+# 本文件是 review_agent.py 中所有硬编码阈值和决策规则的外部化声明。
+# Phase 3a（FEAT-AHF-003）实施后，代码将从此文件读取配置而非使用硬编码值。
+#
+# 修改本文件后：
+#   1. 更新 version 字段
+#   2. 运行 Eval 验证指标无回归
+#   3. 在 commit message 中注明变更原因
+# =============================================================================
+
+version: "1.0.0"
+updated_at: "2026-03-29"
+```
+
+- **原文（阈值本体，含每个键上方的源码指针）**：
+
+```34:58:ad-review-agent/harness/constraints.yaml
+decision_thresholds:
+  # confidence ≥ 此值 且无违规 → 自动通过
+  # 对应 src/config.py: auto_pass_threshold = 0.92
+  # 对应 _determine_verdict(): confidence >= settings.auto_pass_threshold
+  auto_pass: 0.92
+
+  # confidence ≥ 此值 且有违规 → 退回修改（RETURNED）
