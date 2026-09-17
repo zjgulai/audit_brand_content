@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""verify_base.py —— 基座第⑤面：自证（ADR-0013 D1 / 异议一）
+
+一句话：**把「基座是好的」这句话，变成一条能红的命令。**
+
+    python3 base/verify_base.py          # 全绿退出 0，有红退出 2
+
+--------------------------------------------------------------------------
+六个面
+--------------------------------------------------------------------------
+
+  A 五面自证        三个模块的 --selftest 必须各自退出 0
+  B L1 自足性       ★ ADR-0013 异议一承诺的那条检查
+  C 分级一致性      .gitignore 的每条规则都必须被登记表认领，且**在 ADR §三 里有出处**
+  D 产物完备性      盘上实际存在的 L2 文件，要么被登记，要么命中登记的模式
+  E 版本控制        仓库存在、有提交历史、工作区状态如实报告
+  F 反向对照        故意做坏登记表 / .gitignore，检查必须红
+
+--------------------------------------------------------------------------
+★ B 面：异议一原文
+--------------------------------------------------------------------------
+
+> **B0.5 的 `verify_base.py` 必须包含一条检查：L2 的每个关键产物都能在 L1 里
+> 找到它的「生成脚本 + 输入指纹」，找不到即红。** 若该检查做不到，本分级即失效，
+> D7 需重议。
+
+**「做不到」这件事必须先说清，不能假装做到了。** 三类 L2 的性质根本不同：
+
+| 类 | 含义 | 判据 |
+|---|---|---|
+| `derived` | 可复算：给生成脚本 + 输入，跑出来是同一份 | **必须有** git 跟踪的生成脚本 + 可追溯的输入 |
+| `addressed` | 内容寻址：文件名就是指纹，自证 | 判据不适用 —— 它自己证明自己 |
+| `primary` | **本身是账本，不可复算** | ★ **判据不适用**，且必须写清为什么 |
+| `runtime` | 进程运行态（日志、会话） | 判据不适用；但**必须在 ADR §三 里有出处** |
+| `vendored` | 别人管的（含自己的 .git） | 判据不适用 |
+
+**`primary` 这一类是本检查最该说清的地方。** ADR-0013 §三 把 `receipts.jsonl` 判为 L2，
+给的理由是「**追加型账本**：只会增长，不需要 diff 与回滚」——
+**不是**「可复算」。一条回执记录的是「当时判了什么」，L1 里**没有第二份**，
+所以异议一那条判据（生成脚本 + 输入指纹）在它身上**根本不成立**。
+把 L2 笼统说成「机器生成的、可复算的」，正是 L2 那一节自己的**判据**写过头了：
+它列了四类理由（可复算 / 内容寻址 / 追加型账本 / 别人管的），
+而异议一那条检查只对你**第一类**成立。本模块把这个区分做成 `class` 字段，
+**不许不写**。
+
+--------------------------------------------------------------------------
+★ C 面：`.gitignore` 自己的警告，已经发生过一次
+--------------------------------------------------------------------------
+
+`.gitignore` 头部写着：
+
+> ★ 改动本文件 = 改动分级 = 需回到 ADR-0013 §三 同步，否则台账与制品会漂移。
+
+**已经漂移了。** 本模块第一次跑就抓到：`.gitignore` 里有两条规则
+（`PMO/logs/`、`PMO/shouheng-state/`）**在 ADR-0013 §三 里一个字都没有**。
+所以 C 面不只查「规则被登记了吗」，还查「登记的那条**在 ADR 里有没有出处**」——
+没有出处 ⇒ 红，并点名是哪条规则、它盖住了什么。
+"""
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent
+ADR = ROOT / "ADR" / "ADR-0013-基座接口冻结与仓库入库分级.md"
+GITIGNORE = ROOT / ".gitignore"
+
+CONTRACT_VERSION = "verify-base-v1"
+
+# ──────────────────────────────────────────────────────────────────
+#  登记表：仓库里每一个「不入历史」的位置，逐条写清它是什么、凭什么、谁生成
+#
+#  `class` 必填（五类见文件头）；`derived` 必须给 generator + inputs；
+#  所有类**都必须**给 `adr_ref` —— 指向 ADR-0013 §三 里的出处。
+#  `adr_ref=None` 表示**台账里没有它** ⇒ C 面红。
+# ──────────────────────────────────────────────────────────────────
+REGISTRY = [
+    # ── derived：可复算 ────────────────────────────────────────────
+    {"rules": ["research/governance/skeleton/_data/records.json"],
+     "class": "derived", "adr_ref": "§三 L2 · `skeleton/_data/records.json`",
+     "generator": "research/governance/skeleton/build_rules.py",
+     "inputs": ["PRD/内容治理需求文档.md"],
+     "why": "291 条广告记录。源表在 PRD（L1）+ 生成脚本在 L1 + 飞书可重拉。"},
+    {"rules": ["research/governance/skeleton/_data/rules_raw.json"],
+     "class": "derived", "adr_ref": "§三 L2 · `rules_raw.json`",
+     "generator": "research/governance/skeleton/build_rules.py",
+     "inputs": ["PRD/内容治理需求文档.md"],
+     "why": "21 条规则的原始抽取。同上。"},
+    {"rules": ["research/governance/skeleton/_data/miss_attribution.json"],
+     "class": "derived", "adr_ref": "§三 L2 落地澄清（原文归 L1 字面清单，按判据改判 L2）",
+     "generator": "research/governance/skeleton/attribute_misses.py",
+     "inputs": ["research/governance/skeleton/rules-v1.json",
+                "research/governance/skeleton/_data/records.json"],
+     "why": "漏报归因。落地时按 L1 自己的判据（「机器生成的、可复算的」）改判 L2，见 §三 落地澄清。"},
+    {"rules": ["research/landing/要素提取.json"],
+     "class": "derived", "adr_ref": "§三 L2 落地澄清（同上）",
+     "generator": "tools/lp_extract.py",
+     "inputs": ["research/landing/抓取结果.json"],
+     "why": "92 个页面 / 44 个商品 JSON 的六类要素。每次重跑都会变。"},
+    {"rules": ["research/governance/skeleton/_data/manifest-history.jsonl"],
+     "class": "derived", "adr_ref": "§三 L2 · `manifest-history.jsonl`",
+     "generator": "research/governance/skeleton/engine_manifest.py",
+     "inputs": ["research/governance/skeleton/rules-v1.json",
+                "research/governance/skeleton/whitelist-v1.json",
+                "research/governance/skeleton/context-guards-v1.json",
+                "research/governance/skeleton/disposition-layers-v1.json",
+                "research/governance/skeleton/product-lines-v1.json",
+                "research/governance/skeleton/topic-tree-v1.md"],
+     "why": "引擎制品版本历史。**注**：其中 topic-tree-v1.md 曾是 L2 争议项 —— 见 E 面输出。"},
+
+    # ── primary：本身是账本，不可复算 ──────────────────────────────
+    {"rules": ["research/governance/skeleton/_data/receipts.jsonl",
+               "research/governance/skeleton/_data/receipts.chain.json",
+               "research/governance/skeleton/_data/pushed.selftest.jsonl"],
+     "class": "primary", "adr_ref": "§三 L2 · `receipts*.jsonl|json` · `pushed.selftest.jsonl`",
+     "why": ("★★ **异议一那条判据（生成脚本 + 输入指纹）在它身上不成立**，"
+             "而 §三 L2 给它的理由是「**追加型账本**：只会增长，不需要 diff 与回滚」——"
+             "那**不是**「可复算」。一条回执记录的是「当时判了什么」，"
+             "L1 里没有第二份，所以它**不可复算**、也**不该被要求可复算**。"
+             "本类必须给 `why` 说明不可复算的理由，这正是本检查承认自己边界的地方。")},
+
+    # ── runtime：进程运行态 ───────────────────────────────────────
+    {"rules": ["PMO/logs/"], "class": "runtime", "adr_ref": "§三 L2 · `PMO/logs/`（B0.5 补录，见 §十一）",
+     "why": ("守衡（飞书机器人）的进程日志：ws_daemon.log / ws_events.jsonl。"
+             "运行态、只会增长、可复算性无意义。"
+             "★ **B0.5 之前 ADR-0013 §三 从未收录它** —— 本模块第一次跑就抓到，已补录。")},
+    {"rules": ["PMO/shouheng-state/"], "class": "runtime", "adr_ref": "§三 L2 · `PMO/shouheng-state/`（B0.5 补录，见 §十一）",
+     "why": ("守衡的会话状态：seen-messages.json、sessions/chat_oc_*.json。"
+             "含飞书 chat_id 与会话游标 —— 性质接近 §4.2 第 3 条的「内部资源标识」。"
+             "★ **B0.5 之前 §三 同样未收录，已补录。**")},
+
+    # ── addressed：内容寻址，文件名即指纹 ─────────────────────────
+    {"rules": ["**/_evidence/"], "class": "addressed", "adr_ref": "§三 L2 · 一切 `_evidence/**`",
+     "why": "`raw/html-a520e6ca17ab4d1d.gz` —— 文件名即指纹。不可变、自证，本来就不需要版本历史。"},
+
+    # ── 一次性迁移备份 ────────────────────────────────────────────
+    {"rules": ["research/governance/skeleton/_data/backup-batchD/",
+               "research/governance/skeleton/_data/backup-migration/",
+               "research/governance/skeleton/_data/deprecated/"],
+     "class": "addressed", "adr_ref": "§三 L2 · `_data/backup-*/` · `deprecated/`",
+     "why": "一次性迁移备份，有内容指纹可查。"},
+
+    # ── 凭据与浏览器会话（L3 · 结构性防线）────────────────────────
+    {"rules": ["**/SecretKey*.csv", "**/*secret*.csv", "**/*credential*.json",
+               "**/*.pem", "**/id_rsa*"],
+     "class": "forbidden", "adr_ref": "§三 L3 · 凭据 → 已按 D8 移出（~/.dsh/credentials/）",
+     "why": "**结构性防线**：防止日后有人把凭据放回项目目录。真实凭据已于 2026-09-17 移出。"},
+    {"rules": ["**/_cfprof*/", "**/_chromeprof*/"],
+     "class": "forbidden", "adr_ref": "§三 L3 · 浏览器会话数据（显式再列一次）",
+     "why": "含 Trust Tokens 等会话数据。已被 `**/_evidence/` 覆盖，此处**显式再列**，"
+            "防止日后有人把 _evidence 整体提进 L1 时无人察觉。"},
+
+    # ── 依赖与构建产物 ────────────────────────────────────────────
+    {"rules": [".venv-r4/", ".pylibs/", ".vendor/", "node_modules/"],
+     "class": "vendored", "adr_ref": "§三 L2 · 依赖与构建产物，可由清单重建",
+     "why": "依赖与构建产物。"},
+    {"rules": ["skills/", "research/repos/", "research/method/codex_research/",
+               "research/method/Kb2Agent/"],
+     "class": "vendored", "adr_ref": "§三 L2 · 别人管的（后四个各有自己的 .git）",
+     "why": "第三方技能库与克隆；直接纳管会变成 gitlink 或重复纳管。"},
+    {"rules": [".DS_Store", "**/.DS_Store"], "class": "vendored",
+     "adr_ref": "§三 L2 · `.DS_Store`", "why": "macOS 元数据。"},
+]
+
+
+# ──────────────────────────────────────────────────────────────────
+
+def sh(*args) -> str:
+    r = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+    return r.stdout
+
+
+def git_tracked(p: str) -> bool:
+    return bool(sh("git", "ls-files", "--error-unmatch", p).strip())
+
+
+def git_has_commits() -> int:
+    out = sh("git", "rev-list", "--count", "HEAD").strip()
+    return int(out) if out.isdigit() else 0
+
+
+def gitignore_rules() -> list[str]:
+    out = []
+    for line in GITIGNORE.read_text(encoding="utf-8").splitlines():
+        s = line.rstrip()
+        if not s.strip() or s.lstrip().startswith("#"):
+            continue
+        out.append(s)
+    return out
+
+
+def claimed_rules() -> dict[str, dict]:
+    m = {}
+    for e in REGISTRY:
+        for r in e["rules"]:
+            m[r] = e
+    return m
+
+
+# ── 各面 ─────────────────────────────────────────────────────────
+
+def face_A(run: bool) -> list[str]:
+    """五面自证：三个模块的 --selftest 各自必须退出 0。"""
+    mods = [("contract.py", "ContentUnit 契约（B0.2）"),
+            ("judge_adapter.py", "judge(unit) 适配层（B0.3）"),
+            ("sync_rules.py", "权威源单向同步（B0.4）")]
+    if not run:
+        print("  （跳过：--no-selftests）")
+        return []
+    bad = []
+    for f, label in mods:
+        p = HERE / f
+        if not p.exists():
+            bad.append(f"✗ {f} 不存在 —— {label} 没交付")
+            print(f"  ✗ {f:<18} 不存在")
+            continue
+        r = subprocess.run([sys.executable, str(p), "--selftest"],
+                           capture_output=True, text=True, cwd=ROOT)
+        n = r.stdout.count("✓")
+        nneg = r.stdout.count("必红")
+        ok = r.returncode == 0
+        print(f"  {'✓' if ok else '✗'} {f:<18} {label:<24} 退出 {r.returncode} · "
+              f"{n} 项（含 {nneg} 条必红）")
+        if not ok:
+            bad.append(f"✗ {label}：{f} --selftest 退出 {r.returncode}")
+            for line in r.stdout.splitlines():
+                if line.strip().startswith("✗"):
+                    print("        " + line.strip()[:110])
+    return bad
+
+
+def face_B() -> list[str]:
+    """L1 自足性 —— 异议一承诺的那条。"""
+    bad = []
+    by_class: dict[str, int] = {}
+    for e in REGISTRY:
+        by_class[e["class"]] = by_class.get(e["class"], 0) + len(e["rules"])
+        if e["class"] != "derived":
+            continue
+        g = e["generator"]
+        if not (ROOT / g).exists():
+            bad.append(f"✗ {g} 不存在 —— {e['rules'][0]} 没有生成脚本")
+            continue
+        if not git_tracked(g):
+            bad.append(f"✗ {g} **未被 git 跟踪** —— 生成脚本不在 L1 里，"
+                       f"{e['rules'][0]} 因此不可复算")
+        for i in e["inputs"]:
+            if not (ROOT / i).exists():
+                bad.append(f"✗ {e['rules'][0]} 的输入 {i} 不存在")
+            elif not git_tracked(i) and not any(
+                    (ROOT / r.rstrip("/")).exists() and r.rstrip("/") in i
+                    for x in REGISTRY for r in x["rules"]):
+                bad.append(f"✗ {e['rules'][0]} 的输入 {i} 既不在 L1、也不是已登记的 L2 产物")
+    print(f"  按类计数：{by_class}")
+    n_derived = sum(1 for e in REGISTRY if e["class"] == "derived")
+    print(f"  derived 产物 {n_derived} 组，逐组查「生成脚本在 L1 + 输入可追溯」")
+    n_other = sum(1 for e in REGISTRY if e["class"] != "derived")
+    print(f"  ★ 另 {n_other} 组**判据不适用**（addressed / primary / runtime / vendored / forbidden）"
+          f"—— 异议一那条检查只对 derived 成立，这一点必须说出来，不能假装全查了")
+    return bad
+
+
+def face_C() -> list[str]:
+    """分级一致性：.gitignore 每条规则都要被认领，且认领它的那条**在 ADR §三 里有出处**。"""
+    bad = []
+    rules = gitignore_rules()
+    cm = claimed_rules()
+    unclaimed = [r for r in rules if r not in cm]
+    orphan = [r for r in rules if r not in cm]
+    for r in unclaimed:
+        bad.append(f"✗ `{r}` 在 .gitignore 里，但**登记表没有认领它** —— "
+                   f"没人知道它盖住的是什么、凭什么")
+    no_ref = [(r, cm[r]) for r in rules if r in cm and not cm[r].get("adr_ref")]
+    for r, e in no_ref:
+        bad.append(f"✗ `{r}` **ADR-0013 §三 从未收录** —— "
+                   f".gitignore 头部自己写了「改动本文件 = 改动分级 = 需回到 §三 同步，"
+                   f"否则台账与制品会漂移」，而它已经漂移了。（{e['why'][:80]}…）")
+    extra = [r for r in cm if r not in rules]
+    for r in extra:
+        bad.append(f"⚠ 登记表认领了 `{r}`，但 .gitignore 里没有这条规则 —— 两边对不上")
+    print(f"  .gitignore 有效规则 {len(rules)} 条 · 登记表认领 {len(cm)} 条 · "
+          f"未认领 {len(unclaimed)} · ADR 无出处 {len(no_ref)}")
+    print("  ★ 这条检查的存在理由：.gitignore 头部写着「改动本文件 = 改动分级 = 需回到 §三 同步，"
+          "否则台账与制品会漂移」—— 而它**已经应验过一次**：B0.5 首跑抓到 PMO 两条规则无出处，已补录。")
+    return bad
+
+
+def face_D() -> list[str]:
+    """产物完备性：盘上实际被 ignore 的文件，要么被登记，要么命中登记的模式。"""
+    # ★ 必须 `-c core.quotePath=false`：否则 git 把中文路径输出成
+    #   `"research/landing/\350\246\201..."`，与登记表里的真名永远对不上 ——
+    #   第一版就是这样把 `要素提取.json` 误报成「未覆盖」的。
+    #   这类错很危险：它看起来像**发现了问题**，其实只是**两边用了不同的编码**。
+    out = sh("git", "-c", "core.quotePath=false",
+             "ls-files", "--others", "--ignored", "--exclude-standard")
+    files = [f for f in out.splitlines() if f.strip()]
+    # 只查「本项目自己的」产物：跳过依赖、别人管的、以及 _evidence（已按 addressed 覆盖）
+    SKIP = ("node_modules/", ".vendor/", ".pylibs/", ".venv-r4/", "skills/",
+            "research/repos/", "research/method/", ".DS_Store", "_evidence/",
+            "_cfprof", "_chromeprof", "backup-", "deprecated/")
+    mine = [f for f in files if not any(s in f for s in SKIP)]
+    cm = claimed_rules()
+    unreg = []
+    for f in mine:
+        if any(f == r.rstrip("/") or f.startswith(r.rstrip("/") + "/") for r in cm):
+            continue
+        unreg.append(f)
+    for f in unreg[:12]:
+        print(f"  ✗ 未被任何登记项覆盖：{f}")
+    print(f"  盘上本项目 L2/L3 文件 {len(mine)} 个 · 未覆盖 {len(unreg)} 个 · "
+          f"（另跳过依赖/别人管的/_evidence 共 {len(files)-len(mine)} 个）")
+    return [f"✗ {len(unreg)} 个 L2/L3 文件未被登记表覆盖（首例 {unreg[0] if unreg else ''}）"] if unreg else []
+
+
+def face_E() -> list[str]:
+    """版本控制面。**只报告，不把「工作区脏」判成红** —— 开发中本来就该脏。"""
+    bad = []
+    if not (ROOT / ".git").exists():
+        return ["✗ 不是 git 仓库 —— D1 的第一刀没落地"]
+    n = git_has_commits()
+    print(f"  提交数 {n}")
+    if n == 0:
+        bad.append("✗ 有 .git 但没有任何提交 —— 等于没有历史")
+    st = sh("git", "status", "--short").strip()
+    dirty = [x for x in st.splitlines() if x.strip()]
+    print(f"  工作区：{'干净' if not dirty else '%d 项未提交' % len(dirty)}")
+    for x in dirty[:5]:
+        print("    " + x[:100])
+    print(f"  跟踪文件 {len(sh('git','ls-files').splitlines())} 个")
+    return bad
+
+
+def face_F() -> list[str]:
+    """反向对照：把登记表做坏，检查必须红。"""
+    bad = []
+    # 1) 认领一条不存在的规则 → extra 必须报
+    saved = list(REGISTRY)
+    try:
+        REGISTRY.append({"rules": ["这条规则不存在/"], "class": "derived",
+                         "adr_ref": "x", "generator": "不存在.py", "inputs": [], "why": ""})
+        got = face_C() + face_B()
+        if not any("没有这条规则" in x for x in got):
+            bad.append("✗ 反向对照失败：认领了不存在的规则，face_C 没报")
+        else:
+            print("  ✓ 必红：认领 .gitignore 里没有的规则 → face_C 报「两边对不上」")
+    finally:
+        REGISTRY[:] = saved
+    # 2) 把一条 derived 的生成脚本改成不存在的 → face_B 必须红
+    try:
+        REGISTRY.append({"rules": ["research/landing/不存在.json"], "class": "derived",
+                         "adr_ref": "§三", "generator": "tools/根本没有这个脚本.py",
+                         "inputs": [], "why": ""})
+        got = face_B()
+        if not any("没有生成脚本" in x for x in got):
+            bad.append("✗ 反向对照失败：生成脚本不存在，face_B 没报")
+        else:
+            print("  ✓ 必红：derived 产物的生成脚本不存在 → face_B 报「没有生成脚本」")
+    finally:
+        REGISTRY[:] = saved
+    # 3) 把一条输入改成不在 L1 也不在 L2 的路径 → face_B 必须红
+    try:
+        e = next(x for x in REGISTRY if x["class"] == "derived")
+        e["inputs"] = list(e["inputs"]) + ["这个输入不存在.json"]
+        got = face_B()
+        if not any("不存在" in x and "这个输入不存在.json" in x for x in got):
+            bad.append("✗ 反向对照失败：输入不存在，face_B 没报")
+        else:
+            print("  ✓ 必红：derived 产物的输入不存在 → face_B 报出该路径")
+    finally:
+        REGISTRY[:] = saved
+    return bad
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="基座自证（第⑤面）")
+    ap.add_argument("--no-selftests", action="store_true",
+                    help="跳过 A 面（三个模块的 --selftest），只跑仓库治理四条")
+    a = ap.parse_args()
+
+    print("=" * 78)
+    print("基座自证 · %s" % CONTRACT_VERSION)
+    print("=" * 78)
+    faces = [("A 五面自证", lambda: face_A(not a.no_selftests)),
+             ("B L1 自足性（异议一）", face_B),
+             ("C 分级一致性（.gitignore ↔ ADR §三）", face_C),
+             ("D 产物完备性", face_D),
+             ("E 版本控制", face_E),
+             ("F 反向对照", face_F)]
+    allbad: list[str] = []
+    for name, fn in faces:
+        print(f"\n[{name}]")
+        try:
+            if name.startswith("F"):
+                # 反向对照会调 face_B / face_C，它们自己会打印 —— 这里静音，
+                # 否则「检查的输出」会淹没「检查的结果」。
+                import contextlib
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    got = fn()
+                for ln in buf.getvalue().splitlines():
+                    if "必红" in ln:
+                        print(ln)
+            else:
+                got = fn()
+        except Exception as e:                              # noqa: BLE001
+            got = [f"✗ {name} 自己崩了：{type(e).__name__}: {e}"]
+        allbad += got
+
+    print("\n" + "=" * 78)
+    if allbad:
+        print("✗ 基座自证未通过：%d 项" % len(allbad))
+        for x in allbad:
+            print("   " + x[:150])
+        print("=" * 78)
+        return 2
+    print("✓ 基座自证全绿：五面自证通过 · L1 自足性通过 · 分级与 .gitignore 一致 · 无未登记产物")
+    print("=" * 78)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,13 +1,15 @@
 # `base/` —— 基座
 
-> 状态：**B0.2 / B0.3 / B0.4 完成**。B0.1 见 `ADR/ADR-0013-基座接口冻结与仓库入库分级.md`。
-> 自证命令（三条都必须全绿，全部离线）：
+> 状态：**B0 全部完成**（B0.1 立版本 · B0.2 `ContentUnit` · B0.3 `judge(unit)` ·
+> B0.4 权威源同步 · B0.5 基座自证）。B0.1 见 `ADR/ADR-0013-基座接口冻结与仓库入库分级.md`。
+>
+> **一条命令自证整个基座**（全离线，退出码 0/2）：
 >
 > ```bash
-> python3 base/contract.py --selftest        # 30 项检查 + 11 条反向对照
-> python3 base/judge_adapter.py --selftest   # 22 项检查 +  4 条反向对照
-> python3 base/sync_rules.py --selftest      # 19 项检查 +  2 条反向对照
+> python3 base/verify_base.py
 > ```
+>
+> 它自己会调三个模块的自证（41 + 26 + 20 项，含 17 条反向对照），再跑四条仓库治理检查。
 
 ## 为什么单开一个 `base/`
 
@@ -25,7 +27,7 @@ ADR-0013 §一 D1 定的「五个面」里，①②③ 三面会返工。基座�
 ① 进   ContentUnit + 解析器          ← base/contract.py          （B0.2 ✅）
 ② 判   judge(unit) → Verdict         ← base/judge_adapter.py      （B0.3 ✅）
 ③ 供   规则词表单向同步 + 版本        ← base/sync_rules.py         （B0.4 ✅）
-⑤ 证   基座自证                       ← base/verify_base.py        （B0.5）
+⑤ 证   基座自证                       ← base/verify_base.py        （B0.5 ✅）
 ④ 出   处置五层 + 回执                ← 已建成，在 skeleton/（ADR-0012）
 ```
 
@@ -360,6 +362,53 @@ _evidence/rulelib-live.json（真正的飞书拉取，9 列）
 
 ---
 
+## 基座自证（B0.5）
+
+```bash
+python3 base/verify_base.py            # 全绿 0 / 有红 2
+python3 base/verify_base.py --no-selftests   # 只跑仓库治理四条，跳过三个模块自证
+```
+
+六个面：**A 五面自证 · B L1 自足性 · C 分级一致性 · D 产物完备性 · E 版本控制 · F 反向对照**。
+
+### ★ 异议一那条检查：做不到全覆盖，而原因必须先说清
+
+ADR-0013 异议一承诺 `verify_base.py` 必须查「L2 的每个关键产物都能在 L1 里找到
+生成脚本 + 输入指纹」。**做不到 —— 因为 L2 不是一个性质，是五个。**
+
+| 类 | 组数 | 那条判据 |
+|---|---|---|
+| `derived` 可复算 | 5 | **适用** |
+| `addressed` 内容寻址 | 4 | 不适用（文件名即指纹，自证） |
+| `primary` 本身是账本 | 3 | ★ **不适用，且必须写清为什么** |
+| `runtime` 运行态 / `vendored` / `forbidden` | 19 | 不适用 |
+
+**`primary` 是最该说清的一类。** §三 L2 把 `receipts.jsonl` 判为 L2，理由写的是
+「**追加型账本**：只会增长，不需要 diff 与回滚」—— **不是**「可复算」。
+回执记录的是「当时判了什么」，**L1 里没有第二份**，所以它不可复算、也不该被要求可复算。
+`class` 是**必填**字段，正是为了让这件事不能含糊过去。
+
+⇒ 异议一的措辞应收窄为「L2 里**以『可复算』为由**入库的每个产物」。
+**D7 不必重议**：它排除 `records.json` 的理由正是「可复算」，而 `derived` 5 组已逐项查过。
+
+### ★ `.gitignore` 自己的警告，已经应验过一次
+
+`.gitignore` 头部写着「改动本文件 = 改动分级 = 需回到 ADR-0013 §三 同步」。
+**B0.5 首跑就抓到它已经漂移**：`PMO/logs/` 与 `PMO/shouheng-state/` 两条规则
+**在 §三 里一个字都没有**。已补录，并把「有出处」做成硬性要求（`adr_ref` 为空即红）。
+
+这类漂移不会自己暴露：`.gitignore` 生效、git 状态正常、没有任何命令报错，
+只是台账与制品各说各话。
+
+### B0.5 里我自己犯的两个错（记下来）
+
+1. **D 面误报 `要素提取.json`「未被覆盖」。** 真因是 `git ls-files` 对非 ASCII 路径
+   做八进制转义，我 strip 引号后没解码。**这类错很危险：它看起来像发现了问题，
+   其实只是两边用了不同的编码。** 修法：`git -c core.quotePath=false`。
+2. **F 面的输出淹没 F 面的结果。** 反向对照调 B/C 两面，它们自己会打印。已静音子调用。
+
+---
+
 ## 自证
 
 ```bash
@@ -428,6 +477,7 @@ parts 起点挪 1        → H11
 |---|---|---|
 | ~~**B0.3** `judge(unit)`~~ | — | ✅ **已完成**（`judge_adapter.py`） |
 | ~~**B0.4** 规则单向同步~~ | — | ✅ **已完成**（`sync_rules.py`；D2 拆为 D2a/D2b） |
+| ~~**B0.5** `verify_base.py`~~ | — | ✅ **已完成**（含异议一承诺的 L1 自足性检查） |
 | **B0.5** `verify_base.py` | `selftest()` 作为五个面之一被调用；另需补 ADR-0013 异议一承诺的 **L1 自足性检查** | ✅ `--selftest` 退出码 0/1 可直接编入 |
 | **B1** 四形态管道 | `from_media()` 的 `covers` / `does_not_cover` 必填 | ✅ 契约在，实现在 B1 |
 | **装配层（等 PRD）** | `position` 的一致性 | ✅ **已定案（A）**，`position` 可安全用于高亮 |
