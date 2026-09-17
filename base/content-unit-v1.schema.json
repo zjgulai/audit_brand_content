@@ -22,7 +22,7 @@
     "content_key": {
       "type": "string",
       "pattern": "^ck[0-9a-f]{16}$",
-      "description": "H7。同一份**内容**的稳定标识：sha256('ck-v1|kind|text_sha256')[:16]。页面重渲染后它不变 —— 这就是它和 unit_id 分开的理由。实测：136 个观测折叠为 133 个 id（3 个 url_key 取到同一个 target）。"
+      "description": "H7。**这一版正文**的稳定标识：sha256('ck-v1|kind|text_sha256')[:16]。★ 措辞经 B2 订正（Owner 裁定 A）：它答的是「这是哪一版正文」，**不是**「这两次看到的是不是同一个东西」—— 同一批页面隔一天重抓约 70% 换 key（评论数/价格/促销横幅都在动）。「变没变」由 base/change_detect.py 的判据 claim-set-v1 回答。实测：136 个观测折叠为 133 个 id（3 个 url_key 取到同一个 target）。"
     },
     "source": {
       "type": "object",

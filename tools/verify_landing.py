@@ -157,16 +157,24 @@ def main():
     else:
         bad(f"{len(absent)} 个 stored 路径找不到文件", str(absent[:3]))
 
-    # ── V4 指纹稳定
-    print("\nV4 内容指纹稳定")
-    print("    口径：原始 HTML 的 sha256 会因为内嵌的每次请求唯一 reqid / 埋点脚本而变化，"
-          "\n          所以「内容指纹」必须建立在**提取后的正文**上（ADR-0002）。两种都测。")
+    # ── V4 变更识别（★ B2·A 订正：问法改了，因为原来那一问**按构造必然报红**）
+    print("\nV4 变更识别（判据 claim-set-v1）")
+    sys.path.insert(0, str(ROOT / "base"))
+    import change_detect as CD             # 判据本体，不与 lp_stability 各写一份
     if args.offline or args.recheck <= 0:
         skip("--offline，跳过重抓抽检")
     else:
+        print("    口径 ✱ B2·A 订正：V4 原来问「重抓时正文指纹一致吗」，不一致就判红。")
+        print("    但那件事**已被实测为常态**：隔日重抓约 70% 的页面正文会变")
+        print("    （评论数/价格/促销横幅，ADR-0013 §十三.8）——")
+        print("    **一个按构造必然报红的检查，等于一个会被学会忽略的检查**（Owner 裁定 A）。")
+        print("    所以改成分开两件事：")
+        print("      · 指纹一致率：**观测值**，不再是合格线（隔日尺度上的期望就是约三成）")
+        print("      · 判定：正文不同时，判据必须给出三值结论，且『声明已变』要能列出差集词")
         cand = [r for r in F["results"] if r["tier_raw"].startswith("ok")][:args.recheck]
         raw_same = raw_diff = err = 0
         txt_same = txt_diff = 0
+        judged: dict = {}          # url_key → 两版正文，交给判据（不在此处下结论）
         for r in cand:
             a = next((x for x in r["attempts"] if x["label"] == "html" and x.get("sha256")), None)
             e = ext.get(r["url_key"])
@@ -190,18 +198,53 @@ def main():
                 txt_same += 1
             else:
                 txt_diff += 1
-        if txt_same and txt_diff == 0:
-            ok(f"抽检 {txt_same} 个 URL，**提取后正文的指纹逐字节一致**"
-               f"（其中原始 HTML 指纹变化 {raw_diff} 个 —— 属预期，见口径说明）")
-        elif txt_diff:
-            bad(f"提取后正文指纹也在变：一致 {txt_same} / 变化 {txt_diff}",
-                "★ 原因已查清（B2）：变的是**评论数 / 价格 / 促销码**这类"
-                "服务端渲染进正文的易变片段，不是 reqid。"
-                "ADR-0011 的对照实验是在**同一时刻**重抓的（3/3 一致），"
-                "放到「隔一天」这个尺度上只剩 31.6% —— 见 "
-                "`python3 tools/lp_stability.py` 与 ADR-0013 §十三")
-        else:
+            # ★ 两版正文留给判据 —— 这一层只负责**取回来**，不下结论（ADR-0005）。
+            #   **每一行都给**（不只是变了的）：判据要能对「没变」也给出结论（① 同一版正文），
+            #   否则「判了几条」与「变了几条」会被混成一个数。
+            judged[r["url_key"]] = {"old": e["html"]["body_text"], "new": again}
+        n = txt_same + txt_diff
+        if not n:
             skip(f"抽检未能完成（网络错误 {err}）")
+        else:
+            print("      · 观测：原始 HTML 一致 {}/{} · 提取后正文一致 {}/{} = {:.1f}%"
+                  .format(raw_same, n, txt_same, n, 100.0 * txt_same / n))
+            print("        （隔日尺度上的期望就是约三成；这一行是**观测**，不是合格线）")
+            # ★ 判据面：**每一条**正文变化都必须被判据接住，且要能说出变了哪几个词。
+            verdicts, claim_changes, unjudged = {"①": 0, "②": 0, "③": 0}, [], []
+            for r in cand:
+                e = ext.get(r["url_key"])
+                if not e or not e.get("html"):
+                    continue
+                row = judged.get(r["url_key"])
+                if row is None:
+                    continue
+                try:
+                    d = CD.judge(row["old"], row["new"])
+                except Exception as ex:                          # noqa: BLE001
+                    unjudged.append("%s（%s: %s）" % (r["url_key"][:44],
+                                                    type(ex).__name__, ex))
+                    continue
+                verdicts[d["结论"][0]] += 1
+                if d["是否触及合规表述"] and d["差集词数"] == 0:
+                    # 说不清变了哪几个词的「已变」= 不可执行，与旧判据同一种病
+                    unjudged.append("%s（判为已变但差集词数为 0）" % r["url_key"][:44])
+                if d["是否触及合规表述"]:
+                    claim_changes.append((r["url_key"], d))
+            if unjudged:
+                bad("有 %d 条正文变化没能被判据接住" % len(unjudged), str(unjudged[:3]))
+            else:
+                ok("判据 %s 判完全部 %d 条：同一版 %d · 换了版未变 %d · **声明已变 %d**"
+                   % (CD.JUDGE, n, verdicts["①"], verdicts["②"], verdicts["③"]))
+                if claim_changes:
+                    print("      ★ 声明已变的那几条（这是**发现**，不是缺陷）：")
+                    for k, d in claim_changes[:4]:
+                        print("        %s" % k[:62])
+                        print("           消失 %s / 新增 %s"
+                              % (json.dumps(d["消失的声明"], ensure_ascii=False),
+                                 json.dumps(d["新增的声明"], ensure_ascii=False)))
+                else:
+                    print("      · 本次抽检没有声明集合变化 —— 抽 3 个看不出率，"
+                          "要率请跑 `python3 tools/lp_stability.py`")
 
     # ── V5 边界显式
     print("\nV5 边界显式")

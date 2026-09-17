@@ -216,6 +216,32 @@ def claimed_rules() -> dict[str, dict]:
 
 # ── 各面 ─────────────────────────────────────────────────────────
 
+def modules_with_selftest() -> list[str]:
+    """`base/` 下**真的声明了** `--selftest` 的模块。
+
+    ★ 遗留 24 的修法：A 面的模块清单原本是**靠人维护**的 ——
+      B1 交付了 `media.py`（20 项自证），而清单里没有它，
+      于是那 20 项**没有任何东西会去跑**，模块回归了也没人知道。
+      改成自动发现之后，「写了自证却没被跑」在结构上不可能再发生：
+      清单漏掉一个模块，下面那条对照就会红。
+
+    ★ 探测方式刻意用**静态文本**（源码里有没有 `--selftest`）而不是「跑一下试试」：
+      跑一下会真的执行未知模块，而这一面要回答的是「谁**声明**了自证」。
+    """
+    me = Path(__file__).name
+    out = []
+    for p in sorted(HERE.glob("*.py")):
+        if p.name == me:
+            continue
+        try:
+            src = p.read_text(encoding="utf-8")
+        except Exception:                                        # noqa: BLE001
+            continue
+        if '"--selftest"' in src or "'--selftest'" in src:
+            out.append(p.name)
+    return out
+
+
 def face_A(run: bool) -> list[str]:
     """各面自证：**每一个交付的模块**的 --selftest 都必须退出 0。
 
@@ -223,16 +249,41 @@ def face_A(run: bool) -> list[str]:
       B1 交付了它、也写了 20 项自证，但**没有任何东西会去跑那 20 项**。
       「自证写了」与「自证被跑」是两件事 —— 而漏掉的后果是静默的：
       模块回归了没人知道，因为没人在跑。
+
+    ★★ B2·A 把它从「人维护清单」改成「自动发现 + 与清单对照」（遗留 24）：
+      清单仍留着，因为它带着人写的标签；但**清单少一个模块就会红**。
+      只扩充清单而不加这条对照，等于把同一个洞留在原地等下一次。
     """
     mods = [("contract.py", "ContentUnit 契约（B0.2）"),
             ("judge_adapter.py", "judge(unit) 适配层（B0.3）"),
             ("sync_rules.py", "权威源单向同步（B0.4）"),
             ("media.py", "图片/视频进管道（B1）"),
-            ("text_stage.py", "文本两组三指标（B2）")]
+            ("text_stage.py", "文本两组三指标（B2）"),
+            ("change_detect.py", "变更判据 claim-set-v1（B2·A）")]
     if not run:
         print("  （跳过：--no-selftests）")
         return []
     bad = []
+
+    # ── 清单 vs 实际：**双向**对照 ────────────────────────────────
+    declared = {f for f, _ in mods}
+    found = set(modules_with_selftest())
+    if len(found) < 2:
+        # 探测本身坏掉时，下面两条「差集为空」会**假绿** —— 所以先钉住探测。
+        bad.append("✗ 自动发现只找到 %d 个模块，这条对照是空的" % len(found))
+        print("  ✗ 自动发现只找到 %d 个模块 —— 探测坏了，两条对照都在假绿" % len(found))
+    missing = sorted(found - declared)
+    if missing:
+        bad.append("✗ 有 --selftest 却没被 A 面调用：%s" % "、".join(missing))
+        print("  ✗ 这些模块写了自证，但没有任何东西会去跑它：%s" % "、".join(missing))
+        print("     后果是静默的：模块回归了没人知道，因为没人在跑（遗留 24 的形态）")
+    ghost = sorted(declared - found)
+    if ghost:
+        bad.append("✗ A 面登记的模块里，这些没有 --selftest：%s" % "、".join(ghost))
+        print("  ✗ 清单里这几个模块并没有 --selftest：%s" % "、".join(ghost))
+    if not missing and not ghost and len(found) >= 2:
+        print("  ✓ 清单与自动发现一致（%d 个模块，双向无差）" % len(found))
+
     for f, label in mods:
         p = HERE / f
         if not p.exists():

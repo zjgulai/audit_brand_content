@@ -100,6 +100,8 @@
   H5  has_text == bool(text.strip())
   H6  raw_sha256 / text_sha256 都是 64 位小写十六进制
   H7  unit_id / content_key 可复算
+      ★ content_key 答的是「**这是哪一版正文**」——
+        **不是**「这两次看到的是不是同一个东西」（B2 订正，Owner 裁定 A）
   H8  source.kind 在取值域内，source.uri 非空
   H9  normalization.profile/steps 与登记表一致
   H10 composition.profile 已登记；parts 有序、不重叠、在界内
@@ -315,11 +317,27 @@ def _unit_id(kind: str, raw_sha256: str, text_sha256: str) -> str:
 
 
 def _content_key(kind: str, text_sha256: str) -> str:
-    """同一份**内容**的稳定标识。只吃正文指纹 —— 所以页面重渲染后它不变。
+    """**这一版正文**的稳定标识。只吃正文指纹 —— 不掺原件、不掺 uri、不掺时间。
 
-    两个 id 各答一个问题，缺一个就会有人去拿另一个凑合：
-      unit_id      「这一次看的是哪一份原件」
-      content_key  「这两次看到的是不是同一个东西」
+    ★ 措辞在 B2 被订正过一次（**Owner 裁定 A**，ADR-0013 §十三.9）。
+      订正的不是算法，是**它答哪一问** —— 因为下游是照着这句话写的：
+
+        原文（错的）：「这两次看到的是不是同一个东西」
+        实测：同一批页面**隔一天**重抓，约 **70%** 得到一个不同的 content_key
+              （评论数、价格、促销横幅都在动）。
+              把「key 变了」读成「内容变了」，会让变更检测天天报假警。
+        订正为：「**这是哪一版正文**」。
+
+    算法一字未改（H7 仍可复算，指纹仍只吃正文）。三个标识各答一问，
+    缺一个就会有人拿另一个凑合：
+
+        unit_id      「这一次看的是哪一份原件」
+        content_key  「这是哪一版正文」     ← **不是**「是不是同一个东西」
+        变没变        → 交给 `change_detect.judge()`（判据 `claim-set-v1`）
+
+    ★ 一个反直觉但正确的推论：**key 相同不代表同一个页面，key 不同也不代表内容变了。**
+      同一条文案投在多个地区是同一个 key（不同页面）；同一个页面隔一天抓两次是两个 key
+      （同一页面）。这两句都由 `--selftest` [4c] 亲自断言。
     """
     return "ck" + sha256_text(f"ck-v1|{kind}|{text_sha256}")[:16]
 
@@ -820,6 +838,51 @@ def selftest(verbose: bool = True) -> list[str]:
                   % (shrunk[0]["url_key"][:44], a["bytes"], b["bytes"]))
     else:
         print("  · 未找到复取证据（不影响自证）。该项是联网一次性实测，结论写在 base/README.md。")
+
+    print("\n[4c] ★ content_key 答的是「哪一版正文」（B2 订正措辞 · Owner 裁定 A）")
+    # ★ 这一组是本轮**裁定的可执行形式**。裁定改的是措辞，而措辞是被人读、被代码照着写的，
+    #   所以它必须由断言守住 —— 否则下一份文档又会把它写回「是不是同一个东西」。
+    u_a = from_text("Wearable pump 45dB", uri="https://x/p")
+    u_b = from_text("Wearable pump 45dB, rated 4.6 out of 5", uri="https://x/p")
+    check("**同一个载体、两份正文 ⇒ 两个 content_key**（key 是版本标识，不是页面标识）",
+          u_a["content_key"] != u_b["content_key"] and u_a["source"]["uri"] == u_b["source"]["uri"],
+          "同一个 url_key 隔一天抓两次就会走到这里 —— 这不是缺陷，是它答的那一问")
+    u_c = from_text("Wearable pump 45dB", uri="https://de.momcozy.com/p")
+    check("**同一个正文、两个不同载体 ⇒ 同一个 content_key**（key 里没有 uri）",
+          u_a["content_key"] == u_c["content_key"] and u_a["source"]["uri"] != u_c["source"]["uri"],
+          "所以「key 相同」也推不出「同一个页面」—— 两个方向都推不出来")
+    # ★ 下面这一条是**这一轮我自己抓到自己**的一处：我原本断言「unit_id 随载体变」，
+    #   实测**不随** —— `unit_id = f(kind, raw_sha256, text_sha256)`，**不含 uri**。
+    #   也就是说这份契约里「一次观测」是**按内容**定义的，不是按地址定义的。
+    #   我错在照着自己写的文档措辞（「这一次观测是哪一次」）去断言，而没有去看实现。
+    check("unit_id 同样**不含 uri**：同一段文字、两个载体 ⇒ 同一个 unit_id",
+          u_a["unit_id"] == u_c["unit_id"],
+          "unit_id 是 (kind, raw, text) 的函数 —— 地址不在里面")
+    # ⇒ 由此得到一个**真实的边界**：两个**不同地址**若逐字节相同，会被折叠成一次观测。
+    #   本项目的语料里没发生过（见下面那条），但它是可发生的 —— 所以把它变成一条**会被看见**的检查：
+    by_id: dict[str, list] = {}
+    for u in pages:
+        by_id.setdefault(u["unit_id"], []).append(u)
+    collapsed = {k: v for k, v in by_id.items() if len(v) > 1}
+    straddle = {k: v for k, v in collapsed.items()
+                if len({x["source"]["uri"] for x in v}) > 1}
+    check("盘上 %d 组折叠，**全部**折叠的是同一个 target（不是两个地址撞成一个观测）"
+          % len(collapsed), not straddle,
+          ("出现了跨地址碰撞：%s —— unit_id 不含 uri，这正是它会发生的形态"
+           % [v[0]["source"]["uri"][:40] for v in list(straddle.values())[:2]])
+          if straddle else "")
+    # 反向对照：盘上真语料里就有「同 key 不同页面」的例子，它必须存在
+    ck_multi = {}
+    for u in ads:
+        ck_multi.setdefault(u["content_key"], []).append(u)
+    multi = {k: v for k, v in ck_multi.items() if len(v) > 1}
+    check("必红：盘上确有 %d 组「同 content_key、不同载体」" % len(multi),
+          bool(multi),
+          "" if multi else "一个都没有的话，上面那条断言在本项目的语料上是空转的")
+    if multi:
+        g = max(multi.values(), key=len)
+        print("    · 例：%d 个观测共用 %s —— 载体的 uri 各不相同（%s…）"
+              % (len(g), g[0]["content_key"], g[0]["source"]["uri"][:52]))
 
     print("\n[5] 留痕面：正文不落回执")
     fv = fingerprint_view(ads[0])

@@ -55,9 +55,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 
-from lp_extract import CLAIM_RE  # noqa: E402  唯一词形定义，不重复维护
 import lp_extract as X          # noqa: E402
 import lp_fetch as F            # noqa: E402
+
+# ★★ 变更判据**只留一份**，而且它在 `base/change_detect.py`（判据名 `claim-set-v1`，
+#   Owner 裁定 A 的落地物）。本脚本原本自带一个 `claim_relevance()` ——
+#   同样的取差集逻辑写两遍的后果不是「重复」，是**两份会漂移**，
+#   而漂移之后两边仍然各自输出一份看起来完整的结论。
+sys.path.insert(0, str(ROOT / "base"))
+import change_detect as CD      # noqa: E402
 
 LAND = ROOT / "research" / "landing"
 OUT = LAND / "_evidence" / "stability.json"
@@ -181,35 +187,21 @@ def masked(text: str) -> str:
     return t
 
 
-def _claims(text: str) -> dict[str, set]:
-    out = {}
-    for k, rx in CLAIM_RE.items():
-        m = {x.group(0).lower() for x in rx.finditer(text or "")}
-        if m:
-            out[k] = m
-    return out
-
-
 def claim_relevance(old_bt: str, new_bt: str) -> dict:
     """★★ 合规相关表述**有没有真的变** —— 这一问才是「所以呢」。
 
-    ★ 第一版问的是「**变更段里含不含**合规词形」，实测下来它几乎恒为真：
-      最小变更段可能很长，段里的 `45db` / `FSA` 在**新旧两版里都出现**，
-      于是「段里有」被误读成「这条声明变了」。**这是一个会天天报假警的判据。**
+    ★ 判据本体在 `base/change_detect.py`（`claim-set-v1`），这里只是调用它。
+      本脚本原先自带一份同样的取差集逻辑；两处各写一份的后果不是「重复」，
+      是**两份会漂移**，而漂移之后两边仍各自输出一份看起来完整的结论。
+      现在唯一的判据在基座里、带名字、带词形指纹、带自证 —— 这里不再有第二份。
 
-    正确的问法是在**完整的两版正文**上各抽一次声明集合，再取差集：
-
-        消失了什么（旧有新无）  —— 才是「页面把某条声明撤了」
-        新增了什么（新有旧无）  —— 才是「页面新加了一条声明」
-
-    词表仍来自 `lp_extract`，不在这里重写第二份。
+    保留这个函数名，是因为**盘上已有的证据里就是这个名字**
+    （`逐条[].合规相关性`）。改名会让旧证据读不出来，而旧证据是这个项目的账。
     """
-    co, cn = _claims(old_bt), _claims(new_bt)
-    gone = {k: sorted(co[k] - cn.get(k, set())) for k in co if co[k] - cn.get(k, set())}
-    came = {k: sorted(cn[k] - co.get(k, set())) for k in cn if cn[k] - co.get(k, set())}
-    return {"消失的声明": gone, "新增的声明": came,
-            "是否触及合规表述": bool(gone or came),
-            "$口径": "在**完整正文**上抽声明后取差集；不是「变更段里含不含词形」。"}
+    d = CD.judge(old_bt, new_bt)
+    d["$口径"] = ("在**完整正文**上抽声明后取差集（判据 %s）；"
+                  "不是「变更段里含不含词形」。" % CD.JUDGE)
+    return d
 
 
 def volatile_exposure(rows: list[dict]) -> dict:
@@ -236,7 +228,61 @@ def volatile_exposure(rows: list[dict]) -> dict:
                       "两次抓取之间就不会产生分歧。")}
 
 
+# ------------------------------------------------------------------ 正文落盘
+
+# ★★ 为什么要把两版正文存下来：`--analyze-only` 能重算**计数**，
+#   但不能重算**判据** —— 判据要吃正文。词表已经改过一次
+#   （B1 §12.4：两个词永远匹配不上，导致批次 C 的一整批制品要重跑）。
+#   证据里不留正文，词表再动一次就又是「重抓」，而重抓是联网的时间点动作，
+#   不是随时能做的。
+#
+#   落盘沿 ADR-0011 §一.5 的口径：**内容寻址 + gzip**，文件名就是正文指纹。
+#   于是跨轮的去重是免费的，而「这份正文是哪一份」由文件名自证。
+TEXT_DIR = LAND / "_evidence" / "stability-text"
+
+
+def store_text(text: str) -> dict:
+    """把一份正文落盘，返回**指针**。已经存在就不重写（内容寻址）。"""
+    import gzip
+    sha = hashlib.sha256(text.encode()).hexdigest()
+    TEXT_DIR.mkdir(parents=True, exist_ok=True)
+    p = TEXT_DIR / (sha[:16] + ".txt.gz")
+    if not p.exists():
+        with gzip.open(p, "wb") as f:
+            f.write(text.encode())
+    return {"sha256": sha, "path": str(p.relative_to(ROOT)), "chars": len(text)}
+
+
+def load_text(ptr: dict) -> str:
+    """按指针把正文读回来，并**当场重算指纹** —— 不核指纹的读回等于相信文件名。"""
+    import gzip
+    with gzip.open(ROOT / ptr["path"], "rb") as f:
+        b = f.read()
+    got = hashlib.sha256(b).hexdigest()
+    if got != ptr["sha256"]:
+        raise ValueError("正文与指针不符：%s 里读到 %s，指针说 %s"
+                         % (ptr["path"], got[:16], ptr["sha256"][:16]))
+    return b.decode()
+
+
 # ------------------------------------------------------------------ 重抓
+
+def pick_targets(n: int) -> list[dict]:
+    """抽样：从快照批里**等距取** n 个可判 URL。
+
+    ★ 抽出来单独成函数，是为了让「每轮抓的是同一批」这句话**可被检查**：
+      多轮账里记着每轮的 URL 名单，而这张名单必须与今天这个函数算出来的对上。
+      抽样口径一旦被改动（比如改成按域名随机），
+      「N 轮 = N 次重复测量、独立样本仍是 M 个」这个说法就当场失效 ——
+      而它失效时，累计读数不会有任何变化。
+    """
+    fetch = json.loads((LAND / "抓取结果.json").read_text(encoding="utf-8"))
+    cand = [r for r in fetch["results"] if r["tier_raw"].startswith("ok")]
+    # ★ 抽样口径：**等距取**，不是取前 N 个。前 N 个全落在同一个域名/同一种页面上，
+    #   会让「变了几个」变成「au.momcozy.com 变了几个」。
+    step = max(1, len(cand) // max(1, n))
+    return cand[::step][:n]
+
 
 def refetch(n: int, global_gap: float) -> dict:
     fetch = json.loads((LAND / "抓取结果.json").read_text(encoding="utf-8"))
@@ -245,11 +291,7 @@ def refetch(n: int, global_gap: float) -> dict:
     pacer = F.Pacer(global_gap=global_gap, domain_gap=1.5)
     cache: dict = {}
 
-    cand = [r for r in fetch["results"] if r["tier_raw"].startswith("ok")]
-    # ★ 抽样口径：**等距取**，不是取前 N 个。前 N 个全落在同一个域名/同一种页面上，
-    #   会让「变了几个」变成「au.momcozy.com 变了几个」。
-    step = max(1, len(cand) // max(1, n))
-    picked = cand[::step][:n]
+    picked = pick_targets(n)
 
     rows, t0 = [], time.time()
     print("重抓 %d 个 URL（全局间隔 %.1fs，预计 %.0fs）—— 沿批次 C 的节流结论\n"
@@ -277,12 +319,17 @@ def refetch(n: int, global_gap: float) -> dict:
             hashlib.sha256(old_bt.encode()).hexdigest()
         row.update(raw_same=raw_same, text_same=txt_same,
                    old_len=len(old_bt), new_len=len(new_bt))
+        # ★ 两版正文都落盘（内容寻址）。同文的行会自动共用同一份文件。
+        row["旧版正文"] = store_text(old_bt)
+        row["新版正文"] = store_text(new_bt)
+        # ★ 判据**每一行都算**，不只是变了的那些 ——
+        #   判据名必须随**每一条**结论一起落盘；只给变了的行挂判据名，
+        #   会让「这一行是谁判的」在没变的行上无法回答。
+        row["合规相关性"] = claim_relevance(old_bt, new_bt)
         if not txt_same:
             d = first_diff(old_bt, new_bt)
             row["diff"] = d
             row["归因"] = attribute(d)
-            # ★ 两问：① 变更段里有合规相关词吗 ② 掩掉波动片段后还一样吗
-            row["合规相关性"] = claim_relevance(old_bt, new_bt)
             row["掩码后一致"] = (hashlib.sha256(masked(new_bt).encode()).hexdigest()
                                  == hashlib.sha256(masked(old_bt).encode()).hexdigest())
         row["verdict"] = "same" if txt_same else "text_changed"
@@ -301,6 +348,11 @@ def refetch(n: int, global_gap: float) -> dict:
             if not row["归因"]:
                 print("         ← **未归因**（逐词差集也空 —— 差异只在标点/空白）")
 
+    # ★ 写盘前拦一道：判据名没落到每一行上，就不许写。
+    jbad = judge_name_problems(rows)
+    if jbad:
+        raise AssertionError("这些行没带判据名，拒绝写盘：\n  " + "\n  ".join(jbad[:5]))
+
     # ★ 联网只负责把网页取回来；**汇总在 summarize() 里，可以单独对盘上的行跑**
     #   （`--analyze-only`）。判据改了不必重抓，这是抽出来的全部理由。
     return summarize(rows, {
@@ -313,6 +365,22 @@ def refetch(n: int, global_gap: float) -> dict:
         "mask_note": ("掩 `Rated … out of 5 stars <N>` / `N left in stock` / `HH:MM:SS`。"
                       "**价格与折扣码不掩** —— 促销幅度本身可能是被判定的表述。"),
     })
+
+
+def judge_name_problems(rows: list[dict]) -> list[str]:
+    """写盘前的后置断言：**每一条可判的行都必须带判据名**。
+
+    ★ 这是「一个结论离开它的判据就没有意义」的可执行形式。
+      它放在**写盘前**，而不是放在事后检查里：事后检查只能告诉你证据已经坏了。
+    """
+    bad = []
+    for r in rows:
+        if r.get("verdict") not in ("same", "text_changed"):
+            continue
+        j = r.get("合规相关性") or {}
+        if j.get("判据") != CD.JUDGE:
+            bad.append("%s：合规相关性.判据 = %r" % (r.get("url_key", "?")[:44], j.get("判据")))
+    return bad
 
 
 def summarize(rows: list[dict], meta: dict) -> dict:
@@ -370,6 +438,17 @@ def summarize(rows: list[dict], meta: dict) -> dict:
         "elapsed_s": meta.get("elapsed_s"),
         "样本": {"取": meta.get("picked_n"), "可判": len(ok_rows),
                  "重抓失败": len(rows) - len(ok_rows)},
+        # ★ 这一轮的 URL 名单必须落进账里：合并多轮时要能回答
+        #   「这是 N 个页面的 N 次重复测量，还是 N×M 个页面」——
+        #   前者才是事实（抽样确定性等距，每轮都是同一批）。
+        "本轮 URL": [r["url_key"] for r in ok_rows],
+        # ★ 逐条摘要：只有总数的话，「两轮都是 6/20」并不说明两轮**判的是同一批**。
+        #   有了它，跨轮可以逐项对照 —— 那才是「重跑能不能得到一样的数」
+        #   在**判定**这一层上的答案（指纹那一层已经量过：30%）。
+        "逐条摘要": [{"url_key": r["url_key"], "正文一致": bool(r["text_same"]),
+                      "触及合规": bool((r.get("合规相关性") or {}).get("是否触及合规表述")),
+                      "判据": (r.get("合规相关性") or {}).get("判据")}
+                     for r in ok_rows],
         "原始 HTML sha256 一致": len(raw_same),
         "提取后正文 sha256 一致": len(same),
         "正文变化": len(ok_rows) - len(same),
@@ -398,9 +477,33 @@ def summarize(rows: list[dict], meta: dict) -> dict:
 
 def _aggregate(runs: list[dict]) -> dict:
     """多轮合并读数 —— **单轮的 30% 与三轮合并的 30% 不是同一个结论**，
-    后者才谈得上「这个口径大约多久失效一次」。"""
+    后者才谈得上「这个口径大约多久失效一次」。
+
+    ★★ B2 修复：这里原本会把**当前这一轮**再算一遍。
+      `main()` 里写的是 `_aggregate(d["runs"] + [cur])`，而 `d["runs"]` 的末尾
+      **已经是 `cur`** —— 于是**一轮 20 个观测被算成两轮 40 个**。
+      盘上只有一条观测账，累计却写着「轮数 2 / 可判合计 40 / 变更触及合规 10」。
+      而 §13.8 与 README 引用的正是这个 40 与这个 10。
+
+      它危险的地方是**长得完全像一份更厚的证据**：
+      「40 次观测里 10 次真变化」比「20 次里 5 次」可信得多 —— 而它是同一个数。
+      百分比没被它带偏（两轮分母相同，30.0% 与 30.0%），
+      **被带偏的是「这个结论有多少证据托底」**，而那正是本脚本存在的理由。
+
+      修两处，且**不靠「调用点写对」**：
+        ① 调用点改成 `_aggregate(d["runs"])`；
+        ② 本函数自己**拒绝把同一轮算两遍**（同 `measured_at` 出现两次即报错）。
+           本项目的教训是断言要能在下游独立成立 —— 一条只在调用点写对时才成立的
+           检查，下一次有人复制那行 `+ [cur]` 就又没了。
+    """
     if not runs:
         return {}
+    stamps = [r.get("measured_at") for r in runs]
+    dup = sorted({s for s in stamps if s and stamps.count(s) > 1})
+    if dup:
+        raise ValueError(
+            "拒绝合并：同一轮被算了两次（measured_at 重复：%s）。"
+            "累计读数只有在「一轮 = 一条账」时才有意义。" % dup)
     j = sum(r["样本"]["可判"] for r in runs)
     s = sum(r["提取后正文 sha256 一致"] for r in runs)
     raw = sum(r["原始 HTML sha256 一致"] for r in runs)
@@ -410,6 +513,7 @@ def _aggregate(runs: list[dict]) -> dict:
     for r in runs:
         for k, v in (r.get("变化归因") or {}).items():
             forms[k] = forms.get(k, 0) + v
+    keys = {u for r in runs for u in (r.get("本轮 URL") or [])}
     return {"轮数": len(runs), "可判合计": j,
             "原始 HTML 一致": "%d/%d" % (raw, j),
             "正文一致": "%d/%d" % (s, j),
@@ -417,10 +521,358 @@ def _aggregate(runs: list[dict]) -> dict:
             "★ 掩码后可复现率_pct": round(100.0 * mk / j, 1) if j else None,
             "★ 变更触及合规表述": cp,
             "变化归因合计": forms,
+            # ★★ 「可判合计」是**观测次数**，不是**独立样本数**。
+            #   抽样是等距确定性的，所以每一轮抓的是**同一批 20 个 URL**：
+            #   轮数增加的是「同一批页面被重复测量的次数」，不是页面数。
+            #   两个数分开报，是为了让「40 次观测」不被读成「40 个页面」。
+            "★ 有效独立样本": len(keys) or None,
             "$读法": ("★ **合并的是「同一快照、不同时间点」的多次观测。** 每次重抓都是"
                       "一次独立的对照：拿快照日的正文与「今天」的正文比。"
                       "所以轮数越多，「两个时间点之间正文会变的页面占多少」估得越准 —— "
-                      "而它衡量的仍然是**这一点时间跨度内**的变化，不是「永远」。")}
+                      "而它衡量的仍然是**这一点时间跨度内**的变化，不是「永远」。\n"
+                      "★ **`可判合计` 是观测次数，不是样本数。** 抽样确定性等距，"
+                      "每轮抓的是同一批 URL ⇒ N 轮 × M 个 = N×M 次**重复测量**，"
+                      "独立样本仍是 M 个。别把它读成「我测了 40 个页面」。")}
+
+
+# ------------------------------------------------------------------ 多轮账
+
+# ★ 每轮存进 `runs` 的字段**只在这里写一次**。
+#   原本同一份字段清单在 `main()` 里抄了两遍（一次 append、一次 aggregate），
+#   而两份清单漂移是迟早的事 —— 漂移的后果是某一轮少算了一个数，**表照常打印**。
+#   抽成一个函数之后，抄第二遍这件事在结构上就不可能了。
+ROUND_FIELDS = ("measured_at", "样本", "原始 HTML sha256 一致",
+                "提取后正文 sha256 一致", "正文可复现率_pct",
+                "★ 掩码后一致", "★ 掩码后可复现率_pct",
+                "★ 变更触及合规表述", "变化归因", "elapsed_s", "本轮 URL",
+                "逐条摘要")
+
+
+def _round_entry(d: dict) -> dict:
+    """把一轮的读数折成**一条账**。"""
+    return {k: d.get(k) for k in ROUND_FIELDS}
+
+
+# ★ `_aggregate` 真的会读的键。与 ROUND_FIELDS 分开写是**故意的**：
+#   两张清单只要不完全重合，就说明某轮账里某个数会静默变成 None，
+#   而 `_aggregate` 会照常把它当 0 算进分母 —— 表照常打印。
+AGGREGATE_READS = ("measured_at", "样本", "原始 HTML sha256 一致",
+                   "提取后正文 sha256 一致", "★ 掩码后一致",
+                   "★ 变更触及合规表述", "变化归因", "本轮 URL")
+
+
+def round_account_problems(entry: dict) -> list[str]:
+    """一条轮次账缺了什么 —— **缺一个数就不许入账**。
+
+    静默缺字段的后果是分母变小、分子不变，而屏幕上一个字都不说。
+    所以这里把「账不完整」变成一条**写入前就拦下**的检查。
+    """
+    bad = []
+    for k in AGGREGATE_READS:
+        if k not in ROUND_FIELDS:
+            bad.append(f"ROUND_FIELDS 里没有 {k!r} —— 它会被折成 None 并当 0 算")
+        elif entry.get(k) is None:
+            bad.append(f"{k!r} 是 None —— 这一轮的账不完整")
+    if not (entry.get("样本") or {}).get("可判"):
+        bad.append("样本.可判 为 0/缺失 —— 一条没有分母的账")
+    return bad
+
+
+def _reanalyze(raw: dict) -> dict:
+    """用**当前判据**对盘上已有的观测重算顶层汇总。不联网、**不追加账**。
+
+    抽成独立函数是为了**能跑两遍**：自证里要断言「重算两次之后 `累计`
+    一个字都不变」—— 幂等性只有在同一个输入能被调用两次时才验得了。
+    """
+    meta = {k: raw.get(k) for k in ("measured_at", "snapshot", "global_gap_s",
+                                    "elapsed_s")}
+    meta["picked_n"] = (raw.get("样本") or {}).get("取")
+    meta["exposure"] = raw.get("静态暴露面")
+    meta["mask_note"] = raw.get("掩码定义")
+    d = summarize(raw["逐条"], meta)
+    # ★ `runs` 是**每轮观测**的历史：重算**只读不写**。
+    #   这里若 append 一次，同一批观测就会被算两遍 —— 那正是本轮修掉的那个缺陷，
+    #   而它上一次出现时，屏幕上什么都没说。
+    runs = raw.get("runs") or []
+    d["runs"] = runs
+    d["累计"] = _aggregate(runs)
+    d["reanalyzed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    d["reanalyzed_note"] = ("★ 顶层汇总由 `--analyze-only` 用**当前判据**重算；"
+                            "`逐条`（原始观测）与 `runs`（轮次账）都没有被改动。")
+    return d
+
+
+def recompute(raw: dict, write_back: bool = False) -> dict:
+    """不用联网，用**当前判据**对盘上每一行重算一遍。
+
+    ★ 这是「判据改了不必重抓」那句话的兑现处，也是**正文必须落盘**的理由：
+      `--analyze-only` 只能重算**计数**（它读的是旧判据留下的结论），
+      要换一套词形重算，判据就得吃得到正文。
+
+    ★ 重算**不改写**旧结论，除非显式 `write_back`；改写时会把原判据名记进
+      `判据变更历史` —— 一份被换过判据的结论，必须能说出它前身是什么判据判的。
+    """
+    rows = raw.get("逐条") or []
+    can, cannot, agree, disagree, missing = 0, [], 0, [], 0
+    for r in rows:
+        o, n = r.get("旧版正文"), r.get("新版正文")
+        if not (isinstance(o, dict) and isinstance(n, dict)):
+            cannot.append(r.get("url_key"))
+            continue
+        can += 1
+        old_j = r.get("合规相关性") or {}
+        new_j = claim_relevance(load_text(o), load_text(n))
+        if not old_j.get("判据"):
+            # ★ 没有旧结论的行：同文行本来就没算过判据（判据「每一行都算」是后加的）。
+            #   对这种行，重算不是「对答案」，是**补上它一直缺的那个字段** ——
+            #   所以它不该被算进「一致/不一致」，而要单独出声。
+            missing += 1
+            if write_back:
+                r["合规相关性"] = new_j
+                r.setdefault("判据补录", []).append(
+                    {"补录于": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                     "判据": new_j["判据"],
+                     "$为什么": ("该行在本轮之前没有判据结论（判据『每一行都算』是后加的）；"
+                                 "重算用两版正文把它补上，正文来自内容寻址的落盘副本。")})
+            continue
+        same = (old_j.get("消失的声明") == new_j.get("消失的声明")
+                and old_j.get("新增的声明") == new_j.get("新增的声明"))
+        if same:
+            agree += 1
+        else:
+            disagree.append({"url_key": r.get("url_key"),
+                             "旧判据结论": {"消失": old_j.get("消失的声明"),
+                                            "新增": old_j.get("新增的声明")},
+                             "新判据结论": {"消失": new_j.get("消失的声明"),
+                                            "新增": new_j.get("新增的声明")}})
+        if write_back and not same:
+            hist = r.setdefault("判据变更历史", [])
+            hist.append({"由": old_j.get("判据") or "（未记，判据名是本轮才要求落盘的）",
+                         "改为": new_j.get("判据"), "重算于": time.strftime(
+                             "%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+            r["合规相关性"] = new_j
+    return {"判据": CD.JUDGE, "词形来源": CD.claim_source(),
+            "逐条": len(rows), "可重算": can, "不可重算": len(cannot),
+            "不可重算的 URL": cannot[:10],
+            "逐项一致": agree, "逐项不一致": len(disagree),
+            "不一致明细": disagree[:10],
+            "无旧结论可对（已补录）": missing,
+            "已回写": bool(write_back)}
+
+
+def _repair_ledger(raw: dict) -> tuple[dict, list[str]]:
+    """给**旧账**补上它缺的字段 —— **先逐条断言，再写盘**；对不上就拒绝。
+
+    ★ 为什么需要它：`runs` 的字段清单是后来才加上 `本轮 URL` 的，
+      盘上那条旧账因此没有名单，`有效独立样本` 会静默变成 None。
+      （这与本轮另外两个错同形：字段清单是「长出来的」，
+      而**长出来之前写下的账不会自己补齐**。）
+
+    ★ 为什么敢补：`runs` 里最后一条的 `measured_at` 与顶层 `逐条` 的
+      同 ⇒ 它们同属一轮，而 `逐条` 里就有那一轮的 URL 名单。这是**可证的**，不是猜的。
+      所以这里先断言三个数逐一相符，任何一项对不上就拒绝写盘 ——
+      沿用 `media.py --reattach-weights` 的做法：
+      **猜参数会让账错得很安静，所以参数必须显式来自可核的来源。**
+    """
+    runs = raw.get("runs") or []
+    if not runs:
+        return raw, ["盘上没有轮次账，没有可补的"]
+    if runs[-1].get("本轮 URL"):
+        return raw, ["最后一条账已有 URL 名单，不需要补"]
+    rows = raw.get("逐条") or []
+    ok_rows = [r for r in rows if r.get("verdict") in ("same", "text_changed")]
+    last, notes = runs[-1], []
+    same_n = sum(1 for r in ok_rows if r.get("text_same"))
+    for name, a, b in (("measured_at", last.get("measured_at"), raw.get("measured_at")),
+                       ("可判", (last.get("样本") or {}).get("可判"), len(ok_rows)),
+                       ("正文一致", last.get("提取后正文 sha256 一致"), same_n)):
+        if a != b:
+            return raw, ["拒绝补账：%s 对不上（账里 %r ≠ 逐条 %r）—— 不是同一轮" % (name, a, b)]
+        notes.append("%s 相符（%r）" % (name, a))
+    last["本轮 URL"] = [r["url_key"] for r in ok_rows]
+    last["$补账"] = ("★ 本轮 URL 由 `--repair-ledger` 补入：该条账的 measured_at 与顶层"
+                     "逐条相同 ⇒ 同属一轮；并已断言 measured_at/可判/正文一致 三项逐一相符。")
+    return raw, notes + ["补入 %d 个 url_key" % len(last["本轮 URL"])]
+
+
+def selftest(verbose: bool = True) -> list[str]:
+    """B2 自证。**全绿才算完成。** 每条都带反向对照（「必红」）——
+    一条永远不会红的检查等于没有检查。
+
+    这一套守的是**账**。本脚本存在的理由是「这个数明天还是不是这个数」，
+    所以它自己报出来的每个数也必须**可复算、且不会自己长大**。
+    """
+    fails: list[str] = []
+
+    def check(name, cond, detail=""):
+        ok = bool(cond)
+        if verbose:
+            print(("  ✓ " if ok else "  ✗ ") + name + (("   " + detail) if detail else ""))
+        if not ok:
+            fails.append(name + (("  " + detail) if detail else ""))
+        return ok
+
+    print("=" * 78)
+    print("B2 自证 · 落地页正文指纹复现性（账本 + 判据）")
+    print("=" * 78)
+
+    def rnd(tag, same, hits, judged):
+        return {"measured_at": tag, "样本": {"取": 20, "可判": judged,
+                                             "重抓失败": 20 - judged},
+                "原始 HTML sha256 一致": 0, "提取后正文 sha256 一致": same,
+                "正文可复现率_pct": round(100.0 * same / judged, 1),
+                "★ 掩码后一致": same,
+                "★ 掩码后可复现率_pct": round(100.0 * same / judged, 1),
+                "★ 变更触及合规表述": hits, "变化归因": {}, "elapsed_s": 1.0,
+                "本轮 URL": [f"u{i}" for i in range(judged)]}
+
+    print("\n[1] 轮次账：一轮就是一轮")
+    r1 = rnd("T1", 6, 5, 20)
+    a1 = _aggregate([r1])
+    check("一轮 → 轮数 1、可判合计 20、正文一致 6", (a1["轮数"], a1["可判合计"],
+                                                a1["正文一致"]) == (1, 20, "6/20"),
+          "得到 %s" % ((a1["轮数"], a1["可判合计"], a1["正文一致"]),))
+    check("有效独立样本 = 20（不是「20 个页面 × 1 轮」以外的任何数）",
+          a1["★ 有效独立样本"] == 20, str(a1["★ 有效独立样本"]))
+
+    # ★★ 这一条是**本轮修掉的那个缺陷**的回归闸门。
+    #   原来的 `main()` 写的是 `_aggregate(d["runs"] + [cur])`，而 `d["runs"]`
+    #   末尾已经是 `cur` —— 一轮被算两遍，40 与 10 就是这么来的。
+    try:
+        dup = _aggregate([r1, r1])
+        check("必红：同一轮喂两次 → 必须拒绝合并", False,
+              "它默默算出了「轮数 %s / 可判合计 %s」—— 这正是缺陷复发的形态"
+              % (dup["轮数"], dup["可判合计"]))
+    except ValueError:
+        check("必红：同一轮喂两次 → 必须拒绝合并", True, "拒绝得对（不再自增）")
+
+    print("\n[2] 合并是**重算**，不是各轮百分比取平均")
+    r2 = rnd("T2", 1, 1, 10)
+    r3 = rnd("T3", 1, 0, 5)
+    a2 = _aggregate([r2, r3])
+    # 1/10 = 10.0% 与 1/5 = 20.0% 的平均是 15.0%；重算 2/15 = 13.3%
+    check("两轮 1/10 + 1/5 → 合并 2/15 = 13.3%（**不是** 10% 与 20% 的平均 15.0%）",
+          a2["正文一致"] == "2/15" and a2["正文可复现率_pct"] == 13.3,
+          "得到 %s / %s%%" % (a2["正文一致"], a2["正文可复现率_pct"]))
+
+    print("\n[3] 账的完整性：缺一个数就不许入账")
+    real = None
+    if OUT.exists():
+        raw = json.loads(OUT.read_text(encoding="utf-8"))
+        meta = {"measured_at": raw.get("measured_at"), "snapshot": raw.get("snapshot"),
+                "global_gap_s": raw.get("global_gap_s"), "elapsed_s": raw.get("elapsed_s"),
+                "picked_n": (raw.get("样本") or {}).get("取"),
+                "exposure": raw.get("静态暴露面"), "mask_note": raw.get("掩码定义")}
+        real = _round_entry(summarize(raw["逐条"], meta))
+        check("盘上那一轮折成账后**没有缺项**", round_account_problems(real) == [],
+              str(round_account_problems(real)))
+        bp = round_account_problems({})
+        check("必红：空账必须被拦下（不是当成一轮分母 0 的账）", bool(bp),
+              bp and ("拦下了 %d 项" % len(bp)) or "空账被放行了 —— 这条检查是空的")
+        miss = dict(real)
+        miss["★ 变更触及合规表述"] = None
+        bm = round_account_problems(miss)
+        check("必红：少一个数（触及合规表述 = None）必须被拦下",
+              any("变更触及合规表述" in x for x in bm),
+              bm and bm[0] or "它被放行了 —— 分子会静默变 0")
+
+    print("\n[4] 幂等：重算两次，累计一个字都不变")
+    if real is not None:
+        raw = json.loads(OUT.read_text(encoding="utf-8"))
+        d1 = _reanalyze(raw)
+        d2 = _reanalyze(d1)
+        check("`--analyze-only` 幂等（累计逐字节相同）",
+              json.dumps(d1["累计"], ensure_ascii=False, sort_keys=True)
+              == json.dumps(d2["累计"], ensure_ascii=False, sort_keys=True))
+        check("重算**不追加**轮次账：runs 长度 %d 不变"
+              % len(raw.get("runs") or []),
+              len(d1["runs"]) == len(raw.get("runs") or []),
+              "%d → %d" % (len(raw.get("runs") or []), len(d1["runs"])))
+
+    print("\n[5] 抽样：每轮抓的是不是同一批")
+    try:
+        keys_20 = [r["url_key"] for r in pick_targets(20)]
+        check("抽样是确定性的：连算两次得到同一张名单",
+              keys_20 == [r["url_key"] for r in pick_targets(20)])
+        if real is not None and real.get("本轮 URL"):
+            inb = len(set(real["本轮 URL"]) & set(keys_20))
+            check("账里那一轮的 URL 名单 ⊆ 今天算出来的名单（%d/%d 命中）"
+                  % (inb, len(real["本轮 URL"])),
+                  inb == len(real["本轮 URL"]),
+                  "" if inb == len(real["本轮 URL"]) else
+                  "抽样口径被改过了 —— 「N 轮 = N 次重复测量」这个说法随之失效")
+    except FileNotFoundError as e:
+        check("盘上有快照语料", False, str(e))
+
+    print("\n[5b] 正文落盘：内容寻址 + 读回时**当场重算指纹**")
+    probe = "hospital-grade pump\nRated 4.6 out of 5 stars 1,834\n$199.99"
+    ptr = store_text(probe)
+    check("落盘指针就是正文指纹（%s…）" % ptr["sha256"][:12],
+          ptr["sha256"] == hashlib.sha256(probe.encode()).hexdigest())
+    check("读回来逐字节相同（gzip 往返）", load_text(ptr) == probe)
+    check("重复落盘不新建文件（内容寻址，跨轮去重免费）",
+          store_text(probe)["path"] == ptr["path"])
+    bad = dict(ptr); bad["sha256"] = "0" * 64
+    try:
+        load_text(bad)
+        check("必红：指针与实际内容不符时必须**拒绝读回**", False,
+              "它照常返回了内容 —— 不核指纹的读回等于相信文件名")
+    except ValueError:
+        check("必红：指针与实际内容不符时必须**拒绝读回**", True)
+
+    print("\n[6] 判据：声明集合取差集（**不是**「变更段里含词形」）")
+    # ① 旧判据的形态 —— 必须被本判据判成「没变」。
+    #   旧判据问的是「变更段里含不含合规词形」，而 45dB 与 FSA 在**新旧两版里都在**，
+    #   于是它几乎恒为真。这条正向断言就是那个错的回归闸门。
+    same_txt = "Up to 25% Off 45dB quiet FSA eligible hospital-grade pump"
+    v = claim_relevance(same_txt, same_txt)
+    check("必红：两版词形都在 → 判「**没有**合规相关变化」（旧判据在这里会报假警）",
+          v["是否触及合规表述"] is False, json.dumps(v, ensure_ascii=False)[:90])
+    # ② 真的撤了一条声明
+    v = claim_relevance("hospital-grade wearable pump", "wearable pump")
+    check("撤掉 hospital-grade → 消失的声明里有 medical/hospital-grade",
+          "hospital-grade" in v["消失的声明"].get("medical", []),
+          json.dumps(v["消失的声明"], ensure_ascii=False)[:90])
+    # ③ 真的加了一条
+    v = claim_relevance("wearable pump", "guaranteed wearable pump")
+    check("新增 guaranteed → 新增的声明里有 absolute/guaranteed",
+          "guaranteed" in v["新增的声明"].get("absolute", []),
+          json.dumps(v["新增的声明"], ensure_ascii=False)[:90])
+
+    print("\n[7] 掩码口径：写了「价格不掩」就要断言它")
+    check("评论数被掩掉", "<REVIEWS>" in masked("Rated 4.6 out of 5 stars\n1,835"))
+    price_kept = "$199.99" in masked("Only $199.99 today")
+    check("必红：价格**不掩** —— `$199.99` 必须原样留着", price_kept,
+          "" if price_kept else
+          "价格被掩掉了：促销幅度本身可能是一条被判定的表述，掩掉它等于让它对审查隐身")
+
+    print("\n[8] 重算：判据换了不必重抓")
+    if OUT.exists():
+        rc = recompute(json.loads(OUT.read_text(encoding="utf-8")))
+        check("盘上证据**可重算**的行：%d / %d（不可重算 %d）"
+              % (rc["可重算"], rc["逐条"], rc["不可重算"]),
+              rc["可重算"] == rc["逐条"] or rc["可重算"] > 0,
+              "一行都读不回来 ⇒ 证据里没有正文（%s）" % (rc["不可重算的 URL"][:3] or "—"))
+        check("用当前判据重算 → 与盘上结论逐项一致 %d / %d" % (rc["逐项一致"], rc["可重算"]),
+              rc["可重算"] > 0 and rc["逐项不一致"] == 0,
+              "可重算 0 行 —— 这条在**空转**（没有正文就没有一致可言）"
+              if rc["可重算"] == 0 else
+              json.dumps(rc["不一致明细"][:2], ensure_ascii=False)[:160])
+        rows8 = [r for r in (json.loads(OUT.read_text(encoding="utf-8")).get("逐条") or [])
+                 if r.get("verdict") in ("same", "text_changed")]
+        named8 = [r for r in rows8 if (r.get("合规相关性") or {}).get("判据") == CD.JUDGE]
+        check("带判据名的行 %d / %d（**有结论文的行必须带判据名**）"
+              % (len(named8), len(rows8)), len(named8) == len(rows8),
+              "" if len(named8) == len(rows8) else
+              "有行没带判据名 —— 判据『每一行都算』是后加的，"
+              "此后由 `judge_name_problems()` 在**写盘前**拦截")
+
+    print("\n" + "-" * 78)
+    if fails:
+        print("✗ 自证未通过：%d 条" % len(fails))
+    else:
+        print("✓ 自证全绿")
+    return fails
 
 
 def main() -> int:
@@ -428,7 +880,66 @@ def main() -> int:
     ap.add_argument("-n", type=int, default=20, help="重抓多少个 URL（默认 20）")
     ap.add_argument("--global-gap", type=float, default=6.0, help="全局节流间隔秒（别调小）")
     ap.add_argument("--analyze-only", action="store_true", help="不联网，只读盘上证据")
+    ap.add_argument("--recompute", action="store_true",
+                    help="不联网，用当前判据对盘上每一行重算（判据改了不必重抓）")
+    ap.add_argument("--write-back", action="store_true",
+                    help="与 --recompute 合用：把重算结果写回证据，并记下原判据名")
+    ap.add_argument("--repair-ledger", action="store_true",
+                    help="给旧账补 URL 名单（先断言再写盘，对不上就拒绝）")
+    ap.add_argument("--selftest", action="store_true",
+                    help="自证：聚合账本与判据全绿 + 反向对照必红")
     a = ap.parse_args()
+
+    if a.selftest:
+        return 1 if selftest() else 0
+
+    if a.recompute:
+        if not OUT.exists():
+            print("盘上还没有 stability.json。", file=sys.stderr)
+            return 1
+        raw = json.loads(OUT.read_text(encoding="utf-8"))
+        rc = recompute(raw, write_back=a.write_back)
+        print("=" * 78)
+        print("重算 · 判据 %s（词形指纹 %s）" % (rc["判据"], rc["词形来源"]["指纹"]))
+        print("=" * 78)
+        print("\n  逐条 %d 行 · 可重算 %d · **不可重算 %d**" % (
+            rc["逐条"], rc["可重算"], rc["不可重算"]))
+        if rc["不可重算"]:
+            print("    不可重算的行没有落正文（判据改成「必须落正文」之前的旧证据）：")
+            for u in rc["不可重算的 URL"][:6]:
+                print("      · %s" % u)
+        print("  用当前判据重算 → **逐项一致 %d / %d**" % (rc["逐项一致"], rc["可重算"]))
+        if rc["无旧结论可对（已补录）"]:
+            print("  另有 %d 行**没有旧判据结论可对**（同文行原先不算判据）→ %s"
+                  % (rc["无旧结论可对（已补录）"],
+                     "已补录" if a.write_back else "未补录（加 --write-back）"))
+        for x in rc["不一致明细"][:6]:
+            print("    ≠ %s" % x["url_key"][:56])
+            print("        旧判据 %s" % json.dumps(x["旧判据结论"], ensure_ascii=False))
+            print("        新判据 %s" % json.dumps(x["新判据结论"], ensure_ascii=False))
+        if a.write_back and (rc["逐项不一致"] or rc["无旧结论可对（已补录）"]):
+            OUT.write_text(json.dumps(raw, ensure_ascii=False, indent=1), encoding="utf-8")
+            print("\n  → 已回写：改写 %d 行（记下原判据名）· 补录 %d 行（原本没有判据名）"
+                  % (rc["逐项不一致"], rc["无旧结论可对（已补录）"]))
+        elif a.write_back:
+            print("\n  → 没有需要回写的行")
+        else:
+            print("\n  （未回写。要写回请加 --write-back —— 证据的改写必须是显式动作。）")
+        return 0
+
+    if a.repair_ledger:
+        if not OUT.exists():
+            print("盘上还没有 stability.json。", file=sys.stderr)
+            return 1
+        raw, notes = _repair_ledger(json.loads(OUT.read_text(encoding="utf-8")))
+        for x in notes:
+            print("  " + x)
+        if any(x.startswith("拒绝") for x in notes):
+            print("✗ 没有写盘", file=sys.stderr)
+            return 1
+        OUT.write_text(json.dumps(raw, ensure_ascii=False, indent=1), encoding="utf-8")
+        print("→ 已写回 %s" % OUT.relative_to(ROOT))
+        return 0
 
     if a.analyze_only:
         if not OUT.exists():
@@ -438,44 +949,37 @@ def main() -> int:
         # ★ 用**当前判据**对盘上已有的行重算 —— 判据改过之后旧证据仍可用。
         #   这正是把 summarize() 从 refetch() 里抽出来的全部理由：
         #   联网只负责把网页取回来，怎么算与取不取是两件事。
-        meta = {k: raw.get(k) for k in ("measured_at", "snapshot", "global_gap_s",
-                                        "elapsed_s")}
-        meta["picked_n"] = (raw.get("样本") or {}).get("取")
-        meta["exposure"] = raw.get("静态暴露面")
-        meta["mask_note"] = raw.get("掩码定义")
-        d = summarize(raw["逐条"], meta)
-        # ★ `runs` 是**每轮观测**的历史，重算不动它，只改**顶层汇总**。
-        #   若在这里再 append 一次，同一批观测会被算两遍（40 个变 60 个）——
-        #   一个只在「多跑一次 analyze」时才出现的错。
-        d["runs"] = raw.get("runs") or []
-        d["累计"] = raw.get("累计") or _aggregate(d["runs"])
-        d["reanalyzed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        d["reanalyzed_note"] = ("★ 顶层汇总由 `--analyze-only` 用**当前判据**重算；"
-                                "`逐条`（原始观测）没有被改动。")
+        d = _reanalyze(raw)
         OUT.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
     else:
         d = refetch(a.n, a.global_gap)
         # ★ 多轮累积：单轮 20 个的分母太小，说不出「可复现率大约是多少」。
         #   每一轮都是独立的时间点观测，合起来才够。**不覆盖、只追加。**
+        prev_runs = []
         if OUT.exists():
             try:
-                prev = json.loads(OUT.read_text(encoding="utf-8"))
-                d["runs"] = (prev.get("runs") or []) + [{
-                    k: d[k] for k in ("measured_at", "样本", "原始 HTML sha256 一致",
-                                      "提取后正文 sha256 一致", "正文可复现率_pct",
-                                      "★ 掩码后一致", "★ 掩码后可复现率_pct",
-                                      "★ 变更触及合规表述",
-                                      "变化归因", "elapsed_s")}]
-                d["runs"] = d["runs"][-10:]
-            except Exception:                                  # noqa: BLE001
-                d["runs"] = []
-        else:
-            d["runs"] = []
-        agg = _aggregate(d["runs"] + [{k: d[k] for k in (
-            "measured_at", "样本", "原始 HTML sha256 一致", "提取后正文 sha256 一致",
-            "正文可复现率_pct", "★ 掩码后一致", "★ 掩码后可复现率_pct",
-            "★ 变更触及合规表述", "变化归因", "elapsed_s")}])
-        d["累计"] = agg
+                prev_runs = json.loads(OUT.read_text(encoding="utf-8")).get("runs") or []
+            except Exception as e:                              # noqa: BLE001
+                # ★ 这里原本写的是静默 `d["runs"] = []`：读不动历史就**当作没有历史**，
+                #   累计分母悄悄缩水，而屏幕上没有任何一行说这件事。
+                print("!! 读不动盘上的 runs（%s: %s）—— 本轮只按「只有这一轮」记账，"
+                      "累计分母会变小。" % (type(e).__name__, e), file=sys.stderr)
+                prev_runs = []
+        entry = _round_entry(d)
+        # ★ 账不完整就**不许入账**：缺字段会被当 0 算进分母，而表照常打印。
+        bad = round_account_problems(entry)
+        if bad:
+            print("!! 本轮读数不足以入账：", file=sys.stderr)
+            for x in bad:
+                print("   - " + x, file=sys.stderr)
+            return 1
+        d["runs"] = (prev_runs + [entry])[-10:]
+        try:
+            d["累计"] = _aggregate(d["runs"])
+        except ValueError as e:
+            # ★ 宁可停下来喊，也不要打印一个「看起来更厚」的错数。
+            print("!! " + str(e), file=sys.stderr)
+            return 1
         OUT.parent.mkdir(parents=True, exist_ok=True)
         OUT.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
 
