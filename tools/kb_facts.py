@@ -61,6 +61,39 @@ def _rows(snap):
     return led, rs, snap
 
 
+def _n_src(ext_doc, host):
+    """来源里 URL 含该主机的个数（缺口 D10–D12 的量从制品算，不手写）。"""
+    return sum(1 for s in ext_doc.get("sources", [])
+               if host in (s.get("url") or ""))
+
+
+def _n_ent(ext_doc, host):
+    sids = {s["id"] for s in ext_doc.get("sources", [])
+            if host in (s.get("url") or "")}
+    return sum(1 for e in ext_doc.get("entries", []) if e.get("source_id") in sids)
+
+
+def _real_rules(rules_p):
+    """真规则数 = 规则键数 - catch_all（catch-all 不是规则，是兜底）。"""
+    if not os.path.exists(rules_p):
+        return 0
+    return len([r for r in json.load(open(rules_p, encoding="utf-8"))["rules"]
+                if r["rule_key"] != "CATCH-ALL-01"])
+
+
+def _only_general(ext_doc, rules_p):
+    """只有 FTC 举证通则（EXT-039）一条依据的规则数 —— D13 的量。"""
+    if not os.path.exists(rules_p):
+        return 0
+    cov = {}
+    for e in ext_doc.get("entries", []):
+        for k in (e.get("关联规则") or []):
+            cov.setdefault(k, []).append(e.get("id"))
+    return len([r for r in json.load(open(rules_p, encoding="utf-8"))["rules"]
+                if r["rule_key"] != "CATCH-ALL-01"
+                and cov.get(r["rule_key"]) == ["EXT-039"]])
+
+
 def compute(snap=None):
     """算出全部对外引用的事实数字。**每一个都必须是快照的纯函数。**"""
     if snap is None:
@@ -159,6 +192,20 @@ def compute(snap=None):
         "ext_entries": len(ext_doc.get("entries", [])),
         "ext_ratified": sum(1 for e in ext_doc.get("entries", [])
                             if e.get("status") == "ratified"),
+        # ── B3.5：外部标准库落盘后，D10–D14 的「量」也必须能重算 ──
+        #   缺口的数字一旦是手写的，它就会和制品脱钩。这里全部从制品算出来。
+        "sources_meta": _n_src(ext_doc, "meta.com"),
+        "entries_meta": _n_ent(ext_doc, "meta.com"),
+        "sources_tiktok": _n_src(ext_doc, "tiktok.com"),
+        "entries_tiktok": _n_ent(ext_doc, "tiktok.com"),
+        "sources_eu": _n_src(ext_doc, "europa.eu"),
+        "sources_uk": _n_src(ext_doc, "gov.uk") + _n_src(ext_doc, "asa.org.uk"),
+        "entries_blank": sum(1 for e in ext_doc.get("entries", [])
+                             if not (e.get("关联规则") or [])),
+        "entries_total": len(ext_doc.get("entries", [])),
+        "families": len(ext_doc.get("候选规则族") or []),
+        "rules_total": _real_rules(rules_p),
+        "rules_only_general": _only_general(ext_doc, rules_p),
         "materials_total": len(mat.MATERIALS),
         "materials_readable": readable,
         "materials_unreadable": len(mat.MATERIALS) - readable,

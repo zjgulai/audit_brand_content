@@ -329,19 +329,70 @@ def main():
               f" · 待分类 {len(_ax)} 条"
               + (f" ❌ {_ax[:3]}" if _ax else "　（「—」是完整答案：它就不是知识材料）"))
 
-        def _ext_problems(entries, src_ids):
+        def _ext_problems(entries, src_ids, fams=None, rule_keys=None):
+            """★ B3.5（外部标准库落盘）：从只查「引用完整」扩到查「**归组完整**」。
+
+            研究稿交付时有一个字段 `若无法关联规则` 用来记「这条对不上我们哪条
+            规则、该归到哪个候选族」，但 14 条空白条目里它**全是 null** ——
+            7 个候选规则族只写在交付说明的散文里，落盘制品里没有。
+            下游（法务）读 JSON 是看不到族的。散文里的结论没有键可挂，
+            就等于没有。故本检查要求：**空白必落族号，族号必有定义，
+            引用的规则键必须真实存在**。
+            """
             bad = []
+            valid_fam = {f["id"] for f in (fams or [])}
             for e in entries:
                 eid = e.get("id", "?")
                 if e.get("source_id") not in src_ids:
                     bad.append(f"{eid}: source_id={e.get('source_id')!r} 不在 sources 里（悬空引用）")
-                if e.get("status") == "research" and "未确认" not in str(e.get("未确认标记") or ""):
+                # ★ 判据踩过的坑：「未确认」这三个字在实际标记
+                #   「研究稿·未经法务确认」里**并不连续出现**，子串匹配恒为真，
+                #   于是**每一条都会被误判成缺标记**。这条检查此前从未跑过真实数据
+                #   （F3 一直是 SKIP，因为制品不存在），落盘当天才暴露。
+                _mk = str(e.get("未确认标记") or "")
+                if e.get("status") == "research" and not (_mk and "未" in _mk and "确认" in _mk):
                     bad.append(f"{eid}: status=research 却没有「未经法务确认」标记 —— 研究会被读成裁定")
                 if e.get("status") == "ratified" and not (e.get("确认人") and e.get("确认日期")):
                     bad.append(f"{eid}: status=ratified 却没有确认人与日期")
                 if e.get("status") not in ("research", "ratified"):
                     bad.append(f"{eid}: status={e.get('status')!r} 既不是 research 也不是 ratified")
+                linked = e.get("关联规则") or []
+                if not linked:
+                    fam = e.get("若无法关联规则")
+                    if not fam:
+                        bad.append(f"{eid}: 关联规则为空却没有族号 —— 「我们规则库没有这条」只写在散文里，制品里读不到")
+                    elif valid_fam and fam not in valid_fam:
+                        bad.append(f"{eid}: 族号 {fam!r} 不在 候选规则族 里（悬空归组）")
+                if rule_keys is not None:
+                    for k in linked:
+                        if k not in rule_keys:
+                            bad.append(f"{eid}: 引用了规则库里不存在的规则键 {k!r}（凭空关联）")
             return bad
+
+        def _fam_problems(fams, entries):
+            """族的成员必须真实存在，且**并集恰好等于**空白条目集。"""
+            bad = []
+            ids = {e.get("id") for e in entries}
+            blank = {e.get("id") for e in entries if not (e.get("关联规则") or [])}
+            seen = set()
+            for f in fams or []:
+                for m in f.get("成员") or []:
+                    if m not in ids:
+                        bad.append(f"{f.get('id')}: 成员 {m} 不在条目里")
+                    if m in seen:
+                        bad.append(f"{m}: 被归进多个族")
+                    seen.add(m)
+            if fams and seen != blank:
+                bad.append(f"族的成员并集与空白条目集不等：族有而条目没有 {sorted(seen - blank)}；"
+                           f"空白却没归族 {sorted(blank - seen)}")
+            return bad
+
+        # 规则库（引擎侧）的规则键 —— 用来查外部条款是否引了不存在的规则
+        _rp = os.path.join(load.REPO, "research", "governance", "skeleton", "rules-v1.json")
+        _rule_keys = None
+        if os.path.exists(_rp):
+            _rule_keys = {r["rule_key"] for r in
+                          json.load(open(_rp, encoding="utf-8"))["rules"]}
 
         _extp = os.path.join(load.KB, "外部标准库-v1.json")
         _ext = json.load(open(_extp, encoding="utf-8")) if os.path.exists(_extp) else None
@@ -358,29 +409,54 @@ def main():
                    "❌ 制品不存在，**且登记表里没有 D8** —— 空缺既没做也没登记"),
                   skipped=bool(_d8))
         else:
+            _fams = _ext.get("候选规则族") or []
             _e_bad = _ext_problems(_ext.get("entries", []),
-                                   {x["id"] for x in _ext.get("sources", [])})
+                                   {x["id"] for x in _ext.get("sources", [])},
+                                   fams=_fams, rule_keys=_rule_keys)
+            _f_bad = _fam_problems(_fams, _ext.get("entries", []))
+            _all_bad = _e_bad + _f_bad
             _n = len(_ext.get("entries", []))
-            c.add("F3", "外部标准库条目引用完整", not _e_bad,
+            _blank = [e for e in _ext.get("entries", []) if not (e.get("关联规则") or [])]
+            c.add("F3", "外部标准库条目引用与归组完整", not _all_bad,
                   f"{_n} 条 / 来源 {len(_ext.get('sources', []))} 个"
                   f" · research {sum(1 for e in _ext.get('entries', []) if e.get('status') == 'research')}"
                   f" / ratified {sum(1 for e in _ext.get('entries', []) if e.get('status') == 'ratified')}"
-                  + (f" ❌ {_e_bad[:3]}" if _e_bad else "　（每条都指得出来源，身份标清）"))
+                  f" · 空白 {len(_blank)} 条归入 {len(_fams)} 族（并集相等）"
+                  f" · 规则键引用 {len(_rule_keys) if _rule_keys else '—'} 个键内"
+                  + (f" ❌ {_all_bad[:3]}" if _all_bad else "　（来源指得出、身份标清、空白有族）"))
 
         # 反向对照：判据必须能红 —— 抽掉 source、抹掉未确认标记、把状态写歪，三种都要抓住
         _probe = _ext_problems(
             [{"id": "X1", "source_id": "S-nope", "status": "research", "未确认标记": ""},
              {"id": "X2", "source_id": "S1", "status": "ratified"},
              {"id": "X3", "source_id": "S1", "status": "probably-fine",
-              "未确认标记": "研究稿·未经法务确认"}],
-            {"S1"})
+              "未确认标记": "研究稿·未经法务确认"},
+             # ★ B3.5 新增三种：空白不落族 / 引了不存在的规则键 / 悬空归组
+             {"id": "X4", "source_id": "S1", "status": "research",
+              "未确认标记": "研究稿·未经法务确认", "关联规则": [], "若无法关联规则": None},
+             {"id": "X5", "source_id": "S1", "status": "research",
+              "未确认标记": "研究稿·未经法务确认", "关联规则": ["T9.不存在"]},
+             {"id": "X6", "source_id": "S1", "status": "research",
+              "未确认标记": "研究稿·未经法务确认", "关联规则": [], "若无法关联规则": "F99"},
+             # ★ 正例对照：一条**完全合规**的条目必须一条问题都不产生。
+             #   只验反例是不够的 —— 判据写成恒真时反例照样被抓（它们各有别的理由），
+             #   而正例会被误伤。上面那个「未确认」子串 bug 正是这样漏过去的。
+             {"id": "X7", "source_id": "S1", "status": "research",
+              "未确认标记": "研究稿·未经法务确认", "关联规则": [], "若无法关联规则": "F1"}],
+            {"S1"}, fams=[{"id": "F1", "成员": ["EXT-017"]}], rule_keys={"T6.1.regulatory-status"})
+        _fam_probe = _fam_problems([{"id": "F1", "成员": ["EXT-017", "EXT-404"]}],
+                                   [{"id": "EXT-017", "关联规则": []}])
         _axis_probe = _axis_problems([{"编号": "x", "材料性质": "知识材料", "归属知识库": "待分类"}])
         #   断言用「每个变异体都被点到名」，不断言问题的条数 —— 条数是实现的副产品，
         #   而 X2 恰好会触发不止一条理由。第一版断言了 ==3，于是它自己红了。
         _hit = {str(x).split(":")[0] for x in _probe}
         c.add("F4", "反向对照：F2/F3 的判据真的会红（不是恒真）",
-              _hit == {"X1", "X2", "X3"} and len(_axis_probe) == 1,
-              f"三个变异体（悬空来源 / 缺未确认标记 / 状态非法）→ 点中 {sorted(_hit)}；"
+              _hit == {"X1", "X2", "X3", "X4", "X5", "X6"} and "X7" not in _hit
+              and len(_fam_probe) == 2 and len(_axis_probe) == 1,
+              f"六反例（悬空来源 / 缺未确认标记 / 状态非法 / 空白不落族 / "
+              f"引不存在的规则键 / 悬空归组）→ 点中 {sorted(_hit)}；"
+              f"一正例 X7 未被误伤；"
+              f"族成员不存在且并集不等 → 抓住 {len(_fam_probe)}/2；"
               f"材料「待分类」→ 抓住 {len(_axis_probe)}/1")
 
         manual = os.path.join(load.KB, "查询手册.md")

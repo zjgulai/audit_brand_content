@@ -1,0 +1,1820 @@
+{
+ "schema_version": "外部标准库-研究稿-v1",
+ "generated_at": "2026-09-17",
+ "researcher": "DSH agent (deepseek-flash) via web — 逐条抓取公开源原文后结构化，未经法务确认",
+ "authority": {
+  "status_meaning": "research = 研究稿，未经法务确认；ratified = 法务确认过",
+  "ratifier": null
+ },
+ "sources": [
+  {
+   "id": "S1",
+   "机构": "Amazon（Amazon Ads 帮助中心）",
+   "文档": "Healthcare products and services",
+   "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "开篇自述：\"Healthcare policies apply to consumer healthcare products (for example, over-the-counter medicines and medical devices, herbal and dietary supplements, and personal care products), prescription pharmaceuticals, and healthcare services.\" 页面为 Amazon Ads 全球政策，另设 Country-specific restrictions 分节；抓取方式：该页为前端渲染，正文取自服务端下发的 window.__scV2Content 内嵌 JSON 数据块。"
+  },
+  {
+   "id": "S2",
+   "机构": "Amazon（Amazon Ads 帮助中心）",
+   "文档": "Claims and substantiation",
+   "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "开篇自述：\"This policy covers general claims, including books and healthcare.\" 并声明举证要求适用于 \"across all Amazon ad products and all on supply\"；另有 Country-specific restrictions（含英国）。抓取方式同上（内嵌 window.__scV2Content）。"
+  },
+  {
+   "id": "S3",
+   "机构": "Amazon（Amazon Ads 帮助中心）",
+   "文档": "Prohibited content across all supply",
+   "url": "https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "开篇自述：\"The following content is prohibited globally\"（全球禁投，不区分 marketplace 与供货位）。抓取方式同上（内嵌 window.__scV2Content）。"
+  },
+  {
+   "id": "S4",
+   "机构": "Amazon（Amazon Ads 帮助中心）",
+   "文档": "Prohibited products and services across all supply",
+   "url": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述：\"This section covers requirements for all ads. Additional country-specific and supply-specific restrictions may apply.\" 并列有 Country-specific restrictions（澳新/北欧/新加坡/英国）。抓取方式同上（内嵌 window.__scV2Content）。"
+  },
+  {
+   "id": "S5",
+   "机构": "Amazon（Amazon Ads 帮助中心）",
+   "文档": "General requirements",
+   "url": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述：\"This section covers requirements for all ads. Additional country-specific and supply-specific restrictions may apply.\"（全渠道通用要求）。抓取方式同上（内嵌 window.__scV2Content）。"
+  },
+  {
+   "id": "S6",
+   "机构": "Amazon（Amazon Ads 帮助中心）",
+   "文档": "Baby formula and feeding accessories",
+   "url": "https://advertising.amazon.com/help/GFNDKT3FYGDL54VB",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述：\"Advertising of baby formula and feeding accessories is permitted only in countries where local laws and regulations allow such advertising.\" 并按国家列禁投清单（含 United Kingdom 的 \"Ads for infant formula are prohibited.\"）。抓取方式同上（内嵌 window.__scV2Content）。"
+  },
+  {
+   "id": "S7",
+   "机构": "Meta（Transparency Center · Advertising Standards）",
+   "文档": "Health and Wellness",
+   "url": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述：\"This policy covers two categories of ads: Adult Products and Reproductive Health.\" 并声明 \"Ads must follow our Community Standards, in addition to our Advertising Standards\"；页面带 CHANGE LOG（最新一条为 \"Today\"、其上 \"Jul 22, 2026\"）。抓取方式：curl + 完整浏览器请求头取得服务端 HTML（HTTP 200）。"
+  },
+  {
+   "id": "S8",
+   "机构": "Meta（Transparency Center · Advertising Standards）",
+   "文档": "Introduction to the Advertising Standards",
+   "url": "https://transparency.meta.com/policies/ad-standards/",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述适用范围为 Meta 全线广告（\"Advertisers running ads across Meta technologies must follow our Community Standards and our Advertising Standards.\"），并声明广告主除平台政策外还须遵守当地法律与自律守则。抓取方式：curl + 完整浏览器请求头取得服务端 HTML。"
+  },
+  {
+   "id": "S9",
+   "机构": "Google（Google Ads 政策帮助中心）",
+   "文档": "Healthcare and medicines",
+   "url": "https://support.google.com/adspolicy/answer/176031",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述：\"The English version is the official language used to enforce Google Ads policies.\"，并按国家分节（Australia/Belgium/Canada/China/Czechia 等）给出 location-specific 要求；页面另注明 DV360 用户须同时遵守该政策。抓取方式：curl 取服务端 HTML（含完整正文）。"
+  },
+  {
+   "id": "S10",
+   "机构": "Google（Google Ads 政策帮助中心）",
+   "文档": "Misrepresentation",
+   "url": "https://support.google.com/adspolicy/answer/6020955",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述：\"Ads or destinations that deceive users by excluding relevant product information or providing misleading information about products, services, and businesses can compromise user trust in the Google Ads platform.\"，适用于广告与落地页（ads or destinations）。抓取方式：curl 取服务端 HTML（含完整正文）。"
+  },
+  {
+   "id": "S11",
+   "机构": "U.S. Food and Drug Administration（FDA）",
+   "文档": "Is It Really 'FDA Approved'?（Consumer Updates）",
+   "url": "https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "监管指南",
+   "适用范围声明": "页面自述为面向消费者的科普说明，逐类说明 FDA 对药品、器械、化妆品、膳食补充剂等「批准与否」的口径；页面标注 Content current as of: 05/04/2026。监管辖区为美国。"
+  },
+  {
+   "id": "S12",
+   "机构": "U.S. Food and Drug Administration（FDA）",
+   "文档": "Breast Pumps（Medical Devices > Consumer Products）",
+   "url": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "监管指南",
+   "适用范围声明": "自述：\"This website provides general information on breast pumps… this website is not intended to provide medical advice.\"；页面标注 Content current as of: 03/26/2018。监管辖区为美国。"
+  },
+  {
+   "id": "S13",
+   "机构": "U.S. Food and Drug Administration（FDA）",
+   "文档": "General Wellness: Policy for Low Risk Devices（Guidance，Docket FDA-2014-N-1039）",
+   "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "监管指南",
+   "适用范围声明": "指南自述适用于 CDRH 对低风险「一般健康产品」的合规政策，且 \"This guidance does not apply to products (e.g., drugs, biologics, dietary supplements, foods, or cosmetics) regulated by other FDA Centers or to combination products.\"；页面标注 Content current as of: 01/06/2026。注：抓取到的是该指南的官方著录页（含摘要与适用范围），非 PDF 全文。"
+  },
+  {
+   "id": "S14",
+   "机构": "U.S. Federal Trade Commission（FTC）",
+   "文档": "Health Products Compliance Guidance",
+   "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "监管指南",
+   "适用范围声明": "自述以 FTC Act 第 5、12 条及欺骗与广告举证政策声明为基础，面向膳食补充剂及其他健康相关产品的广告；管辖为美国联邦层面（\"The Federal Trade Commission's broad mandate is to prevent 'unfair or deceptive acts or practices.'\"）。"
+  },
+  {
+   "id": "S15",
+   "机构": "Medicines and Healthcare products Regulatory Agency（MHRA，经 GOV.UK 发布）",
+   "文档": "Advertise your medicines",
+   "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "监管指南",
+   "适用范围声明": "页面自述：\"How to comply with the requirements on promoting medicines to the public and to prescribers and suppliers of medicines\"；Published 18 December 2014，Last updated 11 April 2025；发布机构 MHRA，辖区为英国（GB 与北爱尔兰执照分别说明）。注意：其约束对象是「药品」，不直接覆盖医疗器械。"
+  },
+  {
+   "id": "S16",
+   "机构": "Advertising Standards Authority / Committee of Advertising Practice（ASA/CAP，英国）",
+   "文档": "CAP Code — Section 12: Medicines, medical devices, health-related products and beauty products",
+   "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "行业标准",
+   "适用范围声明": "自述：\"The rules in this section apply to all marketing communications for medicines, medical devices, treatments, health-related products and beauty products.\"，并说明规则约束的是营销传播而非产品本身（产品由 MHRA 等监管）；页面明列英国及北爱尔兰的器械合规框架（UK MDR 2002、UKCA/CE）。属行业自律守则。"
+  },
+  {
+   "id": "S17",
+   "机构": "TikTok",
+   "文档": "Branded Content Policy（TikTok 法律条款页）",
+   "url": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+   "抓取日期": "2026-09-17",
+   "语言": "en",
+   "性质": "平台政策",
+   "适用范围声明": "自述为对 Branded Content（付费品牌内容）的规则，要求同时遵守 TikTok 服务条款与社区守则；声明 \"We may update these rules periodically…\"，并按 Market-specific Requirements 分市场适用。注意：本次未能抓取 TikTok Advertising Policies 各正文页（Healthcare and Pharmaceuticals 等，前端渲染，见报告），故本条目只代表品牌内容政策口径。"
+  }
+ ],
+ "entries": [
+  {
+   "id": "EXT-001",
+   "status": "research",
+   "source_id": "S1",
+   "条款位置": "Healthcare products and services > 引言段（正文第 3 段，页内无锚点编号）",
+   "条款原文": "Ads for healthcare products and services must follow all applicable local laws and regulations. Ads may be limited by placement, supply, or scheduling restrictions.",
+   "摘要": "Amazon Ads 把「遵守当地法律法规」写成广告主的义务，并声明医药健康广告还可能受供货位/排期限制。Amazon 帮助页为前端渲染，本条原文取自页面服务端下发的内嵌数据块 window.__scV2Content。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "判定要说「该表述另有当地法规约束」时，可引本句——平台自己也把法规遵守义务明确放在广告主一侧。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-002",
+   "status": "research",
+   "source_id": "S1",
+   "条款位置": "Healthcare products and services > Consumer healthcare products > Supply-specific restrictions（Category 1 表格行）",
+   "条款原文": "Category 1 (low sensitivity products): Generally allowed",
+   "摘要": "Amazon Ads 把 Breast Pump 列入 Category 1（低敏感度、总体允许投放），同表还写着「Permitted on all supply with the following restrictions」。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F6",
+   "对判定的意义": "★ 规则库没有对应条目：26 条规则全部针对「文案说了什么」，没有一条管「这条广告能不能投在这个供货位」。本条既是新规则方向（供货位限制）的来源，也是「吸奶器在 Amazon 属低敏感品类」的外部依据。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-003",
+   "status": "research",
+   "source_id": "S1",
+   "条款位置": "Healthcare products and services > Health claims and comparative statements",
+   "条款原文": "Advertisers must accurately represent their products. This includes ensuring that all implicit and explicit claims made in the ad copy, audio, or visuals are accurate, truthful, not misleading, and, when appropriate, backed by scientific evidence.",
+   "摘要": "健康宣称与比较性陈述必须准确、真实、不误导，并在适当情况下有科学证据支撑；明确覆盖「隐含声称」以及画面与音频。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.3.unsourced-data",
+    "T2.3.sourced-data",
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「无来源数据」「临床背书」类问题时，可引本句把两点写进依据：隐含声称同样受限、画面与音频与文案同等受约束。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-004",
+   "status": "research",
+   "source_id": "S1",
+   "条款位置": "Healthcare products and services > Prohibited products and services > Medical devices marketed for professional use",
+   "条款原文": "Medical devices marketed for professional use",
+   "摘要": "把产品定位为「专业用途」销售的医疗器械属禁投项——机构/专业级定位在 Amazon 不只是措辞问题。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "家居",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.3.institution-grade"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「机构级/专业级」定位时，可引本条说明该表述在 Amazon 上直接对应禁投。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-005",
+   "status": "research",
+   "source_id": "S1",
+   "条款位置": "Healthcare products and services > Country-specific restrictions > Brazil and New Zealand",
+   "条款原文": "Ads must not include statements by medical professionals that imply professional advice, preferences, or recommendations.",
+   "摘要": "（巴西、新西兰）广告不得含由医疗专业人员作出、暗示专业建议/偏好/推荐的表述；约束点是「暗示推荐」，不要求出现人名或职称。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.2.expert-endorsement",
+    "T3.2.lactation-consultant",
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「专家背书/泌乳顾问背书」时，可引本条支持「即使措辞含蓄，只要暗示专业推荐即受限」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-006",
+   "status": "research",
+   "source_id": "S2",
+   "条款位置": "Claims and substantiation > Prohibited content（全渠道禁止清单）",
+   "条款原文": "Regulatory endorsement claims on healthcare products.",
+   "摘要": "「监管背书」类宣称被列为全渠道禁止项（prohibited），而非需要举证的受限项。原文取自页面内嵌 window.__scV2Content 数据块。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T6.1.regulatory-status",
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「监管状态/认证背书」时，可引本条说明在 Amazon 属直接禁投，处置应重于「举证不足」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-007",
+   "status": "research",
+   "source_id": "S2",
+   "条款位置": "Claims and substantiation > Prohibited content（全渠道禁止清单）",
+   "条款原文": "Claims that non-prescription products are as effective as prescription products.",
+   "摘要": "非处方产品宣称「与处方产品同样有效」被直接禁止，且不以是否提供证据为条件。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F1",
+   "对判定的意义": "★ 规则库没有对应条目：T4.1/T4.2 管的是与具名/同业竞品比较，没有「向上一级品类（处方/医疗级）对标等效」这一类。母婴品类里的「院线同款效果」「医用级效果」正落在这里。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-008",
+   "status": "research",
+   "source_id": "S2",
+   "条款位置": "Claims and substantiation > Restricted content > Product effectiveness",
+   "条款原文": "Product effectiveness: claims that describe the effectiveness of a product (for example, \"Decreases cholesterol levels by 25%\") and are typically based on objective evidence or scientific data. If the claim is on the product packaging, no further substantiation is needed. Otherwise, substantiation, including source and date (no age requirement), is required in the ad creative, on product packaging or landing page.",
+   "摘要": "产品有效性宣称属受限内容：若不在包装上，必须在广告素材、包装或落地页给出含来源与日期的举证。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.3.sourced-data",
+    "T2.3.unsourced-data",
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「无来源数据」时，可引本条给出外部要求的具体形态：不是笼统「要有数据」，而是「来源+日期必须出现在素材或落地页」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-009",
+   "status": "research",
+   "source_id": "S2",
+   "条款位置": "Claims and substantiation > Restricted content > Product endorsements",
+   "条款原文": "Product endorsements: Medical or professional society endorsements (for example, \"#1 physician recommended allergy medicine\"). If the claim is on the product packaging, no further substantiation is needed. Otherwise, substantiation, including source and date (within 24 months), is required in the ad creative, on product packaging, or landing page.",
+   "摘要": "医学/专业学会背书类宣称需给出来源与日期，且日期须在 24 个月内。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.1.clinical-endorsement",
+    "T3.2.expert-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「临床/专家背书」时，可引本条说明 Amazon 并非一律禁止，而是设了举证+时效（24 个月）门槛——判定可从「禁用」细化为「举证不足」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-010",
+   "status": "research",
+   "source_id": "S2",
+   "条款位置": "Claims and substantiation > Restricted content > Comparative claims",
+   "条款原文": "Comparative claims: Claims that compare a product or service to a competitor’s product (for example, \"Provides 50% more pain relief than the leading brand\"). If the claim is on the product packaging, no further substantiation is needed. Otherwise, substantiation, including source and date (within 24 months), is required in the ad creative, on product packaging, or landing page.",
+   "摘要": "与竞品比较的宣称需给出 substantiation（来源+日期，24 个月内）；页面举例即「比领先品牌多缓解 50% 疼痛」。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T4.1.named-comparison",
+    "T4.2.industry-comparison",
+    "T2.3.unsourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「具名比较/同业比较」时，可引本条把「比较宣称=举证义务」写进依据，而不只是「疑似不实宣传」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-011",
+   "status": "research",
+   "source_id": "S3",
+   "条款位置": "Prohibited content across all supply > 全局禁止清单第 8 项",
+   "条款原文": "Content that exploits sensitive life events. This includes but isn't limited to pregnancy, job changes, change in marital status, medical events, or death.",
+   "摘要": "利用「敏感人生事件」的内容全球禁投，页面明确把 pregnancy（怀孕）列进该清单。原文取自内嵌 window.__scV2Content 数据块。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "婴幼儿",
+    "喂养",
+    "通用"
+   ],
+   "关联规则": [
+    "T7.2.pain-scenario",
+    "T8.1.anxiety-pressure"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "对母婴品牌最直接的一条：判定「能不能拿怀孕/产后处境当卖点场景」时，可引本条说明平台把怀孕本身列为敏感人生事件，不只看措辞是否温和。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-012",
+   "status": "research",
+   "source_id": "S3",
+   "条款位置": "Prohibited content across all supply > 全局禁止清单（bodily fluids 一项）",
+   "条款原文": "Realistic depictions of bodily fluids.",
+   "摘要": "对体液的写实描绘属全球禁投项——吸奶器/母乳品类的主图与视频常出现乳汁，这一条直接约束画面。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "婴幼儿"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F4",
+   "对判定的意义": "★ 规则库没有对应条目：26 条规则全是文字/关键词层，没有一条管画面内容。母乳、漏奶、储奶的写实镜头在这条下需要单独判定，建议新增「画面物证」类规则。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-013",
+   "status": "research",
+   "source_id": "S3",
+   "条款位置": "Prohibited content across all supply > 全局禁止清单（minors 一项）",
+   "条款原文": "Ads for child-intended products may use appropriate child-related product imagery but can’t directly address children using persuasive language or interactive elements.",
+   "摘要": "儿童向产品可用儿童相关画面，但不得用说服性语言或互动元素直接对儿童说话——区分「出现儿童」与「对儿童说话」。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "婴幼儿",
+    "喂养",
+    "家纺",
+    "家居",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F3",
+   "对判定的意义": "★ 规则库没有对应条目：我们有焦虑/紧迫类规则，但没有「受众定向诉求」这一类。婴童用品文案里的「宝宝爱喝」「宝贝快来」正好落在这里。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-014",
+   "status": "research",
+   "source_id": "S4",
+   "条款位置": "Prohibited products and services across all supply > 全局禁止清单",
+   "条款原文": "Products and services designed exclusively for use by military, law enforcement, or medical professionals.",
+   "摘要": "专供军队、执法或医疗专业人员使用的产品与服务全球禁投。原文取自内嵌 window.__scV2Content 数据块。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "家居",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.3.institution-grade"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "与 EXT-004 互补：即使产品本身合规，把它讲成「医护专用/专业机构专用」也会落到禁投区。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-015",
+   "status": "research",
+   "source_id": "S5",
+   "条款位置": "General requirements > Advertisers are required to（AI-generated content 一项）",
+   "条款原文": "Ensure that AI-generated content doesn't mislead customers. This includes photorealistic but inaccurate depictions, or content that mimics real people without consent. Failure to comply may result in ads being paused, removed, or restricted.",
+   "摘要": "AI 生成内容不得误导：包括照片级真实但不准确的描绘、未经同意模仿真人。原文取自内嵌 window.__scV2Content 数据块。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "家纺",
+    "家居",
+    "服纺",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F5",
+   "对判定的意义": "★ 规则库没有对应条目：素材大量由 AI 生成时，「写实但不准确」「模仿真人未获同意」是独立风险面，现有规则只看文案词。这是本次研究里最接近生产实际的一条空白。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-016",
+   "status": "research",
+   "source_id": "S5",
+   "条款位置": "General requirements > Advertisers are required to（identify themselves 一项）",
+   "条款原文": "Identify themselves and the product or service being promoted in the ad creative.",
+   "摘要": "广告主必须在素材中表明自己与被推广的产品/服务身份——是对「素材本身可识别性」的要求，不是关于宣称真伪。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "家纺",
+    "家居",
+    "服纺",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F4",
+   "对判定的意义": "★ 规则库没有对应条目：判定引擎目前不检查「品牌身份是否可识别」。对白牌/无标素材、达人素材混投的场景，这是一条独立的外部要求。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-017",
+   "status": "research",
+   "source_id": "S6",
+   "条款位置": "Baby formula and feeding accessories > 引言段（正文第 1 段）",
+   "条款原文": "Ad content must not discourage breastfeeding or encourage formula use as a substitution for breastfeeding.",
+   "摘要": "配方奶与喂养用品广告不得贬低母乳喂养，也不得鼓励用配方奶替代母乳。原文取自内嵌 window.__scV2Content 数据块。",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "喂养",
+    "婴幼儿",
+    "孕产"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F2",
+   "对判定的意义": "★ 规则库没有对应条目：母婴品类里「母乳不够就换奶粉」「泵不出来也别焦虑」这类表达，落在这条上的风险高于我们现有任何规则。建议作为喂养品线的首要新规则。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-018",
+   "status": "research",
+   "source_id": "S6",
+   "条款位置": "Baby formula and feeding accessories > Supply-specific restrictions + Country-specific requirements（United Kingdom）",
+   "条款原文": "Ads for formula and feeding products are prohibited globally on Homepage and Fire Devices supply.",
+   "摘要": "配方奶与喂养用品在全球范围禁投首页与 Fire 设备供货位；同页英国条目另写明「Ads for infant formula are prohibited.」",
+   "适用渠道": [
+    "amazon"
+   ],
+   "适用品线": [
+    "喂养",
+    "婴幼儿"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F6",
+   "对判定的意义": "★ 规则库没有对应条目：与 EXT-002 同属「供货位/市场禁投」，但这条把结论推到「英国市场婴儿配方奶广告不可投」的绝对口径——判定若只说「措辞违规」会低估后果。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-019",
+   "status": "research",
+   "source_id": "S7",
+   "条款位置": "Health and Wellness > Health and Wellbeing > 段落 1",
+   "条款原文": "Ads promoting or marketing dietary, health, or weight loss or weight gain products and services must be targeted to people at least 18 years or older.",
+   "摘要": "膳食、健康、减重/增重类产品与服务广告必须定向 18 岁以上人群——这是定向要求，不是文案要求。",
+   "适用渠道": [
+    "meta"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F3",
+   "对判定的意义": "★ 规则库没有对应条目：现有规则不涉及定向与年龄门槛。判定若只审文案，会漏掉「这条广告的受众设置本身违规」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-020",
+   "status": "research",
+   "source_id": "S7",
+   "条款位置": "Health and Wellness > Health and Wellbeing > Guidelines（Ads can't 第 1 项）",
+   "条款原文": "Contains statements of inferiority about physical appearance (i.e., terms, descriptions, or questions that are negative and attack an individual’s appearance, specific body parts, or hygiene).",
+   "摘要": "禁止以贬低外貌的表述（对个人外貌、具体身体部位或卫生的负面攻击）来推广减重/增重或美容产品。",
+   "适用渠道": [
+    "meta"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "服纺",
+    "通用"
+   ],
+   "关联规则": [
+    "T8.1.anxiety-pressure"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "把「制造外貌焦虑」从我们的经验判断升级为有出处的平台明令：命中 T8.1 时可引本条，并注意它把「针对具体身体部位」也点名了。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-021",
+   "status": "research",
+   "source_id": "S7",
+   "条款位置": "Health and Wellness > Health and Wellbeing > Guidelines（cure/heal 一项）",
+   "条款原文": "Claims (including those from health professionals or health organizations) to cure, heal, or eliminate any of the following incurable diseases and/or terminal illnesses (exhaustive list): Diabetes, Herpes, Thyroid, Psoriasis, Ebola, Cancer, Autism, Alzheimer's, Parkinson's, Amyotrophic Lateral Sclerosis (ALS), Human immunodeficiency virus (HIV)",
+   "摘要": "对清单内不治之症/终末期疾病的治愈、消除宣称一律禁止——包括由医疗专业人员或健康机构作出的宣称；清单为 exhaustive（封闭列表），且页面另注「不包括对症治疗或管理症状的宣称」。",
+   "适用渠道": [
+    "meta"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T1.1.medical-cure",
+    "T3.2.expert-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "命中「治愈」类宣称时，可引本条说明 Meta 的口径是「封闭疾病清单 + 连专业机构背书也不能豁免」，同时提供了一条「对症/管理症状不在此限」的边界。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-022",
+   "status": "research",
+   "source_id": "S7",
+   "条款位置": "Health and Wellness > Health and Wellbeing > Guidelines（clickbait 一项）",
+   "条款原文": "Employ clickbait tactics in a health, weight loss, or weight gain context, such as sensational language with exaggerated or extreme claims, or promises of specific outcomes within a set timeframe without disclaimers or qualifiers.",
+   "摘要": "健康/减重语境下不得使用标题党手法：夸张极端语言，或在无免责声明与限定词的情况下承诺「在某个时间范围内达成特定结果」。",
+   "适用渠道": [
+    "meta"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T8.2.urgency-scarcity",
+    "T2.3.unsourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "把「限时见效」类承诺接上了外部出处：命中时限承诺或夸张语言时，可引本条说明它在 Meta 属 clickbait 而非单纯夸大。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-023",
+   "status": "research",
+   "source_id": "S8",
+   "条款位置": "Introduction to the Advertising Standards > 2. Meta advertising policy principles > PROMOTING POSITIVE USER EXPERIENCES",
+   "条款原文": "We also prohibit other objectionable material, such as content implying or attempting to generate negative self-perception in order to promote diet, weight loss or other health related products.",
+   "摘要": "Meta 把「暗示或试图制造负面自我认知以推销减肥/健康类产品」写进广告政策总原则，属原则层而非单项条款。",
+   "适用渠道": [
+    "meta"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T8.1.anxiety-pressure"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为 T8.1 提供原则层出处：即使不适用具体条款，也可引这一句说明「制造负面自我认知」在 Meta 是被点名禁止的动机类型。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-024",
+   "status": "research",
+   "source_id": "S8",
+   "条款位置": "Introduction to the Advertising Standards > Enforcement of our policies（末段）",
+   "条款原文": "It is an advertiser’s responsibility to understand and comply with our policies outlined in Meta’s Advertising Standards, our Terms of Service and any other applicable terms and guidelines, in addition to all local laws, regulations and, where applicable, self-regulatory advertising codes.",
+   "摘要": "平台政策与法律被当作两个各自独立生效的规则体：合规不等于合法，广告主须同时满足当地法律与行业自律守则。",
+   "适用渠道": [
+    "meta",
+    "amazon",
+    "google",
+    "tiktok",
+    "独立站",
+    "通用"
+   ],
+   "适用品线": [
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F7",
+   "对判定的意义": "★ 规则库没有对应条目：这条不给「哪句话不能写」，而是给判定引擎一条边界声明——平台通过 ≠ 法律合规。建议作为判定输出里的固定提示项，而非规则。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-025",
+   "status": "research",
+   "source_id": "S9",
+   "条款位置": "Healthcare and medicines > Unapproved substances（要点 5）",
+   "条款原文": "Non-government approved products that are marketed in a way that implies that they're safe or effective for use in preventing, curing, or treating a particular disease or ailment",
+   "摘要": "未获政府批准的产品，若以暗示其可安全/有效预防、治愈或治疗某疾病或不适的方式营销，属禁止项。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T1.1.medical-cure",
+    "T1.2.medical-prevent",
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "一条同时覆盖「治愈」「预防」「监管状态」三个我们的规则键：命中其一即可引本条，把「未获批产品+疾病暗示」的组合风险写进依据。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-026",
+   "status": "research",
+   "source_id": "S9",
+   "条款位置": "Healthcare and medicines > Unapproved substances（要点 4）",
+   "条款原文": "Products that imply they're as effective as prescription drugs or controlled substances",
+   "摘要": "暗示产品与处方药或管制药物等效，属 Google Ads 的禁止项。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F1",
+   "对判定的意义": "★ 规则库没有对应条目：与 Amazon EXT-007 是同一类空白（处方等效宣称），两个独立来源交叉确认。判定引擎目前无法给「和处方药一样有效」归到任何规则键上。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-027",
+   "status": "research",
+   "source_id": "S9",
+   "条款位置": "Healthcare and medicines > Clinical trial recruitment（限制 3）",
+   "条款原文": "Promotions may not imply that the products being tested are safe.",
+   "摘要": "临床试验招募类推广不得暗示受试产品是安全的（同节还写明不得制造误导性预期）。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T5.1.safety-claim"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为「安全性绝对化」类表达提供平台口径：命中 T5.1 时，可引本条说明「暗示安全」在缺乏结论的阶段本身就是被禁止的表述。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-028",
+   "status": "research",
+   "source_id": "S10",
+   "条款位置": "Misrepresentation > Clickbait ads（第 2 段）",
+   "条款原文": "Ads that use negative life events such as death, accidents, illness, arrests or bankruptcy to induce fear, guilt or other strong negative emotions to pressure the viewer to take immediate action are not allowed.",
+   "摘要": "禁止利用死亡、事故、疾病等负面人生事件引发恐惧、内疚等强烈负面情绪，以迫使观看者立即行动。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "婴幼儿",
+    "喂养",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T8.1.anxiety-pressure",
+    "T8.2.urgency-scarcity"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "把「焦虑施压 + 立即行动」两件事写在同一条里：命中 T8.1 或 T8.2 时，可引本条说明平台把二者视为同一手法（fear → immediate action）。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-029",
+   "status": "research",
+   "source_id": "S10",
+   "条款位置": "Misrepresentation > Unreliable claims",
+   "条款原文": "Making inaccurate claims or claims that entice the user with an improbable result (even if this result is possible) as the likely outcome a user can expect is not allowed.",
+   "摘要": "不准确的宣称，或以「不可能的结果」引诱用户（即使该结果理论上可能）作为其可期待的结果，均不允许。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.2.fit-all-claim",
+    "T2.3.unsourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为「人人适用/必然有效」类表达提供外部口径——注意它的判定标准是「消费者会期待的这个结果」，而不是宣称本身是否字面为真。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-030",
+   "status": "research",
+   "source_id": "S10",
+   "条款位置": "Misrepresentation > Unacceptable business practices（第 1 段第 3 项）",
+   "条款原文": "Lie about services that could put people's health or safety at risk, like pretending to provide medical help when you don't",
+   "摘要": "不得就涉及健康或安全风险的服务说谎，例如假装能提供你并不具备的医疗帮助。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T7.1.hospital-scenario",
+    "T3.3.institution-grade"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为「医院场景/机构级」类表达提供外部依据：命中 T7.1 时，可引本条说明「假装提供医疗帮助」被单列为不诚信经营行为，而不只是措辞夸张。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-031",
+   "status": "research",
+   "source_id": "S10",
+   "条款位置": "Misrepresentation > Misleading representation（第 1 段）",
+   "条款原文": "Making misleading statements, obscuring, or omitting material information about your identity, affiliations, or qualifications is not allowed.",
+   "摘要": "就自身身份、隶属关系或资质作出误导性陈述、遮蔽或遗漏重要信息，均不允许——注意「遗漏」与「遮蔽」同样构成违规。",
+   "适用渠道": [
+    "google"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.2.expert-endorsement",
+    "T3.3.institution-grade"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为资质/隶属类表达提供口径：判定不只是看「有没有说假话」，也可看「有没有该说而未说」（omitting material information）。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-032",
+   "status": "research",
+   "source_id": "S11",
+   "条款位置": "The FDA doesn't approve health care providers.（第 1 段）",
+   "条款原文": "Mere registration of an establishment or listing of a drug or device does not denote approval of the establishment, the drug or device, or other drugs or devices of the establishment, nor does it mean that a product may be legally marketed.",
+   "摘要": "FDA 明确：企业登记或产品列名都不等于获批，也不代表产品可以合法上市。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "监管状态类宣称的核心外部依据：命中 T6.1 时，可引本条说明「已注册/已列名」不能改写为「已获 FDA 批准」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-033",
+   "status": "research",
+   "source_id": "S11",
+   "条款位置": "The FDA uses a risk-based, tiered approach for regulating medical devices for people.（第 3 段）",
+   "条款原文": "Devices that are low risk of harm to the user (Class I) – for example non-powered breast pumps, elastic bandages, tongue depressors, and exam gloves – are subject to general controls only. Most are exempt from premarket notification requirements.",
+   "摘要": "FDA 把非电动吸奶器举例为 Class I 低风险器械（仅受一般控制、多数豁免上市前通知）；同页说明 Class II 通常走 510(k) 清关、Class III 才需上市前批准。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器"
+   ],
+   "关联规则": [
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "给「FDA 批准/清关」类表述一个可核对的分档依据：非电动吸奶器根本不在需要「批准」的档位上，说「FDA 批准」在这一品线上尤其站不住。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-034",
+   "status": "research",
+   "source_id": "S12",
+   "条款位置": "Breast Pumps > 正文第 1 段第 1 句",
+   "条款原文": "Breast pumps are medical devices regulated by the FDA.",
+   "摘要": "FDA 官方页面把吸奶器定义为受 FDA 监管的医疗器械。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器"
+   ],
+   "关联规则": [
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "判定「本品不是医疗器械/无需监管」类表达时，可直接引本句作为官方定义依据。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-035",
+   "status": "research",
+   "source_id": "S12",
+   "条款位置": "Breast Pumps > 正文第 1 段第 3 句",
+   "条款原文": "Breast pumps can also be used to maintain or increase a woman’s milk supply, relieve engorged breasts and plugged milk ducts, or pull out flat or inverted nipples so a nursing baby can latch-on to its mother’s breast more easily.",
+   "摘要": "FDA 页面把「维持或增加奶量、缓解胀奶与堵奶、牵出扁平或凹陷乳头以便含乳」列为吸奶器的用途——这些是器械预期用途，而不是需要额外举证的功效宣称。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产"
+   ],
+   "关联规则": [
+    "T2.1.1.milk-supply",
+    "T1.5.duct-unclog",
+    "T2.1.2.pain-relief"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "同时命中我们三条规则键，作用却是「反向」的：它说明这些表述本身属于器械的既有用途，判定应把火力集中在「超出该用途的绝对化承诺」，而不是把这些词一律判死。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-036",
+   "status": "research",
+   "source_id": "S12",
+   "条款位置": "Breast Pumps > 正文第 2 段（mimic suckling 一句）",
+   "条款原文": "A breast pump can be used as a supplement to breastfeeding and some pumps are designed to mimic the suckling of a nursing baby.",
+   "摘要": "FDA 页面承认「部分吸奶器被设计为模拟婴儿吸吮」这一产品事实。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器"
+   ],
+   "关联规则": [
+    "T2.2.mimic-claim"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为「仿真吮吸」类表达的判定提供边界：连官方页面都描述该设计事实，说明风险点不在「像不像」，而在是否用它引申出医学效果或替代母乳的承诺。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-037",
+   "status": "research",
+   "source_id": "S12",
+   "条款位置": "Breast Pumps > 正文第 3 段（免责一句）",
+   "条款原文": "While it provides information on choosing and using a breast pump, this website is not intended to provide medical advice.",
+   "摘要": "FDA 声明该页面只提供选购与使用信息，不构成医疗建议——可用于区分「科普信息」与「医疗建议」的边界。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产"
+   ],
+   "关联规则": [
+    "T7.1.hospital-scenario"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "「医疗建议/专业指导」类表达（T7.1 医院场景）需要一条边界——信息性内容不等于医疗建议，但一旦以建议口吻给出个体化指导就越界。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-038",
+   "status": "research",
+   "source_id": "S13",
+   "条款位置": "General Wellness: Policy for Low Risk Devices > 页面摘要第 2 段（引 FD&C Act §520(o)(1)(B)）",
+   "条款原文": "Section 520(o)(1)(B) of the FD&C Act, states that software that is intended \"for maintaining or encouraging a healthy lifestyle and is unrelated to the diagnosis, cure, mitigation, prevention, or treatment of a disease or condition\" is not a device under section 201(h) of the FD&C Act.",
+   "摘要": "FDA 的一般健康（general wellness）边界：与疾病诊断、治愈、缓解、预防或治疗无关的健康生活方式类功能，不被视为器械。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "家居",
+    "通用"
+   ],
+   "关联规则": [
+    "T1.1.medical-cure",
+    "T1.2.medical-prevent",
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "给「疾病声称」画了官方分界线：一旦文案把产品拉向疾病层（预防/缓解/治疗），产品属性与监管义务同时改变——这为 T1.1/T1.2 提供了目的论依据。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-039",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > Introduction（两项原则之第 2 项）",
+   "条款原文": "Before disseminating an ad, advertisers must have adequate substantiation for all objective product claims conveyed, expressly or by implication, to consumers acting reasonably.",
+   "摘要": "发布前必须对「明示或默示传达给合理消费者」的全部客观宣称持有充分依据——举证义务前置到发布之前。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.3.unsourced-data",
+    "T2.3.sourced-data",
+    "T2.2.suction-claim",
+    "T2.2.quiet-claim",
+    "T2.1.3.milk-flow"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "T2.3 两类问题（有/无来源数据）最权威的外部依据：注意它约束的是「理性消费者实际接收到的含义」，而不是字面措辞。本条同时是吸力/噪音/出奶速度等性能参数类宣称唯一可引的外部依据——公开政策里没有针对这三项的专门条款，只有「客观宣称必须举证」这条通则。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-040",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > 科学证据标准（competent and reliable scientific evidence 定义）",
+   "条款原文": "The FTC has more specifically defined that standard as “tests, analyses, research, or studies that (1) have been conducted and evaluated in an objective manner by experts in the relevant disease, condition, or function to which the representation relates; and (2) are generally accepted in the profession to yield accurate and reliable results.”",
+   "摘要": "FTC 给出「competent and reliable scientific evidence」的正式定义：由相关领域专家以客观方式实施与评价，且为该专业普遍认可能产出准确可靠结果。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.1.clinical-endorsement",
+    "T2.3.sourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "判定写「证据不足」时，可引本定义把「不足」具体化为两个可核对条件（专家客观实施 + 专业公认方法）。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-041",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > 科学证据标准（RCT 一段）",
+   "条款原文": "As a general matter, substantiation of health-related benefits will need to be in the form of randomized, controlled human clinical testing to meet the competent and reliable scientific standard.",
+   "摘要": "健康获益类宣称的举证通常必须是随机对照人体临床试验（RCT）。同节另指出流行病学/观察性研究只能显示关联、不能证明因果。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "为「临床验证/临床证明」类宣称给出具体门槛：只有 RCT 级证据才够，这使判定可以从「疑似夸大」升级为「证据形态不符标准」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-042",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > 1. Claims Based on Consumer Testimonials or Expert Endorsements（第 1 段）",
+   "条款原文": "An overarching principle is that advertisers should not make claims through consumer testimonials or expert endorsements that would be deceptive or couldn’t be substantiated if the advertiser made them directly.",
+   "摘要": "通过用户证言或专家背书提出的宣称，若换成广告主自己直说就会构成欺骗或无法举证，同样不允许——证言不能充当举证。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.2.expert-endorsement",
+    "T2.3.unsourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "达人/素人证言素材的判定依据：命中「用户反馈式功效宣称」时，可引本条说明换个说话人并不改变举证义务。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-043",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > 1. Claims Based on Consumer Testimonials or Expert Endorsements（Testimonials that report results…）",
+   "条款原文": "Testimonials that report results more dramatic than users can generally expect are likely to be deceptive. Moreover, attempts to disclaim dramatic results with statements like “Results not typical” don’t cure the deception.",
+   "摘要": "比一般用户可期待结果更夸张的证言很可能构成欺骗；用「效果因人而异」这类免责声明并不能治愈该欺骗。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.3.unsourced-data",
+    "T5.1.safety-claim"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "与本仓「免责声明不是许可证」的设计原则直接呼应，且来自外部权威：判定遇到「个案效果 + 免责小字」组合时，可引本条说明小字不能免责。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-044",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > When an advertiser uses an expert endorser…",
+   "条款原文": "When an advertiser uses an expert endorser, it should make sure that the endorser has appropriate qualifications to be represented as an expert and has conducted an examination or testing of the product generally recognized in the field as sufficient to support the endorsement.",
+   "摘要": "使用专家背书时，必须确证其资历足以被称为专家，且其检验/测试达到该领域公认足以支持该背书程度；同段还要求清晰显著披露背书人与广告主之间的重大利益关系。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.2.expert-endorsement",
+    "T3.2.lactation-consultant",
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "把「专家/顾问背书」的判定从「有没有这个人」推进到三个可核对项：资历真实、做过产品检验、利益关系已披露。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-045",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > 4. Mischaracterizations of FDA approval（第 1 段）",
+   "条款原文": "Advertisers should be careful not to mischaracterize the extent to which a product or claim has been reviewed, authorized, or approved by the FDA.",
+   "摘要": "不得对产品或其宣称被 FDA 审查、授权、批准的程度作错误描述（同节举例：把「FDA 将行使执法自由裁量权」说成「符合 FDA 合格健康声称」即属欺骗）。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T6.1.regulatory-status"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "监管状态类宣称的另一独立出处：与 FDA 官方页（EXT-032）互补，一处讲「注册≠批准」，一处讲「不得夸大审查程度」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-046",
+   "status": "research",
+   "source_id": "S14",
+   "条款位置": "Health Products Compliance Guidance > 3. Use of the DSHEA Disclaimer in Advertising（第 2 段）",
+   "条款原文": "Marketers should be aware that the DSHEA disclaimer or similar statements won’t cure an otherwise deceptive ad, particularly where the deception concerns claims about the health-related benefits of a product.",
+   "摘要": "免责声明（如「本声明未经 FDA 评价」）不能修复一则本就具有欺骗性的广告，尤其在涉及健康获益宣称时。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T1.1.medical-cure",
+    "T2.3.unsourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "提供「免责声明不是许可证」的外部权威出处：命中治愈/预防类宣称时，可据此说明加免责声明不构成降级理由。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-047",
+   "status": "research",
+   "source_id": "S15",
+   "条款位置": "Advertise your medicines > Advertise to the public > You must not（第 4 项）",
+   "条款原文": "quote recommendations by scientists, healthcare professionals or celebrities",
+   "摘要": "（英国，面向公众的药品广告）不得引用科学家、医疗专业人员或名人的推荐。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.2.expert-endorsement",
+    "T3.1.clinical-endorsement",
+    "T3.2.lactation-consultant"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "英国站最直接的一条外部依据：把「专家/名人推荐」类表达（T3.2/T3.1）落到了具体法域要求上。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-048",
+   "status": "research",
+   "source_id": "S15",
+   "条款位置": "Advertise your medicines > Advertise to the public > You must not（第 7 项）",
+   "条款原文": "suggest a medicine is different from, the same as or better than any other named product",
+   "摘要": "（英国）不得暗示某药品与任何具名产品不同、相同或更好。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T4.1.named-comparison"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "T4.1（具名比较）的英国法域出处，且口径比我们更宽——连「与之相同」的暗示也在此列。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-049",
+   "status": "research",
+   "source_id": "S15",
+   "条款位置": "Advertise your medicines > Advertise to the public > You must not（第 3 项）",
+   "条款原文": "suggest a medicine has no side-effects or that its effects are guaranteed",
+   "摘要": "（英国）不得暗示药品无副作用，或效果有保证。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T5.1.safety-claim"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "T5.1（安全性绝对化）在英国站的法域依据；与 FTC 的免责声明条款合看，可支撑「绝对化承诺不可用免责声明补救」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-050",
+   "status": "research",
+   "source_id": "S15",
+   "条款位置": "Advertise your medicines > Advertise to the public > You must not（第 11 项）",
+   "条款原文": "direct your advertising at children (under-16s)",
+   "摘要": "（英国）不得面向 16 岁以下儿童投放广告。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "婴幼儿",
+    "喂养",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F3",
+   "对判定的意义": "★ 规则库没有对应条目：与 Amazon EXT-013、TikTok EXT-055 同属「受众定向」空白，但这条给出明确年龄线（16 岁以下），可直接转化成可判定规则。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-051",
+   "status": "research",
+   "source_id": "S15",
+   "条款位置": "Advertise your medicines > Advertise to the public > You must not（第 2 项）",
+   "条款原文": "make misleading claims or use pictures that may lead to a wrong self-diagnosis",
+   "摘要": "（英国）不得作出误导性宣称，也不得使用可能导致错误自我诊断的图片。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T1.1.medical-cure"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "把 T1.1 的「诊断」词从文字扩展到图片：画面同样可能构成自我诊断引导，这是现有规则未覆盖的一层。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-052",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.1（第 1 段）",
+   "条款原文": "Objective claims must be backed by evidence, if relevant consisting of trials conducted on people. Substantiation will be assessed on the basis of the available scientific knowledge.",
+   "摘要": "（英国广告自律守则）客观宣称必须有证据支撑，必要时须为人体试验；举证按现有科学知识水平评估。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.3.unsourced-data",
+    "T2.3.sourced-data",
+    "T3.1.clinical-endorsement"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "英国站 T2.3 的规则出处；与 FTC 的标准形成英美双源，可在判定里说明「无来源数据」不是本仓一家之言。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-053",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.6",
+   "条款原文": "Marketers should not falsely claim that a product is able to prevent or treat disease or a malformation; restore, correct or modify a physiological function; or modify a person’s appearance.",
+   "摘要": "不得虚假宣称产品能预防或治疗疾病/畸形、恢复或改变生理功能，或改变人的外貌。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "服纺",
+    "通用"
+   ],
+   "关联规则": [
+    "T1.2.medical-prevent",
+    "T1.1.medical-cure"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "一条同时锚定 T1.1 与 T1.2 的自律守则条款，并额外覆盖「改变外貌」——后者对护肤/服纺品线是关键边界。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-054",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.9",
+   "条款原文": "Marketers must not encourage consumers to use a product to excess and must hold proof before suggesting their product or therapy is guaranteed to work, absolutely safe or without side-effects (subject to rule 12.19).",
+   "摘要": "不得鼓励过量使用；在暗示产品/疗法「保证有效、绝对安全、没有副作用」之前必须持有证据。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T5.1.safety-claim"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "T5.1 在英国自律守则中的对应条款，且给出了「必须先有证据」这一可操作口径（不是一律禁止）。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-055",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.18",
+   "条款原文": "Marketers must not use health professionals or celebrities to endorse medicines.",
+   "摘要": "不得使用医疗专业人员或名人为药品代言。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T3.2.expert-endorsement",
+    "T3.2.lactation-consultant"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "T3.2 两条规则键（专家背书、泌乳顾问背书）在英国的自律守则出处；注意其口径是「不得使用」，比举证型要求更硬。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-056",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.19",
+   "条款原文": "Marketing communications for a medicine may not claim that its effects are guaranteed, that it is absolutely safe or without side-effects or as good as or better than those of another identifiable product.",
+   "摘要": "药品广告不得宣称效果有保证、绝对安全无副作用，或与另一可识别产品一样好或更好。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T4.1.named-comparison",
+    "T5.1.safety-claim"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "一条同时给出 T4.1 与 T5.1 的英国口径，可用于交叉印证 MHRA 同类要求（EXT-048/049）。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-057",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.15",
+   "条款原文": "Illustrations of the effect or action of a product should be accurate.",
+   "摘要": "对产品效果或作用的表现（图示/演示）应当准确。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "家纺",
+    "家居",
+    "服纺",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F4",
+   "对判定的意义": "★ 规则库没有对应条目：现有规则以文本为主，没有「画面表现准确性」这一类。对以演示视频为主要素材的母婴品类，这是最该补的一条（可与 Amazon 体液条款 EXT-012 合并设计）。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-058",
+   "status": "research",
+   "source_id": "S16",
+   "条款位置": "UK Code of Non-broadcast Advertising (CAP Code) > Section 12 > Rule 12.2（第 1 段）",
+   "条款原文": "Marketers must not discourage essential treatment for conditions for which medical supervision should be sought.",
+   "摘要": "不得劝退本应寻求医疗监督的病症的必要治疗；同段说明此类病症的具体建议、诊断或治疗须由合格健康专业人员在监督下进行。",
+   "适用渠道": [
+    "通用"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "婴幼儿",
+    "喂养",
+    "通用"
+   ],
+   "关联规则": [
+    "T7.1.hospital-scenario",
+    "T7.2.pain-scenario"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "把「医院场景」与「疼痛场景」的判定从「能不能提医院」推进到更实质的一层：文案是否在暗示「不必就医」。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-059",
+   "status": "research",
+   "source_id": "S17",
+   "条款位置": "Branded Content Policy > What do you need to do when you post Branded Content?（第 3 项）",
+   "条款原文": "You must not make false, deceptive or misleading claims about any products or services.",
+   "摘要": "（TikTok 品牌内容政策）不得对任何产品或服务作出虚假、欺骗或误导性宣称。",
+   "适用渠道": [
+    "tiktok"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "家纺",
+    "家居",
+    "服纺",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T2.3.unsourced-data"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "TikTok 侧唯一可核实的成文依据之一（TikTok 广告政策正文页为前端渲染，本次无法抓取，见报告），可作为 TikTok 渠道「误导性宣称」的基础引用。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-060",
+   "status": "research",
+   "source_id": "S17",
+   "条款位置": "Branded Content Policy > In addition, you must not（第 5 项）",
+   "条款原文": "promote or reinforce negative or unhealthy body images, or exploit insecurities to conform to certain beauty ideals or standards",
+   "摘要": "（TikTok）不得推广或强化负面/不健康的身体形象，也不得利用不安全感去迎合某种审美标准。",
+   "适用渠道": [
+    "tiktok"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "孕产",
+    "护肤",
+    "服纺",
+    "通用"
+   ],
+   "关联规则": [
+    "T8.1.anxiety-pressure"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "T8.1 在 TikTok 侧的出处，且措辞比 Meta 更强调「利用不安全感」（exploit insecurities）这一动机。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-061",
+   "status": "research",
+   "source_id": "S17",
+   "条款位置": "Branded Content Policy > Prohibited Industries and Products > Pharmaceuticals, healthcare and medicine products",
+   "条款原文": "Any medical institutions, treatments or devices, including nutritionists, online pharmacies and telehealth providers;",
+   "摘要": "TikTok 品牌内容把「医疗相关」整体列入禁投行业，明确包含 medical institutions、treatments 与 devices 三类对象（同节还包含婴儿两岁以下配方与营养补充剂、作医疗宣称的化妆品）。",
+   "适用渠道": [
+    "tiktok"
+   ],
+   "适用品线": [
+    "吸奶器",
+    "婴幼儿",
+    "喂养",
+    "孕产",
+    "护肤",
+    "通用"
+   ],
+   "关联规则": [
+    "T7.1.hospital-scenario",
+    "T3.3.institution-grade"
+   ],
+   "若无法关联规则": null,
+   "对判定的意义": "给 TikTok 渠道的「医院/机构」类表达一个硬边界：在该平台上，医疗机构的出现不是措辞风险而是禁投项。",
+   "未确认标记": "研究稿·未经法务确认"
+  },
+  {
+   "id": "EXT-062",
+   "status": "research",
+   "source_id": "S17",
+   "条款位置": "Branded Content Policy > In addition, you must not（第 8、9 项）",
+   "条款原文": "cause physical, mental or moral detriment to children;",
+   "摘要": "（TikTok）不得对儿童造成身体、心理或道德上的损害；下一项进一步禁止劝诱儿童购买、或鼓励儿童说服父母购买。",
+   "适用渠道": [
+    "tiktok"
+   ],
+   "适用品线": [
+    "婴幼儿",
+    "喂养",
+    "家纺",
+    "家居",
+    "通用"
+   ],
+   "关联规则": [],
+   "若无法关联规则": "F3",
+   "对判定的意义": "★ 规则库没有对应条目：与 Amazon EXT-013、MHRA EXT-050 构成三个独立来源指向同一空白——儿童作为受众/诉求对象，现有 26 条规则完全没有覆盖。",
+   "未确认标记": "研究稿·未经法务确认"
+  }
+ ],
+ "候选规则族": [
+  {
+   "id": "F1",
+   "名称": "处方/医疗级等效宣称",
+   "成员": [
+    "EXT-007",
+    "EXT-026"
+   ],
+   "依据": "Amazon 与 Google 两个来源独立指向同一空白",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  },
+  {
+   "id": "F2",
+   "名称": "不得贬低母乳喂养/不得鼓励替代",
+   "成员": [
+    "EXT-017"
+   ],
+   "依据": "喂养品线最贴脸的一条，现无任何规则覆盖",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  },
+  {
+   "id": "F3",
+   "名称": "受众定向（儿童/成人）",
+   "成员": [
+    "EXT-013",
+    "EXT-019",
+    "EXT-050",
+    "EXT-062"
+   ],
+   "依据": "四个来源分别给出「不对儿童说话」「16 岁以下不得投放」「18+ 定向」",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  },
+  {
+   "id": "F4",
+   "名称": "画面物证与素材表现",
+   "成员": [
+    "EXT-012",
+    "EXT-057",
+    "EXT-016"
+   ],
+   "依据": "体液写实画面、演示准确性、素材中广告主身份",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  },
+  {
+   "id": "F5",
+   "名称": "AI 生成素材",
+   "成员": [
+    "EXT-015"
+   ],
+   "依据": "写实但不准确、未经同意模仿真人",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  },
+  {
+   "id": "F6",
+   "名称": "供货位与市场禁投",
+   "成员": [
+    "EXT-002",
+    "EXT-018"
+   ],
+   "依据": "含英国市场；属投放侧约束，判定引擎只提示不拦截",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  },
+  {
+   "id": "F7",
+   "名称": "责任边界提示（不是规则）",
+   "成员": [
+    "EXT-024"
+   ],
+   "依据": "平台合规≠法律合规，建议做成判定输出的固定提示",
+   "status": "待法务确认",
+   "归组来源": "研究者（在交付说明里给出 7 族）；EXT-016 的归入由整合人判定，研究者未在制品中落组"
+  }
+ ],
+ "$provenance": {
+  "来源": "research/kb/外部标准库-研究稿-交付原件.json（研究者交付稿，逐字未改条目内容）",
+  "整合人补入": [
+   "$provenance",
+   "候选规则族",
+   "14 条空白条目的「若无法关联规则」族号"
+  ],
+  "整合人订正": [
+   {
+    "id": "EXT-010",
+    "改": "多余空格",
+    "从": "Comparative claims :",
+    "到": "Comparative claims:"
+   },
+   {
+    "id": "EXT-013",
+    "改": "引号形态",
+    "从": "can't",
+    "到": "can’t"
+   },
+   {
+    "id": "EXT-040",
+    "改": "多余空格",
+    "从": "as “ tests",
+    "到": "as “tests"
+   },
+   {
+    "id": "EXT-009",
+    "改": "多余空格",
+    "从": "Product endorsements : Medical or professional society endorsements (f",
+    "到": "Product endorsements: Medical or professional society endorsements (fo"
+   },
+   {
+    "id": "(过程)",
+    "改": "撤销一次自伤",
+    "从": "批量空格正则把 EXT-038 里右引号后的空格也删了（condition\" is not → condition\"is not）",
+    "到": "已从研究稿还原；规则改为只认无歧义的左引号（ “ ‘ ( [ ），不再动直引号"
+   }
+  ],
+  "订正理由": "逐字引用是本法条库的全部价值，形态必须与页面一致；三处均为转录杂质，语义未变",
+  "原文复核": "python3 tools/verify_external.py —— 逐条核对该来源快照的去空白子串；快照钉在 research/kb/_evidence/外部标准库/S*.txt（证据层，不入 git）；Meta 两条来源（S7/S8）本机无匿名取法，改对仓内 2026-09-15 的钉住件核 —— 见〔缺口:D10〕",
+  "法务确认": "authority.ratifier 仍为 null；全部 62 条 status=research"
+ },
+ "覆盖声明": {
+  "规则库真规则数": 26,
+  "有外部条款支撑": 24,
+  "仅挂 FTC 举证通则(EXT-039)": {
+   "条数": 3,
+   "规则": [
+    "T2.1.3.milk-flow",
+    "T2.2.quiet-claim",
+    "T2.2.suction-claim"
+   ],
+   "说明": "公开政策里没有针对吸力/噪音/出奶速度的专门条款，这三条只能引通则 —— 通则是否够用属法务裁定"
+  },
+  "无外部映射": {
+   "条数": 2,
+   "规则": [
+    "T9.objective-parameter",
+    "T6.3.reimbursement"
+   ],
+   "说明": "两条都不是禁止性规则：T6.3.reimbursement 已停用（enabled=false）；T9.objective-parameter 是 permit/topic_only 节点，不产生命中。故「26 条里 24 条有支撑」是完整陈述，不是抽样。"
+  },
+  "空白条目": {
+   "条数": 14,
+   "已归族": 14,
+   "候选规则族": 7
+  }
+ }
+}
