@@ -2069,6 +2069,74 @@ def main() -> int:
           + "　（仍放行只有 2 个词，说明旧语义整体消失了；这两个是 D3 法务定案的成果）")
 
 
+    # ── V45d · 2026-09-17：未接线的词必须指向一个**可决策的**未决项 ──────────
+    #   起因（本次查出的真正根因）：39 个未接线守卫词在表里挂着
+    #   `status_note="待法务定性"`，而 `$decision_queue` 里 22 项**全部 answered、
+    #   0 项 open** —— 也就是说「待法务定性」这件事**从来没有被写进唯一该写的位置**（D12）。
+    #   更坏的是 ADR-0009 §八 把它读成「未接线期间它们的降级效果与现网一致（即：不生效）」，
+    #   而旧 `豁免词` 的语义是**放行**（V45a 每次实测）。于是 39 个词被遗忘，
+    #   而遗忘的形态是一句读起来像结论的话。
+    #
+    #   ★ 本门与 V43a 同形：空缺本身允许存在，但**空缺必须指向一个可决策的未决项**。
+    #     不指向 = 遗忘（红）；指向 = 待决（绿）。两者在制品上看不出差别，只有查得出。
+    _gdoc = json.loads((SKEL / "context-guards-v1.json").read_text(encoding="utf-8"))
+    _unwired = sorted(x["word"] for x in _gdoc["words"] if not x.get("wired"))
+    _ldoc = json.loads((SKEL / "legal-decisions-v1.json").read_text(encoding="utf-8"))
+    _qitems = _ldoc.get("$decision_queue") or []
+    _qby = {q["id"]: q for q in _qitems}
+    _dec_ids = {x["id"] for x in _ldoc.get("decisions", [])}
+
+    # 判据抽成函数 —— 反向对照必须打在同一判据上，否则对照证明的是另一个东西
+    def _unwired_problems(words: list, items: list) -> list:
+        bad = []
+        for w in words:
+            cov = [q for q in items if w in (q.get("covers_unwired_guards") or [])]
+            if len(cov) > 1:
+                bad.append(f"{w}: 被 {len(cov)} 条未决项同时认领（定位不唯一）")
+                continue
+            if cov and cov[0].get("status") == "open":
+                continue
+            # 另一种合法形态：决定已经答了，直接写在词条里（不必再挂未决项）
+            row = next((x for x in _gdoc["words"] if x["word"] == w), {})
+            blob = f"{row.get('wire_gap') or ''} {row.get('status_note') or ''}"
+            cited = ({f"Q{n}" for n in re.findall(r"\bQ(\d+)\b", blob)} & set(_qby)) \
+                | ({f"D{n}" for n in re.findall(r"\bD(\d+)\b", blob)} & _dec_ids)
+            if any((_qby[i].get("status") == "answered") if i in _qby else True
+                   for i in cited):
+                continue
+            bad.append(f"{w}: 既没有被任何 open 的未决项认领，词条里也没点名一条已答的 "
+                       f"Q/D —— 这不是「待决」，是「遗忘」")
+        return bad
+
+    _uprob = _unwired_problems(_unwired, _qitems)
+    # 守恒：认领并集必须**恰好**等于未接线集合（缺口与多余都算断）
+    _claimed = [w for q in _qitems for w in (q.get("covers_unwired_guards") or [])]
+    _gap = [w for w in _unwired if w not in set(_claimed)]
+    _stale = [w for w in _claimed if w not in set(_unwired)]
+    # 反向对照：真正抽掉一条认领，判据必须变红，否则本条是恒真
+    _mut = copy.deepcopy(_qitems)
+    for _q in _mut:
+        if _q.get("covers_unwired_guards"):
+            _q["covers_unwired_guards"] = _q["covers_unwired_guards"][1:]
+            break
+    _mut_claimed = {y for q in _mut for y in (q.get("covers_unwired_guards") or [])}
+    _ctrl_u = bool(_unwired_problems(_unwired, _mut)) or any(
+        w for w in _unwired if w not in _mut_claimed)
+    _N_UNWIRED = 39
+    _relax_u = (f"未接线 {len(_unwired)} < {_N_UNWIRED}" if len(_unwired) < _N_UNWIRED else "")
+    check("V45d", f"每个未接线的守卫词都指向一条**可决策的**未决项（被 ≥1 条 open 认领，"
+                  f"或词条点名一条已答的 Q/D）；认领并集恰好等于未接线集合；未接线 ≤ {_N_UNWIRED}",
+          not _uprob and not _gap and not _stale and _ctrl_u
+          and len(_unwired) <= _N_UNWIRED,
+          f"未接线 {len(_unwired)} 个 · open 未决项 "
+          f"{sum(1 for q in _qitems if q.get('status') == 'open')} 条 · "
+          f"认领 {len(_claimed)} 个（缺口 {len(_gap)} / 多余 {len(_stale)}）· "
+          + ("；".join(_uprob[:2]) if _uprob else "逐词可决策")
+          + ("　★ 已改善：" + _relax_u + " —— 本门转红是故意的：请把阈值收紧到当前值再提交"
+             if _relax_u else "")
+          + f"　反向对照：抽掉一条认领 → {'必红' if _ctrl_u else '❌判据恒真'}")
+
+
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
     if a.json:

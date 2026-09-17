@@ -1459,6 +1459,186 @@
    "answered_at": "2026-09-17",
    "record": "legal-decisions-v1.json · D28",
    "$how": "以选择题交付（D12），选项与推荐写在本题的 options 里。"
+  },
+  {
+   "id": "Q23",
+   "kind": "legal_question",
+   "line": "engine",
+   "status": "open",
+   "owner": "法务（经 Owner 转达）",
+   "raised_at": "2026-09-17",
+   "title": "16 个「否定」+ 2 个「免责声明」的未接线守卫词，是否接线为降级",
+   "question": "把 36 个「自身就会命中本规则」的旧豁免词逐个喂给引擎实测：2 个仍放行、13 个变成降级、21 个**拿不到任何带**（词在表里但 `wired=false`，对引擎零影响 → 规则按满档判险）。这 21 个的语义档是：否定 16、免责声明 2、未归类 3（后 3 个另见 Q24/Q25）。前 18 个所属的「否定 / 免责」**正是守卫表 `mechanism.semantics` 自己写明的两类**，且同族词已经接线（`cannot cure` 已接线、`cannot treat` 未接线；`does not treat` 已接线、`does not cure` 未接线）；其中 4 个的 `wire_gap` 更是表自己写的「同族已接线 —— 词形未补全」，即表已自认这是缺陷而非决定。按 ADR-0008 §三分工表，「一条语境规则该不该存在」是法务的决定、开发者不得自行增删 —— 所以接通之前必须有人答这一句。",
+   "evidence": "三桶实测 2/13/21（守恒：2+13+21=36）见 `research/governance/skeleton/_data/迁移保真度.json` 的 `轴1_例外漂移`，`python3 research/governance/audit_migration_fidelity.py` 可重跑；逐词接线状态见 `context-guards-v1.json` 的 `words[].wired`/`wire_gap`。这 21 个词在 291 条存量语料上实例数**实测 0** —— 是潜在缺陷，不是已发生的事故（已发生的 3 条来自 `treat yourself`，它不是本项）。",
+   "options": [
+    {
+     "key": "A",
+     "label": "18 个全部接线为降级（与同族已接线词同处置）",
+     "recommended": true,
+     "impact": "后果是把「本品不能治疗任何疾病」这类免责声明从 `auto_reject` 降到 `manual_review`（进人工复核），不是直接放行。代价是人工队列会多出这一类条目；收益是它们不再被当作「医疗功效主张」满档拦截 —— 目前同一个意思，英文的 `cannot cure` 降级、`cannot treat` 满档，语种决定结局。"
+    },
+    {
+     "key": "B",
+     "label": "只接 4 个自述「同族已接线·词形未补全」的，其余 14 个逐词另议",
+     "recommended": false,
+     "impact": "4 个是表自己承认的缺陷，接通无争议；代价是剩下 14 个（含 8 个中文否定式）继续无带，而它们的英文同义式已接线 —— 「同一句免责声明，中文满档、英文降级」的语种不对称继续存在。"
+    },
+    {
+     "key": "C",
+     "label": "维持不接线（= 现状）",
+     "recommended": false,
+     "impact": "18 个词继续对引擎零影响，规则按满档判险。本语料无实例，所以沉默不会立刻产生误拦；但它把**一个没有人做过的决定**继续当作「已决定：不接线」执行 —— 这正是本次查出来的根因形态。"
+    }
+   ],
+   "default_if_unanswered": "沉默 = 选项 C（维持不接线）：现状即如此 —— 18 个词的降级效果继续不生效，规则对这 18 个词按 L4 满档判险。本语料 291 条实测 0 实例，所以代价暂时是隐性的，直到第一条「不能治疗任何疾病」式的免责声明进入投放为止。",
+   "where": "`research/governance/skeleton/context-guards-v1.json` 的 `words[].wired` 与 `wire_gap`；账本 `research/governance/skeleton/_data/迁移保真度.json`。",
+   "covers_unwired_guards": [
+    "can't treat",
+    "cannot treat",
+    "do not cure",
+    "does not cure",
+    "won't cure",
+    "不可以治疗",
+    "不可以治疗乳腺炎",
+    "不可治疗",
+    "不是乳腺炎治疗设备",
+    "不是治疗",
+    "不用于治疗",
+    "不能治愈",
+    "不能治愈乳腺炎",
+    "不能治疗",
+    "不能治疗乳腺炎",
+    "并非治疗",
+    "无法治疗",
+    "无法治疗乳腺炎"
+   ]
+  },
+  {
+   "id": "Q24",
+   "kind": "legal_question",
+   "line": "engine",
+   "status": "open",
+   "owner": "法务（经 Owner 转达）",
+   "raised_at": "2026-09-17",
+   "title": "`乳腺炎治疗设备` —— 旧规则的一条假阴孔，迁移还是剔除",
+   "question": "H02（医疗功效·预防/治疗乳腺炎）的 `exceptions` 里有两条并列的词：`不是乳腺炎治疗设备` 与 **`乳腺炎治疗设备`**。后者不是免责声明 —— 它**就是 H02 要抓的那个主张本身**（`乳腺炎` 是 H02 的匹配词）。旧系统 `exceptions` 的语义是**放行**（同批次天然对照：`Savannah-20260825` 的 `i=265` 含豁免词 → 源表 0 命中·绿；`i=270/271` 不含 → 命中 H07,U04·红），也就是说：**旧系统对写着「乳腺炎治疗设备」的文案是放行的**。它现在 `wired=false`，所以今天拿不到带、按满档判险 —— 这个洞是被**意外**关上的，不是被决定关上的。忠实迁移会把这个洞搬进新系统。",
+   "evidence": "`research/governance/skeleton/_data/rules_raw.json` 的 H02 `exceptions`（逐字）；同文件中 H02 `keywords` 含 `乳腺炎`、不含 `乳腺炎治疗设备`（实测）；同批次天然对照由 `audit_migration_fidelity.py` 轴 0 每次运行实测；live 实测 `judge(\"乳腺炎治疗设备\")` → `auto_reject`，同时命中 T1.1.medical-cure 与 T1.2.medical-prevent。",
+   "options": [
+    {
+     "key": "A",
+     "label": "不迁移：从守卫表剔除，单独立项为「旧规则假阴孔」交法务确认是否补召回",
+     "recommended": true,
+     "impact": "承认旧表里有一条写反的词。代价是要回头查旧表还有没有同类（同一 `豁免词` 字段在另外 20 条规则里尚未逐条互查）；收益是不把一个「正向主张被豁免」的洞当成词表迁移问题悄悄处理掉。"
+    },
+    {
+     "key": "B",
+     "label": "按 legacy 忠实迁移为放行项",
+     "recommended": false,
+     "impact": "新系统会重现旧行为：写着「乳腺炎治疗设备」的文案被判为无风险。可辩护之处只有「与现网一致」，而这条一致本身就是错的 —— ADR-0009 §八 已经犯过一次「把现状当成正确」的错（见 ADR-0014）。"
+    },
+    {
+     "key": "C",
+     "label": "迁移为降级（= 现表默认处置）",
+     "recommended": false,
+     "impact": "它会与 `不是乳腺炎治疗设备`（语义相反）在表里并列且同为降级 —— 一个主张和它的否定拿到同一个处置，这一档信号就失去区分力。"
+    }
+   ],
+   "default_if_unanswered": "沉默 = 选项 C（当作普通降级词）：现状是 `wired=false`，暂时等价于「不生效 + 满档判险」；一旦有人按 Q23 批量接通，它会连同 `不是乳腺炎治疗设备` 一起被接成降级 —— **洞被顺手关上，而没有人知道它曾经开着**。",
+   "where": "`research/governance/skeleton/_data/rules_raw.json` 的 H02 `exceptions` 与 `keywords`。",
+   "covers_unwired_guards": [
+    "乳腺炎治疗设备"
+   ]
+  },
+  {
+   "id": "Q25",
+   "kind": "legal_question",
+   "line": "engine",
+   "status": "open",
+   "owner": "法务（经 Owner 转达）",
+   "raised_at": "2026-09-17",
+   "title": "「非主张」词无家可归：`treat yourself` / `or cure` / `or treat` 该走哪条通道",
+   "question": "两个通道的准入判据合起来没有「非主张」的位置：白名单准入是「能否被第三方独立复核为真/假」（`whitelist-v1.json` 的 `admission_criterion`）—— 非主张无所谓真假；守卫的机制语义是「表明该规则所指的主张**并未被作出**（否定 / 免责 / 溯源 / 弱化替代）」（`context-guards-v1.json` 的 `mechanism.semantics`）—— 非主张不是「取消主张」，它是**另一个主张**（如自我照护建议）。实测后果：`treat yourself` 落在 `guard_type=未归类`，被接成降级（旧系统是**放行**），已造成 3 条记录被误拦；`or cure` / `or treat` 同为未归类、未接线、拿不到带。注意 `treat yourself` 之所以会命中 H01，是因为 H01 的匹配词里有裸 `treat` —— 命中的不是「疗效主张」，是**词形**。所以这可能不是通道问题，而是 ADR-0007 的**准入**问题。",
+   "evidence": "live 实测 `judge(\"treat yourself\")` → `manual_review`（旧系统放行，已造成迁移回归假阳性 3/291）· `judge(\"or cure\")` / `judge(\"or treat\")` → `auto_reject`；`context-guards-v1.json` 中 `guard_type=未归类` 全表 7 个（`or cure` `or treat` `soulage les engorgements` `soulager les engorgements` `treat yourself` `乳腺炎治疗设备` `gently`）；H01 `keywords` 含裸 `treat`；两通道判据见 `whitelist-v1.json` 的 `admission_criterion` 与 `context-guards-v1.json` 的 `mechanism.semantics`。",
+   "options": [
+    {
+     "key": "A",
+     "label": "不改通道，改准入：非主张词走 ADR-0007 的准入过滤，不再作为守卫词存在",
+     "recommended": true,
+     "impact": "它们既不该放行、也不该降级，而是**不该让规则因它们而命中**。代价是 H01 的匹配词表要动（影响面大于加一个守卫词），且需要法务裁一次「哪些词形不算主张」；收益是 `treat yourself` 的 3 条误拦从根上消失，而不是靠降级去和稀泥。"
+    },
+    {
+     "key": "B",
+     "label": "新增第三通道「非主张」落放行带（= 复现旧系统行为，独立成表）",
+     "recommended": false,
+     "impact": "行为上回到现网，且把「非主张」写成结构而不是靠词义区分；代价是放行带首次出现白名单以外的来源，ADR-0008/0009 的「放行 = 白名单唯一职责」这条不变量需要改写。"
+    },
+    {
+     "key": "C",
+     "label": "维持降级（= 现状）",
+     "recommended": false,
+     "impact": "`treat yourself` 继续把 H01 从 `auto_reject` 降到 `manual_review`（比旧系统更严），3 条误拦继续发生；`or cure` / `or treat` 继续无带。可辩护之处是 fail-safe 方向，代价是「同一个短语，旧系统拿它免责、新系统拿它定罪」这句话仍然没有被回答。"
+    }
+   ],
+   "default_if_unanswered": "沉默 = 选项 C（维持降级）：现状即如此 —— `treat yourself` 继续造成约 3 条/批的误拦，`or cure` / `or treat` 继续无带，「非主张」这一档继续不存在，下一个同类词还会被塞进降级通道。",
+   "where": "`research/governance/skeleton/context-guards-v1.json` 的 `mechanism.semantics`；`research/governance/skeleton/whitelist-v1.json` 的 `admission_criterion`。",
+   "covers_unwired_guards": [
+    "or cure",
+    "or treat"
+   ]
+  },
+  {
+   "id": "Q26",
+   "kind": "legal_question",
+   "line": "engine",
+   "status": "open",
+   "owner": "法务（经 Owner 转达）",
+   "raised_at": "2026-09-17",
+   "title": "剩下 18 个未接线守卫词（弱化 10 / 风险降低 5 / 溯源 1 / 未归类 2）是否接线",
+   "question": "Q23/Q24/Q25 覆盖了 39 个未接线词里的 21 个，剩下这 18 个的处境完全相同：`wired=false` → 对引擎零影响。它们的语义档（弱化/替代 10、风险降低 5、溯源/同源 1）也都是守卫表 `mechanism.semantics` 自己写明的档，只有 2 个法语词（`soulage/soulager les engorgements`）是 `未归类`。「不会自我命中」**不等于没用** —— 守卫词的作用是在**别的词**让规则命中时把它降级（例如 `relieves engorgement` 要在 `engorgement treatment` 命中 H01 时起作用），所以这批不能靠 Q23 的自我触发实测来判，必须单独问。",
+   "measured": "语料侧实测：这 18 个词里 **17 个在本语料 291 条上零实例**；唯一有实例的 `soulage les engorgements` 出现在 4 条记录（#136/#166/#168/#169，广告名 `w1-卖点图`/`w1-卖点视频`），源表判 `H07,M01·高危·红`、引擎判 `auto_reject / L4 / H07,M01` —— **两者一致**（它要降的是 H01，而这几条 H01 未命中）。即：这 18 个词在本语料上造成的分歧为 **0 条**，问题完全是前瞻性的，与 ADR-0012「`FDA registered` 改降级（存量 0 次命中，前瞻性）」属同一类。",
+   "evidence": "逐词状态见 `research/governance/skeleton/context-guards-v1.json` 的 `words[].wired`/`wire_gap`（成因两种：同族已接线·词形未补全 / 骨架未收录·需确认是有意剔除还是抄漏）；语料实例数与逐条对照由 `python3 research/governance/audit_migration_fidelity.py` 重跑得出。",
+   "options": [
+    {
+     "key": "A",
+     "label": "16 个语义档明确的接线为降级，2 个法语未归类词随 Q25 一并处理",
+     "recommended": true,
+     "impact": "与守卫表自己的语义定义一致，且与已接线的同族词（`relieve discomfort`/`reduces discomfort` 等）同处置。代价是人工复核队列会多出「缓解涨奶」这类边界表述的条目 —— 但 H01 的边界文本本来就写着「边界允许：缓解涨奶 ease/relieve engorgement」，那正是降级而不是拦截的含义。"
+    },
+    {
+     "key": "B",
+     "label": "18 个全部维持不接线，并在表里逐词写明「有意剔除」及理由",
+     "recommended": false,
+     "impact": "如果决定是不接线，那也是一种决定，写下来即可；代价是这批词留在表里成为**死重**（G2 要求每个守卫词至少声明一条 downgrades，声明了却不生效，读表的人会以为它生效）。"
+    },
+    {
+     "key": "C",
+     "label": "维持不接线且不改表（= 现状）",
+     "recommended": false,
+     "impact": "与 Q23 选项 C 同病：把「没有人做过的决定」继续当作「已决定」执行。本语料分歧 0 条，所以代价暂时隐性。"
+    }
+   ],
+   "default_if_unanswered": "沉默 = 选项 C（维持不接线）：这 18 个词的降级效果继续不生效，规则在它们出现的文案上按满档判险。本语料 291 条实测分歧 0 条（17 个零实例、1 个与源表一致），所以沉默的代价目前只在前瞻面上。",
+   "where": "`research/governance/skeleton/context-guards-v1.json` 的 `words[].wired` 与 `wire_gap`。",
+   "covers_unwired_guards": [
+    "eases engorgement",
+    "easing engorgement",
+    "engorgement relief",
+    "may help your flow",
+    "reduce the risk of plugged",
+    "reduces the risk of clogged",
+    "reducing the risk of clogged",
+    "relaxation supports",
+    "relieves engorgement",
+    "relieving engorgement",
+    "risk of clogged ducts",
+    "risk of plugged ducts",
+    "soothe engorgement",
+    "soothes engorgement",
+    "soulage les engorgements",
+    "soulager les engorgements",
+    "放松",
+    "自然奶阵"
+   ]
   }
  ]
 }
