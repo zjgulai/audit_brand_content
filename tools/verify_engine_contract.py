@@ -1060,6 +1060,49 @@ def main() -> int:
         check("V30f", "每条未决项都指得出「去哪里看」（where 点名的文件真实存在，不是悬空引用）",
               not _dang, "；".join(_dang) if _dang else f"{len(_open)} 项全部可解析")
 
+        # ── V30g · 2026-09-17（B3.1 · D27）：台账扩成全仓台账之后的新失败形态 ──
+        #   D12 把「未决项写在哪」收敛成一处；Q21/D27 把这一处从「法务/引擎」扩成
+        #   「本仓所有线」。于是多了一种过去不存在的错法：**线的混淆** ——
+        #   知识库线的题指回一条引擎线的决定，或者新条目干脆忘了标线。
+        #   两种都让「这是谁的决定」在阅读时消失，而它消失得没有任何声响。
+        _LINES = {"engine", "kb", "repo"}
+        _dec_by_id = {x["id"]: x for x in _led.get("decisions", [])}
+        _line_bad = []
+        for x in _led.get("decisions", []):
+            if x.get("line") not in _LINES:
+                _line_bad.append(f"{x['id']}: line={x.get('line')!r} 不在 {sorted(_LINES)}")
+        for q in _dq:
+            if q.get("line") not in _LINES:
+                _line_bad.append(f"{q['id']}: line={q.get('line')!r} 不在 {sorted(_LINES)}")
+            if q.get("status") != "answered":
+                continue
+            for c in re.findall(r"\bD(\d+)\b", q.get("record") or ""):
+                dd = _dec_by_id.get(f"D{c}")
+                if dd is not None and dd.get("line") != q.get("line"):
+                    _line_bad.append(f"{q['id']}({q.get('line')}) 指回 D{c}"
+                                     f"({dd.get('line')}) —— 不同线")
+        check("V30g", "每条问题与每条规定都标了归属线，且已答项指回的决定与它同线（D27）",
+              not _line_bad, f"{len(_dq)} 题 / {len(_dec_by_id)} 决定 · "
+                             + ("；".join(_line_bad) if _line_bad
+                                else "全部标线且同线 · "
+                                     + str(sorted({q.get("line") for q in _dq}))))
+
+        # 反向对照：把一条已答项的 line 掰弯，V30g 必须真的变红
+        _seed2 = next((q for q in _dq if q.get("status") == "answered" and q.get("record")), None)
+        _bad2 = []
+        if _seed2:
+            _m = copy.deepcopy(_seed2)
+            _m["line"] = "engine" if _seed2.get("line") != "engine" else "kb"
+            _m["id"] = "Q-mut"
+            for c in re.findall(r"\bD(\d+)\b", _m.get("record") or ""):
+                dd = _dec_by_id.get(f"D{c}")
+                if dd is not None and dd.get("line") != _m.get("line"):
+                    _bad2.append("不同线")
+        check("V30h", "反向对照：把已答项的 line 掰弯，V30g 的判据必须报「不同线」（不是恒真）",
+              bool(_seed2) and bool(_bad2),
+              f"样本={_seed2.get('id') if _seed2 else '★无'} · 掰弯后 → {_bad2 or '★没抓住'}")
+
+
     # ══ V31–V37 · 2026-09-16 第三批（D13–D18）═══════════════════════
     #   六项决定全部落在「升级面 / 声明与实现一致 / 键结构 / 命名 / 取值域 / 送达」
     #   这六处**存量语料看不见的地方**，所以每一组都配了反向对照。
