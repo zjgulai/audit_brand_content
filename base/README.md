@@ -1,0 +1,268 @@
+# `base/` —— 基座
+
+> 状态：**B0.2 完成**（`ContentUnit` 契约）。B0.1 见 `ADR/ADR-0013-基座接口冻结与仓库入库分级.md`。
+> 自证命令：`python3 base/contract.py --selftest`（**全绿才算完成**）
+
+## 为什么单开一个 `base/`
+
+仓库原有两个顶层目录，各自有明确的语义：
+
+| 目录 | 装什么 | 判据 |
+|---|---|---|
+| `research/` | 调研过程与结论。证据、报告、方法论文档 | 「这是一次调研的产物」 |
+| `tools/` | 调研期的脚本。抓取、核对、体检、推送 | 「这是为了让某次调研跑起来而写的」 |
+| **`base/`** | **产品化的契约层。会被 PRD 之后的装配层依赖** | **「这东西不能随便改，改了要有人知道」** |
+
+ADR-0013 §一 D1 定的「五个面」里，①②③ 三面会返工。基座就是那三面的落点：
+
+```
+① 进   ContentUnit + 解析器          ← base/contract.py          （B0.2 ✅）
+② 判   judge(unit) → Verdict         ← base/judge_adapter.py      （B0.3）
+③ 供   规则词表单向同步 + 版本        ← base/sync_rules.py         （B0.4）
+⑤ 证   基座自证                       ← base/verify_base.py        （B0.5）
+④ 出   处置五层 + 回执                ← 已建成，在 skeleton/（ADR-0012）
+```
+
+**`research/` 与 `tools/` 本轮不动。** 引擎代码（`research/governance/skeleton/`）也不动 ——
+ADR-0013 D1 说的是「在引擎**前面**立一个统一信封」，不是「改引擎」。
+
+---
+
+## `ContentUnit` 是什么
+
+一句话：**把任意形态的内容，变成同一种可判、可溯、可复现的东西。**
+
+```python
+from contract import from_text, validate
+u = from_text("FDA approved wearable breast pump", product_line="吸奶器")
+validate(u)          # → [] 表示通过
+u["text"]            # → 判定输入
+u["fingerprint"]     # → 两个指纹
+```
+
+### 字段
+
+| 字段 | 答什么问题 | 备注 |
+|---|---|---|
+| `unit_id` | **这一次观测**是哪一次 | `cu` + 16 hex。**两份指纹都进** —— 原件变了就是新的一次观测 |
+| `content_key` | **这两次看到的是不是同一个东西** | `ck` + 16 hex。**只吃正文指纹** —— 页面重渲染后它不变 |
+| `fingerprint.raw_sha256` | 看的是**哪份原件** | 广告 = 整行记录的规范化 JSON；落载体 = 原始响应体 |
+| `fingerprint.text_sha256` | **重跑能不能得到一样的数** | 恒等于 `sha256(text)`（H4 断言） |
+| `text` | 判定输入本身 | 是归一化的**不动点**（H3 断言）。**不是审计记录** |
+| `source.uri` | **实际被取的那个 target** | 不是逻辑页面键。见下面「一个 url_key ≠ 一个 unit」 |
+| `source.raw_pointer` | 原件在哪 | 可空。指不到时 `raw_verified=false`，**不假装验证过** |
+| `normalization` | 正文经过哪一档归一化 | 具名档位 + 步骤。改档位 = 改所有指纹 |
+| `composition` | 正文由哪些字段按什么口径拼成 | 含 `parts` 边界，**逐字可核** |
+| `textification` | 非文本形态怎么变成文字、覆盖到哪 | 图片/视频必填 `covers` 与 `does_not_cover` |
+| `text` / `has_text` | 有没有可判文本 | `has_text` 是**路由输入**（D5），不是判定输入 |
+| `routing` | 按什么查得到收件人 | 键必须是 `judge()` 真的接受的形参名（H14） |
+| `context` | 盘子有多大 | 花费/展示/点击/广告组。**不进判定，也不做路由键** |
+| `reference_verdict` | 人工当时判了什么 | **只作对照**。进 `judge()` 就是拿答案评自己的卷子 |
+
+### 不变量（`validate()` 执行，H1–H14）
+
+```
+H1  contract_version 已知
+H2  text 是 str
+H3  text 是归一化的不动点：normalize(text) == text
+H4  text_sha256 == sha256(text)，text_chars == len(text)
+H5  has_text == bool(text.strip())
+H6  两个指纹都是 64 位小写十六进制
+H7  unit_id / content_key 可复算
+H8  source.kind 在取值域内，source.uri 非空
+H9  normalization.profile/steps 与登记表一致
+H10 composition 已登记；parts 有序、不重叠、在界内
+H11 逐字可核：text[start:end] 的 sha256 == parts[i].value_sha256
+H12 parts 之间恰好是 separator，首尾无多余字符
+H13 reference_verdict 是 dict 或 None
+H14 routing 的键 ⊆ judge() 的形参名（在 to_judge_kwargs() 里查）
+```
+
+**H11 是这套里最有用的一条。** 它让「拼装没吃掉、也没掺入任何字符」在**不持有原件**时也能验 ——
+每个 part 带着自己那段的 `value_sha256`，所以一个 unit 离开它的来源之后仍然自证（ADR-0008 §四）。
+
+---
+
+## 三件在写它的过程中被实测逼出来的事
+
+### 一、「广告文本怎么拼」全仓有四个口径，而它们**不一致**
+
+| 位置 | 口径 | 空字段 |
+|---|---|---|
+| `skeleton/score.py:484` `rec_text()` | `" | ".join` | 过滤 |
+| `tools/offline_replay.py:63` `text_of()` | `"\n".join` | 过滤 |
+| `tools/verify_engine_contract.py:1427` | `PT + "\n" + HL` | **不过滤**，`.strip()` |
+| `tools/lp_consistency.py:106` | `" | ".join` | 过滤 |
+
+在 291 条真实语料上量两种口径（`" | "` vs `"\n"`）：
+
+```
+文本不同          232 / 291      ← 只有 59 条 PLA 空文案两边一致
+判定不同            0 / 291
+命中规则集不同      0 / 291
+命中条数不同        0 / 291
+命中位置不同       12 / 291      ← 差恰好 2 个字符（" | " 比 "\n" 长 2）
+```
+
+**今天它不改变任何一条判定，它改变位置。** 而位置是契约字段（ADR-0012 决策 5），
+且 §3.1 写过「宁可少报位置，不可错报位置 —— 一个错位置比没有位置更坏，**它看起来是对的**」。
+
+更硬的一条：**规则文件里有 10 条 pattern 把 `|` 写进了排除类**（`[^.!?|]*`）：
+
+```
+T2.1.1.milk-supply       295\s?mmhg[^.!?|]*(more milk|better|faster)
+T2.1.2.pain-relief       (say )?goodbye to [^.!?|]*pain\w*
+T3.2.expert-endorsement  \brecommended by [^.!?|]*(doctor|expert|pediatrician|ob-?gyn)
+T2.2.mimic-claim         (auto|automatic|smart)[^.!?|]*(detect|find|identif|recogniz)\w*[^.!?|]*(rhythm|pattern|let-?down|pace)
+…… 共 10 条
+```
+
+无论作者本意如何，它的**实际作用**是在 `|` 处截断跨字段匹配。换成 `"\n"` 拼串后这 10 道屏障**全部失效** ——
+逐条 pattern 构造验证，有 **11 组**跨字段伪命中会因此成立：
+
+```
+PT="Hospital"  HL="Grade Suction"   →  T3.3.institution-grade 命中 "Hospital\nGrade"
+PT="FDA"       HL="approved …"      →  T6.1.regulatory-status 命中 "FDA\napproved"
+PT="zero"      HL="risk pumping"    →  T5.1.safety-claim      命中 "zero\nrisk"
+PT="doctor"    HL="recommended …"   →  T3.2.expert-endorsement 命中 "doctor\nrecommended"
+PT="3x"        HL="faster than …"   →  T2.3.sourced-data       命中 "3x\nfaster"
+…… 共 11 组
+```
+
+**本语料上这 11 组一次都没发生**（291 条实测 0 处）。所以这是**潜伏**缺陷，不是现行缺陷 —— 这个区别必须说清。
+
+**处置**：`" | "` 定为唯一规范口径（`fields-pipe-v1`），并把 `parts` 的**字段边界**记进 unit。
+另一条口径（`fields-newline-v1`）在 `COMPOSITION_REGISTRY` 里**登记但未采用**，状态
+`documented-not-canonical` —— 登记的用途是让「换口径位置会差 2 字符」这件事**可被复算**，而不是消失。
+
+> **留给 Owner 的一道选择题**（本题不需要现在答，但它是本层唯一一处「选另一条也能自圆其说」的地方）：
+> 第三个选项是 **不做拼串** —— 把 `Primary Text` 与 `Headline` 作为两个 part 分别判定再做聚合。
+> 它最干净（跨字段伪命中在结构上不可能），但会改动判定语义与聚合规则，代价远大于前两条。
+> 在 PRD 到来、复核界面需要按位置高亮原文之前，前两条的差别不会显现。
+> **推论**：如果装配层要按 `position` 高亮，这条必须先定案。
+
+### 二、双指纹不是设计偏好，是**实测出来的必需品**
+
+联网复取 4 个页面、每个取两次（间隔 20 秒；只读、遵守 robots、复用批次 C 的节流）：
+
+```
+页面                                                     raw_sha256   text_sha256
+au.momcozy.com/pages/brand-new-wellness-1-warm-massage…    变           同
+ca.momcozy.com/blogs/breastfeeding/how-much-milk-to-pump   变           同
+de.momcozy.com/collections/electric-breast-pump            变           同
+es.momcozy.com/collections/electric-breast-pump            变           同
+
+→ raw 变 4/4，正文变 0/4
+```
+
+其中 de 站那个页面连**字节数**都变了（1074085 → 1072914），正文仍**逐字节相同**。
+
+**这就是两个指纹不能合并的实测依据**：原件在变，正文没变。
+合并成一个数之后，这件事再也观测不到 —— 要么把「页面没改」误报成「改了」（只留 raw），
+要么答不了「当时到底看的是哪一份」（只留 text）。
+
+原始证据：`research/landing/_evidence/refetch-20260917T080011Z/复取实测.json`（L2）。
+
+### 三、一个「不崩、不报错」的静默缺陷，在第一版里真的发生了
+
+`from_landing_page()` 第一版对商品 JSON 写的是 `extract_rec["structured"].get("text")` ——
+而 `lp_extract.analyze_structured()` **根本不产出 `text` 这个键**（它给的是 `title` / `description_text`）。
+
+后果：**44 个商品 JSON 全部拿到空正文、全部 `has_text=False`**，
+也就是全部被路由去 DP0「没有可判文本」—— 而它们 44/44 有标题、17/44 有描述。
+
+这正是本项目最怕的失效形态：**不崩、不报错，只是安静地把「取了 44 个 JSON」
+记成「44 条没什么可看的」。** 覆盖 44 个 URL 的工作量看起来完成了，实际一条都没进判定。
+
+**处置**：修正为按 `fields-pipe-v1` 拼 `title` + `description_text`（与广告文案同一口径，
+同样受 `[^.!?|]` 那道屏障保护），并**加了一条专门守这个形态的断言**：
+
+```
+[9] 有提取内容却产出空正文的落载体：0 / 136
+```
+
+该断言已做**反向对照**：把 bug 放回去，它报 **44 / 44** —— 这条断言挡得住。
+
+---
+
+## 「一个 url_key ≠ 一个 unit」
+
+`抓取结果.json` 里：
+
+```
+92 个 url_key  →  133 个不同 target
+                  其中 48 次抓取打的是 <页面>.js（Shopify 商品 JSON）
+```
+
+`ContentUnit` 因此以 **target** 为 `source.uri`，而不是 `url_key`。
+把一个页面的 HTML 与它的 JSON 塞进同一个 unit，会让 `raw_sha256` 指着 A 而正文来自 B ——
+**两个字段都写对了，合起来是错的。**
+
+副产品：`92 + 44 = 136` 个观测折叠为 **133 个 `unit_id`**。少 3 个不是 bug ——
+有 3 个 url_key（`collections/…/products/…` 形式）重定向到了同一个 target，
+它们本来就该是同一个观测。这正是「一次观测 = 一个 id」的意义。
+
+---
+
+## 自证
+
+```bash
+python3 base/contract.py --selftest     # 30 项检查 + 11 条反向对照，必须全绿
+python3 base/contract.py --stats        # 语料规模与指纹分布
+python3 base/contract.py --from-text "文案…" --json
+python3 base/contract.py --from-record GG-d1ff3cf1bb1d --json
+python3 base/contract.py --from-url-key momcozy.com/products/… --json
+```
+
+当前结果：
+
+```
+✓ B0.2 自证全绿：291 条广告 + 136 个落载体 → 427 个合法 unit
+```
+
+九个面：语料面 / 归一化面 / 拼装面 / 指纹面 / 复取实测 / 留痕面 / 桥接面 /
+反向对照 / schema 面 / 静默空正文面。
+
+**十条反向对照**（改坏 unit 必须红）是这套自证的价值所在 ——
+一条永远不会红的检查等于没有检查。它们各自盯一个不变量：
+
+```
+改一个字符            → H4        正文尾部塞空白        → H3
+unit_id 手改          → H7        正文尾部塞可见字符    → H4 + H12
+has_text 撒谎         → H5        separator 改掉        → H10
+raw_sha256 写短       → H6        未知路由键            → H14
+kind 越域             → H8        旧 bug 复现           → [9] 44/44 红
+parts 起点挪 1        → H11
+归一化档位不存在      → H9
+```
+
+---
+
+## 这一层**不做**什么（说清，否则会被当成已解决）
+
+1. **不判定。** 本层不产出任何合规结论。`to_judge_kwargs()` 只把 unit 翻译成 `judge()` 的实参，
+   判定是 ADR-0005 的边界，属 `judge()`（B0.3）。
+2. **不落库。** `unit["text"]` 是判定输入，不是审计记录。
+   留痕用 `fingerprint_view()` —— 它把正文换成指纹，与 ADR-0012 §3.3 同一条规矩。
+   **代价同那条决定**：光看这个视图无法还原当时判了什么，要复核必须同时持有原文。
+3. **不抓取、不解析。** 落地页的字节来自批次 C（`lp_fetch.py` / `lp_extract.py`）；
+   本层只把它们的产物收进同一个信封。
+4. **图片 / 视频只有契约，没有实现。** `from_media()` 存在，但**必须由调用方给出正文与覆盖边界**，
+   且刻意不提供默认值 —— 一个默认的 `covers` 会让「只做了 OCR」看起来像「图片已审」。
+   OCR/ASR 是 **B1**。ADR-0013 异议二要求：B1 的图片/视频指标里必须写清
+   「本数字只覆盖图内文字，不含画面语义」，并进 `boundary_statement.unknowns`。
+5. **`raw_sha256` 不等于「原件已入库」。** 它是指纹；原件在 L2（内容寻址），或压根不在本仓。
+   `raw_verified` 如实记录指纹是不是由落盘原件重算来的。
+6. **规则与词表的权威源仍在飞书**（ADR-0013 D2）。本层不做同步，那是 B0.4。
+
+---
+
+## 与后续步骤的接口
+
+| 期 | 依赖本层的什么 | 本层已备好 |
+|---|---|---|
+| **B0.3** `judge(unit)` | `to_judge_kwargs(u)` + `fingerprint_view(u)` | ✅ 两者都在，且 H14 保证路由键真的被 `judge()` 接受 |
+| **B0.4** 规则单向同步 | `composition` / `normalization` 的**版本会进回执**，因此规则的「哪一版」与正文的「哪一版」必须能分开答 | ✅ 具名档位 + 登记表 |
+| **B0.5** `verify_base.py` | `selftest()` 作为五个面之一被调用；另需补 ADR-0013 异议一承诺的 **L1 自足性检查** | ✅ `--selftest` 退出码 0/1 可直接编入 |
+| **B1** 四形态管道 | `from_media()` 的 `covers` / `does_not_cover` 必填 | ✅ 契约在，实现在 B1 |
+| **装配层（等 PRD）** | `position` 的一致性 —— 见「留给 Owner 的一道选择题」 | ⚠️ **需先定案** |
