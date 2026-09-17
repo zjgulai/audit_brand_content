@@ -1,7 +1,13 @@
 # `base/` —— 基座
 
-> 状态：**B0.2 完成**（`ContentUnit` 契约）。B0.1 见 `ADR/ADR-0013-基座接口冻结与仓库入库分级.md`。
-> 自证命令：`python3 base/contract.py --selftest`（**全绿才算完成**）
+> 状态：**B0.2 / B0.3 完成**（`ContentUnit` 契约 + `judge(unit)` 适配层）。
+> B0.1 见 `ADR/ADR-0013-基座接口冻结与仓库入库分级.md`。
+> 自证命令（两条都必须全绿）：
+>
+> ```bash
+> python3 base/contract.py --selftest        # 30 项检查 + 11 条反向对照
+> python3 base/judge_adapter.py --selftest   # 22 项检查 +  4 条反向对照
+> ```
 
 ## 为什么单开一个 `base/`
 
@@ -17,7 +23,7 @@ ADR-0013 §一 D1 定的「五个面」里，①②③ 三面会返工。基座�
 
 ```
 ① 进   ContentUnit + 解析器          ← base/contract.py          （B0.2 ✅）
-② 判   judge(unit) → Verdict         ← base/judge_adapter.py      （B0.3）
+② 判   judge(unit) → Verdict         ← base/judge_adapter.py      （B0.3 ✅）
 ③ 供   规则词表单向同步 + 版本        ← base/sync_rules.py         （B0.4）
 ⑤ 证   基座自证                       ← base/verify_base.py        （B0.5）
 ④ 出   处置五层 + 回执                ← 已建成，在 skeleton/（ADR-0012）
@@ -185,6 +191,89 @@ es.momcozy.com/collections/electric-breast-pump            变           同
 
 ---
 
+## `judge(unit)` —— 适配层（B0.3）
+
+一句话：**`ContentUnit` → 一份判定，且这份判定知道自己在什么边界内成立。**
+
+```python
+from judge_adapter import judge_unit
+r = judge_unit(unit)                    # 引擎一行没改
+r["verdict"]["disposition"]
+r["boundary_statement"]["unknowns"]     # 已按载体订正
+```
+
+### 为什么这不是「一层薄封装」
+
+因为 `judge()` 的边界声明里有一句话，在 `ContentUnit` 出现之后**变成了假话**。
+
+`skeleton/judge.py:220` 写死着一句（同一句话还以机器可读形式出现在
+`boundary_statement.not_covered_carriers` 里）：
+
+> **未覆盖的载体**：本判定只看文本。图片、视频、**落地页正文**、A+ 详情页均不在输入内。
+> 批次 C 已产出落地页正文的获取能力，但**尚未接入本引擎**。
+
+在一个 `landing_page` unit 进判定时，**它逐字是假的** —— 那份判定的输入就是落地页正文。
+而 `judge.py` 自己（`_layer_note()` 的注释）已经立过这条原则：
+
+> ★ 一句写死的免责声明迟早会变成假话。
+
+**「边界声明说错了边界」比没有边界声明更坏**：一份声称「落地页不在输入内」的判定，
+会让读的人以为这次审查根本没看落地页 —— 于是要么重复劳动，要么据此做出错误的覆盖结论。
+
+订正的方向只有一条能走：**在适配层订正**（改 `judge.py` 是改引擎，且 161 项验收盯着它）。
+订正动作本身进 `boundary_statement.$corrections`，**留痕，不静默改写**。
+
+实测对照（`python3 base/judge_adapter.py --boundary-report`）：
+
+| | 内容 |
+|---|---|
+| 订正前的 `unknowns[4]` | 「…落地页正文…**尚未接入本引擎**」← 对落地页 unit 是假的 |
+| 订正后 | 「**载体：落地页正文——已接入，但只覆盖到文字那一层。**…**不含画面语义**，也抓不到 JS 运行时渲染出来的内容」 |
+| `not_covered_carriers` | `['图片','视频','落地页正文','A+ 详情页']` → `['图片','视频','A+ 详情页']` |
+
+**订正按载体分，不按「有没有文本」分。** 对一条广告文案，引擎那句仍然为真，**不动它** ——
+只为落地页 / 商品 JSON 改写。这一条被写成断言守着。
+
+### 回执：`judge()` 的回执答不了「哪份原件」
+
+引擎回执只存 `input_sha256`（= 正文指纹）。这对广告够用（正文就是原件），对落地页不够 ——
+同一段正文可以来自无数份 HTML（实测 raw 变 4/4 而正文变 0/4）。
+
+适配层的回执在引擎那份之上加一个 `unit` 块：
+`raw_sha256` / `text_sha256` / `kind` / `uri` / 归一化档位 / 组装口径 / 文本化边界。
+**仍然不含原文与片段** —— ADR-0008 决策 2 与 ADR-0012 §3.3 那条约束没有被绕过。
+
+**一个实现取舍值得记下**：回执的 `obligations` 块（D6/D10 出口声明）由 `judge()` 内部从分层表
+生成，本层**不重写** —— 重写等于把一份**法务所有**的契约字段抄成第二份实现，两份迟早不一致。
+做法是让 `judge()` 照常生成完整回执（只是写到临时路径），本层补上 `unit` 块后
+再经**生产闸门**（`append_receipt`，含 origin 检查与前缀哈希链）落到真账本。
+
+### 这一层的四条不变量
+
+```
+J1  unit 合法（contract.validate() 全过）—— 不拿坏信封去判定
+J2  正文原样到达引擎：result["input"]["text_sha256"] == unit.fingerprint.text_sha256
+    ★ 引擎自己也算了一遍 sha256；两个独立实现算出同一个数，证明正文没被中间层改写
+J3  边界声明里不再声称本次的载体未被覆盖（且**只**对真的不成立的载体订正）
+J4  边界声明新增本次输入的 covers / does_not_cover（ADR-0013 异议二）
+J5  回执带 unit 块，且仍不含原文与片段
+```
+
+### 本层自己制造过一句假话（记下来）
+
+第一版对「正文为空」只判了 `not has_text`，于是它对**那 59 条 PLA 广告**也说：
+
+> ★★ **本条落 DP0 的原因与 PLA 那 59 条不同。**
+
+—— 而它自己就是其中一条。**本层为了订正一句假话而写出的新句子，第一版就是假的。**
+被本文件自己的断言抓到（[J3] 里「59 条 PLA 空文案不被告知『你与 PLA 那 59 条不同』」）。
+
+修正后的判据按**载体**分：`landing_page` / `structured_json` / `image` / `video` 的空正文是
+**取不到**；`free_text` 的空正文是**调用方给的就是空的**；`ad_text` 的空正文是**结构上没有**（PLA）。
+三者都走 DP0，但性质与处置都不同 —— 而 DP0 那条通知如果只说「没有文本」，收件人无法行动。
+
+---
+
 ## 「一个 url_key ≠ 一个 unit」
 
 `抓取结果.json` 里：
@@ -214,10 +303,16 @@ python3 base/contract.py --from-record GG-d1ff3cf1bb1d --json
 python3 base/contract.py --from-url-key momcozy.com/products/… --json
 ```
 
+```bash
+python3 base/judge_adapter.py --selftest          # 427 个 unit 全部进判定
+python3 base/judge_adapter.py --boundary-report   # 边界声明订正前后对照
+```
+
 当前结果：
 
 ```
 ✓ B0.2 自证全绿：291 条广告 + 136 个落载体 → 427 个合法 unit
+✓ B0.3 自证全绿：427 个 unit 进判定，边界声明按载体订正，回执挂双指纹
 ```
 
 九个面：语料面 / 归一化面 / 拼装面 / 指纹面 / 复取实测 / 留痕面 / 桥接面 /
@@ -253,6 +348,9 @@ parts 起点挪 1        → H11
    「本数字只覆盖图内文字，不含画面语义」，并进 `boundary_statement.unknowns`。
 5. **`raw_sha256` 不等于「原件已入库」。** 它是指纹；原件在 L2（内容寻址），或压根不在本仓。
    `raw_verified` 如实记录指纹是不是由落盘原件重算来的。
+7. **适配层不改引擎。** `judge.py` 里那句过时的边界声明**仍然在源码里** —— 本层只在返回值上订正。
+   真正的修法要等 ADR-0012 的验收脚本一起改，那时才能动那句话。在那之前，
+   **凡是不经 `base/judge_adapter.py` 直接调 `judge()` 的路径，拿到的仍是那句假话。**
 6. **规则与词表的权威源仍在飞书**（ADR-0013 D2）。本层不做同步，那是 B0.4。
 
 ---
@@ -261,7 +359,7 @@ parts 起点挪 1        → H11
 
 | 期 | 依赖本层的什么 | 本层已备好 |
 |---|---|---|
-| **B0.3** `judge(unit)` | `to_judge_kwargs(u)` + `fingerprint_view(u)` | ✅ 两者都在，且 H14 保证路由键真的被 `judge()` 接受 |
+| ~~**B0.3** `judge(unit)`~~ | — | ✅ **已完成**（`judge_adapter.py`） |
 | **B0.4** 规则单向同步 | `composition` / `normalization` 的**版本会进回执**，因此规则的「哪一版」与正文的「哪一版」必须能分开答 | ✅ 具名档位 + 登记表 |
 | **B0.5** `verify_base.py` | `selftest()` 作为五个面之一被调用；另需补 ADR-0013 异议一承诺的 **L1 自足性检查** | ✅ `--selftest` 退出码 0/1 可直接编入 |
 | **B1** 四形态管道 | `from_media()` 的 `covers` / `does_not_cover` 必填 | ✅ 契约在，实现在 B1 |
