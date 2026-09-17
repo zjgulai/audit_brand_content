@@ -76,24 +76,23 @@ CONTRACT_VERSION = "migration-fidelity-v1"
 #   是词义消歧；对它降级 = 把一个正确放行的广告标成可疑。
 DISCLAIMER_TYPES = {"免责声明", "否定"}
 
-# ★ 但这还不够。「非免责类」里混着两种**完全不同**的东西，处置相反：
+# ★★ 2026-09-17 撤回：这里原本有一组按 `guard_type` 切出来的「甲/乙」分类，
+#    结论是「甲 14 个根本不是主张 → 应改回放行」。**那个结论错了，已删除。**
 #
-#   甲 · 根本不是主张（词义消歧 / 生理事实 / 归因）
-#        `treat yourself`（犒劳自己）、`natural letdown`（描述生理过程）、
-#        `inspired by natural nursing`（说设计灵感来自自然）。
-#        这些句子里**没有对产品做任何主张**，命中它们才是错的 →
-#        正确动作是**改回放行**。这是迁移的语义翻转，是明确的技术错误。
+#    错在哪：`guard_type` 是**机器推导**的（词条自己写着
+#    `guard_type_derivation: 机器推导（表面词素）· 语义归属待法务确认`），
+#    我拿一个待确认的启发式当了事实，并据此提出要改生产词表。
+#    更具体地错了两处：
+#      · 把 `natural let-down` 一类归成「无主张」—— 但源表自己的命中原因里
+#        写明「放松叙事+限定语（natural let-down/may help）**走 M07 语境守卫**」，
+#        即**改档**，不是放行。旧设计是三层，我压成了两层。
+#      · 把 `gently` 算成「跟随白名单词根 gentle」—— 但 `gentle` 在飞书表里
+#        是 `status=quarantined`，按 W3 隔离词**走降级带、不放行**。
+#        所以 `gently` 与 `gentle` 同通道，不是缺陷。
 #
-#   乙 · 弱化表述（仍然是主张，只是更弱）
-#        `relieve discomfort`、`reduce the risk of clogged`。
-#        「缓解不适」依然是功效主张，只是弱一档 —— 设计文档 §F
-#        「免责声明不是许可证」的教条在这个方向上**站得住**。
-#        降级到人工是**可辩护的政策**，不是错误 → 交法务定性。
-#
-# 把甲和乙合成一个数（28）报出去，等于把「必须改」和「请裁定」混成一件事 ——
-# 那正是本项目反复在治的合并计数病。所以这里必须分开。
-NOT_A_CLAIM_TYPES = {"溯源/同源表述", "未归类"}
-SOFTENING_TYPES = {"弱化/替代表述", "风险降低表述"}
+#    教训与本项目反复在治的病同形：**读到一个字段就推一个语义**。
+#    下面这组数字因此全部改成**实测**：拿词本身去问引擎，看它拿到什么带。
+#    实测不需要相信任何分类，只需要相信引擎的输出。
 
 
 def _sha256(p: Path) -> str:
@@ -171,35 +170,56 @@ def axis0_exception_semantics(recs, raw):
 #  轴 1 · 94 个旧豁免词的去向与语义
 # ══════════════════════════════════════════════════════════════════════
 def axis1_exception_drift(recs, raw, rules, wl, gd):
+    """旧豁免词今天还起不起作用 —— **实测**，不靠任何分类字段。
+
+    ★ 判据：只有「**自己就会命中本规则**」的豁免词，豁免才真正起过作用。
+      其余的词（例如 `不用于治疗` 之于关键词表）从来不自我触发，谈不上被翻转。
+      对这些自我触发词，直接把词本身喂给引擎：
+        band=pass       → 旧语义（放行）**保住了**
+        band=downgrade  → 变成了**降级**
+        无带            → 旧语义**彻底消失**，按满档判险
+      三个桶之和必须等于自我触发词总数（守恒），否则判据漏了词。
+    """
     wl_map = {w["word"].lower(): w for w in wl}
     gd_map = {w["word"].lower(): w for w in gd}
-    # 新规则里还有没有这个词（可能被改成关键词而非豁免）
-    new_kw = collections.defaultdict(set)
-    for r in rules:
-        new_kw[r["parent_rule"]] |= {k.lower() for k in (r["match"].get("keywords") or [])}
 
     rows = []
     for lr in raw:
         rid = lr["rule_id"]
+        kws = [k.lower() for k in (lr.get("keywords") or [])]
+        pats = lr.get("patterns") or []
         for w in (lr.get("exceptions") or []):
             k = w.lower()
-            g = gd_map.get(k)
-            wle = wl_map.get(k)
+            self_trigger = (any(k in kk or kk in k for kk in kws)
+                            or any(re.search(p, w, re.I) for p in pats if p))
+            g, wle = gd_map.get(k), wl_map.get(k)
             if g is not None:
-                dest, status = "语境守卫", g.get("status")
-                gtype = g.get("guard_type")
+                dest = "语境守卫"
                 wired = bool(g.get("wired"))
-                target = g.get("effect_target")
             elif wle is not None:
-                dest, status = "白名单", wle.get("status")
-                gtype, wired, target = None, True, "auto_pass(豁免)"
+                dest = "白名单"
+                wired = wle.get("status") == "active"
             else:
-                dest, status, gtype, wired, target = "无归属", None, None, False, None
+                dest, wired = "无归属", False
+            # 实测：把词本身喂给引擎，看它拿到什么带
+            band, disp, sev, fired = "未自我触发", "", "", False
+            if self_trigger:
+                v = J.judge(w)
+                fired = rid in v["verdict"]["rules_hit"]
+                for h in v["hits"]:
+                    if h["parent_rule"] == rid:
+                        band = (h.get("band") or {}).get("kind") or "无带"
+                disp, sev = v["verdict"]["disposition"], v["verdict"]["severity"]
             rows.append({
-                "旧规则": rid, "词": w, "去向": dest, "状态": status,
-                "守卫类型": gtype, "已接线": wired, "效果目标": target,
-                "是免责/否定类": (gtype in DISCLAIMER_TYPES) if gtype else None,
+                "旧规则": rid, "词": w, "去向": dest, "已接线": wired,
+                "自我触发": self_trigger, "实测带": band,
+                "实测处置": disp, "实测等级": sev, "实测命中": fired,
             })
+
+    st = [x for x in rows if x["自我触发"]]
+    keep = [x for x in st if x["实测带"] == "pass"]
+    down = [x for x in st if x["实测带"] == "downgrade"]
+    gone = [x for x in st if x["实测带"] == "无带"]
 
     # 这条词实际翻掉了哪些记录：源表没命中、引擎命中了它所降级的那条规则
     flipped = collections.Counter()
@@ -216,89 +236,49 @@ def axis1_exception_drift(recs, raw, rules, wl, gd):
     for rr in rows:
         rr["翻掉的记录数"] = flipped.get(rr["词"], 0)
 
-    dest_c = collections.Counter(x["去向"] for x in rows)
-    active_non_disclaimer = [x for x in rows
-                             if x["去向"] == "语境守卫" and x["已接线"]
-                             and x["是免责/否定类"] is False]
-    jia = [x for x in active_non_disclaimer if x["守卫类型"] in NOT_A_CLAIM_TYPES]
-    yi = [x for x in active_non_disclaimer if x["守卫类型"] in SOFTENING_TYPES]
     return {
         "旧豁免词总数": len(rows),
-        "去向分布": dict(dest_c),
+        "去向分布": dict(collections.Counter(x["去向"] for x in rows)),
         "守卫类型分布": dict(collections.Counter(
-            x["守卫类型"] for x in rows if x["守卫类型"])),
-        # ★ 核心数：迁成「降级」且**本来不该降级**（非免责/否定类）的词
-        "已接线但非免责类": sorted(x["词"] for x in active_non_disclaimer),
-        "已接线但非免责类_条数": len(active_non_disclaimer),
-        # ★ 再拆成两种处置完全不同的：
-        "甲_根本不是主张_应改回放行": sorted(x["词"] for x in jia),
-        "甲_条数": len(jia),
-        "乙_弱化表述_待法务定性": sorted(x["词"] for x in yi),
-        "乙_条数": len(yi),
+            (gd_map.get(x["词"].lower()) or {}).get("guard_type") for x in rows
+            if gd_map.get(x["词"].lower()))),
+        # ── 实测三桶（守恒：三者之和 = 自我触发词数）──────────────
+        "自我触发词数": len(st),
+        "仍放行": sorted(x["词"] for x in keep),
+        "仍放行_条数": len(keep),
+        "变成降级": sorted(x["词"] for x in down),
+        "变成降级_条数": len(down),
+        "满档判险_无带": sorted(x["词"] for x in gone),
+        "满档判险_无带_条数": len(gone),
         "翻掉记录的词": dict(flipped),
         "逐词": rows,
     }
 
 
-def _stem(w: str) -> str:
-    """极简词干：够用来把 comfort/comfortable、gentle/gentler/gently 归到一组。
-
-    ★ 只做这件事，不假装是词形还原器 —— 它服务的是「同一条旧规则里的形态变体
-      有没有被拆到相反的通道上」这一个判断，归错组的代价是漏报一组、不是判错内容。
-    """
-    w = w.lower().strip()
-    for suf in ("ing", "edly", "ly", "ed", "es", "s", "er", "able", "ness"):
-        if w.endswith(suf) and len(w) > len(suf) + 3:
-            base = w[: -len(suf)]
-            return base
-    return w
-
-
-def _stem_candidates(w: str) -> set:
-    """一个词的候选词根：`gently`→`gent` 要能对上 `gentle`，`comfortable`→`comfort`。
-
-    ★ 只做「够用」的形态归并，不假装是词形还原器 —— 它服务的是「同一条旧规则的
-      同一行 exceptions，有没有被拆到相反的通道上」这一个判断。归错组的代价是
-      多报或少报一组，不会判错任何内容。
-    """
-    s = _stem(w)
-    return {s, s + "e", s + "le", s.rstrip("e"), s.rstrip("le")}
-
-
-def axis1b_channel_split(rows):
-    """★ 同一个词根的形态变体被拆进**语义相反**的两张表。
-
-    `comfort` → 白名单（放行） 而 `comfortable` → 语境守卫（降级）；
-    `gentle` → 白名单，而 `gentler` / `gently` → 语境守卫。
-    这不是政策分歧，是**一次迁移的疏忽**：这些词来自同一条旧规则的同一行
-    `exceptions`，拆开之后一张表说「豁免」、另一张说「可疑」。
-    """
-    fam = collections.defaultdict(set)
-    for x in rows:
-        for c in _stem_candidates(x["词"]):
-            fam[c].add(x["词"])
-    # 合并互相重叠的组
-    merged: list[set] = []
-    for c, ws in fam.items():
-        if len(ws) < 2:
-            continue
-        for m in merged:
-            if m & ws:
-                m |= ws
-                break
-        else:
-            merged.append(set(ws))
-    out = []
-    byword = {x["词"]: x for x in rows}
-    for ws in merged:
-        xs = [byword[w] for w in sorted(ws)]
-        if len({x["去向"] for x in xs}) > 1:
-            out.append({
-                "同根词": sorted(ws),
-                "分支": [{"词": x["词"], "去向": x["去向"], "效果目标": x["效果目标"]}
-                       for x in xs],
-            })
-    return sorted(out, key=lambda d: d["同根词"][0])
+# ══════════════════════════════════════════════════════════════════════
+#  轴 1b —— **已撤回（2026-09-17）**
+#
+#  原判据：同根词的形态变体被拆进语义相反的两张表（`comfort` 进白名单=放行、
+#          `comfortable` 进语境守卫=降级，`gentle` 对 `gentler`/`gently`）。
+#
+#  **这个判据是错的，整段删除。** 错因是可复算的：白名单表里的 `comfort`/`gentle`
+#  是 `status=quarantined`，而按 vocab.py 的组带逻辑
+#  （`band_target(rule, w)`，逐词判落点）与不变量 W3「隔离词不得进入放行带」，
+#  隔离词落到**降级带**。实测确认：
+#
+#      pain relief                    → auto_reject  无带
+#      pain relief + gentle           → downgrade（词=gentle）
+#      pain relief + comfort          → downgrade（词=comfort）
+#      pain relief + comfortable      → downgrade（词=comfort, comfortable）
+#      pain relief + gentler          → downgrade（词=gentle, gentler）
+#
+#  五个词**全在同一通道**，不存在「相反通道」。我此前只读了 `去向=白名单`
+#  这一个字段就推出「放行」，而真正决定通道的是 `status` ——
+#  与本项目反复在治的病同形：**读到一个字段就推一个语义**。
+#
+#  保留这段撤回记录而不是删干净，是因为「改口」本身要可审计：
+#  下一版若有人再看到 `comfort` 在白名单里，不该重新犯同一个推断。
+# ══════════════════════════════════════════════════════════════════════
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -541,10 +521,14 @@ def build():
             "旧豁免词_迁到语境守卫": d.get("语境守卫", 0),
             "旧豁免词_迁到白名单": d.get("白名单", 0),
             "旧豁免词_无归属": d.get("无归属", 0),
-            "已接线但非免责类": a1["已接线但非免责类_条数"],
-            "甲_根本不是主张_应改回放行": a1["甲_条数"],
-            "乙_弱化表述_待法务定性": a1["乙_条数"],
-            "同根词被拆进相反通道": len(axis1b_channel_split(a1["逐词"])),
+            "自我触发豁免词": a1["自我触发词数"],
+            "仍放行": a1["仍放行_条数"],
+            "变成降级": a1["变成降级_条数"],
+            "满档判险_无带": a1["满档判险_无带_条数"],
+            "已接线但非免责类": sum(
+                1 for x in a1["逐词"]
+                if x["去向"] == "语境守卫" and x["已接线"]
+                and (x["实测带"] in ("downgrade", "无带"))),
             "无归属关键词": a2["无归属词总数"],
             "逐行分歧": a3["有分歧"],
             "分歧_迁移回归_假阳性": regression,
@@ -558,12 +542,14 @@ def build():
         },
         "守恒": {
             "旧豁免词_去向之和等于总数": cons_ex,
+            "豁免词_实测三桶之和等于自我触发词数":
+                (a1["仍放行_条数"] + a1["变成降级_条数"]
+                 + a1["满档判险_无带_条数"]) == a1["自我触发词数"],
             "逐行_一致加分歧等于总数": cons_scan,
             "轴0语义前提成立": a0["成立"],
         },
         "轴0_例外语义证据": a0,
         "轴1_例外漂移": {k: v for k, v in a1.items() if k != "逐词"},
-        "轴1b_同根词通道拆分": axis1b_channel_split(a1["逐词"]),
         "轴2_检出覆盖": a2,
         "轴3_逐行对账": {k: v for k, v in a3.items() if k != "逐行"},
         "轴3_分歧逐行": a3["逐行"],
@@ -604,12 +590,11 @@ def md(led):
     print("## 迁移保真度对账（旧规则集 → 骨架 v1）\n")
     print(f"- 旧豁免词 {t['旧豁免词总数']} 个 → 语境守卫 {t['旧豁免词_迁到语境守卫']}"
           f" / 白名单 {t['旧豁免词_迁到白名单']} / 无归属 {t['旧豁免词_无归属']}")
-    print(f"- **已接线但非免责/否定类：{t['已接线但非免责类']} 个** → 拆成两种处置："
-          f"甲「根本不是主张」{t['甲_根本不是主张_应改回放行']} 个（**应改回放行**）"
-          f" / 乙「弱化表述」{t['乙_弱化表述_待法务定性']} 个（**待法务定性**）")
-    print(f"  · 甲：{', '.join('`'+w+'`' for w in led['轴1_例外漂移']['甲_根本不是主张_应改回放行'])}")
-    print(f"  · 乙：{', '.join('`'+w+'`' for w in led['轴1_例外漂移']['乙_弱化表述_待法务定性'])}")
-    print(f"- 同根词被拆进相反通道：{t['同根词被拆进相反通道']} 组")
+    print(f"- **旧豁免语义存活率（实测 {t['自我触发豁免词']} 个自我触发词）**："
+          f"仍放行 {t['仍放行']} · 变成降级 {t['变成降级']} · "
+          f"**满档判险 {t['满档判险_无带']}**")
+    print(f"  · 仍放行：{', '.join('`'+w+'`' for w in led['轴1_例外漂移']['仍放行'])}")
+    print(f"  · 变成降级：{', '.join('`'+w+'`' for w in led['轴1_例外漂移']['变成降级'])}")
     print(f"- 无归属关键词：{t['无归属关键词']} 个")
     print(f"- 逐行对账：{led['轴3_逐行对账']['两次扫描一致']}/{led['轴3_逐行对账']['记录数']} 一致，"
           f"{t['逐行分歧']} 条分歧")
@@ -628,11 +613,12 @@ def md(led):
         for k, v in led["轴1_例外漂移"]["翻掉记录的词"].items():
             print(f"| `{k}` | {v} |")
         print()
-    print("| 同根词组 | 拆进了哪些相反通道 |")
+    print("| 满档判险（旧语义彻底消失）的豁免词 | 实测 |")
     print("|---|---|")
-    for s in led["轴1b_同根词通道拆分"]:
-        parts = " · ".join(f"`{b['词']}`→{b['去向']}" for b in s["分支"])
-        print(f"| {'/'.join('`'+w+'`' for w in s['同根词'])} | {parts} |")
+    _w = {x["词"]: x for x in led["轴1_逐词"]}
+    for w in led["轴1_例外漂移"]["满档判险_无带"]:
+        x = _w[w]
+        print(f"| `{w}` | {x['实测处置']} · {x['实测等级']} |")
 
 
 def main():

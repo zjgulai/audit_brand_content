@@ -2027,28 +2027,46 @@ def main() -> int:
           f" = {_a3.get('记录数')}；"
           f"反向对照：一致数减一→守恒断 {'成立' if _ctrl_b else '❌判据恒真'}")
 
-    # V45c：棘轮 —— 甲类「根本不是主张却被降级」的词数只许减不许增
-    _N_A, _N_FP = 14, 3
-    _n_a = (((_mf or {}).get("轴1_例外漂移", {}) or {}).get("甲_条数"))
+    # V45c：实测三桶的守恒 + 棘轮
+    #   ★ 这一门原本守的是「甲类「根本不是主张却被降级」≤ 14」——**那个分类已撤回**：
+    #     它建立在 `guard_type`（机器推导、自带「待法务确认」标注）之上，
+    #     且把源表写明的三层设计压成了两层。取而代之的是**实测**：
+    #     把 36 个「自身就会命中本规则」的旧豁免词逐个喂给引擎，看它拿到什么带。
+    #     实测不需要相信任何分类字段，只需要相信引擎自己的输出。
+    _a1m = ((_mf or {}).get("轴1_例外漂移", {}) or {})
+    _n_self = _a1m.get("自我触发词数")
+    _n_pass, _n_down = _a1m.get("仍放行_条数"), _a1m.get("变成降级_条数")
+    _n_gone = _a1m.get("满档判险_无带_条数")
+    # 守恒：三桶之和必须等于自我触发词数（漏一类就断）
+    _mig_cons = (None not in (_n_self, _n_pass, _n_down, _n_gone)
+                 and _n_pass + _n_down + _n_gone == _n_self)
+    # 反向对照：把「仍放行」减一，守恒必须断
+    _mig_ctrl = (_n_pass is not None
+                 and _n_pass - 1 + (_n_down or 0) + (_n_gone or 0) != _n_self)
+    # 棘轮：满档判险（最重的一桶）与已发生的假阳性都只许减不许增
+    _N_GONE, _N_FP = 21, 3
     _n_fp = (((_mf or {}).get("totals", {}) or {}).get("分歧_迁移回归_假阳性"))
-    # 反向对照：各推高一格必须红
-    _ctrl_c = ((_n_a is None or _n_a + 1 > _N_A) and (_n_fp is None or _n_fp + 1 > _N_FP))
+    _ctrl_c = ((_n_gone is None or _n_gone + 1 > _N_GONE)
+               and (_n_fp is None or _n_fp + 1 > _N_FP))
     _relax_mf = []
-    if _n_a is not None and _n_a < _N_A:
-        _relax_mf.append(f"甲类 {_n_a} < {_N_A}")
+    if _n_gone is not None and _n_gone < _N_GONE:
+        _relax_mf.append(f"满档判险 {_n_gone} < {_N_GONE}")
     if _n_fp is not None and _n_fp < _N_FP:
         _relax_mf.append(f"假阳性 {_n_fp} < {_N_FP}")
-    check("V45c", f"棘轮：甲类「根本不是主张却被降级」≤ {_N_A} 个、"
-                  f"迁移回归假阳性 ≤ {_N_FP} 条（只许变好；变好时必须收紧阈值）",
-          (_n_a is not None and _n_a <= _N_A
-           and _n_fp is not None and _n_fp <= _N_FP) and _ctrl_c,
-          f"甲类 {_n_a}/{_N_A} · 假阳性 {_n_fp}/{_N_FP} · "
+    check("V45c", f"实测三桶守恒（仍放行 + 变成降级 + 满档判险 = 自我触发词数），"
+                  f"且棘轮：满档判险 ≤ {_N_GONE} 个、迁移回归假阳性 ≤ {_N_FP} 条",
+          _mig_cons and _mig_ctrl
+          and (_n_gone is not None and _n_gone <= _N_GONE)
+          and (_n_fp is not None and _n_fp <= _N_FP) and _ctrl_c,
+          f"实测 {_n_pass} 放行 + {_n_down} 降级 + {_n_gone} 满档判险 = "
+          f"{(_n_pass or 0) + (_n_down or 0) + (_n_gone or 0)} vs 自我触发 {_n_self}"
+          f" · 假阳性 {_n_fp}/{_N_FP} · "
           + (f"★ 已改善：{('；'.join(_relax_mf))} —— 本门转红是**故意的**："
              f"请把阈值收紧到当前值再提交，否则这条门守的是一个过期的现状"
              if _relax_mf else
-             f"反向对照：各推高一格 → {'必红' if _ctrl_c else '❌棘轮不咬'}")
-          + "　（乙类 14 个「弱化表述」不设棘轮：它是待法务定性的政策项，"
-            "不是我们单方面该改的数）")
+             f"反向对照：减一个放行→守恒断 {'成立' if _mig_ctrl else '❌判据恒真'} · "
+             f"各推高一格 → {'必红' if _ctrl_c else '❌棘轮不咬'}")
+          + "　（仍放行只有 2 个词，说明旧语义整体消失了；这两个是 D3 法务定案的成果）")
 
 
     ok = sum(1 for _, o, _ in RESULTS if o)

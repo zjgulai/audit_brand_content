@@ -291,7 +291,10 @@ def compute(snap=None):
         # ── D15/D16 的键（迁移保真度对账）────────────────────────────
         #   同上：数字只有一个家 —— _data/迁移保真度.json，这里只转发。
         "legacy_exception_words": mf_t.get("旧豁免词总数"),
-        "exception_wired_non_disclaimer": mf_t.get("已接线但非免责类"),
+        "exception_self_triggering": mf_t.get("自我触发豁免词"),
+        "exception_still_pass": mf_t.get("仍放行"),
+        "exception_now_downgrade": mf_t.get("变成降级"),
+        "exception_full_severity": mf_t.get("满档判险_无带"),
         "regression_false_positives": mf_t.get("分歧_迁移回归_假阳性"),
         "scan_drift_records": mf_t.get("逐行分歧"),
         "scan_pairs_agree": (mf.get("轴3_逐行对账") or {}).get("两次扫描一致"),

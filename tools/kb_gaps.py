@@ -309,8 +309,8 @@ def build(facts=None, snap=None):
         },
         {
             "id": "D15", "kind": "data",
-            "title": "规则迁移不保真：94 个旧豁免词里 28 个被翻成「降级」，"
-                     "把本该放行的广告标成可疑",
+            "title": "规则迁移不保真：旧规则的「豁免词」语义在迁移中消失 —— "
+                     "36 个自我触发词里只剩 2 个还能放行",
             # ★ 本条已**改写**。立案时的表述是「源表的规则扫描漏放 3 条」——
             #   做完逐行对账后，那句话是错的，且错的方向是**指控了源表**。
             #   留这段注释是为了让「改口」这件事本身可审计。
@@ -320,32 +320,45 @@ def build(facts=None, snap=None):
                    "证据链：① 旧规则 H01 的 `exceptions` 里有 `treat yourself`；"
                    "② 同批次 `Savannah-20260825` 天然对照证明旧 `exceptions` 的语义是"
                    "**放行**（i=265 含豁免词→源表 0 命中·绿；i=270/271 不含→命中 H07,U04·红，"
-                   "同一次扫描）；③ 迁移把这 94 个豁免词拆进语境守卫表（80）与白名单（14），"
-                   "其中 **28 个已接线、却不属于免责/否定类** —— 它们被当成"
-                   "「免责声明」降级了，而它们根本不是免责声明（`treat yourself` 是词义消歧、"
-                   "`natural letdown` 是生理事实、`inspired by` 是归因）。"
-                   "设计文档 §F「免责声明不是许可证」这条教条**只对否定式成立**，"
-                   "迁移把它无差别套到了全部 94 个词上。同一个短语，旧系统拿它免责、"
-                   "新系统拿它定罪。另有一条同根词被拆进相反通道：`comfort` 进白名单（放行）、"
-                   "`comfortable` 进语境守卫（降级）。",
+                   "同一次扫描）。"
+                   "★ 结论用**实测**给出，不用任何分类字段：旧规则的 94 个豁免词里，"
+                   "只有「自身就会命中本规则」的 36 个词，豁免才真正生效过。"
+                   "把这 36 个词逐个喂给今天的引擎：**只剩 2 个还能放行**（`silent mode`/"
+                   "`静音模式`，即 D3 法务定案的那次修正）——**13 个变成降级**、"
+                   "**21 个的语义彻底消失**（词在守卫表里但 `已接线=False`，规则按满档 "
+                   "L4 auto_reject 判险）。21 个里 8 个是中文否定式（`不能治疗`/`并非治疗`…）、"
+                   "7 个是英文否定式（`cannot treat`/`won't cure`…），"
+                   "而同义的 `not intended to treat` 却是降级 —— **同一个意思，语种不同、结局不同**。"
+                   "另：这条的立案稿曾写「28 个非免责类被翻成降级，其中甲类 14 个应改回放行」，"
+                   "该分类已撤回 —— 它建立在 `guard_type`（机器推导、自带「待法务确认」标注）"
+                   "这个启发式上，且把源表写明的三层设计（放行 / 走 M07 审慎 / 判险）压成了两层。"
+                   "撤回记录保留在脚本里，见 `audit_migration_fidelity.py` 轴 1b 段。",
             "affects": ["Q1", "Q6"],
             "量": {
                 "legacy_exception_words": facts["legacy_exception_words"],
-                "exception_wired_non_disclaimer": facts["exception_wired_non_disclaimer"],
+                "exception_self_triggering": facts["exception_self_triggering"],
+                "exception_still_pass": facts["exception_still_pass"],
+                "exception_now_downgrade": facts["exception_now_downgrade"],
+                "exception_full_severity": facts["exception_full_severity"],
                 "regression_false_positives": facts["regression_false_positives"],
                 "scan_drift_records": facts["scan_drift_records"],
                 "scan_pairs_agree": facts["scan_pairs_agree"],
                 "orphan_keywords": facts["orphan_keywords"],
             },
-            "量说明": "旧豁免词总数 / 其中被当成降级接线、却非免责否定类的 / "
-                      "**实际翻掉的记录数（假阳性）** / 两次扫描有分歧的记录数 / "
-                      "两次扫描一致的记录数 / 在新规则里彻底没有家的旧关键词数。"
-                      "★ 假阳性那一格是 3、不是 28：28 是**暴露面**，3 是**这份语料上"
-                      "已经发生的**。两个数都要写，只写一个都会误导。",
+            "量说明": "旧豁免词总数 / 其中豁免真正生效过的（自身会命中本规则）/ "
+                      "**今天仍能放行的** / **变成降级的** / **语义彻底消失、按满档判险的** / "
+                      "本语料上已翻掉的记录数（假阳性）/ 两次扫描有分歧的记录数 / "
+                      "两次扫描一致的记录数 / 新规则里彻底没有家的旧关键词数。"
+                      "★ 三个桶必须满足 2+13+21=36，守恒成门（V45c）。"
+                      "★ 已发生的那一格是 3：21 是**暴露面**，3 是**这份语料上真的错了的**。"
+                      "两个数都要写，只写一个都会误导。",
             "owner": "审核侧（规则维护，谁迁的谁修）；不需要投放侧动手",
-            "status": "待修：把 28 个非免责类豁免词按语义分三档归位"
-                      "（真免责→维持降级 / 词义消歧与归因→改为放行 / 弱化表述→法务定性）；"
-                      "`treat yourself` 一类应先改回放行",
+            "status": "待修，两件事："
+                      "① **21 个未接线**的否定式豁免词（免责声明今天会被 L4 自动拒绝）"
+                      "——先决定接线与否，中文 8 个优先；"
+                      "② **13 个已接线但通道从放行变降级**的，逐词定性"
+                      "（`treat yourself` 是词义消歧、不是主张 → 应放行；"
+                      "其余否定式属免责声明，维持降级亦可辩护 → 交法务）",
             "提出方式": "把旧规则集的 94 个豁免词与新系统的两张词表逐词对账，"
                         "并用同批次对照实测旧语义 —— 不靠回忆，靠重跑",
             "复算": "python3 research/governance/audit_migration_fidelity.py --check",
