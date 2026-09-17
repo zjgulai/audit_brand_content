@@ -206,9 +206,14 @@ def main():
             if any("GAP" in str(x) for x in lines) and \
                     not any("〔缺口:" in str(x) for x in lines):
                 unregistered.append(f"Q{i}: 声明了 GAP 却没有任何登记标记")
-        c.add("D1", "黄金问题可答", not empty,
-              f"{len(kb_query.QUESTIONS)} 条全部产出结论" if not empty
-              else f"{len(empty)} 条答不出来：{empty}")
+        # ★ 名字里的「可答」会把「产出结论」读成「答得出来」。Q7 产出的是一个
+        #   **登记过的 GAP**（不是答案）。所以这一条的文案必须把两者分开写：
+        #   D1 守「有没有结论」，E1 守「结论里的空缺有没有落点」。
+        c.add("D1", "黄金问题全部产出结论", not empty,
+              (f"{len(kb_query.QUESTIONS)} 条全部产出结论 —— 其中 {len(gaps)} 条"
+               f"（{gaps if gaps else '无'}）的结论是**登记过的 GAP**，不是答案；"
+               f"「可答」的完整口径见 E1/E2"
+               if not empty else f"{len(empty)} 条连结论都没有：{empty}"))
 
         # ── E1 缺口登记引用完整（取代原先恒为 True 的 D2）─────────
         #   ★ 一律读**盘上**的登记表：`kb_gaps.build()` 现算一份会让「登记表里
