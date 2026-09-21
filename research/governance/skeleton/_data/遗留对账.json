@@ -1,0 +1,2152 @@
+{
+ "source": "ADR/ADR-0013-基座接口冻结与仓库入库分级.md",
+ "source_sha256": "6664618bb2abe1ccb3924271570823b393e1f863d3d98e66822e82716237a5c0",
+ "source_lines": 1912,
+ "tables": 11,
+ "rows": 52,
+ "distinct_numbers": 40,
+ "number_range": [
+  1,
+  40
+ ],
+ "unique_items": 38,
+ "items": [
+  {
+   "key": "仓库可否设远端需先结清ADR0003",
+   "numbers": [
+    1
+   ],
+   "occurrences": [
+    {
+     "num": 1,
+     "line": 218,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner",
+     "text": "**仓库可否设远端** —— 需先结清 ADR-0003"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "downgrade_band字段名仍误导ADR0012§6.1未清",
+   "numbers": [
+    2
+   ],
+   "occurrences": [
+    {
+     "num": 2,
+     "line": 219,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B1）",
+     "text": "`downgrade_band` 字段名仍误导（ADR-0012 §6.1 未清）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "申诉通道D1O3仍unmet无入口/无责任人/无时限",
+   "numbers": [
+    3
+   ],
+   "occurrences": [
+    {
+     "num": 3,
+     "line": 220,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner",
+     "text": "申诉通道 `D1-O3` 仍 `unmet`（无入口 / 无责任人 / 无时限）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "品线维度机制就绪但零条规则声明待产品填7条",
+   "numbers": [
+    4
+   ],
+   "occurrences": [
+    {
+     "num": 4,
+     "line": 221,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "产品",
+     "text": "品线维度：机制就绪但零条规则声明，待产品填 7 条"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": ".md被一层未知介入加长4096字节",
+   "numbers": [
+    5
+   ],
+   "occurrences": [
+    {
+     "num": 5,
+     "line": 222,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "Owner（远端决策时一并考虑）",
+     "text": "~~`.md` 被一层未知介入加长 4096 字节~~ → **已定位：天锐绿盾 DLP 透明加密**（`com.tipray.trldKext`），见 §七.6。**非故障、无需修复**；但「能否设远端」因此多一道企业管控关"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "content_key的语义与实测不符隔日重抓约70%的页面换key",
+   "numbers": [
+    6,
+    20
+   ],
+   "occurrences": [
+    {
+     "num": 6,
+     "line": 223,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**`content_key` 的语义与实测不符**：隔日重抓约 70% 的页面换 key~~ → **已关闭**：Owner 裁定 **A**，落地见 **§十四**（判据 `claim-set-v1`；`content_key` 措辞订正为「这是哪一版正文」）"
+    },
+    {
+     "num": 20,
+     "line": 1238,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**`content_key` 的语义与实测不符**：隔日重抓约 70% 的页面换 key。三条修法 A/B/C，**需 Owner 裁定**~~ → **已关闭**（Owner 裁定 **A**，落地见 §十四）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "组装口径A/B/C定案→Owner已裁定A",
+   "numbers": [
+    6
+   ],
+   "occurrences": [
+    {
+     "num": 6,
+     "line": 483,
+     "table_line": 481,
+     "section": "8.5 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "~~Owner~~ 已结",
+     "text": "~~组装口径 A/B/C 定案~~ → **Owner 已裁定 A**（§8.4）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "图片/视频的covers/does_not_cover只有契约无实现from_media刻意无默认值防只做OCR看起来像",
+   "numbers": [
+    7
+   ],
+   "occurrences": [
+    {
+     "num": 7,
+     "line": 484,
+     "table_line": 481,
+     "section": "8.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B1）",
+     "text": "图片 / 视频的 `covers` / `does_not_cover` 只有契约、无实现（`from_media()` 刻意无默认值，防「只做 OCR」看起来像「图片已审」）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "广告组的跳①平台→存量表不可测广告侧的真实覆盖率答不出来需导出侧数据",
+   "numbers": [
+    7,
+    22
+   ],
+   "occurrences": [
+    {
+     "num": 7,
+     "line": 224,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner / 产品",
+     "text": "广告组的**跳①（平台 → 存量表）不可测** —— 广告侧的真实覆盖率答不出来，需导出侧数据"
+    },
+    {
+     "num": 22,
+     "line": 1240,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner / 产品",
+     "text": "A 组的**跳①（平台 → 存量表）不可测**：广告侧的真实覆盖率答不出来，需要导出侧数据"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "base/是新增顶层目录其L1归属需并入§三逐条清单",
+   "numbers": [
+    8
+   ],
+   "occurrences": [
+    {
+     "num": 8,
+     "line": 485,
+     "table_line": 481,
+     "section": "8.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B0.5 一并）",
+     "text": "`base/` 是新增顶层目录，其 L1 归属需并入 §三 逐条清单"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "退化占位图1×12/120算不算素材影响识别完整度与获取成功率的分母口径",
+   "numbers": [
+    8,
+    21
+   ],
+   "occurrences": [
+    {
+     "num": 8,
+     "line": 225,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "法务 / 产品",
+     "text": "「退化占位图」（1×1，2/120）算不算素材 —— 影响识别完整度与获取成功率的分母口径"
+    },
+    {
+     "num": 21,
+     "line": 1239,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "法务 / 产品",
+     "text": "「退化占位图」（1×1，2/120）算不算素材 —— 影响识别完整度的分母口径"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "A面的模块清单靠人维护没有任何检查在问base/下每个有selftest的模块是否都被调用",
+   "numbers": [
+    9,
+    24
+   ],
+   "occurrences": [
+    {
+     "num": 9,
+     "line": 226,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**A 面的模块清单靠人维护**：没有任何检查在问「`base/` 下每个有 `--selftest` 的模块是否都被调用」~~ → **已关闭**：A 面改成「自动发现 + 双向对照」（§十四.4）"
+    },
+    {
+     "num": 24,
+     "line": 1242,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**A 面的模块清单靠人维护** —— 没有任何检查在问「`base/` 下每个有 `--selftest` 的模块是否都被调用」~~ → **已关闭**（§十四.4：自动发现 + 双向对照）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "judge.py220那句过时的话仍在源码里本层只在返回值上订正凡不经base/judge_adapter.py直接调j",
+   "numbers": [
+    9
+   ],
+   "occurrences": [
+    {
+     "num": 9,
+     "line": 547,
+     "table_line": 545,
+     "section": "9.4 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（待 ADR-0012 验收脚本一并改）",
+     "text": "**`judge.py:220` 那句过时的话仍在源码里** —— 本层只在返回值上订正，凡不经 `base/judge_adapter.py` 直接调 `judge()` 的路径拿到的仍是假话"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "2条无标识广告记录recvuNu8mWXyYp/recvuNE6m1MyjQ缺外部广告ID任何按标识的比对覆盖不到",
+   "numbers": [
+    10
+   ],
+   "occurrences": [
+    {
+     "num": 10,
+     "line": 644,
+     "table_line": 642,
+     "section": "10.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "业务（补标识或删除空行）",
+     "text": "**2 条无标识广告记录**（`recvuNu8mWXyYp` / `recvuNE6m1MyjQ`）—— 缺 `外部广告ID`，任何按标识的比对覆盖不到"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013ADR13D3措辞宜同步修订",
+   "numbers": [
+    10,
+    16,
+    23
+   ],
+   "occurrences": [
+    {
+     "num": 10,
+     "line": 227,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订",
+     "text": "图片 OCR 的定位**再次下调**（无偏样本 40.0% · alt 与图内文字**负相关**），ADR-0013 ADR13-D3 措辞宜同步修订"
+    },
+    {
+     "num": 16,
+     "line": 867,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订",
+     "text": "**图片 OCR 的定位需按 §12.3 下调**（净增量小、噪声多），ADR13-D3 的措辞宜同步修订"
+    },
+    {
+     "num": 23,
+     "line": 1241,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订",
+     "text": "图片 OCR 的定位**再次下调**（无偏样本 40.0%、alt 与图内文字负相关），ADR13-D3 措辞宜同步修订"
+    },
+    {
+     "num": 16,
+     "line": 1246,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订（**已并入 23**）",
+     "text": "图片 OCR 的定位需按 §12.3 下调（净增量小、噪声多），ADR13-D3 的措辞宜同步修订"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": 23
+  },
+  {
+   "key": "规则链上夹的L1人工文档PRD与飞书之间无自动校验verify只比条目集合未逐列比字段",
+   "numbers": [
+    11
+   ],
+   "occurrences": [
+    {
+     "num": 11,
+     "line": 645,
+     "table_line": 642,
+     "section": "10.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B0.5 或其后）",
+     "text": "规则链上夹的 L1 人工文档（PRD）与飞书之间**无自动校验** —— `--verify` 只比条目集合，未逐列比字段"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "_evidence/sync/是L2已由/_evidence/覆盖每次pull都新增一个快照无保留策略",
+   "numbers": [
+    12,
+    15
+   ],
+   "occurrences": [
+    {
+     "num": 12,
+     "line": 646,
+     "table_line": 642,
+     "section": "10.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B0.5 一并定）",
+     "text": "`_evidence/sync/**` 是 L2（已由 `**/_evidence/` 覆盖）。**每次 `--pull` 都新增一个快照**，无保留策略"
+    },
+    {
+     "num": 15,
+     "line": 721,
+     "table_line": 717,
+     "section": "11.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者",
+     "text": "每次 `--pull` 都新增一个快照，`_evidence/sync/**` 无保留策略"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "PMO/shouhengstate/含飞书chat_id与§4.2第3条同类加远端前必须一并重估",
+   "numbers": [
+    13
+   ],
+   "occurrences": [
+    {
+     "num": 13,
+     "line": 719,
+     "table_line": 717,
+     "section": "11.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（远端决策时）",
+     "text": "`PMO/shouheng-state/**` 含飞书 `chat_id` —— 与 §4.2 第 3 条同类，**加远端前必须一并重估**"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "异议一的措辞需收窄为以『可复算』为由入库的L2产物",
+   "numbers": [
+    14
+   ],
+   "occurrences": [
+    {
+     "num": 14,
+     "line": 720,
+     "table_line": 717,
+     "section": "11.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订时",
+     "text": "异议一的措辞需收窄为「以『可复算』为由入库的 L2 产物」（§11.2）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "抽样偏差本次样本取自已成功抓取的页面获取成功率100%部分是构造出来的",
+   "numbers": [
+    17
+   ],
+   "occurrences": [
+    {
+     "num": 17,
+     "line": 868,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B2 或其后重抽）",
+     "text": "抽样偏差：本次样本取自已成功抓取的页面，获取成功率 100% 部分是构造出来的"
+    },
+    {
+     "num": 17,
+     "line": 1236,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~抽样偏差：本次样本取自已成功抓取的页面，获取成功率 100% 部分是构造出来的~~ → **已关闭**（13.6 / 13.7：重抽无偏样本，并量化了偏差）"
+    }
+   ],
+   "status_conflict": true,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "49条视频广告$5,110/7天的素材完全未覆盖且缺素材文件与转写通道",
+   "numbers": [
+    18
+   ],
+   "occurrences": [
+    {
+     "num": 18,
+     "line": 869,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（素材）+ 开发者（通道）",
+     "text": "49 条视频广告（$5,110/7天）的素材完全未覆盖，且缺素材文件与转写通道"
+    },
+    {
+     "num": 18,
+     "line": 1247,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（素材）+ 开发者（通道）",
+     "text": "49 条视频广告（$5,110/7天）的素材完全未覆盖，且缺素材文件与转写通道"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "CLAIM_PATTERNS已修正批次C制品需重跑本轮已跑lp_consistency.py整改路由.json/指标.j",
+   "numbers": [
+    19
+   ],
+   "occurrences": [
+    {
+     "num": 19,
+     "line": 870,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者",
+     "text": "`CLAIM_PATTERNS` 已修正，批次 C 制品需重跑 —— 本轮已跑 `lp_consistency.py`；`整改路由.json` / `指标.json` 未复查"
+    },
+    {
+     "num": 19,
+     "line": 1237,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~`CLAIM_PATTERNS` 已修正，批次 C 制品需重跑~~ → **已关闭**（13.4：三件全部复查，`整改路由` 33→35）"
+    }
+   ],
+   "status_conflict": true,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "遗留编号双轨§五的610与本节2024是同一批洞各有一套号靠人记对应关系",
+   "numbers": [
+    25
+   ],
+   "occurrences": [
+    {
+     "num": 25,
+     "line": 1243,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**遗留编号双轨**：§五 的 6–10 与本节 20–24 是同一批洞，各有一套号，靠人记对应关系~~ → **已关闭（第十二批 · D38）**：对应关系不再靠人记 —— 它进 `_data/遗留对账.json` 与台账的 `$id_aliases`，由 `verify_engine_contract.py` 的 V46b/V46e 守（撞号会红、悬空别名会红、产物过期会红）。★ **残留边界**：号本身**没改**（§五 的注写明「Owner 已按 6 号读过并据此裁定」），所以人读 `遗留 6` 仍要看到表内标记才知道是哪一个 —— 改号与否是 **Q37**。"
+    },
+    {
+     "num": 25,
+     "line": 1483,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**遗留编号双轨**：§五 的 6–10 与 §十三.12 的 20–24 是同一批洞，各有一套号~~ → **已关闭（第十二批 · D38）**，同 §13.12。"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "unit_id不含uri两个不同地址若逐字节相同会被折叠成一次观测当前语料未发生盘上3组折叠全是同target已做成检查",
+   "numbers": [
+    26
+   ],
+   "occurrences": [
+    {
+     "num": 26,
+     "line": 1244,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者 / 下次修订 ADR13-D9 时一并议",
+     "text": "**`unit_id` 不含 uri**：两个不同地址若逐字节相同会被折叠成一次观测。当前语料未发生（盘上 3 组折叠全是同 target，已做成检查），但它是可发生的"
+    },
+    {
+     "num": 26,
+     "line": 1484,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者 / 下次修订 ADR13-D9 时一并议",
+     "text": "**`unit_id` 不含 uri**：两个不同地址若逐字节相同会被折叠成一次观测（当前语料未发生，已做成检查）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "旧证据没有正文判据名与两版正文是§十四.5才要求落盘的此前各轮的观测不可重算判据只能重算计数",
+   "numbers": [
+    27
+   ],
+   "occurrences": [
+    {
+     "num": 27,
+     "line": 1245,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "归属列已结",
+     "owner": "已修，从下一轮起生效；旧轮不可补",
+     "text": "**旧证据没有正文**：判据名与两版正文是 §十四.5 才要求落盘的，此前各轮的观测**不可重算判据**（只能重算计数）"
+    },
+    {
+     "num": 27,
+     "line": 1485,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": true,
+     "closed_evidence": "归属列空",
+     "owner": "—",
+     "text": "**旧证据没有正文**：§14.5 之前各轮的观测不可重算判据（只能重算计数）。已修，旧轮不可补"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "stabilitytext/的入库分级未登记→查过了不需要登记/_evidence/已登记为addressed文件名即指",
+   "numbers": [
+    28
+   ],
+   "occurrences": [
+    {
+     "num": 28,
+     "line": 1486,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~`stability-text/` 的入库分级未登记~~ → **查过了，不需要登记**：`**/_evidence/` 已登记为 `addressed`（文件名即指纹），`load_text()` 读回时重算指纹、不符即拒。见下面那条自我更正"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "轮次覆盖让上一轮的正文副本成为孤儿逐条每轮被新版覆盖只有最新一轮的指针留在盘上旧轮的.txt.gz仍占着盘却没有任何指针",
+   "numbers": [
+    29
+   ],
+   "occurrences": [
+    {
+     "num": 29,
+     "line": 1487,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者",
+     "text": "**轮次覆盖让上一轮的正文副本成为孤儿**：`逐条` 每轮被新版覆盖，只有最新一轮的指针留在盘上；旧轮的 `.txt.gz` 仍占着盘，却没有任何指针指向它们（实测：盘上 35 份，最新一轮引用 34 份 → 当前 1 份孤儿；轮次多了会累积）。修法：把每轮的正文指针一并记进轮次账（`runs`）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "其余散文里的数字仍无机制保证E4只覆盖生成块+手册两处§四已改成指针别处没有保证",
+   "numbers": [
+    30
+   ],
+   "occurrences": [
+    {
+     "num": 30,
+     "line": 1629,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3 后续）",
+     "text": "**其余散文里的数字仍无机制保证**：E4 只覆盖「生成块 + 手册」两处；§四 已改成指针，别处没有保证"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "缺口表的细分项还没有各自的键§三未识别品线取值逐项未纳入量",
+   "numbers": [
+    31
+   ],
+   "occurrences": [
+    {
+     "num": 31,
+     "line": 1630,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3.2 一并）",
+     "text": "**缺口表的细分项还没有各自的键**：§三「未识别品线取值」逐项未纳入 `量`"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "两个新生成物未登记入库分级缺口v1.json与README生成块需并入§三逐条清单",
+   "numbers": [
+    32
+   ],
+   "occurrences": [
+    {
+     "num": 32,
+     "line": 1631,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（下次修订 §三）",
+     "text": "**两个新生成物未登记入库分级**：`缺口-v1.json` 与 README 生成块需并入 §三 逐条清单"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "load.today仍在现在只有basis_date进判据但today留着就还会有人用",
+   "numbers": [
+    33
+   ],
+   "occurrences": [
+    {
+     "num": 33,
+     "line": 1632,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3 后续：审计全部调用点）",
+     "text": "**`load.today()` 仍在**：现在只有 `basis_date()` 进判据，但 `today()` 留着就还会有人用"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "E组没有自证开关反向对照目前靠bash/tmp/rc_kb.sh没有随仓库走",
+   "numbers": [
+    34
+   ],
+   "occurrences": [
+    {
+     "num": 34,
+     "line": 1633,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3 后续：做成 `verify_kb.py --self-test`）",
+     "text": "**E 组没有自证开关**：反向对照目前靠 `bash /tmp/rc_kb.sh`，没有随仓库走"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "规程只覆盖文本审查一条路径图片/视频/落地区块的操作规程还没写",
+   "numbers": [
+    35
+   ],
+   "occurrences": [
+    {
+     "num": 35,
+     "line": 1711,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B4）",
+     "text": "**规程只覆盖文本审查一条路径**：图片/视频/落地区块的操作规程还没写"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "演练报告的数字靠一条聚合管道judge.pybatch的输出要再parse才得到分层表没有制品级的落盘",
+   "numbers": [
+    36
+   ],
+   "occurrences": [
+    {
+     "num": 36,
+     "line": 1712,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（把分层摘要做成 `--summary` 输出）",
+     "text": "**演练报告的数字靠一条聚合管道**：`judge.py --batch` 的输出要再 parse 才得到分层表，没有制品级的落盘"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "D9的处置口径未定源表要不要加无可审内容取值是产品/投放侧的决定未入队",
+   "numbers": [
+    37
+   ],
+   "occurrences": [
+    {
+     "num": 37,
+     "line": 1713,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（下批入 `$decision_queue`）",
+     "text": "**D9 的处置口径未定**：源表要不要加「无可审内容」取值，是产品/投放侧的决定，未入队"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "verify_skill.py的PROMISES是手写的规程新增一条命令而忘了加承诺字段检查仍绿只验退出码",
+   "numbers": [
+    38
+   ],
+   "occurrences": [
+    {
+     "num": 38,
+     "line": 1714,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（改成从规程里读字段名或强制每条命令声明字段）",
+     "text": "**`verify_skill.py` 的 PROMISES 是手写的**：规程新增一条命令而忘了加承诺字段，检查仍绿（只验退出码）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "manifesthistory.jsonl是本机唯一副本ADR0012§6.1对旧回执可反查历史的承诺因此只在本机成立7",
+   "numbers": [
+    39
+   ],
+   "occurrences": [
+    {
+     "num": 39,
+     "line": 1910,
+     "table_line": 1908,
+     "section": "17.8 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "**Owner**（改的是 §三 对「追加型账本」整行的理由）",
+     "text": "**`manifest-history.jsonl` 是本机唯一副本**：ADR-0012 §6.1 对「旧回执可反查历史」的承诺因此只在本机成立 —— 7 个版本不在版本控制内，其中 6 个全仓仅一份。同一目录已有一次不可恢复的丢账事故。候选 A/B/C 见 §17.6"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "2026091618221850那三次改动的内容已无从复核三个制品的上一版只以sha2565d76c9c7ca7d等的形",
+   "numbers": [
+    40
+   ],
+   "occurrences": [
+    {
+     "num": 40,
+     "line": 1911,
+     "table_line": 1908,
+     "section": "17.8 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（下次修订时确认是否接受为永久缺口）",
+     "text": "**2026-09-16 18:22–18:50 那三次改动的内容已无从复核**：三个制品的上一版只以 `sha256`（`5d76c9c7ca7d…` 等）的形式留在 manifest 里，**字节不存在于任何地方** —— 已逐处搜索（`backup-migration/`、`backup-batchD/`、`deprecated/`，并按旧尺寸 46726 / 26890 / 8630 字节全仓定位）**零命中**。这三版内容构成一处**永久缺口**"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  }
+ ],
+ "cluster_merges": [
+  {
+   "a": "A组的跳①平台→存量表不可测广告侧的真实覆盖率答不出来需要导出侧数据",
+   "b": "广告组的跳①平台→存量表不可测广告侧的真实覆盖率答不出来需导出侧数据",
+   "jaccard": 0.857,
+   "containment": 0.938,
+   "by": "jaccard"
+  },
+  {
+   "a": "CLAIM_PATTERNS已修正批次C制品需重跑",
+   "b": "CLAIM_PATTERNS已修正批次C制品需重跑本轮已跑lp_consistency.py",
+   "jaccard": 0.421,
+   "containment": 1.0,
+   "by": "containment"
+  },
+  {
+   "a": "_evidence/sync/是L2已由/_evidence/覆盖每次pull都新增一个快照",
+   "b": "每次pull都新增一个快照_evidence/sync/无保留策略",
+   "jaccard": 0.69,
+   "containment": 0.935,
+   "by": "jaccard"
+  },
+  {
+   "a": "content_key的语义与实测不符隔日重抓约70%的页面换key",
+   "b": "content_key的语义与实测不符隔日重抓约70%的页面换key三条修法A/B/C需Ow",
+   "jaccard": 0.638,
+   "containment": 1.0,
+   "by": "jaccard"
+  },
+  {
+   "a": "unit_id不含uri两个不同地址若逐字节相同会被折叠成一次观测当前语料未发生已做成检查",
+   "b": "unit_id不含uri两个不同地址若逐字节相同会被折叠成一次观测当前语料未发生盘上3组折叠",
+   "jaccard": 0.729,
+   "containment": 0.977,
+   "by": "jaccard"
+  },
+  {
+   "a": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013ADR13D3",
+   "b": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR13D3措辞宜同步修订",
+   "jaccard": 0.918,
+   "containment": 1.0,
+   "by": "jaccard"
+  },
+  {
+   "a": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013ADR13D3",
+   "b": "图片OCR的定位需按§12.3下调净增量小噪声多ADR13D3的措辞宜同步修订",
+   "jaccard": 0.299,
+   "containment": 0.526,
+   "by": "共前 6 字"
+  },
+  {
+   "a": "旧证据没有正文§14.5之前各轮的观测不可重算判据只能重算计数",
+   "b": "旧证据没有正文判据名与两版正文是§十四.5才要求落盘的此前各轮的观测不可重算判据只能重算计数",
+   "jaccard": 0.479,
+   "containment": 0.793,
+   "by": "共前 6 字"
+  },
+  {
+   "a": "退化占位图1×12/120算不算素材影响识别完整度与获取成功率的分母口径",
+   "b": "退化占位图1×12/120算不算素材影响识别完整度的分母口径",
+   "jaccard": 0.771,
+   "containment": 0.964,
+   "by": "jaccard"
+  },
+  {
+   "a": "遗留编号双轨§五的610与§十三.12的2024是同一批洞各有一套号",
+   "b": "遗留编号双轨§五的610与本节2024是同一批洞各有一套号靠人记对应关系",
+   "jaccard": 0.581,
+   "containment": 0.758,
+   "by": "jaccard"
+  }
+ ],
+ "collide_numbers": [
+  6,
+  7,
+  8,
+  9,
+  10
+ ],
+ "collide": {
+  "6": [
+   "content_key的语义与实测不符隔日重抓约70%的页面换key",
+   "组装口径A/B/C定案→Owner已裁定A"
+  ],
+  "7": [
+   "图片/视频的covers/does_not_cover只有契约无实现from_m",
+   "广告组的跳①平台→存量表不可测广告侧的真实覆盖率答不出来需导出侧数据"
+  ],
+  "8": [
+   "base/是新增顶层目录其L1归属需并入§三逐条清单",
+   "退化占位图1×12/120算不算素材影响识别完整度与获取成功率的分母口径"
+  ],
+  "9": [
+   "A面的模块清单靠人维护没有任何检查在问base/下每个有selftest的模块是",
+   "judge.py220那句过时的话仍在源码里本层只在返回值上订正凡不经base/"
+  ],
+  "10": [
+   "2条无标识广告记录recvuNu8mWXyYp/recvuNE6m1MyjQ缺外",
+   "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013A"
+  ]
+ },
+ "status_conflicts": [
+  {
+   "numbers": [
+    17
+   ],
+   "key": "抽样偏差本次样本取自已成功抓取的页面获取成功率100%部分是构造出来的",
+   "detail": [
+    {
+     "line": 868,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false
+    },
+    {
+     "line": 1236,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true
+    }
+   ]
+  },
+  {
+   "numbers": [
+    19
+   ],
+   "key": "CLAIM_PATTERNS已修正批次C制品需重跑本轮已跑lp_consistency.py整改路由.json/指标.j",
+   "detail": [
+    {
+     "line": 870,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false
+    },
+    {
+     "line": 1237,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true
+    }
+   ]
+  }
+ ],
+ "multi_numbered": [
+  {
+   "numbers": [
+    6,
+    20
+   ],
+   "key": "content_key的语义与实测不符隔日重抓约70%的页面换key",
+   "places": 2
+  },
+  {
+   "numbers": [
+    7,
+    22
+   ],
+   "key": "广告组的跳①平台→存量表不可测广告侧的真实覆盖率答不出来需导出侧数据",
+   "places": 2
+  },
+  {
+   "numbers": [
+    8,
+    21
+   ],
+   "key": "退化占位图1×12/120算不算素材影响识别完整度与获取成功率的分母口径",
+   "places": 2
+  },
+  {
+   "numbers": [
+    9,
+    24
+   ],
+   "key": "A面的模块清单靠人维护没有任何检查在问base/下每个有selftest的模块是否都被调用",
+   "places": 2
+  },
+  {
+   "numbers": [
+    10,
+    16,
+    23
+   ],
+   "key": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013ADR13D3措辞宜同步修订",
+   "places": 4
+  },
+  {
+   "numbers": [
+    12,
+    15
+   ],
+   "key": "_evidence/sync/是L2已由/_evidence/覆盖每次pull都新增一个快照无保留策略",
+   "places": 2
+  },
+  {
+   "numbers": [
+    17
+   ],
+   "key": "抽样偏差本次样本取自已成功抓取的页面获取成功率100%部分是构造出来的",
+   "places": 2
+  },
+  {
+   "numbers": [
+    18
+   ],
+   "key": "49条视频广告$5,110/7天的素材完全未覆盖且缺素材文件与转写通道",
+   "places": 2
+  },
+  {
+   "numbers": [
+    19
+   ],
+   "key": "CLAIM_PATTERNS已修正批次C制品需重跑本轮已跑lp_consistency.py整改路由.json/指标.j",
+   "places": 2
+  },
+  {
+   "numbers": [
+    25
+   ],
+   "key": "遗留编号双轨§五的610与本节2024是同一批洞各有一套号靠人记对应关系",
+   "places": 2
+  },
+  {
+   "numbers": [
+    26
+   ],
+   "key": "unit_id不含uri两个不同地址若逐字节相同会被折叠成一次观测当前语料未发生盘上3组折叠全是同target已做成检查",
+   "places": 2
+  },
+  {
+   "numbers": [
+    27
+   ],
+   "key": "旧证据没有正文判据名与两版正文是§十四.5才要求落盘的此前各轮的观测不可重算判据只能重算计数",
+   "places": 2
+  }
+ ],
+ "absorbed": [
+  {
+   "numbers": [
+    10,
+    16,
+    23
+   ],
+   "key": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013ADR13D3措辞宜同步修订",
+   "into": 23
+  }
+ ],
+ "open_items": [
+  {
+   "key": "仓库可否设远端需先结清ADR0003",
+   "numbers": [
+    1
+   ],
+   "occurrences": [
+    {
+     "num": 1,
+     "line": 218,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner",
+     "text": "**仓库可否设远端** —— 需先结清 ADR-0003"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "downgrade_band字段名仍误导ADR0012§6.1未清",
+   "numbers": [
+    2
+   ],
+   "occurrences": [
+    {
+     "num": 2,
+     "line": 219,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B1）",
+     "text": "`downgrade_band` 字段名仍误导（ADR-0012 §6.1 未清）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "申诉通道D1O3仍unmet无入口/无责任人/无时限",
+   "numbers": [
+    3
+   ],
+   "occurrences": [
+    {
+     "num": 3,
+     "line": 220,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner",
+     "text": "申诉通道 `D1-O3` 仍 `unmet`（无入口 / 无责任人 / 无时限）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "品线维度机制就绪但零条规则声明待产品填7条",
+   "numbers": [
+    4
+   ],
+   "occurrences": [
+    {
+     "num": 4,
+     "line": 221,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "产品",
+     "text": "品线维度：机制就绪但零条规则声明，待产品填 7 条"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "图片/视频的covers/does_not_cover只有契约无实现from_media刻意无默认值防只做OCR看起来像",
+   "numbers": [
+    7
+   ],
+   "occurrences": [
+    {
+     "num": 7,
+     "line": 484,
+     "table_line": 481,
+     "section": "8.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B1）",
+     "text": "图片 / 视频的 `covers` / `does_not_cover` 只有契约、无实现（`from_media()` 刻意无默认值，防「只做 OCR」看起来像「图片已审」）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "广告组的跳①平台→存量表不可测广告侧的真实覆盖率答不出来需导出侧数据",
+   "numbers": [
+    7,
+    22
+   ],
+   "occurrences": [
+    {
+     "num": 7,
+     "line": 224,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner / 产品",
+     "text": "广告组的**跳①（平台 → 存量表）不可测** —— 广告侧的真实覆盖率答不出来，需导出侧数据"
+    },
+    {
+     "num": 22,
+     "line": 1240,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner / 产品",
+     "text": "A 组的**跳①（平台 → 存量表）不可测**：广告侧的真实覆盖率答不出来，需要导出侧数据"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "base/是新增顶层目录其L1归属需并入§三逐条清单",
+   "numbers": [
+    8
+   ],
+   "occurrences": [
+    {
+     "num": 8,
+     "line": 485,
+     "table_line": 481,
+     "section": "8.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B0.5 一并）",
+     "text": "`base/` 是新增顶层目录，其 L1 归属需并入 §三 逐条清单"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "退化占位图1×12/120算不算素材影响识别完整度与获取成功率的分母口径",
+   "numbers": [
+    8,
+    21
+   ],
+   "occurrences": [
+    {
+     "num": 8,
+     "line": 225,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "法务 / 产品",
+     "text": "「退化占位图」（1×1，2/120）算不算素材 —— 影响识别完整度与获取成功率的分母口径"
+    },
+    {
+     "num": 21,
+     "line": 1239,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "法务 / 产品",
+     "text": "「退化占位图」（1×1，2/120）算不算素材 —— 影响识别完整度的分母口径"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "judge.py220那句过时的话仍在源码里本层只在返回值上订正凡不经base/judge_adapter.py直接调j",
+   "numbers": [
+    9
+   ],
+   "occurrences": [
+    {
+     "num": 9,
+     "line": 547,
+     "table_line": 545,
+     "section": "9.4 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（待 ADR-0012 验收脚本一并改）",
+     "text": "**`judge.py:220` 那句过时的话仍在源码里** —— 本层只在返回值上订正，凡不经 `base/judge_adapter.py` 直接调 `judge()` 的路径拿到的仍是假话"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "2条无标识广告记录recvuNu8mWXyYp/recvuNE6m1MyjQ缺外部广告ID任何按标识的比对覆盖不到",
+   "numbers": [
+    10
+   ],
+   "occurrences": [
+    {
+     "num": 10,
+     "line": 644,
+     "table_line": 642,
+     "section": "10.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "业务（补标识或删除空行）",
+     "text": "**2 条无标识广告记录**（`recvuNu8mWXyYp` / `recvuNE6m1MyjQ`）—— 缺 `外部广告ID`，任何按标识的比对覆盖不到"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "图片OCR的定位再次下调无偏样本40.0%alt与图内文字负相关ADR0013ADR13D3措辞宜同步修订",
+   "numbers": [
+    10,
+    16,
+    23
+   ],
+   "occurrences": [
+    {
+     "num": 10,
+     "line": 227,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订",
+     "text": "图片 OCR 的定位**再次下调**（无偏样本 40.0% · alt 与图内文字**负相关**），ADR-0013 ADR13-D3 措辞宜同步修订"
+    },
+    {
+     "num": 16,
+     "line": 867,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订",
+     "text": "**图片 OCR 的定位需按 §12.3 下调**（净增量小、噪声多），ADR13-D3 的措辞宜同步修订"
+    },
+    {
+     "num": 23,
+     "line": 1241,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订",
+     "text": "图片 OCR 的定位**再次下调**（无偏样本 40.0%、alt 与图内文字负相关），ADR13-D3 措辞宜同步修订"
+    },
+    {
+     "num": 16,
+     "line": 1246,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订（**已并入 23**）",
+     "text": "图片 OCR 的定位需按 §12.3 下调（净增量小、噪声多），ADR13-D3 的措辞宜同步修订"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": 23
+  },
+  {
+   "key": "规则链上夹的L1人工文档PRD与飞书之间无自动校验verify只比条目集合未逐列比字段",
+   "numbers": [
+    11
+   ],
+   "occurrences": [
+    {
+     "num": 11,
+     "line": 645,
+     "table_line": 642,
+     "section": "10.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B0.5 或其后）",
+     "text": "规则链上夹的 L1 人工文档（PRD）与飞书之间**无自动校验** —— `--verify` 只比条目集合，未逐列比字段"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "_evidence/sync/是L2已由/_evidence/覆盖每次pull都新增一个快照无保留策略",
+   "numbers": [
+    12,
+    15
+   ],
+   "occurrences": [
+    {
+     "num": 12,
+     "line": 646,
+     "table_line": 642,
+     "section": "10.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B0.5 一并定）",
+     "text": "`_evidence/sync/**` 是 L2（已由 `**/_evidence/` 覆盖）。**每次 `--pull` 都新增一个快照**，无保留策略"
+    },
+    {
+     "num": 15,
+     "line": 721,
+     "table_line": 717,
+     "section": "11.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者",
+     "text": "每次 `--pull` 都新增一个快照，`_evidence/sync/**` 无保留策略"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "PMO/shouhengstate/含飞书chat_id与§4.2第3条同类加远端前必须一并重估",
+   "numbers": [
+    13
+   ],
+   "occurrences": [
+    {
+     "num": 13,
+     "line": 719,
+     "table_line": 717,
+     "section": "11.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（远端决策时）",
+     "text": "`PMO/shouheng-state/**` 含飞书 `chat_id` —— 与 §4.2 第 3 条同类，**加远端前必须一并重估**"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "异议一的措辞需收窄为以『可复算』为由入库的L2产物",
+   "numbers": [
+    14
+   ],
+   "occurrences": [
+    {
+     "num": 14,
+     "line": 720,
+     "table_line": 717,
+     "section": "11.5 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "本 ADR 下次修订时",
+     "text": "异议一的措辞需收窄为「以『可复算』为由入库的 L2 产物」（§11.2）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "抽样偏差本次样本取自已成功抓取的页面获取成功率100%部分是构造出来的",
+   "numbers": [
+    17
+   ],
+   "occurrences": [
+    {
+     "num": 17,
+     "line": 868,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B2 或其后重抽）",
+     "text": "抽样偏差：本次样本取自已成功抓取的页面，获取成功率 100% 部分是构造出来的"
+    },
+    {
+     "num": 17,
+     "line": 1236,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~抽样偏差：本次样本取自已成功抓取的页面，获取成功率 100% 部分是构造出来的~~ → **已关闭**（13.6 / 13.7：重抽无偏样本，并量化了偏差）"
+    }
+   ],
+   "status_conflict": true,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "49条视频广告$5,110/7天的素材完全未覆盖且缺素材文件与转写通道",
+   "numbers": [
+    18
+   ],
+   "occurrences": [
+    {
+     "num": 18,
+     "line": 869,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（素材）+ 开发者（通道）",
+     "text": "49 条视频广告（$5,110/7天）的素材完全未覆盖，且缺素材文件与转写通道"
+    },
+    {
+     "num": 18,
+     "line": 1247,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（素材）+ 开发者（通道）",
+     "text": "49 条视频广告（$5,110/7天）的素材完全未覆盖，且缺素材文件与转写通道"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "CLAIM_PATTERNS已修正批次C制品需重跑本轮已跑lp_consistency.py整改路由.json/指标.j",
+   "numbers": [
+    19
+   ],
+   "occurrences": [
+    {
+     "num": 19,
+     "line": 870,
+     "table_line": 865,
+     "section": "12.6 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者",
+     "text": "`CLAIM_PATTERNS` 已修正，批次 C 制品需重跑 —— 本轮已跑 `lp_consistency.py`；`整改路由.json` / `指标.json` 未复查"
+    },
+    {
+     "num": 19,
+     "line": 1237,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~`CLAIM_PATTERNS` 已修正，批次 C 制品需重跑~~ → **已关闭**（13.4：三件全部复查，`整改路由` 33→35）"
+    }
+   ],
+   "status_conflict": true,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "unit_id不含uri两个不同地址若逐字节相同会被折叠成一次观测当前语料未发生盘上3组折叠全是同target已做成检查",
+   "numbers": [
+    26
+   ],
+   "occurrences": [
+    {
+     "num": 26,
+     "line": 1244,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者 / 下次修订 ADR13-D9 时一并议",
+     "text": "**`unit_id` 不含 uri**：两个不同地址若逐字节相同会被折叠成一次观测。当前语料未发生（盘上 3 组折叠全是同 target，已做成检查），但它是可发生的"
+    },
+    {
+     "num": 26,
+     "line": 1484,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者 / 下次修订 ADR13-D9 时一并议",
+     "text": "**`unit_id` 不含 uri**：两个不同地址若逐字节相同会被折叠成一次观测（当前语料未发生，已做成检查）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "轮次覆盖让上一轮的正文副本成为孤儿逐条每轮被新版覆盖只有最新一轮的指针留在盘上旧轮的.txt.gz仍占着盘却没有任何指针",
+   "numbers": [
+    29
+   ],
+   "occurrences": [
+    {
+     "num": 29,
+     "line": 1487,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者",
+     "text": "**轮次覆盖让上一轮的正文副本成为孤儿**：`逐条` 每轮被新版覆盖，只有最新一轮的指针留在盘上；旧轮的 `.txt.gz` 仍占着盘，却没有任何指针指向它们（实测：盘上 35 份，最新一轮引用 34 份 → 当前 1 份孤儿；轮次多了会累积）。修法：把每轮的正文指针一并记进轮次账（`runs`）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "其余散文里的数字仍无机制保证E4只覆盖生成块+手册两处§四已改成指针别处没有保证",
+   "numbers": [
+    30
+   ],
+   "occurrences": [
+    {
+     "num": 30,
+     "line": 1629,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3 后续）",
+     "text": "**其余散文里的数字仍无机制保证**：E4 只覆盖「生成块 + 手册」两处；§四 已改成指针，别处没有保证"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "缺口表的细分项还没有各自的键§三未识别品线取值逐项未纳入量",
+   "numbers": [
+    31
+   ],
+   "occurrences": [
+    {
+     "num": 31,
+     "line": 1630,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3.2 一并）",
+     "text": "**缺口表的细分项还没有各自的键**：§三「未识别品线取值」逐项未纳入 `量`"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "两个新生成物未登记入库分级缺口v1.json与README生成块需并入§三逐条清单",
+   "numbers": [
+    32
+   ],
+   "occurrences": [
+    {
+     "num": 32,
+     "line": 1631,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（下次修订 §三）",
+     "text": "**两个新生成物未登记入库分级**：`缺口-v1.json` 与 README 生成块需并入 §三 逐条清单"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "load.today仍在现在只有basis_date进判据但today留着就还会有人用",
+   "numbers": [
+    33
+   ],
+   "occurrences": [
+    {
+     "num": 33,
+     "line": 1632,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3 后续：审计全部调用点）",
+     "text": "**`load.today()` 仍在**：现在只有 `basis_date()` 进判据，但 `today()` 留着就还会有人用"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "E组没有自证开关反向对照目前靠bash/tmp/rc_kb.sh没有随仓库走",
+   "numbers": [
+    34
+   ],
+   "occurrences": [
+    {
+     "num": 34,
+     "line": 1633,
+     "table_line": 1627,
+     "section": "15.9 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B3 后续：做成 `verify_kb.py --self-test`）",
+     "text": "**E 组没有自证开关**：反向对照目前靠 `bash /tmp/rc_kb.sh`，没有随仓库走"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "规程只覆盖文本审查一条路径图片/视频/落地区块的操作规程还没写",
+   "numbers": [
+    35
+   ],
+   "occurrences": [
+    {
+     "num": 35,
+     "line": 1711,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（B4）",
+     "text": "**规程只覆盖文本审查一条路径**：图片/视频/落地区块的操作规程还没写"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "演练报告的数字靠一条聚合管道judge.pybatch的输出要再parse才得到分层表没有制品级的落盘",
+   "numbers": [
+    36
+   ],
+   "occurrences": [
+    {
+     "num": 36,
+     "line": 1712,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（把分层摘要做成 `--summary` 输出）",
+     "text": "**演练报告的数字靠一条聚合管道**：`judge.py --batch` 的输出要再 parse 才得到分层表，没有制品级的落盘"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "D9的处置口径未定源表要不要加无可审内容取值是产品/投放侧的决定未入队",
+   "numbers": [
+    37
+   ],
+   "occurrences": [
+    {
+     "num": 37,
+     "line": 1713,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "Owner（下批入 `$decision_queue`）",
+     "text": "**D9 的处置口径未定**：源表要不要加「无可审内容」取值，是产品/投放侧的决定，未入队"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "verify_skill.py的PROMISES是手写的规程新增一条命令而忘了加承诺字段检查仍绿只验退出码",
+   "numbers": [
+    38
+   ],
+   "occurrences": [
+    {
+     "num": 38,
+     "line": 1714,
+     "table_line": 1709,
+     "section": "16.5 落进 §五 遗留",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（改成从规程里读字段名或强制每条命令声明字段）",
+     "text": "**`verify_skill.py` 的 PROMISES 是手写的**：规程新增一条命令而忘了加承诺字段，检查仍绿（只验退出码）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "manifesthistory.jsonl是本机唯一副本ADR0012§6.1对旧回执可反查历史的承诺因此只在本机成立7",
+   "numbers": [
+    39
+   ],
+   "occurrences": [
+    {
+     "num": 39,
+     "line": 1910,
+     "table_line": 1908,
+     "section": "17.8 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "**Owner**（改的是 §三 对「追加型账本」整行的理由）",
+     "text": "**`manifest-history.jsonl` 是本机唯一副本**：ADR-0012 §6.1 对「旧回执可反查历史」的承诺因此只在本机成立 —— 7 个版本不在版本控制内，其中 6 个全仓仅一份。同一目录已有一次不可恢复的丢账事故。候选 A/B/C 见 §17.6"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  },
+  {
+   "key": "2026091618221850那三次改动的内容已无从复核三个制品的上一版只以sha2565d76c9c7ca7d等的形",
+   "numbers": [
+    40
+   ],
+   "occurrences": [
+    {
+     "num": 40,
+     "line": 1911,
+     "table_line": 1908,
+     "section": "17.8 落进 §五「遗留」",
+     "closed": false,
+     "closed_evidence": "",
+     "owner": "开发者（下次修订时确认是否接受为永久缺口）",
+     "text": "**2026-09-16 18:22–18:50 那三次改动的内容已无从复核**：三个制品的上一版只以 `sha256`（`5d76c9c7ca7d…` 等）的形式留在 manifest 里，**字节不存在于任何地方** —— 已逐处搜索（`backup-migration/`、`backup-batchD/`、`deprecated/`，并按旧尺寸 46726 / 26890 / 8630 字节全仓定位）**零命中**。这三版内容构成一处**永久缺口**"
+    }
+   ],
+   "status_conflict": false,
+   "closed": false,
+   "merged_into": null
+  }
+ ],
+ "closed_items": [
+  {
+   "key": ".md被一层未知介入加长4096字节",
+   "numbers": [
+    5
+   ],
+   "occurrences": [
+    {
+     "num": 5,
+     "line": 222,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "Owner（远端决策时一并考虑）",
+     "text": "~~`.md` 被一层未知介入加长 4096 字节~~ → **已定位：天锐绿盾 DLP 透明加密**（`com.tipray.trldKext`），见 §七.6。**非故障、无需修复**；但「能否设远端」因此多一道企业管控关"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "content_key的语义与实测不符隔日重抓约70%的页面换key",
+   "numbers": [
+    6,
+    20
+   ],
+   "occurrences": [
+    {
+     "num": 6,
+     "line": 223,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**`content_key` 的语义与实测不符**：隔日重抓约 70% 的页面换 key~~ → **已关闭**：Owner 裁定 **A**，落地见 **§十四**（判据 `claim-set-v1`；`content_key` 措辞订正为「这是哪一版正文」）"
+    },
+    {
+     "num": 20,
+     "line": 1238,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**`content_key` 的语义与实测不符**：隔日重抓约 70% 的页面换 key。三条修法 A/B/C，**需 Owner 裁定**~~ → **已关闭**（Owner 裁定 **A**，落地见 §十四）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "组装口径A/B/C定案→Owner已裁定A",
+   "numbers": [
+    6
+   ],
+   "occurrences": [
+    {
+     "num": 6,
+     "line": 483,
+     "table_line": 481,
+     "section": "8.5 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "~~Owner~~ 已结",
+     "text": "~~组装口径 A/B/C 定案~~ → **Owner 已裁定 A**（§8.4）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "A面的模块清单靠人维护没有任何检查在问base/下每个有selftest的模块是否都被调用",
+   "numbers": [
+    9,
+    24
+   ],
+   "occurrences": [
+    {
+     "num": 9,
+     "line": 226,
+     "table_line": 216,
+     "section": "五、遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**A 面的模块清单靠人维护**：没有任何检查在问「`base/` 下每个有 `--selftest` 的模块是否都被调用」~~ → **已关闭**：A 面改成「自动发现 + 双向对照」（§十四.4）"
+    },
+    {
+     "num": 24,
+     "line": 1242,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**A 面的模块清单靠人维护** —— 没有任何检查在问「`base/` 下每个有 `--selftest` 的模块是否都被调用」~~ → **已关闭**（§十四.4：自动发现 + 双向对照）"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "遗留编号双轨§五的610与本节2024是同一批洞各有一套号靠人记对应关系",
+   "numbers": [
+    25
+   ],
+   "occurrences": [
+    {
+     "num": 25,
+     "line": 1243,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**遗留编号双轨**：§五 的 6–10 与本节 20–24 是同一批洞，各有一套号，靠人记对应关系~~ → **已关闭（第十二批 · D38）**：对应关系不再靠人记 —— 它进 `_data/遗留对账.json` 与台账的 `$id_aliases`，由 `verify_engine_contract.py` 的 V46b/V46e 守（撞号会红、悬空别名会红、产物过期会红）。★ **残留边界**：号本身**没改**（§五 的注写明「Owner 已按 6 号读过并据此裁定」），所以人读 `遗留 6` 仍要看到表内标记才知道是哪一个 —— 改号与否是 **Q37**。"
+    },
+    {
+     "num": 25,
+     "line": 1483,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~**遗留编号双轨**：§五 的 6–10 与 §十三.12 的 20–24 是同一批洞，各有一套号~~ → **已关闭（第十二批 · D38）**，同 §13.12。"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "旧证据没有正文判据名与两版正文是§十四.5才要求落盘的此前各轮的观测不可重算判据只能重算计数",
+   "numbers": [
+    27
+   ],
+   "occurrences": [
+    {
+     "num": 27,
+     "line": 1245,
+     "table_line": 1234,
+     "section": "13.12 落进 §五「遗留」",
+     "closed": true,
+     "closed_evidence": "归属列已结",
+     "owner": "已修，从下一轮起生效；旧轮不可补",
+     "text": "**旧证据没有正文**：判据名与两版正文是 §十四.5 才要求落盘的，此前各轮的观测**不可重算判据**（只能重算计数）"
+    },
+    {
+     "num": 27,
+     "line": 1485,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": true,
+     "closed_evidence": "归属列空",
+     "owner": "—",
+     "text": "**旧证据没有正文**：§14.5 之前各轮的观测不可重算判据（只能重算计数）。已修，旧轮不可补"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  },
+  {
+   "key": "stabilitytext/的入库分级未登记→查过了不需要登记/_evidence/已登记为addressed文件名即指",
+   "numbers": [
+    28
+   ],
+   "occurrences": [
+    {
+     "num": 28,
+     "line": 1486,
+     "table_line": 1481,
+     "section": "14.9 落进 §五 遗留",
+     "closed": true,
+     "closed_evidence": "删除线",
+     "owner": "—",
+     "text": "~~`stability-text/` 的入库分级未登记~~ → **查过了，不需要登记**：`**/_evidence/` 已登记为 `addressed`（文件名即指纹），`load_text()` 读回时重算指纹、不符即拒。见下面那条自我更正"
+    }
+   ],
+   "status_conflict": false,
+   "closed": true,
+   "merged_into": null
+  }
+ ]
+}

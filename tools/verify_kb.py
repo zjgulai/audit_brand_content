@@ -22,7 +22,7 @@ G1「存在性」的验收标准（建设方案 §二）：
 
 ★ E 组（B3.0 新增）守的是**治理**，不是数字：
   E1 缺口登记引用完整  每处 GAP 结论都必须带 〔缺口:ID〕，且该 ID 在 缺口-v1.json 里真实存在
-                      —— 取代原先那条写成 `True` 的恒真检查（见 §D2 的历史）
+                      —— 取代原先那条写成 `True` 的恒真检查（见 §KB-CHK-2 的历史）
   E2 缺口量可重算     每条缺口的「量」都要在 kb_facts 里重算对上；算不出来的必须显式声明
   E3 台账与快照同代    台账的 snapshot_id 必须等于当前快照 —— 基准日建在这上面
   E4 文档可重算        README 事实块与查询手册都必须是重算结果，手改/过期即红
@@ -32,7 +32,9 @@ G1「存在性」的验收标准（建设方案 §二）：
   python3 tools/verify_kb.py --json      # 机器可读
 """
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import re
@@ -180,7 +182,7 @@ def main():
         c.add("C10", "飞书回读", False,
               f"未找到 {os.path.relpath(ROUNDTRIP, load.REPO)}（落库后生成）", skipped=True)
 
-    # ── D1-D3 G3 可用性：10 条黄金问题 ───────────────────────
+    # ── KB-CHK-1–KB-CHK-3 G3 可用性：10 条黄金问题 ───────────────────────
     try:
         sys.path.insert(0, os.path.join(load.REPO, "tools"))
         import kb_query
@@ -200,22 +202,22 @@ def main():
             if any("GAP" in str(x) for x in lines):
                 gaps.append(f"Q{i}")
             # ★ 每处 GAP 都必须带登记标记，且标记里的编号必须真实存在（E1）。
-            #   这正是原来的 D2 想守、却写成 `True` 而永远守不住的东西。
+            #   这正是原来的 KB-CHK-2 想守、却写成 `True` 而永远守不住的东西。
             #   判据写成「**声明 GAP 的那条问题**至少有一处标记」，而不是「每行」——
             #   后者会把 GAP 的标题行本身算成违规（第一版就误报了）。
             if any("GAP" in str(x) for x in lines) and \
                     not any("〔缺口:" in str(x) for x in lines):
                 unregistered.append(f"Q{i}: 声明了 GAP 却没有任何登记标记")
-        # ★ 名字里的「可答」会把「产出结论」读成「答得出来」。Q7 产出的是一个
+        # ★ 名字里的「可答」会把「产出结论」读成「答得出来」。KB-Q-7 产出的是一个
         #   **登记过的 GAP**（不是答案）。所以这一条的文案必须把两者分开写：
-        #   D1 守「有没有结论」，E1 守「结论里的空缺有没有落点」。
-        c.add("D1", "黄金问题全部产出结论", not empty,
+        #   KB-CHK-1 守「有没有结论」，E1 守「结论里的空缺有没有落点」。
+        c.add("KB-CHK-1", "黄金问题全部产出结论", not empty,
               (f"{len(kb_query.QUESTIONS)} 条全部产出结论 —— 其中 {len(gaps)} 条"
                f"（{gaps if gaps else '无'}）的结论是**登记过的 GAP**，不是答案；"
                f"「可答」的完整口径见 E1/E2"
                if not empty else f"{len(empty)} 条连结论都没有：{empty}"))
 
-        # ── E1 缺口登记引用完整（取代原先恒为 True 的 D2）─────────
+        # ── E1 缺口登记引用完整（取代原先恒为 True 的 KB-CHK-2）─────────
         #   ★ 一律读**盘上**的登记表：`kb_gaps.build()` 现算一份会让「登记表里
         #     有没有这一条」被自己回答 —— 第一版就是这样，检查恒绿。
         gap_path = os.path.join(load.KB, "缺口-v1.json")
@@ -228,7 +230,10 @@ def main():
                 txt = "\n".join(str(x) for x in fn(ledger_doc, real))
             except Exception:                                 # noqa: BLE001
                 continue
-            for m in re.findall(r"〔缺口:([A-Za-z0-9_]+)〕", txt):
+            # ★ D37：字符类必须含 `-`。改名后编号是 `KB-GAP-1`，而
+            #   `[A-Za-z0-9_]+` 匹配不到连字符 —— 结果是**一处也匹配不上**，
+            #   `seen_ids` 空、`missing` 空，E1 变成恒真。改名当天实测到过这一幕。
+            for m in re.findall(r"〔缺口:([A-Za-z0-9_-]+)〕", txt):
                 seen_ids.add(m)
                 if m not in reg:
                     missing.append(m)
@@ -274,6 +279,33 @@ def main():
                if have_gap == want_gap else
                "❌ 登记表已过期 —— 修复：python3 tools/kb_gaps.py"))
 
+        # ── E7 外部承诺到期（2026-09-21 新增）────────────────────
+        #   起因：KB-GAP-6 在 2026-09-21 登记进一条**外部承诺**（上游「两周内」提供
+        #   其余品线规则，换算到期日 2026-10-02）。登记本身不产生约束力 ——
+        #   承诺方到期没交，得有东西会响。
+        #
+        #   为什么这条必须长在**验收器里**，而不只是 kb_gaps.py 里打印一句：
+        #   到期时需要的是「下一次任何人做 KB 相关改动都会撞见它」，
+        #   而不是「有人恰好手动跑了那个脚本」。E5 只比内容，**跑不到 check_due
+        #   的退出码** —— 所以没有这一条，那个逾期信号就只是脚本里的一段打印，
+        #   即 `AGENTS.md` §2.4 说的「注释，不是约束」。
+        #
+        #   反向对照（AGENTS.md §2.4.1：没红过的断言不算验证过）：把 check_due 的
+        #   `today` 推到 2026-10-03 即返回 2，本条随之变红。五情形实测（到期前 /
+        #   到期当天 / 逾期 1 天 / 已填完成于 / due 写成非日期）复现：
+        #     python3 -c "import importlib.util,datetime; \
+        #       s=importlib.util.spec_from_file_location('g','tools/kb_gaps.py'); \
+        #       m=importlib.util.module_from_spec(s); s.loader.exec_module(m); \
+        #       print(m.check_due(m.build(), today=datetime.date(2026,10,3)))"
+        _buf = io.StringIO()
+        with contextlib.redirect_stdout(_buf):
+            _due = kb_gaps.check_due(gap_doc or {})
+        c.add("E7", "外部承诺未逾期", _due == 0,
+              ("在途外部承诺均未到期"
+               if _due == 0 else
+               "⏰ 有承诺逾期未交付（明细见下；修复前先核『是不是我把到期日算错了』）\n     "
+               + _buf.getvalue().strip().replace("\n", "\n     ")))
+
         # ── E3 台账与快照同代（基准日、数字都建在这上面）──────────
         c.add("E3", "台账与快照同代",
               ledger_doc["snapshot_id"] == snap.snapshot_id,
@@ -294,6 +326,107 @@ def main():
               f"README 事实块 {'一致' if have == want else '❌已过期'}；"
               f"查询手册 {'一致' if manual_have == manual_want else '❌已过期'}"
               f"（修复：python3 tools/kb_facts.py && python3 tools/kb_query.py --md）")
+
+        # ── E6 跨命名空间撞车守护（D37）───────────────────────────
+        #   D37 落地当天实测出三条，共性是同一件事：**改的是编号，坏的是围着编号
+        #   写的那些假设** —— ① 漏扫生成器 `kb_classes.py`，重算一次就把裸 `D#`
+        #   写了回去；② E1 的 `〔缺口:([A-Za-z0-9_]+)〕` 匹配不上 `KB-GAP-1` 的
+        #   连字符，于是一处也找不到、**判据变成恒真**；③ 打印分组按
+        #   `id.startswith("D")`，改完 G3 整段消失且不报错。三条没有一条会自己喊。
+        #
+        #   所以这条判据不问「改对了吗」，只问**现在还认不认得出谁是谁**：
+        #     (a) KB 线的**登记处**（缺口 `gaps[].id`、`affects`、验收检查编号）
+        #         一律不得出现裸 `D#`/`Q#` —— 这是根因，完全可判定；
+        #     (b) KB 线的文档与脚本里，裸写的 `D#`/`Q#` 必须**逐条等于清单里那几条**
+        #         台账引用 —— 多一条少一条都红，于是「新写一个裸 `D#`」会被抓住。
+        #   ★ 别名区（`$renamed_from` / `RENAMED_FROM`）整段剥掉再扫：台账
+        #     `D1`–`D16` 与缺口旧编号**完全重叠**，不剥就等于放过全部撞车，
+        #     这条判据也会变成恒真 —— 而恒真正是本仓一直在治的病。
+        _ledger_p = os.path.join(load.REPO, "research", "governance",
+                                 "skeleton", "legal-decisions-v1.json")
+        try:
+            _lg = json.load(open(_ledger_p, encoding="utf-8"))
+            _lid = ({d["id"] for d in _lg["decisions"]}
+                    | {q["id"] for q in _lg["$decision_queue"]})
+        except Exception:                                     # noqa: BLE001
+            _lid = set()
+
+        # (a) 登记处不得有裸编号
+        _bare = re.compile(r'^(?:[DQ]\d+)$')
+        _reg_bad = []
+        _gap_now = json.load(open(os.path.join(load.KB, "缺口-v1.json"), encoding="utf-8"))
+        for _g in _gap_now.get("gaps", []):
+            if _bare.match(str(_g.get("id"))):
+                _reg_bad.append(f"缺口 id 裸写：{_g['id']}")
+            for _a in (_g.get("affects") or []):
+                if _bare.match(str(_a)):
+                    _reg_bad.append(f"{_g['id']}.affects 裸写：{_a}")
+        for _i in c.items:
+            if _bare.match(_i["id"]):
+                _reg_bad.append(f"验收检查编号裸写：{_i['id']}")
+
+        # (b) 文档与脚本里的裸编号必须逐条等于这张清单
+        #   ★ 本文件（`verify_kb.py`）**故意不在扫描范围内**：这张清单本身写在
+        #     它里面，扫它就成了自指 —— 清单里加一条，实际值也跟着加一条，
+        #     判据永远是绿的。自指的检查不是检查。（它自己的**检查编号**仍由
+        #     (a) 管着，那一条没有自指问题。）
+        #   ★ `查询手册.md` 的 `D28` 是**台账**决定（先结构化 R1，法务只做确认/否决），
+        #     由 `知识库-v1.json` 的「缺口说明」渲染进来 —— 台账引用，应当保留。
+        _kb_scan = [
+            (os.path.join(load.KB, "README.md"), []),
+            (os.path.join(load.KB, "知识库-v1.json"), ["D28"]),
+            (os.path.join(load.KB, "外部标准库-v1.json"), []),
+            (os.path.join(load.KB, "查询手册.md"), ["D28"]),
+            (os.path.join(load.KB, "缺口-v1.json"), ["D3", "D37"]),
+            (os.path.join(load.REPO, "tools", "kb_gaps.py"), ["D3", "D37"]),
+            (os.path.join(load.REPO, "tools", "kb_facts.py"), []),
+            (os.path.join(load.REPO, "tools", "kb_query.py"), ["D37"]),
+            (os.path.join(load.REPO, "tools", "kb_classes.py"), ["D28"]),
+        ]
+        _exempt = [('"$renamed_from": {', "\n },"), ("RENAMED_FROM = {", "\n}")]
+
+        def _strip(text):
+            for _s, _e in _exempt:
+                _i = text.find(_s)
+                if _i < 0:
+                    continue
+                _j = text.find(_e, _i)
+                if _j > 0:
+                    text = text[:_i] + text[_j + len(_e):]
+            return text
+
+        def _bare_ids(text):
+            return sorted({m.group(0) for m in re.finditer(
+                r"(?<![A-Za-z0-9_#-])([DQ])(\d{1,3})(?![0-9])", _strip(text))})
+
+        def _cmp(name, text, exp):
+            """一条文件的裸编号是否**恰好**等于清单。抽出来是为了反向对照能对同一判据做。"""
+            got = _bare_ids(text)
+            bad = [] if got == sorted(exp) else \
+                [f"{name}：实际 {got or '无'} ≠ 清单 {sorted(exp) or '无'}"]
+            return bad + [f"{name}：{t} 不在台账里" for t in got if t not in _lid]
+
+        _doc_bad = []
+        for _p, _exp in _kb_scan:
+            if not os.path.exists(_p):
+                _doc_bad.append(f"{os.path.basename(_p)} 不存在")
+                continue
+            _doc_bad += _cmp(os.path.basename(_p),
+                             open(_p, encoding="utf-8").read(), _exp)
+
+        # 反向对照：**对同一个判据函数**注入一个裸缺口编号，它必须报红。
+        #   （第一版这里只断言「正则能匹配到东西」—— 那证明的是正则没坏，
+        #     不是判据会红。与 V30e / F4 是同一类要求。）
+        _readme_p = os.path.join(load.KB, "README.md")
+        _ctrl = _cmp("反向对照", open(_readme_p, encoding="utf-8").read() + "\n〔缺口:D8〕", [])
+        _ctrl_ok = any("D8" in _x for _x in _ctrl)
+
+        _e6_bad = _reg_bad + _doc_bad
+        c.add("E6", "跨命名空间撞车守护：KB 线自有编号必须带前缀，裸 `D#`/`Q#` 必须逐条等于台账引用清单（D37）",
+              not _e6_bad and _ctrl_ok,
+              (f"登记处 0 处裸编号；{len(_kb_scan)} 个文件的裸编号与台账引用清单逐条相等；"
+               f"反向对照：塞入 〔缺口:D8〕 → {'判据报红' if _ctrl_ok else '❌没报红'}"
+               if not _e6_bad else "；".join(_e6_bad[:4])))
 
         # ── F 组（B3.2）· 4 类知识库实例化 ────────────────────────
         #   守三件事：① 登记表是重算出来的（不是手抄的现状）
@@ -399,14 +532,14 @@ def main():
         if _ext is None:
             # ★ 制品不在时**不能直接红到底**：一个长期恒红的检查会被学会忽略，
             #   和恒真一样坏。这里的纪律是「红可以变成 SKIP，但前提是这个空缺
-            #   已经被登记成缺口」—— 把 D8 从登记表里删掉，本条立刻变红。
-            _d8 = reg.get("D8")
+            #   已经被登记成缺口」—— 把 KB-GAP-8 从登记表里删掉，本条立刻变红。
+            _gap8 = reg.get("KB-GAP-8")
             c.add("F3", "外部标准库条目引用完整",
                   bool(_d8),
                   (f"⏭️ 制品 `外部标准库-v1.json` 未建立，但已在登记表里记为 "
-                   f"〔缺口:D8〕（{_d8.get('status') if _d8 else '—'}）—— 跳过不算通过"
+                   f"〔缺口:KB-GAP-8〕（{_gap8.get('status') if _gap8 else '—'}）—— 跳过不算通过"
                    if _d8 else
-                   "❌ 制品不存在，**且登记表里没有 D8** —— 空缺既没做也没登记"),
+                   "❌ 制品不存在，**且登记表里没有 KB-GAP-8** —— 空缺既没做也没登记"),
                   skipped=bool(_d8))
         else:
             _fams = _ext.get("候选规则族") or []
@@ -462,11 +595,11 @@ def main():
         manual = os.path.join(load.KB, "查询手册.md")
         n_sec = 0
         if os.path.exists(manual):
-            n_sec = open(manual, encoding="utf-8").read().count("\n## Q")
-        c.add("D3", "查询手册", n_sec >= 10,
+            n_sec = open(manual, encoding="utf-8").read().count("\n## KB-Q-")
+        c.add("KB-CHK-3", "查询手册", n_sec >= 10,
               f"{os.path.relpath(manual, load.REPO)} 含 {n_sec} 条问题（需 ≥10）")
     except Exception as e:                                    # noqa: BLE001
-        c.add("D1", "黄金问题可答", False, f"导入 kb_query 失败：{e}")
+        c.add("KB-CHK-1", "黄金问题可答", False, f"导入 kb_query 失败：{e}")
 
     # ── 汇总 ─────────────────────────────────────────────────
     result = {
@@ -490,7 +623,7 @@ def main():
                 print(f"  {mark} {i['id']:<4}{i['name']:<10} {i['detail']}")
         print("　G3 可用性：")
         for i in c.items:
-            if i["id"].startswith("D"):
+            if i["id"].startswith("KB-CHK-"):
                 mark = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️ "}[i["status"]]
                 print(f"  {mark} {i['id']:<4}{i['name']:<10} {i['detail']}")
         print("　F 组 · 4 类知识库实例化（B3.2）：")

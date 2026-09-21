@@ -1,37 +1,60 @@
-# 由 tools/lark_people.py 生成（只读采集）,harvested_at=2026-09-16T11:18:41Z,app=cli_aa2243de0438dcd7（守衡）,底座=8,数据表=41,记录=5042,人数=35,口径=bitable 里所有人员形状的值（即本应用唯一能同时拿到 姓名+邮箱+open_id 的通道）
+# 由 tools/lark_people.py 生成（只读采集）,harvested_at=2026-09-21T07:37:05Z,app=cli_aa2243de0438dcd7（守衡）,底座=8,数据表=41,记录=5222,群=1,群成员=3,索引owner=22,索引已换名=19,人数=58,口径=**3 条通道的并集**：① bitable 人员形状的值（姓名+邮箱+open_id）；② 机器人所在群的成员（姓名+open_id，无邮箱）；③ 在我们读得到的资源上署名过的 owner（姓名+邮箱+open_id）。都不是的人，本应用解析不出 —— 但那是「读得到的通道里都没有」，不是「世上没有这个人」
 姓名,en_name,邮箱,open_id,出处
 于小宁,Nolan Yu,,ou_2a0434d018b7a24d4818fa9e85a66c44,KPI-绩效评价系统/0-考核范围 · KPI-绩效评价系统/1-考核指标维护 · KPI-绩效评价系统/4-上级评价 · KPI-绩效评价系统/5-绩效考评结果
+于术卿,,n***@rootglobal.net,ou_273bb32482f2e2bebd086a71b64d808f,资源索引owner
 仪欣怡,仪欣怡,y***@rootglobal.net,ou_80cb5a8a38789b7bd74d3500d522e854,【创意】需求排期与任务管理/【平面】日常需求看板
 何宛应,何宛应,w***@rootglobal.net,ou_390079674606e8567742abe884840b61,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
 何文诗,何文诗,l***@rootglobal.net,ou_d974d9d4b01cdfea8d9a68a450dd547a,【创意】需求排期与任务管理/【视频】日常需求看板
 余玉珊,余玉珊,r***@rootglobal.net,ou_dd3f9a2e79d23eecaf7c963659d6149a,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板 · 【创意】需求排期与任务管理/【创意支持】项目需求 · 【创意】需求排期与任务管理/国庆前后 考勤值班计划
+刘华丽,,,ou_af95e2a43871579692afbb25a529e77e,群成员/内容治理-守衡Agent-测试
+刘季,,j***@rootglobal.net,ou_092c52df5ea23c13f9ed1ec28fb21cad,资源索引owner
+刘泳婷,,l***@rootglobal.net,ou_e1640c6fe2fa8cc4705b1fc5ce5bc163,资源索引owner
+刘真如宝,,z***@rootglobal.net,ou_d586ddb6e699a7d6de0571867527c573,资源索引owner
+刘聪,,l***@rootglobal.net,ou_d2fb16aed52cea023738483ac2ad13d0,资源索引owner
 刘菊忠,刘菊忠,j***@rootglobal.net,ou_a3218fcce9332569b580292295b37079,品线SEO任务管理系统/品线SEO任务管理系统
 叶玲珊,叶玲珊,c***@rootglobal.net,ou_d7ca735d1d3e15ab8d52d247ad1ee52b,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
+周健,,,ou_e5ada0b1c7a023c44e407c60ee8bd91b,群成员/内容治理-守衡Agent-测试 · 资源索引owner
 周厚涛,周厚涛,s***@rootglobal.net,ou_ab212b785621844551acc0bddc713071,【创意】需求排期与任务管理/【视频】日常需求看板
 周洋,周洋,c***@rootglobal.net,ou_7bf5a84f46c50b942d9efafdb90c3e3b,【创意】需求排期与任务管理/【视频】日常需求看板
+唐奕,,t***@rootglobal.net,ou_22afb83d2e73ce59930f7d79377026a3,资源索引owner
 唐恬甜,唐恬甜,t***@rootglobal.net,ou_fb65185477d398ad9d2502f17226dc42,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
-张子煊,张子煊,a***@rootglobal.net,ou_98d09c1b6acc7a620d958b2827b7dded,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
+宋若梅,宋若梅,m***@rootglobal.net,ou_ba7a8de42242f95aced5c3324ca527d5,【创意】需求排期与任务管理/【视频】日常需求看板
+张子煊,张子煊,a***@rootglobal.net,ou_98d09c1b6acc7a620d958b2827b7dded,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板 · 【创意】需求排期与任务管理/【创意支持】项目需求
 张小力,Jimmy Wang,,ou_4c76bba5e69525e440793946734214cd,KPI-绩效评价系统/2-业绩完成情况（2022年度） · KPI-绩效评价系统/3-员工自我评价
+张敏,,m***@rootglobal.net,ou_3977fece389ecb854199b64d02f89278,资源索引owner
 曾芷桢,曾芷桢,e***@rootglobal.net,ou_22b647ed670801fb6a3835675d69d15d,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/国庆前后 考勤值班计划
 朱从文,朱从文,k***@rootglobal.net,ou_a50c05f30a5089844703d84bbb8cbd50,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
-李佳丽,李佳丽,j***@rootglobal.net,ou_b8820db2e195df21f7605f1af355a429,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
+李佳丽,李佳丽,j***@rootglobal.net,ou_b8820db2e195df21f7605f1af355a429,【创意】需求排期与任务管理/【平面】日常需求看板
+李倩怡,,,ou_3eef3cc3fbecfdafa98cd74e608522c3,群成员/内容治理-守衡Agent-测试 · 资源索引owner
 李嘉曦,李嘉曦,l***@rootglobal.net,ou_f6a29100c3082c9ef5d6f4077710962a,品线SEO任务管理系统/品线SEO任务管理系统
+李昊天,,h***@rootglobal.net,ou_c3a0fc7c58353670927af2f5b510091a,资源索引owner
 李晓莉,李晓莉,a***@rootglobal.net,ou_f07e6502d3f64b84c0cfd980c76e1996,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
+李礼,,l***@rootglobal.net,ou_c0f56c554acc9688934b271c12849147,资源索引owner
+杨富美,,f***@rootglobal.net,ou_614e204ebe4093fdf9adbbccffedda12,资源索引owner
 林敏祺,林敏祺,l***@rootglobal.net,ou_a0aeec4de1097765d28d225c5b183fdb,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【创意支持】项目需求 · 【创意】需求排期与任务管理/国庆前后 考勤值班计划
-欧阳嘉雯,欧阳嘉雯,j***@rootglobal.net,ou_9618af440e7c96e19d2951a667576ed7,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/国庆前后 考勤值班计划
+柳彤彤,,d***@rootglobal.net,ou_ea674bc76022807bb027080933d94b70,资源索引owner
+欧阳嘉雯,欧阳嘉雯,j***@rootglobal.net,ou_9618af440e7c96e19d2951a667576ed7,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板 · 【创意】需求排期与任务管理/国庆前后 考勤值班计划
 江湾,江湾,w***@rootglobal.net,ou_64cd8e5e79554343f904eaf6b1406c28,品线SEO任务管理系统/品线SEO任务管理系统
+池浩,,v***@rootglobal.net,ou_22d34cb33b2ce9e903a321580358d3f9,资源索引owner
 熊晓枫,熊晓枫,z***@rootglobal.net,ou_185f6e82e2a1090225f5cdbea757897d,【创意】需求排期与任务管理/【创意UGC】提需表
+甄全,,c***@rootglobal.net,ou_32f1f608f50976e338a05411b8793225,资源索引owner
 田卓,田卓,l***@rootglobal.net,ou_cbc0dc1753ab6daaf7dfcf2705048757,品线SEO任务管理系统/品线SEO任务管理系统
 白小丁,白小丁,,ou_6e94018ed77b567dd52ac9101ef57937,KPI-绩效评价系统/0-考核范围 · KPI-绩效评价系统/1-考核指标维护 · KPI-绩效评价系统/4-上级评价 · KPI-绩效评价系统/5-绩效考评结果
+翁昌才,,r***@rootglobal.net,ou_89cac14246a96945d60e730830f008fd,资源索引owner
 肖子涵,肖子涵,s***@rootglobal.net,ou_6fda70fd070b39ad5d98515ee772fe99,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板 · 【创意】需求排期与任务管理/【创意UGC】提需表
 胡欣媚,胡欣媚,s***@rootglobal.net,ou_638ba65077c637f71a7d08f06cabb2f8,【创意】需求排期与任务管理/【平面】日常需求看板 · 【创意】需求排期与任务管理/【创意支持】项目需求 · 【创意】需求排期与任务管理/国庆前后 考勤值班计划
+苏帅,,g***@rootglobal.net,ou_01f92db98f5366e7b14f29dc41229e49,资源索引owner
 莫锦芳,莫锦芳,j***@rootglobal.net,ou_cbb3e3e2d39fc194dc9d14f9f13e60dd,【创意】需求排期与任务管理/【视频】日常需求看板
 葛奕辰,葛奕辰,r***@rootglobal.net,ou_b76cf60b18c0c9d9482729ff31f9c96c,【创意】需求排期与任务管理/【创意UGC】提需表
 蔡瑞华,蔡瑞华,r***@rootglobal.net,ou_9d195d534a8bc4a1349db1b7521827b7,【创意】需求排期与任务管理/【创意UGC】提需表
-赵巳未,赵巳未,s***@rootglobal.net,ou_6cb1da31803a596fd017ae5129270372,【创意】需求排期与任务管理/【平面】日常需求看板
+赵巳未,赵巳未,s***@rootglobal.net,ou_6cb1da31803a596fd017ae5129270372,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
 郭彦来,郭彦来,l***@rootglobal.net,ou_42718a4336a1d82fb2351312c54ffea2,【创意】需求排期与任务管理/【视频】日常需求看板
+钟家玮,钟家玮,j***@rootglobal.net,ou_0a99276be64461aa2679f3e2f319f55b,【创意】需求排期与任务管理/【视频】日常需求看板
+钱撷羽,,s***@rootglobal.net,ou_a37e9c410b0bd1136f62592d6feaa002,资源索引owner
 陈明葳,陈明葳,t***@rootglobal.net,ou_89a8c387f4f34b0a85faf4d383a1efb5,【创意】需求排期与任务管理/【平面】日常需求看板 · 【创意】需求排期与任务管理/【创意支持】项目需求 · 【创意】需求排期与任务管理/【创意UGC】提需表
 陈晓琳,陈晓琳,x***@rootglobal.net,ou_ac3af5fcbf41681b02012df0f096f4fa,【创意】需求排期与任务管理/【视频】日常需求看板 · 【创意】需求排期与任务管理/【平面】日常需求看板
+陈英凯,陈英凯,g***@rootglobal.net,ou_b5b41d7e1b53bcc99ddee6f0258d46c6,【创意】需求排期与任务管理/【平面】日常需求看板
 陈蕾,陈蕾,l***@rootglobal.net,ou_15d127d4a28d4d6f8a749666b3190cd4,【创意】需求排期与任务管理/【视频】日常需求看板
 韦静华,韦静华,a***@rootglobal.net,ou_04f5f4c2bc592e615f8b9580e6f0d862,【创意】需求排期与任务管理/【平面】日常需求看板
+马欣悦,,m***@rootglobal.net,ou_1c1033666eed98603df30ab3ba9586a9,资源索引owner
 黄泡泡,Amanda Huang,,ou_ad1a5eb954f4b61ed09612f55c2fa699,KPI-绩效评价系统/0-考核范围 · KPI-绩效评价系统/1-考核指标维护 · KPI-绩效评价系统/4-上级评价 · KPI-绩效评价系统/5-绩效考评结果

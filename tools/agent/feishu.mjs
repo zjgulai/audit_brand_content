@@ -13,6 +13,13 @@ import { beijingString } from './timefmt.mjs';
 export const client = new Lark.Client({
   appId: config.lark.appId,
   appSecret: config.lark.appSecret,
+  // ★ loggerLevel 显式降到 warn。
+  // 默认是 info，SDK 会在构造时往 **stdout** 打一行 `[info]: [ 'client ready' ]`。
+  // 后果不是刷屏，是**把 stdout 弄脏**：任何 `node xxx.mjs --json | 下一步` 的管道
+  // 都会拿到一段不是 JSON 的开头。2026-09-18 实测：
+  // `cli.mjs sample receipt --json | cli.mjs validate -` 因此报「不是合法 JSON」。
+  // 守衡自己的日志走 ws_daemon 的 log()，不依赖 SDK 这一行。
+  loggerLevel: Lark.LoggerLevel.warn,
 });
 
 /** 机器人显示名（名字匹配用）。集中定义，避免多处硬编码写成不一致的字面量 */
@@ -209,6 +216,30 @@ export async function replyMarkdown(messageId, chatId, markdown) {
   }
 }
 
+/**
+ * 回复某条消息，内容是一张卡片（msg_type=interactive）。
+ *
+ * 为什么单独一个函数、不复用 replyCard（reply-cards/index.mjs 里那个）：
+ * 那个版本失败时自己会去 sendCard 兜底，而 daemon 需要的是
+ * 「reply 失败 → 由调用方决定退成什么」。两处兜底叠加的后果是
+ * 同一个回答在群里出现两次。所以这一层**只做一次尝试**，失败如实返回。
+ *
+ * @returns {Promise<{ok:boolean, messageId?:string, mode:string, error?:string}>}
+ */
+export async function replyCard(messageId, card) {
+  try {
+    const r = await client.im.message.reply({
+      path: { message_id: messageId },
+      data: { msg_type: 'interactive', content: JSON.stringify(card) },
+    });
+    return { ok: true, messageId: r?.data?.message_id ?? null, mode: 'reply-card' };
+  } catch (e) {
+    const d = e?.response?.data;
+    return { ok: false, mode: 'reply-card-failed',
+             error: d ? `code=${d.code} ${String(d.msg ?? '').slice(0, 140)}` : String(e?.message ?? e) };
+  }
+}
+
 /** 发一条「正在处理」提示，返回其 message_id 以便后续撤回或更新 */
 export async function sendTyping(chatId, text = '（守衡正在处理…）') {
   try {
@@ -287,9 +318,15 @@ export async function listRecentMessages(chatId, pageSize = 20, memberMap = null
       // 必须把它和「正常但很短的消息」区分开：前者是**内容没了**，后者是**本来就这么短**。
       // 混在一起时，守衡会把「撤回」读成「有一条我看不懂的消息」，进而低估自己漏了多少东西。
       const recalled = /^This message was recalled$/i.test(raw.trim());
+      // 附件（file/image/media/audio）不是「我看不到」—— 是**按规矩不取**：
+      // 飞书内容禁止下载（AGENTS.md §2.6），而附件只有下载这一条通道。
+      // 工具给的是事实，事实就该由工具说清，不让模型去猜自己为什么读不到。
+      const ATTACHMENT_TYPES = new Set(['file', 'image', 'media', 'audio']);
       const text = recalled
         ? '（原文已在飞书端撤回，撤回后任何接口都不返回内容）'
-        : (raw || `（${it.msg_type ?? '未知'} 类型，正文为空 —— 我没法看到里面的内容）`);
+        : (raw || `（${it.msg_type ?? '未知'} 类型，正文为空 —— ${ATTACHMENT_TYPES.has(it.msg_type)
+            ? '这是附件：飞书内容禁止下载，附件只有下载这一条通道，所以我不取它的内容。'
+            : '我没法看到里面的内容。'}）`);
       const sender = {
         messageId: it.message_id,
         // 北京时间，不是 UTC。原来这里是 toISOString()，而 `now` 工具给的是北京时间，

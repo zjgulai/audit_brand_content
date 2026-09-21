@@ -145,9 +145,9 @@ def q7(led, rs):
     out.append("❌ **GAP：无法回答「卡在同一状态超过 N 天」**")
     # ★ 这句「已登记」过去是散文，没有任何落点（B3.0 抓到）。现在它是**读出来的**：
     #   登记表里没有对应条目，这里就打「未登记」，E1 检查随之变红。
-    out.extend(_gap_lines("D1"))
+    out.extend(_gap_lines("KB-GAP-1"))
     out.append("   同一族还有一条：四个疑似「开始时间」字段的语义未确认 ——")
-    out.extend(_gap_lines("D2", indent="   "))
+    out.extend(_gap_lines("KB-GAP-2", indent="   "))
     out.append("   （为什么不能用它们替代：语义未确认时把「排期没到」算成「卡住了」，"
                "正是这个项目一直在防的那类错误。）")
     return out
@@ -157,8 +157,8 @@ def _gap_lines(gid, indent="   "):
     """把登记表里的一条缺口渲染成结论行。**语句由登记表决定，不由散文决定。**
 
     ★ 未登记时**也必须打印标记**。第一版在这里返回了一句不带 `〔缺口:…〕` 的
-      「未登记」，于是悬空检查永远不会触发 —— 反向对照 RC1a 实测：把 D1 换成
-      D99，E1 仍然全绿，只有恰好也变了的 E4 报了红。**标记就是引用本身**，
+      「未登记」，于是悬空检查永远不会触发 —— 反向对照 RC1a 实测：把 KB-GAP-1 换成
+      KB-GAP-99，E1 仍然全绿，只有恰好也变了的 E4 报了红。**标记就是引用本身**，
       引用不成立时更要留下能被检查的痕迹。
     """
     reg = _gaps()
@@ -275,9 +275,11 @@ def render_manual(led, sections):
           "> 每条问题配一条可复现命令：`python3 tools/kb_query.py <N>`",
           "",
           "> ⚠️ **本文件是生成物**：`python3 tools/kb_query.py --md` 重写它。",
-          "> 手改会被 `tools/verify_kb.py` 的 D4 逐字比对抓住。", ""]
+          "> 手改会被 `tools/verify_kb.py` 的 E4 逐字比对抓住。", ""]
     for i, name, lines in sections:
-        md.append(f"## Q{i}. {name}")
+        # ★ D37：标题带前缀。裸写的黄金问题编号与台账未决项同名不同物 ——
+        #   命令行入口保持数字（`kb_query.py 7`），因为它是一个**地址**不是一个编号。
+        md.append(f"## KB-Q-{i}. {name}")
         md.append("")
         md.append(f"```bash\npython3 tools/kb_query.py {i}\n```")
         md.append("")
@@ -308,7 +310,7 @@ def main():
         if want and i != want:
             continue
         lines = fn(led, rs)
-        print(f"Q{i}. {name}")
+        print(f"KB-Q-{i}. {name}")
         for l in lines:
             print(f"   {l}")
         print()

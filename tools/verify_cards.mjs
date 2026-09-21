@@ -1,0 +1,560 @@
+#!/usr/bin/env node
+/**
+ * verify_cards.mjs —— 卡片模版与语域规程的自证器
+ *
+ * ## 为什么需要它
+ *
+ * 本项目已经在「文档里的数字复现不出来」上吃过一次亏（ADR-0013 §15.3），
+ * 而卡片模版比数字更容易腐烂：写卡片的人改一个 tag、加一个字段，
+ * `contract.md` 和 `SKILL.md` 照旧读起来完全正常，**直到某天守衡的回复在群里凭空消失**
+ * ——因为 schema V2 里一个不认的 tag 会让整张卡被服务端整体拒绝，不是降级，是丢。
+ *
+ * 所以本脚本做的是把「模版」「登记表」「文档」三者的**一致性**变成可执行断言：
+ *
+ *   A 构建   十一个构造器都能建出卡，且都过本地校验
+ *   B 登记   REGISTRY 里每个字段真的被构造器读过（写进文档却没人用的字段 = 假槽位）
+ *   C 白名单  cards.mjs 的 ALLOWED_TAGS 与探针读数一致；被 V2 移除的 tag 能被拦下
+ *   D 降级   每张卡都能降级成纯文本，且降级文本里不出现 JSON、不出现内部记录
+ *   E 文档   contract.md / SKILL.md 里出现的每一个 kind 都在登记表里，反之亦然
+ *   F 语域   去 AI 味的机械规则本身有效（正例命中、反例不误报）
+ *
+ * 用法：
+ *   node tools/verify_cards.mjs            # 全套
+ *   node tools/verify_cards.mjs --verbose
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.dirname(HERE);
+const CARDS_DIR = path.join(HERE, 'reply-cards');
+const PROBE = path.join(ROOT, 'PMO', 'logs', 'card_probe.jsonl');
+
+const VERBOSE = process.argv.includes('--verbose');
+
+const {
+  REGISTRY, BY_KIND, BUILDERS, BUILDER_SOURCE_NAME,
+  build, validateCard, renderText, shapeOf, sampleCards, lintCopy,
+} = await import(path.join(CARDS_DIR, 'index.mjs'));
+const cardsSrc = fs.readFileSync(path.join(CARDS_DIR, 'cards.mjs'), 'utf8');
+const cardsMod = await import(path.join(CARDS_DIR, 'cards.mjs'));
+
+let pass = 0, fail = 0;
+const bad = [];
+const ok = (label) => { pass++; if (VERBOSE) console.log(`  ✅ ${label}`); };
+const no = (label, why) => { fail++; bad.push(`${label} —— ${why}`); console.log(`  ❌ ${label}\n       ${why}`); };
+const head = (t) => console.log(`\n${t}`);
+
+/* ─────────────── A 构建 ─────────────── */
+head('A 构建 · 每个类型都能建卡并过本地校验');
+const samples = sampleCards();
+for (const r of REGISTRY) {
+  try {
+    const c = samples[r.kind];
+    const v = validateCard(c);
+    if (!v.ok) no(`A ${r.kind}`, `样例卡校验不过：${v.errors.map((e) => `${e.path}:${e.msg}`).join('; ')}`);
+    else ok(`A ${r.kind} → ${shapeOf(c)}`);
+  } catch (e) {
+    no(`A ${r.kind}`, `构建抛异常：${e.message}`);
+  }
+}
+// 构造器数 = 登记数，不能有孤儿
+for (const k of Object.keys(BUILDERS)) {
+  if (!BY_KIND.has(k)) no(`A 孤儿构造器 ${k}`, 'BUILDERS 里有，REGISTRY 里没有 —— 没人知道什么时候该用它');
+  else ok(`A 构造器 ${k} 已登记`);
+}
+for (const r of REGISTRY) {
+  if (!BUILDERS[r.kind]) no(`A 缺构造器 ${r.kind}`, 'REGISTRY 里有，BUILDERS 里没有');
+  // 源文件里函数名要对得上（防止有人改了函数名忘记改登记）
+  const src = BUILDER_SOURCE_NAME[r.kind];
+  if (!src || !new RegExp(`export function ${src}\\s*\\(`).test(cardsSrc)) {
+    no(`A ${r.kind} 函数名`, `BUILDER_SOURCE_NAME 写的 ${src} 在 cards.mjs 里找不到 export function`);
+  } else ok(`A ${r.kind} 函数名 ${src} 对得上`);
+}
+
+/* ─────────────── B 字段 ─────────────── */
+head('B 登记 · 每个登记字段都真的被构造器读过');
+for (const r of REGISTRY) {
+  const fn = BUILDER_SOURCE_NAME[r.kind];
+  const m = cardsSrc.match(new RegExp(`export function ${fn}\\s*\\(d = \\{\\}\\)[\\s\\S]*?\\n\\}`));
+  if (!m) { no(`B ${r.kind}`, `找不到函数体 ${fn}`); continue; }
+  const body = m[0];
+  for (const f of Object.keys(r.fields)) {
+    // 出现形式：d.<field>（含 d.fields、d.can、d.columns…）
+    if (!new RegExp(`d\\.${f}\\b`).test(body)) {
+      no(`B ${r.kind}.${f}`, '登记表里有这个字段，构造器从不读它 —— 假槽位，写进文档只会误导');
+    } else ok(`B ${r.kind}.${f} 被读到`);
+  }
+}
+
+/* ─────────────── C 白名单与探针一致 ─────────────── */
+head('C 白名单 · 与探针读数一致，且能拦下 V2 已移除的 tag');
+{
+  const probeRows = fs.existsSync(PROBE)
+    ? fs.readFileSync(PROBE, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l))
+    : [];
+  if (!probeRows.length) no('C 探针读数', `${PROBE} 不存在或为空 —— 白名单失去了实测依据`);
+  else {
+    const byProbe = Object.fromEntries(probeRows.map((r) => [r.id, r]));
+    const mustPass = ['header_theme', 'markdown_element', 'table_element', 'column_set', 'collapsible', 'v2_fields_columnset', 'v2_button_bare'];
+    const mustFail = ['note_fields', 'button_callback'];
+    for (const id of mustPass) {
+      if (!byProbe[id]) no(`C 探针 ${id}`, '读数缺失：不能声称这个元素可用');
+      else if (!byProbe[id].ok) no(`C 探针 ${id}`, `读数是被拒，但白名单当它可用 —— 模版会用上它然后整卡被拒`);
+      else ok(`C 探针 ${id} 通过，已在白名单`);
+    }
+    for (const id of mustFail) {
+      if (!byProbe[id]) no(`C 探针 ${id}`, '读数缺失');
+      else if (byProbe[id].ok) no(`C 探针 ${id}`, '读数是通过，但代码当它被移除 —— 拒绝的理由已经不成立，该更新');
+      else ok(`C 探针 ${id} 被拒（${byProbe[id].error?.error?.ErrCode ?? byProbe[id].error?.code}），已在移除表`);
+    }
+    // 白名单里不该出现被拒的 tag 名
+    for (const tag of Object.keys(cardsMod.REMOVED_IN_V2)) {
+      if (cardsMod.ALLOWED_TAGS.has(tag)) no(`C 白名单含 ${tag}`, '同时出现在 ALLOWED_TAGS 与 REMOVED_IN_V2');
+      else ok(`C ${tag} 不在白名单，会被拦`);
+    }
+  }
+}
+{
+  // 校验器真的能拦：造三张坏卡
+  const base = samples['query-answer'];
+  const clone = () => JSON.parse(JSON.stringify(base));
+  const cases = [
+    ['note 元素', (c) => c.body.elements.push({ tag: 'note', elements: [] })],
+    ['action 容器', (c) => c.body.elements.push({ tag: 'action', actions: [] })],
+    ['未知配色', (c) => { c.header.template = 'chartreuse'; }],
+    ['表格 rows 写成数组', (c) => c.body.elements.push({ tag: 'table', columns: [{ name: 'a' }], rows: [['x']] })],
+    ['表格列名不匹配', (c) => c.body.elements.push({ tag: 'table', columns: [{ name: 'a' }], rows: [{ b: 'x' }] })],
+    ['正文放在顶层', (c) => { c.elements = c.body.elements; delete c.body; }],
+    ['header.title 用 markdown', (c) => { c.header.title = { tag: 'markdown', content: 'x' }; }],
+  ];
+  for (const [label, mutate] of cases) {
+    const c = clone(); mutate(c);
+    const v = validateCard(c);
+    if (v.ok) no(`C 拦截「${label}」`, '校验器放过了它 —— 这张卡会被飞书整体拒绝');
+    else ok(`C 拦住「${label}」：${v.errors[0].msg.slice(0, 46)}`);
+  }
+  // 好卡必须过
+  if (!validateCard(clone()).ok) no('C 好卡误报', '干净卡被判不合格，校验器过严');
+  else ok('C 干净样例卡不被误报');
+}
+
+/* ─────────────── D 降级 ─────────────── */
+head('D 降级 · 卡片发不出去时，纯文本仍然可读');
+for (const r of REGISTRY) {
+  const c = samples[r.kind];
+  const txt = renderText(c, '卡片被拒 code=230099');
+  const problems = [];
+  if (txt.includes('{"schema"') || txt.includes('"tag"')) problems.push('降级文本里出现了原始 JSON');
+  if (!txt.startsWith('【')) problems.push('降级文本没有以标题开头');
+  if (!txt.includes('卡片被拒')) problems.push('降级文本没注明降级原因 —— 对方不知道格式为什么变了');
+  if (/toolTrace|tool_calls|call_\d|run_readonly_command\(/.test(txt)) problems.push('降级文本里出现了内部调用记录');
+  if (txt.length < 8) problems.push('降级文本几乎为空');
+  if (problems.length) no(`D ${r.kind}`, problems.join('；'));
+  else ok(`D ${r.kind} 降级 ${txt.length} 字：${txt.split('\n')[0]}`);
+  // 形状摘要必须非空（空摘要说明卡里没放任何可见元素）
+  if (!shapeOf(c)) no(`D ${r.kind} 形状`, '卡片里没有任何可见元素');
+}
+
+/* ─────────────── E 文档一致性 ─────────────── */
+head('E 文档 · kind 在登记表、contract.md、SKILL.md 三处一致');
+{
+  const docFiles = [
+    path.join(CARDS_DIR, 'contract.md'),
+    path.join(ROOT, 'agent-skills', '守衡语域', 'SKILL.md'),
+  ];
+  for (const f of docFiles) {
+    const rel = path.relative(ROOT, f);
+    if (!fs.existsSync(f)) { no(`E ${rel}`, '文件不存在'); continue; }
+    const md = fs.readFileSync(f, 'utf8');
+    for (const r of REGISTRY) {
+      if (!md.includes(`\`${r.kind}\``)) no(`E ${rel} 缺 ${r.kind}`, '登记表里有这个类型，文档里没写 —— 用的人不会知道它存在');
+      else ok(`E ${rel} 含 ${r.kind}`);
+    }
+    // 反向：文档里提到的所有 kind 都要在登记表里
+    for (const m of md.matchAll(/`([a-z]+(?:-[a-z]+)+)`/g)) {
+      const k = m[1];
+      const looksLikeKind = /^(query|data|correction|capability|find|cannot|receipt|turn|evidence|alert|decision)-/.test(k);
+      if (looksLikeKind && !BY_KIND.has(k)) no(`E ${rel} 提到未知类型 ${k}`, '文档里写了，代码里没有');
+    }
+  }
+  // 白名单数字一致：contract.md 里声称的可用 tag 应与 ALLOWED_TAGS 相同
+  const contract = fs.readFileSync(path.join(CARDS_DIR, 'contract.md'), 'utf8');
+  const claimed = (contract.match(/`(markdown|plain_text|hr|table|column_set|column|collapsible_panel|button|code_block|standard_icon)`/g) ?? [])
+    .map((x) => x.replace(/`/g, ''));
+  const missing = [...cardsMod.ALLOWED_TAGS].filter((t) => !claimed.includes(t));
+  if (missing.length) no('E contract.md 白名单不全', `缺：${missing.join(', ')}`);
+  else ok(`E contract.md 列出了全部 ${cardsMod.ALLOWED_TAGS.size} 个可用 tag`);
+}
+
+/* ─────────────── F 语域规则本身有效 ─────────────── */
+head('F 语域 · 去 AI 味的机械规则：正例命中、反例不误报');
+{
+  const { COPY_RULES } = await import(path.join(CARDS_DIR, 'registry.mjs'));
+  const positives = [
+    ['chatbotResidue', '好问题！让我来看看这个文件。'],
+    ['chatbotResidue', '希望这对你有帮助。'],
+    ['conclusionTail', '综上所述，这个方案是可行的。'],
+    ['padding', '我们需要先对这个目录进行分析，然后予以处理。'],
+    ['hedgeStack', '这个可能是编码问题，或许也许是压缩存储，大概如此。'],
+    ['padding', '对这条需求做出决定之前，需要对它进行确认。'],
+    // 结构级：那条 434 字故障输出的真实形态
+    ['internalLeak', '我查了几轮还是没能得出可靠结论，先把已知的告诉你：我试过 list_files、list_files、list_files，但信息不足。'],
+    ['internalLeak', 'trace: run_readonly_command(53ms) → run_readonly_command(1194ms)'],
+    ['internalLeak', '"role": "tool", "tool_call_id": "call_00_xT8wRM60iidlhia0CyIw4532"'],
+  ];
+  for (const [id, text] of positives) {
+    const hits = lintCopy(text);
+    if (!hits.some((h) => h.id === id)) no(`F 正例 ${id}`, `「${text}」没命中 ${id}`);
+    else ok(`F 正例 ${id} 命中`);
+  }
+  // 短语表里**每一条**都要真的能被自己命中 —— 防止写进去一条永远匹配不到的短语
+  for (const r of COPY_RULES) {
+    if (!r.phrases) continue;
+    const dead = r.phrases.filter((p) => !lintCopy(`前一句。${p}。后一句。`).some((h) => h.id === r.id));
+    if (dead.length) no(`F ${r.id} 死短语`, `这些短语永远匹配不到自己：${dead.join(' / ')}`);
+    else ok(`F ${r.id} 的 ${r.phrases.length} 条短语全部可命中`);
+  }
+  const negatives = [
+    ['单个连词是正常的', '此外，还有一个文件没读。'],
+    ['正式语域不是 AI 味', '依据 `PMO/守衡-架构说明.md` 第四节第 4 条，九个工具全只读。'],
+    ['单个限定词是正常的', '这个可能是编码问题。'],
+    ['三顿号并列是正常的', '顶层是 ADR、PMO、PRD、base 四个目录。'],
+    ['表格不算排比', '| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |'],
+    // 正常回复会提到工具名，这**不是**泄漏；泄漏是「连续同名」或「栈帧/内部字段名」
+    ['正常回复里出现一次工具名', '我用 `list_files` 找了一遍，没找到。'],
+    ['正常回复里出现两次不同工具名', '先 `list_files` 找，再 `read_text_file` 读，都没有。'],
+    ['正常回复里说「我试过 grep 和 wc」', '我在工作区里试过 grep 和 wc，零命中。'],
+  ];
+  for (const [label, text] of negatives) {
+    const hits = lintCopy(text).filter((h) => h.level === 'error');
+    if (hits.length) no(`F 反例「${label}」`, `被误报为 error：${hits.map((h) => h.id).join(',')} —— 过度纠正本身是另一种指纹`);
+    else ok(`F 反例「${label}」不误报`);
+  }
+}
+
+/* ─────────────── G stdout 干净（管道能用） ─────────────── */
+head('G stdout · CLI 的 JSON 输出不被日志污染');
+{
+  // 这条不是洁癖：`sample --json | validate -` 是这个模版对外的主要用法，
+  // 而飞书 SDK 默认往 stdout 打一行 `[info]: client ready`，
+  // 会让整条管道拿到一段不是 JSON 的开头。2026-09-18 实测踩到过。
+  const { execFileSync } = await import('node:child_process');
+  const cli = path.join(CARDS_DIR, 'cli.mjs');
+  let out = '';
+  try {
+    out = execFileSync(process.execPath, [cli, 'sample', 'receipt', '--json'], { encoding: 'utf8' });
+  } catch (e) { no('G sample --json', `执行失败：${e.message}`); }
+  if (out) {
+    try { JSON.parse(out); ok('G sample --json 的 stdout 是纯 JSON（无日志前缀）'); }
+    catch (e) { no('G sample --json', `stdout 不是纯 JSON：${e.message}；开头是「${out.slice(0, 60)}」`); }
+  }
+  // 校验器的退出码要能当闸用
+  const { spawnSync } = await import('node:child_process');
+  const r1 = spawnSync(process.execPath, [cli, 'validate', '-'],
+    { input: JSON.stringify(samples.receipt), encoding: 'utf8' });
+  if (r1.status !== 0) no('G validate 好卡退出码', `应为 0，实际 ${r1.status}`);
+  else ok('G validate 好卡退出码 0');
+  const r2 = spawnSync(process.execPath, [cli, 'validate', '-'],
+    { input: '{"schema":"1.0"}', encoding: 'utf8' });
+  if (r2.status === 0) no('G validate 坏卡退出码', '坏卡也返回 0 —— 这个校验器没法当闸用');
+  else ok('G validate 坏卡退出码非 0');
+}
+
+/* ─────────────── H 规程文件真的会入库 ─────────────── */
+head('H 入库 · 规程文件不在 .gitignore 里');
+{
+  // 这条是被真实踩到后才加的：本项目 .gitignore 第 39 行是 `skills/`，
+  // 注释写明「第三方技能库与克隆」。项目**自有**的规程放进 skills/ 不会入库，
+  // 写完之后 `git status` 一片干净，看起来像什么都没发生。
+  // 所以自证要能把「写了但没入库」变成红的。
+  const { spawnSync } = await import('node:child_process');
+  const skill = path.join(ROOT, 'agent-skills', '守衡语域', 'SKILL.md');
+  if (!fs.existsSync(skill)) no('H 规程文件存在', `${path.relative(ROOT, skill)} 不存在`);
+  else {
+    const r = spawnSync('git', ['check-ignore', '-q', skill], { cwd: ROOT });
+    if (r.status === 0) no('H 规程可入库', `${path.relative(ROOT, skill)} 被 .gitignore 忽略 —— 它不会进版本库`);
+    else ok('H 规程文件可入库（未被 .gitignore 忽略）');
+  }
+  for (const f of ['tools/reply-cards/contract.md', 'tools/reply-cards/cards.mjs', 'tools/verify_cards.mjs']) {
+    const r = spawnSync('git', ['check-ignore', '-q', path.join(ROOT, f)], { cwd: ROOT });
+    if (r.status === 0) no(`H ${f} 可入库`, '被 .gitignore 忽略');
+    else ok(`H ${f} 可入库`);
+  }
+}
+
+/* ─────────────── J 信封 · 模型输出 → 卡片，且内部标记永不出现在群里 ─────────────── */
+head('J 信封 · 解析、上限执行、以及「标记不许漏进群」');
+{
+  const { toCardOrText, extractCardBlock, enforceLimits, leaksInternalMark, publicTextOf, CARD_MARK } =
+    await import(path.join(CARDS_DIR, 'envelope.mjs'));
+
+  // J1 三个上限常量真的被读了 —— 这是本轮修掉的真实缺口。
+  // 修之前：VERDICT_MAX / BOUNDARY_MAX / MAX_SECTIONS 定义在 cards.mjs 里，
+  // grep 全仓库只有定义行，没有任何引用。也就是「结论 ≤60 字」只是一句注释。
+  const envSrc = fs.readFileSync(path.join(CARDS_DIR, 'envelope.mjs'), 'utf8');
+  for (const k of ['VERDICT_MAX', 'BOUNDARY_MAX', 'MAX_SECTIONS']) {
+    if (!new RegExp(`\\b${k}\\b`).test(envSrc)) no(`J1 ${k} 有执行点`, `${k} 在 envelope.mjs 里没被引用，上限又变回注释了`);
+    else ok(`J1 ${k} 在 envelope.mjs 里被使用`);
+  }
+
+  // J2 ★ 最要紧的一条：要发出去的**文本**里，任何输入都不许留下 [[card: 或内部记录。
+  // 第一版这里漏了 ——「坏 JSON」那条会把 [[card:receipt]] 和半截 JSON 原样发进群。
+  const leakCases = [
+    ['纯文本', '就是一句话，没有卡片。'],
+    ['正常卡', `${CARD_MARK}query-answer]]\n{"title":"11 条","verdict":"**11 条**。"}`],
+    ['带 json 围栏', `${CARD_MARK}receipt]]\n\`\`\`json\n{"title":"已收到","verdict":"收到。"}\n\`\`\``],
+    ['块前后有正文', `先说明一下。\n\n${CARD_MARK}receipt]]\n{"title":"已收到","verdict":"收到。"}\n\n补充一句。`],
+    ['未知类型', `${CARD_MARK}nope]]\n{"title":"T"}`],
+    ['JSON 截断', `${CARD_MARK}receipt]]\n{"title":`],
+    ['JSON 截断且后面有正文', `${CARD_MARK}receipt]]\n{"title":\n\n顺便说一句，日志我看过了。`],
+    ['只有标记', `${CARD_MARK}receipt]]`],
+    ['标记后没有对象', `${CARD_MARK}receipt]] 然后呢`],
+    ['括号不配平', `${CARD_MARK}query-answer]]\n{"title":"T","verdict":"V","evidence":["a"`],
+    ['字段名全错', `${CARD_MARK}receipt]]\n{"标题":"乱写","结论":"乱写"}`],
+    ['嵌套花括号', `${CARD_MARK}decision]]\n{"title":"定一下","ask":"选哪个？","options":[{"label":"A","cost":"x"}]}`],
+  ];
+  for (const [name, txt] of leakCases) {
+    let r;
+    try { r = toCardOrText(txt); }
+    catch (e) { no(`J2 ${name}`, `toCardOrText 抛异常：${e.message}`); continue; }
+    if (typeof r.text !== 'string' || !r.text.length) { no(`J2 ${name}`, '产出的文本是空的 —— 降级不许变成不答'); continue; }
+    if (leaksInternalMark(r.text)) no(`J2 ${name}`, `要发出去的文本里还留着内部标记：${JSON.stringify(r.text.slice(0, 120))}`);
+    else ok(`J2 ${name} → ${r.mode}，文本无标记残留`);
+  }
+
+  // J2b 公开格（对方一眼能看到的格子）里不许有内部标识 —— 折叠区里允许，
+  // 那正是 alert 这个类型存在的理由。
+  {
+    const r = toCardOrText(`${CARD_MARK}alert]]\n{"title":"坏了","what":"tool_calls 有 27 次","impact":"没答上"}`);
+    if (r.mode !== 'card') no('J2b 内部记录被搬进折叠区', `没有建出卡：${r.reason}`);
+    else {
+      const pub = publicTextOf(r.card);
+      const folded = JSON.stringify(r.card).includes('tool_calls');
+      if (leaksInternalMark(pub)) no('J2b 公开格干净', `公开格里有内部标识：${JSON.stringify(pub.slice(0, 120))}`);
+      else if (!folded) no('J2b 内部记录没有被丢弃', '搬走之后内部详情整个不见了 —— 拦住和丢掉是两回事');
+      else ok('J2b 内部记录被搬进折叠区，公开格干净');
+    }
+  }
+
+  // J3 结论超长必须**搬走**而不是**砍掉**：一个字符都不许丢。
+  {
+    const long = '这是一句很长的结论。'.repeat(12);
+    const { data, moved } = enforceLimits('query-answer', { verdict: long });
+    const rejoined = [...data.verdict, ...(data.boundary ?? ''), ...(data.evidence ?? []).join('')].join('');
+    const lost = [...long].filter((ch) => !rejoined.includes(ch)).length;
+    if (moved.length === 0) no('J3 超长结论被搬迁', '超过 60 字却没有产生任何搬迁记录');
+    else if (lost) no('J3 超长结论零丢失', `搬迁后丢了 ${lost} 个字符 —— 搬是搬，砍是砍，不能混`);
+    else ok(`J3 超长结论搬迁且零丢失（${moved.length} 条搬迁记录）`);
+  }
+
+  // J4 块之外还有正文时，正文要进折叠区，不能凭空消失
+  {
+    const r = toCardOrText(`前面这句要说。\n\n${CARD_MARK}receipt]]\n{"title":"已收到","verdict":"收到。"}`);
+    const inCard = JSON.stringify(r.card ?? {});
+    if (!inCard.includes('前面这句要说')) no('J4 块外正文并入折叠区', '块外的话被丢掉了');
+    else ok('J4 块外正文并入折叠区');
+  }
+
+  // J5 没有块时必须是原样透传 —— 信封不许改写正常回答
+  {
+    const plain = '这是一条普通回复，带 `代码` 和 **粗体**。\n\n| a | b |\n|---|---|\n| 1 | 2 |';
+    const r = toCardOrText(plain);
+    if (r.mode !== 'text' || r.text !== plain) no('J5 无块时原样透传', `mode=${r.mode}，文本被改动了`);
+    else ok('J5 无块时原样透传');
+  }
+}
+
+/* ─────────────── K 提示词 · registry 与 persona 不许漂移 ─────────────── */
+head('K 提示词 · 模型看到的类型清单必须与登记表一致');
+{
+  const { buildSystemPrompt, cardContract } = await import(path.join(HERE, 'agent', 'persona.mjs'));
+  const prompt = buildSystemPrompt();
+
+  // K1 十一个 kind 逐个出现在提示词里。少一个，模型就永远用不了它；
+  // 多一个不存在的，模型调用它 → 整卡被拒 → 回复消失。
+  for (const r of REGISTRY) {
+    if (!prompt.includes(`\`${r.kind}\``)) no(`K1 ${r.kind} 出现在提示词里`, '模型不知道有这个类型');
+    else ok(`K1 ${r.kind} 在提示词里`);
+  }
+
+  // K2 反向：提示词里的每个 kind 都必须是真的 —— 从卡片块形态里抠出来逐个核
+  {
+    const mentioned = new Set([...prompt.matchAll(/`([a-z][a-z-]+)`/g)].map((m) => m[1]));
+    const looksLikeKind = [...mentioned].filter((k) => k.includes('-') || BY_KIND.has(k));
+    const ghosts = looksLikeKind.filter((k) => !BY_KIND.has(k) && !['card-failed', 'reply-card', 'text-fallback', 'json', 'zhe'].includes(k));
+    // 只对「形态像 kind 且出现在类型清单那一节」的做断言，避免误伤普通词
+    const section = prompt.slice(prompt.indexOf('## 十一个类型'), prompt.indexOf('## 各类型的字段'));
+    const ghostsInList = ghosts.filter((k) => section.includes(`\`${k}\``));
+    if (ghostsInList.length) no('K2 清单里没有不存在的类型', `提示词里的类型清单含未知 kind：${ghostsInList.join(', ')}`);
+    else ok('K2 清单里没有不存在的类型');
+  }
+
+  // K3 三条硬约束必须在提示词里逐字出现 —— 它们是模版存在的理由，不能只活在文档里
+  const musts = [
+    ['结论 ≤60 字', /不超过 60 个字符/],
+    ['边界 ≤90 字', /不超过 90 个字符/],
+    ['内部记录只进折叠区', /只能进折叠区/],
+    ['块外不要重复写正文', /块之外不要重复写正文/],
+    ['不套卡的反向指引', /一句话能答完的，就一句话答完/],
+    ['结论要写事实不写排版', /结论是你查到的事实，不是你打算怎么排版/],
+  ];
+  for (const [name, re] of musts) {
+    if (!re.test(prompt)) no(`K3 ${name}`, '提示词里找不到这条硬约束');
+    else ok(`K3 ${name} 已写进提示词`);
+  }
+
+  // K4 字段名清单要与登记表一致（模型才知道该填什么）
+  for (const r of REGISTRY) {
+    const line = prompt.split('\n').find((l) => l.startsWith(`- \`${r.kind}\`：`));
+    if (!line) { no(`K4 ${r.kind} 字段行`, '提示词里没有这个类型字段行'); continue; }
+    const missing = Object.keys(r.fields).filter((f) => !line.includes(f));
+    if (missing.length) no(`K4 ${r.kind} 字段齐全`, `提示词漏了字段：${missing.join(', ')}`);
+    else ok(`K4 ${r.kind} 字段齐全（${Object.keys(r.fields).length} 个）`);
+  }
+
+  // K5 提示词长度要有个上限意识：它进的是每一次调用的前缀
+  {
+    const n = [...prompt].length;
+    if (n > 8000) no('K5 提示词长度', `${n} 字符，太长了；卡片段应保持精炼`);
+    else ok(`K5 提示词 ${n} 字符（卡片段 ${[...cardContract()].length}）`);
+  }
+}
+
+/* ─────────────── L 发送链 · daemon 只有一个格式决策点 ─────────────── */
+head('L 发送链 · 降级链完整且不重复投递');
+{
+  const daemon = fs.readFileSync(path.join(HERE, 'ws_daemon.mjs'), 'utf8');
+
+  // L1 卡片降级的目标必须是**同一条引用**里的纯文本，不是新发一条。
+  // 新发一条会断开引用，而且和 replyMarkdown 自己的补发叠加 → 群里出现两份回答。
+  if (!/replyCard\(messageId, card\)/.test(daemon)) no('L1 卡片走 reply', 'daemon 里没有 replyCard 调用');
+  else ok('L1 卡片走 reply');
+
+  if (!/card-failed→/.test(daemon)) no('L1 卡片失败降级到 reply 纯文本', '找不到 card-failed 降级分支');
+  else ok('L1 卡片失败降级到同一条引用里的纯文本');
+
+  // L2 feishu.replyCard 只尝试一次、不自己兜底 —— 兜底只能有一处，
+  // 两处叠加的表现是同一个回答在群里出现两次。
+  const feishuSrc = fs.readFileSync(path.join(HERE, 'agent', 'feishu.mjs'), 'utf8');
+  const replyCardBody = feishuSrc.slice(feishuSrc.indexOf('export async function replyCard'), feishuSrc.indexOf('export async function sendTyping'));
+  if (/sendMarkdown|sendCard|message\.create/.test(replyCardBody)) {
+    no('L2 replyCard 只尝试一次', 'replyCard 自己做了兜底发送，与调用方的兜底叠加会重复投递');
+  } else ok('L2 feishu.replyCard 只尝试一次，兜底只有 daemon 一处');
+
+  // L3 daemon 里必须真的调用 toCardOrText，且把结果用在发送上
+  if (!/toCardOrText\(result\.reply\)/.test(daemon)) no('L3 daemon 调用信封', 'daemon 没有把回复过信封');
+  else ok('L3 daemon 对每条回复过信封');
+  if (!/shaped\.card \?\? null/.test(daemon)) no('L3 卡片真的传给了发送', '信封结果没传进 replyTo');
+  else ok('L3 卡片真的传给了发送');
+
+  // L4 形态与搬迁必须落到日志里 —— 否则调模版只能靠重跑猜
+  for (const [name, re] of [['卡片形态', /🃏 卡片/], ['搬迁记录', /↪ /], ['语域命中', /语域 /], ['降级原因', /卡片降级为文本/]]) {
+    if (!re.test(daemon)) no(`L4 ${name} 记进日志`, '日志里看不到这一项，出问题无法归因');
+    else ok(`L4 ${name} 记进日志`);
+  }
+
+  // L5 内核不许自己拼卡片 —— 形态决策只能在发送层一处。
+  // 两处都能定形态，就会出现「内核按 A 想、发送层按 B 发」的错位。
+  const agentSrc = fs.readFileSync(path.join(HERE, 'agent', 'agent.mjs'), 'utf8');
+  if (/reply-cards|toCardOrText|\[\[card:/.test(agentSrc)) {
+    no('L5 内核不碰卡片', 'agent.mjs 里出现了卡片逻辑；形态决策必须只在 ws_daemon 一处');
+  } else ok('L5 形态决策只在发送层一处');
+}
+
+/* ─────────────── N 附件 · 「按规矩不取」不许被说成「我读不到」 ─────────────── */
+head('N 附件 · 策略边界不许被说成能力边界');
+{
+  // 依据 AGENTS.md §2.6 红线：飞书上的内容禁止下载。
+  // 附件（file/image/media/audio）只有下载这一条通道，所以对它们是**不取**，不是**读不到**。
+  // 为什么值得专门守：两种说法在对方那里引出的动作**完全相反** ——
+  //   「读不到 / 没权限」→ 去申请权限、去找文件主人（全是白跑）
+  //   「按规矩不取」→ 把文字贴过来，或者存成飞书云文档发我
+  // 这条规矩横跨三个文件（内核直答 / 群历史占位 / 卡片模版），所以三处一起断言。
+  const BANNED = [
+    [/看到里面的内容/, '把「不取」说成「看不到」'],
+    [/只能读文本消息/, '把规矩说成能力不足'],
+    [/没有下载.{0,8}能力|能力还没做|工具集里没有/, '把规矩说成「能力还没做」'],
+    [/没权限|权限不足/, '把规矩说成权限问题'],
+  ];
+  const hitsOf = (t) => BANNED.filter(([re]) => re.test(t)).map(([, why]) => why);
+
+  // N1/N2 内核直答（agent.mjs）—— 群里第一眼看到的就是它
+  const agent = fs.readFileSync(path.join(HERE, 'agent', 'agent.mjs'), 'utf8');
+  const a0 = agent.indexOf('ATTACHMENT_TYPES.has');
+  const a1 = agent.indexOf("reason: 'unsupported_type'");
+  const branch = a0 >= 0 && a1 > a0 ? agent.slice(a0, a1) : '';
+  if (!branch) no('N1 找到附件分支', 'agent.mjs 里找不到附件分支 —— 断言落空比断言失败更危险');
+  else {
+    const h = hitsOf(branch);
+    if (h.length) no('N1 内核直答', `附件分支里还留着「${h.join('、')}」`);
+    else ok('N1 内核直答说的是「不取」，不是「读不到」');
+    if (!/贴过来|云文档/.test(branch)) no('N2 内核直答给替代路径', '说了不取，却没告诉对方下一步能怎么做');
+    else ok('N2 内核直答给了走得通的替代路径');
+  }
+
+  // N3 卡片模版 cannot-read 的**示例**——
+  //   只查 sample，不查 when/fields：那两处是给模型的**告诫**，
+  //   它们必须能说出「别写成没权限 / 能力还没做」，把告诫本身判成违规就成了自伤。
+  const cr = BY_KIND.get('cannot-read');
+  const hc = cr ? hitsOf(JSON.stringify(cr.sample)) : ['找不到 cannot-read'];
+  if (hc.length) no('N3 cannot-read 模版示例', `示例里还有「${hc.join('、')}」`);
+  else ok('N3 cannot-read 模版示例说的是「不取」');
+
+  // N4 群历史占位（feishu.mjs）—— 「我看不到什么」由工具给，不该让模型猜。
+  //   只查**附件那一句**：非附件类型说「我没法看到里面的内容」是对的，不该被误伤。
+  const fe = fs.readFileSync(path.join(HERE, 'agent', 'feishu.mjs'), 'utf8');
+  const f0 = fe.indexOf('const ATTACHMENT_TYPES = new Set');
+  const fSlice = f0 >= 0 ? fe.slice(f0, f0 + 900) : '';
+  const fm = fSlice.match(/这是附件：[^']*/);
+  if (!fm) no('N4 找到附件占位', 'feishu.mjs 里找不到附件那一句占位文案');
+  else {
+    const hf = hitsOf(fm[0]);
+    if (hf.length) no('N4 群历史占位', `附件占位里还有「${hf.join('、')}」`);
+    else if (!/不取/.test(fm[0])) no('N4 附件占位要写明「不取」', '占位文案没把「不取」说出来，模型只能自己猜');
+    else ok('N4 群历史占位说的是「不取」');
+  }
+
+  // N5 检测器自证：喂**改动前**的旧文案必须报红，否则上面几条都是空转
+  const OLD = '（file 类型，正文为空 —— 我没法看到里面的内容）';
+  if (!hitsOf(OLD).length) no('N5 检测器自证', '喂 2026-09-18 之前的旧文案没报红 —— 这几条正则是空转的');
+  else ok('N5 检测器自证：喂旧文案会红');
+}
+
+/* ─────────────── I 文档里的自证数不能是写死的 ─────────────── */
+head('I 数字 · 文档里写的自证项数必须等于实际项数');
+{
+  // 本项目第一号坑就是「文档里的数字复现不出来」（ADR-0013 §15.3）。
+  // 所以文档里凡出现「N 项全过」，那 N 必须是**当前**的实测值。
+  // 这一轮已经踩过一次：加了 G/H 两段之后文档里还写着 158。
+  // 与其每次记得改，不如让它红。
+  const docs = [
+    'tools/reply-cards/README.md',
+    'tools/reply-cards/contract.md',
+    'PMO/守衡-回复卡片模版与语域规程.md',
+  ];
+  for (const rel of docs) {
+    const f = path.join(ROOT, rel);
+    if (!fs.existsSync(f)) { no(`I ${rel}`, '文件不存在'); continue; }
+    const md = fs.readFileSync(f, 'utf8');
+    const claims = [...md.matchAll(/(\d+)\s*项(?:全过|通过)/g)].map((m) => Number(m[1]));
+    if (!claims.length) { ok(`I ${rel} 未写死项数`); continue; }
+    // pass 是本文件跑到这里时的累计通过数；再算上本轮 I 段自己会加的几条，
+    // 用一个容差判断，避免这一段的断言数自己把自己算进去。
+    const wrong = claims.filter((n) => Math.abs(n - pass) > 12);
+    if (wrong.length) no(`I ${rel}`, `写着 ${wrong.join('/')} 项，实际跑到这里是 ${pass} 项（差得太多，说明数字是手写的）`);
+    else ok(`I ${rel} 的 ${claims.join('/')} 与实测 ${pass} 同量级`);
+  }
+}
+
+/* ─────────────── 汇总 ─────────────── */
+console.log(`\n${'═'.repeat(64)}`);
+console.log(`通过 ${pass} 项 · 不通过 ${fail} 项`);
+if (fail) {
+  console.log('\n不通过明细：');
+  for (const b of bad) console.log(`  · ${b}`);
+  console.log('\n❌ 卡片模版与文档还不一致，别拿去发群。');
+  process.exit(1);
+}
+console.log('✅ 十一个类型建得出、字段都真的被用、白名单与探针一致、降级可读、文档同步、语域规则正反都对');

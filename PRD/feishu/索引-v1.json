@@ -1,0 +1,41 @@
+{
+  "generated_by": "本轮增量探查（一次性抓取，非生成器）",
+  "fetched_at": "2026-09-21 11:30:35 +0800",
+  "api": "docx/v1/documents/{obj_token}/raw_content（只读；未调用任何 download/medias）",
+  "docs": [
+    {
+      "file": "内容审查Agent-PRD-v1.0.md",
+      "title_online": "内容审查 Agent PRD",
+      "title_expected": "内容审查 Agent PRD",
+      "wiki_node_token": "NB55wAq8liEOdKkquL2cgtPEnmg",
+      "obj_token": "PXfBdjTwFokEQixtmTscqm7knNh",
+      "obj_type": "docx",
+      "space_id": "7632532941620480966",
+      "parent_node_token": "PpZuwfHZ3i3iMJkHccWcHTC2ndh",
+      "owner_open_id": "ou_3eef3cc3fbecfdafa98cd74e608522c3",
+      "node_create_time_bj": "2026-09-21 10:37:00",
+      "obj_edit_time_bj": "2026-09-21 10:41:33",
+      "chars": 7144,
+      "sha256": "9254f5c76f7abe4e4d206fddf5dc4d2b7d7b6f00660369896963d50a30d7ca44",
+      "size_bytes": 14614,
+      "stored_as": "逐字原文（raw_content 原样，未做任何改写）"
+    },
+    {
+      "file": "美国市场内容治理项目-一页纸计划书.md",
+      "title_online": "美国市场内容治理项目（第一阶段）一页纸计划书",
+      "title_expected": "美国市场内容治理项目（第一阶段）一页纸计划书",
+      "wiki_node_token": "BlKswESKkiyfakkWGIgcFKx3nxf",
+      "obj_token": "Q2wKdDRfeoHEB7xQc1xcEqJdngc",
+      "obj_type": "docx",
+      "space_id": "7626230951214861501",
+      "parent_node_token": "Ix5qwfQA1ivTuykOhtHcPHBKnGh",
+      "owner_open_id": "ou_3eef3cc3fbecfdafa98cd74e608522c3",
+      "node_create_time_bj": "2026-09-14 11:41:17",
+      "obj_edit_time_bj": "2026-09-20 12:06:40",
+      "chars": 2831,
+      "sha256": "d78fdef6d7f2b61ec5d9bfd0c40758915841cd5ae91b63c8329ffcd3714b9460",
+      "size_bytes": 6367,
+      "stored_as": "逐字原文（raw_content 原样，未做任何改写）"
+    }
+  ]
+}

@@ -164,6 +164,22 @@ def changed_modules(out):
     return mods
 
 
+def spawned_scripts(out):
+    """闸门「另（spawn）」那一段列出的脚本（2026-09-21 新增那段读数）。"""
+    mods, inside = [], False
+    for line in out.splitlines():
+        if "另（spawn）" in line:
+            inside = True
+            continue
+        if inside:
+            if line.startswith("  ─"):
+                break
+            t = line.strip()
+            if t.startswith("tools/") and t.endswith(".py"):
+                mods.append(t)
+    return mods
+
+
 rc, out = run_gate("--check", "--since=0")
 mods_all = changed_modules(out)
 check("B1", rc == 0 and "tools/ws_daemon.mjs" in mods_all and len(mods_all) >= 5,
@@ -173,6 +189,19 @@ mods_none = changed_modules(out)
 check("B2", rc == 0 and not mods_none and "无" in out,
       f"--since=未来 → 空（{len(mods_none)} 个），读数确实按时间过滤")
 check("B3", not scan_bypass("find tools -newer ref"), "闸门不再用「改过的文件都算生效」那种粗读法")
+
+# 第二段读数：**被 spawn 的脚本**（2026-09-21 补，因为上一版只报 import 表，
+# `tools/verify_pending.py` 这种「靠重启才会开始被调用」的文件在报告里看不见）
+rc, out = run_gate("--check", "--since=0")
+sp_all = spawned_scripts(out)
+check("B4", rc == 0 and "tools/verify_pending.py" in sp_all and len(sp_all) >= 2,
+      f"--since=0 → 列出被 spawn 的脚本 {len(sp_all)} 个（含本轮新加的 verify_pending.py）")
+rc, out = run_gate("--check", "--since=9999999999")
+check("B5", rc == 0 and not spawned_scripts(out),
+      "反向对照：spawn 那段也必须按时间过滤，不是一张常量表")
+rc, out = run_gate("--check", "--since=0")
+check("B6", rc == 0 and "tools/restart_shouheng.sh" not in changed_modules(out) + spawned_scripts(out),
+      "★ 闸门自己不许出现在任何一张表里（它是既不 import 也不被 spawn 的 —— 这就是 §2.7 记的那个老错）")
 
 # ── C 不许绕过闸门 ──────────────────────────────────────────────────────
 print("\nC 绕过闸门的写法（全仓可执行代码）")

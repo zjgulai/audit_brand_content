@@ -63,7 +63,7 @@ def _rows(snap):
 
 
 def _n_src(ext_doc, host):
-    """来源里 URL 含该主机的个数（缺口 D10–D12 的量从制品算，不手写）。"""
+    """来源里 URL 含该主机的个数（缺口 KB-GAP-10–KB-GAP-12 的量从制品算，不手写）。"""
     return sum(1 for s in ext_doc.get("sources", [])
                if host in (s.get("url") or ""))
 
@@ -83,7 +83,7 @@ def _real_rules(rules_p):
 
 
 def _only_general(ext_doc, rules_p):
-    """只有 FTC 举证通则（EXT-039）一条依据的规则数 —— D13 的量。"""
+    """只有 FTC 举证通则（EXT-039）一条依据的规则数 —— KB-GAP-13 的量。"""
     if not os.path.exists(rules_p):
         return 0
     cov = {}
@@ -153,7 +153,7 @@ def compute(snap=None):
         except (TypeError, ValueError):
             return 0.0
 
-    # ★ 2026-09-17（D9 执行）：原来这里只有一句话 ——「没有 Primary Text / Headline
+    # ★ 2026-09-17（KB-GAP-9 执行）：原来这里只有一句话 ——「没有 Primary Text / Headline
     #   的就是无文案广告」。数出来 59 条。**其中 2 条根本不是广告**：所有身份字段
     #   （广告名称 / 外部广告ID / 广告账号 / 平台）全空，是没读到的空行。
     #   合并计数的后果很具体：「去修拉取管道」与「去改口径」这两件不相干的事
@@ -188,15 +188,15 @@ def compute(snap=None):
             raise SystemExit("❌ 风险等级-还原.json 已过期（源表指纹对不上）。" + _FIX)
     rl_t = (rl or {}).get("totals", {})
 
-    # ★ 迁移保真度对账账本（D15/D16）。与上面同一条纪律：不在这里手算，
+    # ★ 迁移保真度对账账本（KB-GAP-15/KB-GAP-16）。与上面同一条纪律：不在这里手算，
     #   只转发 + 核对指纹。它比 风险等级-还原.json 多挂了四个输入
     #   （旧规则集 / 新规则 / 白名单 / 语境守卫），任一改动都会让它过期 ——
-    #   而 D15 的结论正是「迁移不保真」，所以账一旦过期，结论就不再可信。
+    #   而 KB-GAP-15 的结论正是「迁移不保真」，所以账一旦过期，结论就不再可信。
     mf_p = os.path.join(load.REPO, "research", "governance", "skeleton", "_data",
                         "迁移保真度.json")
     mf = json.load(open(mf_p, encoding="utf-8")) if os.path.exists(mf_p) else None
     if mf is None:
-        raise SystemExit("❌ 迁移保真度.json 不存在 —— D15/D16 的量没有家。"
+        raise SystemExit("❌ 迁移保真度.json 不存在 —— KB-GAP-15/KB-GAP-16 的量没有家。"
                          "修复：python3 research/governance/audit_migration_fidelity.py")
     _skel = os.path.join(load.REPO, "research", "governance", "skeleton")
     for _n, _rel in [("records.json", os.path.join("_data", "records.json")),
@@ -249,7 +249,7 @@ def compute(snap=None):
         "ext_entries": len(ext_doc.get("entries", [])),
         "ext_ratified": sum(1 for e in ext_doc.get("entries", [])
                             if e.get("status") == "ratified"),
-        # ── B3.5：外部标准库落盘后，D10–D14 的「量」也必须能重算 ──
+        # ── B3.5：外部标准库落盘后，KB-GAP-10–KB-GAP-14 的「量」也必须能重算 ──
         #   缺口的数字一旦是手写的，它就会和制品脱钩。这里全部从制品算出来。
         "sources_meta": _n_src(ext_doc, "meta.com"),
         "entries_meta": _n_ent(ext_doc, "meta.com"),
@@ -276,7 +276,7 @@ def compute(snap=None):
         "ads_no_text_marked_green": sum(1 for x in no_text if "绿" in str(x.get("风险等级"))),
         "ads_no_text_spend_usd": round(sum(_spend(x) for x in no_text), 2),
         "ads_total_spend_usd": round(sum(_spend(x) for x in ads), 2),
-        # ── D9 扩大口径后要用的键（源表「合规·绿」的真实构成）──────────
+        # ── KB-GAP-9 扩大口径后要用的键（源表「合规·绿」的真实构成）──────────
         #   数字只有一个家：research/governance/skeleton/_data/风险等级-还原.json。
         #   这里不重算，只转发 —— 重算一遍就是把同一个数写在两处，正是本文件要防的。
         "risk_green": rl_t.get("绿标_条数"),
@@ -288,7 +288,7 @@ def compute(snap=None):
         "risk_uncovered": rl_t.get("覆盖_未覆盖"),
         "risk_covered": rl_t.get("覆盖_覆盖"),
         "risk_blind_spot_rate": rl_t.get("盲区率"),
-        # ── D15/D16 的键（迁移保真度对账）────────────────────────────
+        # ── KB-GAP-15/KB-GAP-16 的键（迁移保真度对账）────────────────────────────
         #   同上：数字只有一个家 —— _data/迁移保真度.json，这里只转发。
         "legacy_exception_words": mf_t.get("旧豁免词总数"),
         "exception_self_triggering": mf_t.get("自我触发豁免词"),

@@ -2,8 +2,9 @@
 /**
  * ws_daemon.mjs —— 守衡 · 常驻入口（v3：接入推理内核）
  *
- * 本文件只做四件事：建立长连接、把事件交给内核、把回复发出去、管理生命周期。
- * 所有「怎么想」的逻辑都在 agent/ 目录下，不在这里。
+ * 本文件只做五件事：建立长连接、把事件交给内核、**决定回复用什么形态**、
+ * 把回复发出去、管理生命周期。
+ * 所有「怎么想」的逻辑都在 agent/ 目录下，怎么「成形」在 reply-cards/ 下，都不在这里。
  *
  * 版本历史：
  *   v1  打印事件 + 写死回复（验证入向链路）
@@ -22,6 +23,9 @@ import path from 'node:path';
 import { config, describeConfig, LOG_DIR, REPO_ROOT, ensureDir } from './agent/config.mjs';
 import * as feishu from './agent/feishu.mjs';
 import { handleMessage, flushSeen, loadedTools, status } from './agent/agent.mjs';
+import { toCardOrText } from './reply-cards/envelope.mjs';
+import { shapeOf } from './reply-cards/registry.mjs';
+import { checkNow, checkPending, resolveChat, LARK_DOC_RE, bjDate, loadState, loadPendingState, saveState } from './agent/prd_baseline.mjs';
 
 const PROBE     = process.argv.includes('--probe');
 const DUMP_ONLY = process.argv.includes('--dump-only');
@@ -59,6 +63,11 @@ async function onMessage(data) {
 
   if (DUMP_ONLY) { log('   （--dump-only 模式，不回复）'); return; }
 
+  // 群里被推了飞书文档/维基链接 → 顺手核一次上游基线（**不阻塞回话**）。
+  // 为什么挂在这里：她 2026-09-21 10:42 就是这么把 PRD 推进来的 —— 推链接是这条链路上
+  // 唯一一个"上游有新东西"的可观测信号。
+  if (LARK_DOC_RE.test(preview)) void baselineWatch('link', chatId);
+
   const t0 = Date.now();
   let result;
   try {
@@ -82,15 +91,46 @@ async function onMessage(data) {
   if (trace.length) log(`   🔧 工具: ${trace.map((t) => `${t.tool}${t.ok ? '' : '✗'}(${t.ms}ms)`).join(' → ')}`);
   if (result.meta?.compacted) log(`   🗜 历史已压缩（保留 ${result.meta.turns} 轮 + 纪要）`);
   if (result.meta?.truncated) log('   ⚠️ 回复被长度上限截断（已附截断说明，不是完整回答）');
+
+  // ── 形态决策：模型给的是一段话，这里才决定它变成卡还是文本。
+  // 决策本身在 reply-cards/envelope.mjs 里，这里只负责记录 ———
+  // 「模型选了哪种形态、有没有被搬迁、有没有踩到 AI 味」必须能从日志里回答，
+  // 否则调模版就只能靠重跑猜。
+  const shaped = toCardOrText(result.reply);
+  for (const m of shaped.moved) log(`   ↪ ${m.field} → ${m.to}（${m.why}）`);
+  for (const h of shaped.lint) log(`   ${h.level === 'error' ? '❌' : '⚠️ '} 语域 ${h.id} ×${h.count} ${h.sample}`);
+  if (shaped.mode === 'card') log(`   🃏 卡片 ${shaped.kind} · ${shapeOf(shaped.card)}`);
+  else if (shaped.dropped) log(`   ⚠️ 卡片降级为文本：${shaped.reason}`);
   log(`   💬 回复 ${result.reply.length} 字，耗时 ${ms}ms`);
 
-  const sent = await replyTo(chatId, msg.message_id, result.reply);
+  const sent = await replyTo(chatId, msg.message_id, shaped.text, shaped.card ?? null);
   if (sent.ok) { counters.replied++; log(`   ✓ 已发送 ${sent.messageIds.filter(Boolean).join(', ')} [${sent.mode}]`); }
   else { counters.failed++; log(`   ✗ 发送失败: ${sent.error}`); }
 }
 
-/** 回复失败时退化为普通发送；再失败就只记日志，不静默吞掉 */
-async function replyTo(chatId, messageId, text) {
+/**
+ * 发送一条回复。这是**唯一**的格式决策点。
+ *
+ * 降级链只有一条，且每一步都有明确的失败原因记录：
+ *
+ *   有卡片 → reply 卡  ──失败──→ reply 纯文本（正文 = 卡的降级文本）
+ *   没有卡 → reply 纯文本 ──失败──→ sendMarkdown 补发
+ *
+ * ★ 为什么卡片的降级目标也是 reply（而不是 sendCard 新发一条）：
+ *   新发一条会断开引用关系 —— 群里看到的是一段悬空的话，不知道在答谁。
+ *   守住「引用」比守住「卡片」重要。
+ * ★ 为什么每一步都要把原因写进正文：对方看到格式变了，得知道是为什么，
+ *   而不是以为守衡改了风格。这是 2026-09-17 那次故障的直接教训 ——
+ *   当时它对着一堆内部记录说「✓ 已发送」。
+ */
+async function replyTo(chatId, messageId, text, card = null) {
+  if (card) {
+    const rc = await feishu.replyCard(messageId, card);
+    if (rc.ok) return { ok: true, messageIds: [rc.messageId], mode: rc.mode };
+    log(`   ⚠ 卡片 reply 失败（${rc.error}），退成同一条引用里的纯文本`);
+    const rt = await feishu.replyMarkdown(messageId, chatId, text);
+    return rt.ok ? { ...rt, mode: `card-failed→${rt.mode}`, error: rc.error } : rt;
+  }
   const r = await feishu.replyMarkdown(messageId, chatId, text);
   if (r.ok) return r;
   log(`   ⚠ reply 失败（${r.error}），改为直接发送`);
@@ -99,6 +139,66 @@ async function replyTo(chatId, messageId, text) {
 
 async function safeSend(chatId, text) {
   try { await feishu.sendMarkdown(chatId, text); } catch (e) { log('   ✗ 兜底发送也失败:', e.message); }
+}
+
+/**
+ * 上游 PRD 基线漂移：**触发 + 通报**（`tools/agent/prd_baseline.mjs` 是状态机与判据）。
+ *
+ * 为什么要在常驻链路里做：2026-09-21 11:52 守衡在群里对上游承诺「改版后得重新拉一次基线
+ * 并记新指纹」，当天补出了 `tools/verify_prd_baseline.py` —— 但**那是"命令存在"，
+ * 不是"谁在跑"**。没人跑的检查器，和一句没执行点的承诺是同一个形状。
+ *
+ * 两条纪律写在这里：
+ *   1. **不阻塞回话**：调用点全是 `void`，出错只记日志，绝不影响正常回答。
+ *   2. **未测不得沉默**：退 2 会说话，且文案里不许出现"没问题"（判据在 prd_baseline 的
+ *      `stripNegated` + 离线自测第 6/7/8 条）。
+ */
+async function baselineWatch(reason, chatId) {
+  try {
+    if (chatId) saveState({ ...loadState(), lastChatId: chatId });
+    const r = await checkNow({ reason });
+    if (r.skipped) { log(`   · 基线检查跳过（${r.skipped}）`); return; }
+    log(`   · 基线检查[${reason}] 退出码 ${r.code} —— ${r.why}${r.note ? ` · ${r.note}` : ''}`);
+    if (!r.say) return;
+    const target = chatId ?? await resolveChat();
+    if (!target) {
+      log('   ⚠ 基线检查有话要说，但还没有可通报的群 —— 只进日志（退 2 不许沉默）');
+      return;
+    }
+    await safeSend(target, r.say);
+    log(`   · 基线告警已发到 ${target}`);
+  } catch (e) {
+    log('   ⚠ 基线检查自身出错（不影响回话）:', e?.message ?? e);
+  }
+}
+
+/**
+ * 待收清单的到期提醒（判据在 `tools/verify_pending.py`，清单在 `PMO/待收清单-v1.json`）。
+ *
+ * 为什么要在常驻链路里做：`PRD/PRD差异对照-20260921.md` §五 记着上游 09-18 的承诺
+ * 「其它已跟业务沟通接下来两周陆续整理提供」（→ 2026-10-02），而同一天那份对照表
+ * **自己就写着「到期没人会提醒」**。这一层就是补上那个「谁在跑」。
+ *
+ * 与 `baselineWatch` 同两条纪律：不阻塞回话（调用点全是 `void`）、**未测不得沉默**。
+ * 措辞上有一条额外的：**不 @ 任何人** —— 到期日是我方推算的，那是问一句，不是催办。
+ */
+async function pendingWatch(reason, chatId) {
+  try {
+    if (chatId) saveState({ ...loadState(), lastChatId: chatId });
+    const r = await checkPending({ reason });
+    if (r.skipped) { log(`   · 待收检查跳过（${r.skipped}）`); return; }
+    log(`   · 待收检查[${reason}] 退出码 ${r.code} —— ${r.why}${r.note ? ` · ${r.note}` : ''}`);
+    if (!r.say) return;
+    const target = chatId ?? await resolveChat();
+    if (!target) {
+      log('   ⚠ 待收检查有话要说，但还没有可通报的群 —— 只进日志（退 2 不许沉默）');
+      return;
+    }
+    await safeSend(target, r.say);
+    log(`   · 待收到期提醒已发到 ${target}`);
+  } catch (e) {
+    log('   ⚠ 待收检查自身出错（不影响回话）:', e?.message ?? e);
+  }
 }
 
 /* ─────────────────────── 事件注册 ─────────────────────── */
@@ -162,10 +262,23 @@ process.on('uncaughtException',  (e) => log('⚠ uncaughtException:',  e?.stack 
 await ws.start({ eventDispatcher: dispatcher });
 log('✓ 长连接已启动，等待事件（断线由 SDK 自动重连）');
 
+// 启动即核一次上游基线：重启后第一时间知道手上那份 PRD 是不是最新版
+// （`--dump-only` 不跑 —— 那个模式是排查用，不该产生任何对外动作）
+if (!DUMP_ONLY) void baselineWatch('startup');
+// 启动也核一次待收清单：**到期这件事和基线一样，重启后才该被想起来**
+if (!DUMP_ONLY) void pendingWatch('startup');
+
 // 每 5 分钟打一次心跳，方便判断进程是活着还是卡死
 const hb = setInterval(() => {
   log(`· 心跳 事件 ${counters.events} 已回答 ${counters.handled} 失败 ${counters.failed} | LLM 调用 ${status().llm.calls}`);
   rotateLogIfHuge();
+  // 每日兜底：**她"基于评估重新修改"已经推过的那一篇时，群里不会有新链接** ——
+  // 这正是「只在收到链接时跑」漏掉的那一种，也是她原话描述的那一种。
+  if (!DUMP_ONLY && loadState().lastDay !== bjDate()) void baselineWatch('daily');
+  // 待收清单同理换日兜底：到期日的比较对象就是「今天」，而今天只有换日时才会变。
+  // ★ 读的是**待收那一份**状态文件（`prd-pending-watch.json`）—— 两个检查共写一份
+  //   会互相覆盖：基线那次是「读 → 等网络 3 秒 → 写」，写回去的是旧快照。
+  if (!DUMP_ONLY && loadPendingState().p_lastDay !== bjDate()) void pendingWatch('daily');
 }, 5 * 60_000);
 hb.unref?.();
 

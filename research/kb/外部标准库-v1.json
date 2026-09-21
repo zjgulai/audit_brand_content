@@ -1788,7 +1788,7 @@
    }
   ],
   "订正理由": "逐字引用是本法条库的全部价值，形态必须与页面一致；三处均为转录杂质，语义未变",
-  "原文复核": "python3 tools/verify_external.py —— 逐条核对该来源快照的去空白子串；快照钉在 research/kb/_evidence/外部标准库/S*.txt（证据层，不入 git）；Meta 两条来源（S7/S8）本机无匿名取法，改对仓内 2026-09-15 的钉住件核 —— 见〔缺口:D10〕",
+  "原文复核": "python3 tools/verify_external.py —— 逐条核对该来源快照的去空白子串；快照钉在 research/kb/_evidence/外部标准库/S*.txt（证据层，不入 git）；Meta 两条来源（S7/S8）本机无匿名取法，改对仓内 2026-09-15 的钉住件核 —— 见〔缺口:KB-GAP-10〕",
   "法务确认": "authority.ratifier 仍为 null；全部 62 条 status=research"
  },
  "覆盖声明": {

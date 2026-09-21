@@ -97,9 +97,20 @@ export async function handleMessage(event) {
     return { reply: null, reason: 'duplicate', meta: { message_id: msg.message_id } };
   }
 
-  // ── 2. 只处理文本。其他类型（图片/文件/语音）先明确说出「我读不了」，不装懂。
+  // ── 2. 只处理文本。附件类明确说「按规矩不取」，不装懂、也**不把规矩说成能力**。
+  //
+  // 依据 AGENTS.md §2.6 红线：飞书上的内容禁止下载。
+  // 这里曾经写的是「我现在只能读文本消息 …… 我看不到里面的内容」——
+  // 那句话把**策略**说成了**能力/权限**问题：对方会以为还差一个开关没打开，
+  // 于是去申请权限、去找文件主人。全是白跑。规矩就该照直说，并给出走得通的路。
   if (msg.message_type !== 'text') {
-    return { reply: `我现在只能读文本消息。这条是「${msg.message_type}」，我看不到里面的内容 —— 需要的话请把它转成文字发我。`,
+    const ATTACHMENT_TYPES = new Set(['file', 'image', 'media', 'audio']);
+    if (ATTACHMENT_TYPES.has(msg.message_type)) {
+      return { reply: '附件我不取 —— 飞书上的内容公司不让下载，附件只有下载这一条通道。\n'
+                    + '要审的话，把里面的文字贴过来；或者存成飞书云文档发我，云文档我能直接读。',
+               reason: 'attachment_not_taken', meta: { message_type: msg.message_type } };
+    }
+    return { reply: `这条是「${msg.message_type}」，它的正文我读不了 —— 需要的话请把它转成文字发我。`,
              reason: 'unsupported_type', meta: { message_type: msg.message_type } };
   }
 

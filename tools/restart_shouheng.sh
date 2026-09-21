@@ -101,6 +101,13 @@ PY
 #   不会进新进程，把它们算进来就是「这句话比我的输入大」（§2.4.1 记过这个病：
 #   一个 file 被改过 ≠ 它会被重新加载）。上一版就是这么错的 —— 它把闸门脚本
 #   自己列成了「重启会生效」。
+#
+# ⚠ 2026-09-21 补第二段：**被 spawn 的脚本**（`path.join(REPO_ROOT,'tools','x.py')`）。
+#   它和 import 的语义**不一样**，所以分行报、不混在一起：
+#     脚本每次触发都是新起的进程 → **它自己的改动不用重启就会生效**；
+#     但「调用它的那一行」若是新加的（在 import 表里），那它现在**根本没被调用**，
+#     得靠这次重启才会开始跑。本轮 `tools/verify_pending.py` 正是这一种 ——
+#   上一版只报 import 表，于是这一条在报告里**看不见**。
 runtime_changed_since() {   # $1 = 进程启动的 epoch
   python3 - "$ROOT" "$1" <<'PY'
 import os, re, sys
@@ -120,7 +127,21 @@ while stack:
                 stack.append(cand)
                 break
 changed = [os.path.relpath(f, root) for f in seen if os.stat(f).st_mtime > epoch]
+
+# spawn 目标：图内代码按 path.join(REPO_ROOT, 'tools', '…….py') 指到的脚本
+spawn_rx = re.compile(r"""path\.join\(\s*REPO_ROOT\s*,\s*((?:'[^']*'\s*,\s*)*'[^']*')""")
+spawn = set()
+for f in seen:
+    for m in spawn_rx.finditer(open(f, encoding='utf-8', errors='replace').read()):
+        p = os.path.join(root, *re.findall(r"'([^']*)'", m.group(1)))
+        if os.path.isfile(p):
+            spawn.add(p)
+spawned = sorted(os.path.relpath(p, root) for p in spawn if os.stat(p).st_mtime > epoch)
+
+print('===IMPORT===')
 print('\n'.join(sorted(changed)))
+print('===SPAWN===')
+print('\n'.join(spawned))
 PY
 }
 
@@ -138,12 +159,25 @@ echo "  群里最后一条  $(last_msg_age)"
 echo "  重启方式      launchctl kickstart -k $DOMAIN/$LABEL"
 echo "                ⚠ 不要用 kill -TERM —— 退出码 0 会让 launchd 认为这是正常停机，不再拉起（见本文件头部实测）"
 if [ -n "${START_EPOCH:-}" ]; then
-  CHANGED="$(runtime_changed_since "${SINCE:-$START_EPOCH}")"
-  if [ -n "$CHANGED" ]; then
-    echo "  重启会生效    $(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ') 个被 import 的模块在启动后被改过："
-    printf '%s\n' "$CHANGED" | sed 's/^/                  /'
+  RAW="$(runtime_changed_since "${SINCE:-$START_EPOCH}")"
+  CHANGED="$(printf '%s\n' "$RAW" | sed -n '/^===IMPORT===/,/^===SPAWN===/p' | sed '1d;$d')"
+  SPAWNED="$(printf '%s\n' "$RAW" | sed -n '/^===SPAWN===/,$p' | sed '1d')"
+  if [ -n "$CHANGED" ] || [ -n "$SPAWNED" ]; then
+    if [ -n "$CHANGED" ]; then
+      echo "  重启会生效    $(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ') 个被 import 的模块在启动后被改过："
+      printf '%s\n' "$CHANGED" | sed 's/^/                  /'
+    else
+      echo "  重启会生效    没有被 import 的模块在启动后被改过"
+    fi
+    if [ -n "$SPAWNED" ]; then
+      echo "  另（spawn）   $(printf '%s\n' "$SPAWNED" | wc -l | tr -d ' ') 个被调起的脚本在启动后被改过/新建："
+      printf '%s\n' "$SPAWNED" | sed 's/^/                  /'
+      echo "                · 脚本每次触发都是新起的进程 —— **它自己的改动不用重启就会生效**"
+      echo "                · 但「调用它的那一行」若是新加的（见上面那张表），它现在**根本没被调用**，"
+      echo "                  要靠这次重启才会开始跑。逐条看清是哪一种，别整段照读。"
+    fi
   else
-    echo "  重启会生效    无 —— 启动之后没有任何被 import 的模块被改过"
+    echo "  重启会生效    无 —— 启动之后没有任何被 import 的模块或被调起的脚本被改过"
     echo "                （那这次重启不带来任何运行时变化，先想清楚为什么还要重启）"
   fi
 fi

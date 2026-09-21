@@ -1817,7 +1817,14 @@ def main() -> int:
                         _people.append({"姓名": _d.get("姓名", ""), "en_name": _d.get("en_name", ""),
                                         "邮箱": _d.get("邮箱", ""), "open_id": _d.get("open_id", ""),
                                         "出处": _d.get("出处", "")})
-        _ok, _why = _lp.verify_resolver(_people)
+        # ★ 2026-09-21 修：`verify_resolver` 改成**每条通道各自自证**之后，
+        #   这里还按旧签名只传 people 一个参数 → stat 为空 → 通道二、三一律
+        #   被读成「没采到」→ V42a/V42b 恒红（174/176）。
+        #   根因不在这一行，在产物：写 CSV 的元信息行当时没记第三条通道的读数。
+        #   现在读数由 `lark_people.CHANNELS` 现算，这里用**同一个解析器**读回来
+        #   （单一解析点，见 §2.5）。
+        _stat = _lp.parse_meta(_pp)
+        _ok, _why = _lp.verify_resolver(_people, _stat)
         _neg = _lp.resolve("林建纯", _people, verified=_ok, why=_why)
         # site 侧地址自己读一遍（V41 块里的 _owner_addr 是那一段的局部变量）
         with (SKEL / "_data" / "site-owners.csv").open(encoding="utf-8-sig", newline="") as f:
@@ -2169,6 +2176,201 @@ def main() -> int:
              if _relax_u else "")
           + f"　反向对照：抽掉一条认领 → {'必红' if _ctrl_u else '❌判据恒真'}")
 
+
+    # ══ V46 · 2026-09-17（D38 · Q36 裁定 A）编号空间收口 ══════════════════
+    #   本仓的编号不是一个平面。Q35（→D37）处置了 KB 线自有编号，Q36（→D38）处置了
+    #   ADR-0013 的局部决策编号。两次都撞上同一件事：**改的是编号，坏的是围着编号写的假设。**
+    #
+    #   这一组守的不是「改成了什么样」，是**「还有哪些号是别人的」必须逐条写下来**。
+    #   Q36 选项 A 声明的收益是「裸写的 `D#` 只可能是台账」—— 实测**达不到**：改完之后
+    #   ADR-0013 里仍有 20 处裸 `D#`（台账引用 + 旧缺口号 + 旧检查编号引文），它们不该改。
+    #   所以到货形态只能是一句带白名单的话，而白名单必须在判据里，不能留在迁移脚本的注释里。
+    #   **恒真的全称句会被下一个人当成真的用。**
+    if not a.only or a.only.startswith("V46"):
+        import importlib.util as _ilu
+
+        _spec = _ilu.spec_from_file_location(
+            "_mb12", str(ROOT / "tools" / "_migrate_ids_batch12.py"))
+        _mb12 = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_mb12)
+
+        # ★ 白名单是 `(token, near, 理由)` 的列表，**按内容锚定**，不是按行号。
+        #   第一版是 `{行号: {token: 理由}}`，落地当天就因为往 §五 的注里插了 3 行而
+        #   整体错位、2 条当场失效。判据当时**报了出来** —— 那正是它该有的样子。
+        _wl = _mb12.WHITELIST
+        _adr13_lines = (ROOT / "ADR" / "ADR-0013-基座接口冻结与仓库入库分级.md") \
+            .read_text(encoding="utf-8").split("\n")
+
+        def _hit(tok, line, wl):
+            return any(w[0] == tok and w[1] in line for w in wl)
+
+        def _stray(wl):
+            """白名单之外还剩下的裸 `D#`。抽出来是为了反向对照能对同一判据做。"""
+            return [f"行{i} {m.group(0)}" for i, l in enumerate(_adr13_lines, 1)
+                    for m in _mb12.BARE.finditer(l) if not _hit(m.group(0), l, wl)]
+
+        _bare = [(i, m.group(0)) for i, l in enumerate(_adr13_lines, 1)
+                 for m in _mb12.BARE.finditer(l)]
+        _stray_now = _stray(_wl)
+        _unused = [f"{t} @ {nr[:24]!r}" for t, nr, _ in _wl
+                   if not any(_hit(t, l, [(t, nr, "")]) for l in _adr13_lines)]
+        # 反向对照：**从白名单里抽掉一条**，那一处裸 `D#` 必须当场变成「没理由的」。
+        _victim = _wl[0] if _wl else None
+        _stray_mut = _stray(_wl[1:]) if _victim else []
+        check("V46a", "ADR-0013 里裸写的 `D#` 逐条落在白名单里，且白名单无未命中项"
+                      "（每条按内容锚定、写明它凭什么例外）",
+              not _stray_now and not _unused and len(_stray_mut) > len(_stray_now),
+              f"裸 `D#` {len(_bare)} 处 · 白名单 {len(_wl)} 条（按内容锚） · "
+              + ("全部有理由" if not _stray_now else "；".join(_stray_now[:3]))
+              + (f"；❌ 白名单未被命中 {_unused[:2]}" if _unused else "")
+              + f"　反向对照：抽掉 {_victim[0]} → "
+              + (f"报出 {_stray_mut[:1]}" if len(_stray_mut) > len(_stray_now) else "❌判据恒真"))
+
+        # ── V46b · 别名唯一（D34 的「单一编号空间」能不能成立，全看这一条）──
+        #   ★ 这里**自己加载**台账，不沿用 V30 组里那个 `_led`。
+        #     第一版写的是 `locals().get("_led") or json.loads(...)` —— 结果 V30 到 V46 之间
+        #     有别的组把 `_led` 重新绑成了 `Path`（存的是路径，不是文档），于是 `--only V46`
+        #     单跑没问题、**全量跑直接 AttributeError 崩掉**。
+        #     这正是本项目反复撞见的那一类：**围着名字写的假设**。修法不是改个名，
+        #     是让这一段不依赖任何环境状态 —— 自己读自己那份。
+        _led = json.loads((SKEL / "legal-decisions-v1.json").read_text(encoding="utf-8"))
+        _ia = _led.get("$id_aliases") or {}
+        _ent = _ia.get("entries") or []
+        _seen, _dup = {}, []
+        for _e in _ent:
+            for _al in _e.get("aliases") or []:
+                if _al in _seen:
+                    _dup.append(f"{_al} 同时指 {_seen[_al]} 与 {_e['id']}")
+                _seen[_al] = _e["id"]
+        _conf = [e["id"] for e in _ent if e.get("status_conflict")]
+        # ★ 撞号的号必须带表域限定 —— 一个不带 `@` 的撞号别名就是「别名不唯一」的种子。
+        #   撞号集合取自对账产物：它是**算出来的**，不是这里抄一份（抄一份就会漂）。
+        # ── 撞号集合**现算**，不从盘上的产物读 ──────────────────────────
+        #   ★ 这条是踩出来的：D38 往 10 个撞号行的行尾追加了 `<!-- … -->` 注释，
+        #     而对账解析器的行正则要求以 `|` 结尾 —— 那 10 行因此整个消失（52→42 行），
+        #     撞号集合变成空。**而 V46b 当时是绿的**，因为它读的是迁移**之前**落盘的
+        #     `_data/遗留对账.json`。判据吃了一份过期快照，于是它守的东西已经不存在了，
+        #     它还在报平安。这与 D37 的三条自撞同形，解法 E5 早就写过：**守「制品本身没过期」**。
+        #     这里更进一步：判据用**现算**，产物只作人读的那一份（另由 V46e 守新鲜度）。
+        import importlib.util as _ilu2
+        _rspec = _ilu2.spec_from_file_location("_recon_legacy",
+                                               str(ROOT / "tools" / "_recon_legacy.py"))
+        _recon_mod = _ilu2.module_from_spec(_rspec)
+        _rspec.loader.exec_module(_recon_mod)
+        _live = _recon_mod.recon()
+        _coll = set(_live["collide_numbers"])
+        _recon_why = ""
+        if not _coll:
+            _recon_why = ("❌ 现算的撞号集合是空的 —— ADR 里 `遗留 6–10` 的撞号要么被修好了，"
+                          "要么解析器又读不到那些行了（后者更可能）。")
+        _unscoped = [a for e in _ent for a in (e.get("aliases") or [])
+                     if "@" not in a
+                     and (a.split()[1].split("@")[0].isdigit()
+                          and int(a.split()[1].split("@")[0]) in _coll)]
+        # ── 别名必须指向**还存在的号**（悬空引用那一类）────────────────
+        #   ★ 登记处是一份**制品**；ADR 是另一份。两者会各自演化 ——
+        #     删掉 ADR 里某一行、或改掉某个号，登记处就多出一个指不到东西的别名。
+        #     这正是 Q35 evidence ⑦ 那条已经断掉的引用（`kb_query.py` 的抬头写着
+        #     「会被 verify_kb.py 的 D4 抓住」，而那条检查现名 E4）的同一形态：
+        #     **编号空间一动、引用就断，而且没有任何检查发现它。**
+        #   别名的算法只有一份（`_ingest_batch12.alias_of`），判据直接调它。
+        _bspec = _ilu2.spec_from_file_location(
+            "_ingest_batch12", str(ROOT / "tools" / "_ingest_batch12.py"))
+        _ing = _ilu2.module_from_spec(_bspec)
+        _bspec.loader.exec_module(_ing)
+        _live_alias = {a for it in _live["items"] for a in _ing.alias_of(it, _coll)}
+        _reg_alias = {a for e in _ent for a in (e.get("aliases") or [])}
+        _dangling = sorted(_reg_alias - _live_alias)      # 登记了，ADR 里没有
+        _unreg = sorted(_live_alias - _reg_alias)         # ADR 里有，没登记
+
+        check("V46b", "单一编号空间：别名唯一 · 撞号带域限定 · 且每个别名都指得到 ADR 里现存的号",
+              not _dup and not _unscoped and not _dangling and not _unreg
+              and _ia.get("spaces") and not _recon_why,
+              (_recon_why or
+               f"{len(_ia.get('spaces') or {})} 个编号空间 · {len(_ent)} 件 ADR 遗留 · "
+               f"别名 {len(_seen)} 个 · 撞号 {sorted(_coll)}（现算） · 状态冲突 {_conf or '无'}"
+               + ("" if not (_dup or _unscoped) else "；" + "；".join(
+                   (_dup + [f"未加域：{_unscoped[:3]}"])[:3]))
+               + (f"；❌ 悬空别名 {_dangling[:3]}" if _dangling else "")
+               + (f"；❌ 未登记 {_unreg[:3]}" if _unreg else "")))
+
+        # ── V46e · 对账产物必须新鲜**且结构完整**（它是人读的那一份；判据本身已改成现算）──
+        #   ★ 「指纹一致」只管「源变没变」，管不了「产物本身被改坏」。
+        #     实测：把产物里的 `collide_numbers` 键改个名，指纹照样对得上 ——
+        #     而那份产物已经不能回答它该回答的问题了。**空缺必须可见。**
+        _recon_art = SKEL / "_data" / "遗留对账.json"
+        _need = ["collide_numbers", "items", "rows", "unique_items",
+                 "collide", "status_conflicts", "source_sha256"]
+        _missing_keys = []
+        if _recon_art.exists():
+            _art = json.loads(_recon_art.read_text(encoding="utf-8"))
+            _missing_keys = [k for k in _need if k not in _art]
+        _struct_ok = not _missing_keys
+        _fresh_ok, _fresh_why = _recon_mod.is_fresh(str(_recon_art))
+        check("V46e", "`_data/遗留对账.json` 与其源 ADR 同代**且结构完整**（不是过期快照、不是被改坏的产物）",
+              _fresh_ok and _struct_ok,
+              (f"{_fresh_why} · 现算 {_live['rows']} 行 / {_live['unique_items']} 件 · "
+               f"产物记 {len(_ia.get('entries') or [])} 件")
+              + (f"；❌ 对账产物结构不全，缺 {_missing_keys}" if _missing_keys else ""))
+
+        # ── V46c · 批次标签双向对账（台账 `$artifact` ↔ 讨论稿 §八 的表）──
+        #   实测：这两处**早就对不上了** —— `D31` 写 B4/B6、表里是 B7；`D35` 写 B7、表里是 B6。
+        #   而「下一批做什么」这个问题正是靠这两处回答的。两处不一致 = 这个问题有两个答案。
+        _plan = (ROOT / "PMO" / "守衡-创建全景图与知识库体系-讨论稿-v1.md") \
+            .read_text(encoding="utf-8")
+        _q2d = {q["id"]: (q.get("record") or "").split("· ")[-1]
+                for q in _led.get("$decision_queue", []) if q.get("status") == "answered"}
+        _plan_of = {}          # 决定 → 表里它落在哪个批次
+        for _ln in _plan.split("\n"):
+            _m = re.match(r"^\|\s*\*\*(B\d+'?)\*\*", _ln)
+            if not _m:
+                continue
+            for _q in re.findall(r"\bQ(\d+)\b", _ln):
+                _d = _q2d.get(f"Q{_q}")
+                if _d:
+                    _plan_of.setdefault(_d, set()).add(_m.group(1))
+        _mism, _orphan = [], []
+        # ★ 表只覆盖 B4–B10（B0–B3 已落地，没有行）。所以「台账标了 B3」不是漂移，
+        #   是**已经做完的批次**。第一版没有这条豁免，于是 D28 的 `B3.2` 被当成孤儿报了出来 ——
+        #   那不是判据抓到了错，是判据不知道表有下界。**一条会把正常状态报成错的判据，
+        #   会被学会忽略，和恒真一样坏**（同 §16.5 那条 F3 的豁免理由）。
+        _tbl_min = min(int(b[1:].rstrip("'")) for b in
+                       {m.group(1) for ln in _plan.split("\n")
+                        for m in [re.match(r"^\|\s*\*\*(B\d+'?)\*\*", ln)] if m})
+        for _d in _led.get("decisions", []):
+            _art = _d.get("$artifact") or ""
+            _lab = set(re.findall(r"\bB\d+'?", _art))
+            _want = _plan_of.get(_d["id"])
+            if _lab and _want and not (_lab & _want):
+                _mism.append(f"{_d['id']}: 台账 {sorted(_lab)} vs 表 {sorted(_want)}")
+            if _lab and not _want and any(int(x[1:].rstrip("'")) >= _tbl_min for x in _lab):
+                _orphan.append(f"{_d['id']} 标了 {sorted(_lab)}，但表里没有任何批次认领它")
+        _plan_orphan = [f"{d} 表里排在 {sorted(b)}，台账却没标批次"
+                        for d, b in _plan_of.items() if d not in
+                        {x["id"] for x in _led.get("decisions", []) if
+                         re.search(r"\bB\d+'?", x.get("$artifact") or "")}]
+        check("V46c", "批次标签双向对账：台账 `$artifact` 的 `B#` 与讨论稿 §八 的表逐条互相点名",
+              not _mism and not _orphan and not _plan_orphan,
+              f"表里认领了 {len(_plan_of)} 条决定 · "
+              + ("逐条对上" if not (_mism or _orphan or _plan_orphan)
+                 else "；".join((_mism + _orphan + _plan_orphan)[:3])))
+
+        # 反向对照：从表里删掉 B6 那一行的 Q 引用，`D35` 必须当场变成「无人认领」
+        _plan_mut = re.sub(r"^\|\s*\*\*B6\*\*.*$", "", _plan, count=1, flags=re.M)
+        _plan_of_mut = {}
+        for _ln in _plan_mut.split("\n"):
+            _m = re.match(r"^\|\s*\*\*(B\d+'?)\*\*", _ln)
+            if not _m:
+                continue
+            for _q in re.findall(r"\bQ(\d+)\b", _ln):
+                _d = _q2d.get(f"Q{_q}")
+                if _d:
+                    _plan_of_mut.setdefault(_d, set()).add(_m.group(1))
+        _caught = [d["id"] for d in _led.get("decisions", [])
+                   if re.search(r"\bB\d+'?", d.get("$artifact") or "")
+                   and d["id"] not in _plan_of_mut]
+        check("V46d", "反向对照：从表里删掉一个批次行，V46c 的判据必须报出「无人认领」",
+              "D35" in _caught, f"删掉 B6 行后无人认领：{_caught or '❌没抓住'}")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
