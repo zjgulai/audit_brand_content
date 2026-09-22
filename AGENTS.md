@@ -609,7 +609,12 @@ after .lastState = ok                          ← 原来是 drift 也会被抹�
 
 > 🚫 **下面这段 bash 里有会真重启的命令，任何「把文档里的命令跑一遍」的检查器都不得覆盖本文件。**
 > 本仓库里唯一会那样做的是 `tools/verify_skill.py`，它只扫
-> `skills/内容合规审查/SKILL.md` —— **那个范围不许扩到 AGENTS.md**。
+> `agent-skills/内容合规审查/SKILL.md` —— **那个范围不许扩到 AGENTS.md**。
+> （2026-09-22 更正路径：原先写 `skills/内容合规审查/SKILL.md`，而那一份被
+> `.gitignore:39` 忽略、从未进过版本库；已搬到 `agent-skills/`。
+> 同一个检查器新加的 S0 闸门也顺手堵住了另一条路：它新增的 `--target` 开关
+> **只做探测、永不执行命令** —— 否则「把文档里的命令跑一遍」这件事就能被指向
+> 本文这一段。实测 `--target AGENTS.md` 抽出 33 个 bash 块、**执行 0 条**、退 0。）
 > 守住这件事的是 `verify_shouheng_ops.py` 的 **G 段**（2026-09-21 加的）：
 > 那个检查器的源码里一旦出现 `AGENTS.md` 就变红。
 > （直接读 AGENTS.md 是不违规的 —— `verify_feishu_index.py` 的 M4 就在读它，

@@ -131,14 +131,32 @@
     },
     {
       "verifier": "tools/verify_skill.py",
-      "asserts": "把规程文档里每条 bash 命令真跑一遍",
+      "asserts": "S0：验的对象必须在 git ls-files 里（没入库退 2，不是退 0）；然后才把规程文档里每条 bash 命令真跑一遍",
       "subjects": [
-        "skills/内容合规审查/SKILL.md"
-      ],
-      "untracked": [
-        "skills/内容合规审查/SKILL.md 被 .gitignore:39 忽略、未入库，只存在于本机。",
-        "换一台机器这个 verifier 会直接 FileNotFoundError。",
-        "在册是为了让这件事可见 —— 不是为了让检查通过。"
+        "agent-skills/内容合规审查/SKILL.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_doc_reachability.py",
+      "asserts": "文档可达性：每份 ADR / 每篇 PMO/守衡-* 可达 · 不可达总数不超钉住值 · 非豁免的第一方文档全部可达 · 不可达集合被三个声明了判据的豁免类**分区**（分项之和 == 总数）",
+      "subjects": [
+        "README.md",
+        "AGENTS.md",
+        "skills-inventory/refs/README.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_adr_status.py",
+      "asserts": "ADR 台账与 ADR 文件的状态逐条相等（双源冲突由构造不可能）：每个 ADR 恰好一条状态行、取值在规则 6 的四个里、台账集合 ≡ 磁盘集合、日期是 YYYY-MM-DD",
+      "subjects": [
+        "ADR/README.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_open_items.py",
+      "asserts": "未决项「等了多久、在等谁、沉默会发生什么」：每条 open 项带合法且非未来的 raised_at、带 owner 与 default_if_unanswered；未决项数 ≤ 棘轮",
+      "subjects": [
+        "research/governance/skeleton/legal-decisions-v1.json"
       ]
     }
   ]

@@ -1,7 +1,7 @@
 {
  "source": "ADR/ADR-0013-基座接口冻结与仓库入库分级.md",
- "source_sha256": "6664618bb2abe1ccb3924271570823b393e1f863d3d98e66822e82716237a5c0",
- "source_lines": 1912,
+ "source_sha256": "cacb6c9582aeb37a698b912ef0c68cbcf6b828b1b4d42d42627dc9107a1819cf",
+ "source_lines": 1919,
  "tables": 11,
  "rows": 52,
  "distinct_numbers": 40,
@@ -838,8 +838,8 @@
    "occurrences": [
     {
      "num": 35,
-     "line": 1711,
-     "table_line": 1709,
+     "line": 1718,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -859,8 +859,8 @@
    "occurrences": [
     {
      "num": 36,
-     "line": 1712,
-     "table_line": 1709,
+     "line": 1719,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -880,8 +880,8 @@
    "occurrences": [
     {
      "num": 37,
-     "line": 1713,
-     "table_line": 1709,
+     "line": 1720,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -901,8 +901,8 @@
    "occurrences": [
     {
      "num": 38,
-     "line": 1714,
-     "table_line": 1709,
+     "line": 1721,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -922,8 +922,8 @@
    "occurrences": [
     {
      "num": 39,
-     "line": 1910,
-     "table_line": 1908,
+     "line": 1917,
+     "table_line": 1915,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -943,8 +943,8 @@
    "occurrences": [
     {
      "num": 40,
-     "line": 1911,
-     "table_line": 1908,
+     "line": 1918,
+     "table_line": 1915,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1839,8 +1839,8 @@
    "occurrences": [
     {
      "num": 35,
-     "line": 1711,
-     "table_line": 1709,
+     "line": 1718,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1860,8 +1860,8 @@
    "occurrences": [
     {
      "num": 36,
-     "line": 1712,
-     "table_line": 1709,
+     "line": 1719,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1881,8 +1881,8 @@
    "occurrences": [
     {
      "num": 37,
-     "line": 1713,
-     "table_line": 1709,
+     "line": 1720,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1902,8 +1902,8 @@
    "occurrences": [
     {
      "num": 38,
-     "line": 1714,
-     "table_line": 1709,
+     "line": 1721,
+     "table_line": 1716,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1923,8 +1923,8 @@
    "occurrences": [
     {
      "num": 39,
-     "line": 1910,
-     "table_line": 1908,
+     "line": 1917,
+     "table_line": 1915,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1944,8 +1944,8 @@
    "occurrences": [
     {
      "num": 40,
-     "line": 1911,
-     "table_line": 1908,
+     "line": 1918,
+     "table_line": 1915,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
