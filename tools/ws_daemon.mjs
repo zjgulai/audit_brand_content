@@ -92,24 +92,27 @@ async function onMessage(data) {
   if (result.meta?.compacted) log(`   🗜 历史已压缩（保留 ${result.meta.turns} 轮 + 纪要）`);
   if (result.meta?.truncated) log('   ⚠️ 回复被长度上限截断（已附截断说明，不是完整回答）');
 
-  // ── 形态决策：模型给的是一段话，这里才决定它变成卡还是文本。
-  // 决策本身在 reply-cards/envelope.mjs 里，这里只负责记录 ———
-  // 「模型选了哪种形态、有没有被搬迁、有没有踩到 AI 味」必须能从日志里回答，
-  // 否则调模版就只能靠重跑猜。
-  const shaped = toCardOrText(result.reply);
-  for (const m of shaped.moved) log(`   ↪ ${m.field} → ${m.to}（${m.why}）`);
-  for (const h of shaped.lint) log(`   ${h.level === 'error' ? '❌' : '⚠️ '} 语域 ${h.id} ×${h.count} ${h.sample}`);
-  if (shaped.mode === 'card') log(`   🃏 卡片 ${shaped.kind} · ${shapeOf(shaped.card)}`);
-  else if (shaped.dropped) log(`   ⚠️ 卡片降级为文本：${shaped.reason}`);
+  // ── 形态决策**不在这里**。（2026-09-22 改）
+  // 原先这一块是 `const shaped = toCardOrText(result.reply)`，然后只把 `shaped.card`
+  // 传进 `replyTo` —— 于是「谁能定形态」有两个答案：`AGENTS.md` §2.5 说只在 `replyTo`，
+  // 代码却在 `onMessage`。**两处都能定形态，错位的表现是群里格式随机**，
+  // 而这正是 §2.5 存在的理由。现在这里只把模型的原文交下去，由 `replyTo` 一处决定。
   log(`   💬 回复 ${result.reply.length} 字，耗时 ${ms}ms`);
 
-  const sent = await replyTo(chatId, msg.message_id, shaped.text, shaped.card ?? null);
+  const sent = await replyTo(chatId, msg.message_id, result.reply);
   if (sent.ok) { counters.replied++; log(`   ✓ 已发送 ${sent.messageIds.filter(Boolean).join(', ')} [${sent.mode}]`); }
   else { counters.failed++; log(`   ✗ 发送失败: ${sent.error}`); }
 }
 
 /**
- * 发送一条回复。这是**唯一**的格式决策点。
+ * 发送一条回复。这是**唯一**的格式决策点 —— 也是**唯一**的形态决策点。
+ *
+ * ★ 形态决策（卡 vs 纯文本）在这里做，参数收的是**模型的原文**，不是已经定好形态的结果。
+ *   `AGENTS.md` §2.5：「这个判断只允许在 `replyTo` 里做」。2026-09-22 之前它其实在
+ *   `onMessage` 里（`toCardOrText` 在那边调），`replyTo` 只收 `card` —— 两处都碰形态。
+ *   现在 `onMessage` 只记一行日志，形态的输入与输出都收在本函数内。
+ *   「模型选了哪种形态、有没有被搬迁、有没有踩到 AI 味」仍然全部进日志 ——
+ *   否则调模版就只能靠重跑猜。
  *
  * 降级链只有一条，且每一步都有明确的失败原因记录：
  *
@@ -123,7 +126,15 @@ async function onMessage(data) {
  *   而不是以为守衡改了风格。这是 2026-09-17 那次故障的直接教训 ——
  *   当时它对着一堆内部记录说「✓ 已发送」。
  */
-async function replyTo(chatId, messageId, text, card = null) {
+async function replyTo(chatId, messageId, rawReply) {
+  const shaped = toCardOrText(rawReply);
+  for (const m of shaped.moved) log(`   ↪ ${m.field} → ${m.to}（${m.why}）`);
+  for (const h of shaped.lint) log(`   ${h.level === 'error' ? '❌' : '⚠️ '} 语域 ${h.id} ×${h.count} ${h.sample}`);
+  if (shaped.mode === 'card') log(`   🃏 卡片 ${shaped.kind} · ${shapeOf(shaped.card)}`);
+  else if (shaped.dropped) log(`   ⚠️ 卡片降级为文本：${shaped.reason}`);
+
+  const text = shaped.text;
+  const card = shaped.card ?? null;
   if (card) {
     const rc = await feishu.replyCard(messageId, card);
     if (rc.ok) return { ok: true, messageIds: [rc.messageId], mode: rc.mode };

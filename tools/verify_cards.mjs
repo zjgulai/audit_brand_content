@@ -553,11 +553,57 @@ head('L 发送链 · 降级链完整且不重复投递');
     no('L2 replyCard 只尝试一次', 'replyCard 自己做了兜底发送，与调用方的兜底叠加会重复投递');
   } else ok('L2 feishu.replyCard 只尝试一次，兜底只有 daemon 一处');
 
-  // L3 daemon 里必须真的调用 toCardOrText，且把结果用在发送上
-  if (!/toCardOrText\(result\.reply\)/.test(daemon)) no('L3 daemon 调用信封', 'daemon 没有把回复过信封');
-  else ok('L3 daemon 对每条回复过信封');
-  if (!/shaped\.card \?\? null/.test(daemon)) no('L3 卡片真的传给了发送', '信封结果没传进 replyTo');
+  // L2b 「兜底只能有一处」的另一半：`replyCard` 全仓只许有**一个实现**。
+  // ★ 为什么需要它（2026-09-22 诊断 #14）：L2 只扫 `agent/feishu.mjs` **一个文件**，
+  //   而 `tools/reply-cards/index.mjs` 同名同形地导出了**第二个** `replyCard`，
+  //   它失败时自己会去 `sendCard` **新发一条** —— 正是 L2 要拦的形状，
+  //   却因为「它在另一个文件里」而从来没被扫到。两份同名实现，一份合规一份不合规。
+  //   判据是**唯一性**，不是「名字出现过」：`length !== 1` 同时挡住「多了一个」和
+  //   「一个都没有」（后者是改名/搬走之后判据恒绿的形状 —— §2.4 那个病）。
+  const exporterFiles = [];
+  for (const dir of ['.', 'agent', 'reply-cards']) {
+    let names = [];
+    try { names = fs.readdirSync(path.join(HERE, dir)); } catch { continue; }
+    for (const n of names) {
+      if (!n.endsWith('.mjs')) continue;
+      const src = fs.readFileSync(path.join(HERE, dir, n), 'utf8');
+      // ★ 必须**行首锚定**（`^\s*export`，m 标志），不能只查子串。
+      //   第一版写的是 `/export async function replyCard\b/`，于是这条判据**自己**
+      //   把三个文件报了出来：`verify_cards.mjs`（判据自己那行正则字面量）、
+      //   `reply-cards/index.mjs`（我刚写的解释它为什么被删的注释）、
+      //   以及真正的实现。**「名字出现过」在这里第三次骗人** ——
+      //   前两次是 J1（常量名出现在 import 里）和 §2.4.4 的 `dryRun: true` 计数。
+      //   行首锚定要求的是**一条真的导出语句**，注释与正则字面量都到不了行首。
+      if (/^\s*export\s+async\s+function\s+replyCard\b/m.test(src)) {
+        exporterFiles.push(dir === '.' ? n : `${dir}/${n}`);
+      }
+    }
+  }
+  if (exporterFiles.length !== 1 || exporterFiles[0] !== 'agent/feishu.mjs') {
+    no('L2b replyCard 全仓只有一个实现',
+       `导出 replyCard 的文件有 ${exporterFiles.length} 个：${exporterFiles.join('、') || '（一个都没有）'} —— 兜底只能有一处`);
+  } else ok('L2b replyCard 全仓只有一个实现（agent/feishu.mjs）');
+
+  // L3 形态决策**只能在一处**：`replyTo` 里过信封，`onMessage` 里不许碰。
+  // ★ 2026-09-22 改。原先这里断言的是 `toCardOrText(result.reply)` 出现在 daemon 里、
+  //   外加 `shaped.card ?? null` —— 那是在**描述当时的实现**（`onMessage` 过信封、
+  //   `replyTo` 只收 `card`），而 `AGENTS.md` §2.5 写的是「只允许在 `replyTo` 里做」。
+  //   **断言与规范指的是两个地方，而断言是绿的。**
+  //   现在两条一起断言：**该在的地方必须在，不该在的地方必须不在** —— 这才叫「只允许一处」。
+  // ★ 扫之前先剥注释：`onMessage` 里那段解释「原先 `toCardOrText` 在这里调」的注释，
+  //   第一版把这条判据**自己**绊红了（注释里写着函数名）。同 J1a / C5：
+  //   **注释不算代码**。剥注释这个动作本身也可能误伤（字符串里的 `//`），
+  //   已知盲区明着留着 —— 这里两个函数体里没有那种字符串。
+  const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const rtBody = stripComments(daemon.slice(daemon.indexOf('async function replyTo'), daemon.indexOf('async function safeSend')));
+  const omBody = stripComments(daemon.slice(daemon.indexOf('async function onMessage'), daemon.indexOf('async function replyTo')));
+  if (!/toCardOrText\(/.test(rtBody)) no('L3 形态决策在 replyTo 里', 'replyTo 没有过信封 —— §2.5 说这个判断只允许在那里做');
+  else ok('L3 形态决策在 replyTo 一处过信封');
+  if (!/if \(card\)/.test(rtBody)) no('L3 卡片真的传给了发送', 'replyTo 里没有「有卡走卡」的分支');
   else ok('L3 卡片真的传给了发送');
+  if (/toCardOrText|shaped\./.test(omBody)) {
+    no('L3 onMessage 不碰形态', 'onMessage 里也在碰形态（toCardOrText / shaped.*）—— 两处定形态，群里格式会随机');
+  } else ok('L3 onMessage 只记日志，不碰形态');
 
   // L4 形态与搬迁必须落到日志里 —— 否则调模版只能靠重跑猜
   for (const [name, re] of [['卡片形态', /🃏 卡片/], ['搬迁记录', /↪ /], ['语域命中', /语域 /], ['降级原因', /卡片降级为文本/]]) {
