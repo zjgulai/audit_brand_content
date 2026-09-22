@@ -306,7 +306,20 @@ export async function resolveChat() {
     const r = await feishu.client.im.chat.list({ params: { page_size: 20 } });
     const items = r?.data?.items ?? [];
     const g = items.find((c) => c.chat_mode === 'group') ?? items[0];
-    if (g?.chat_id) { saveChatId(g.chat_id); return g.chat_id; }
+    /**
+     * ★ **猜出来的群不落盘。**（2026-09-22 加）
+     *
+     * 这里挑的是「接口返回的第一个群」—— 它通常就是最近活跃的那个，但**那是接口的排序**，
+     * 不是我们的依据；而我们没有查过「这个群是不是我们该说话的地方」。
+     * 原先这里会 `saveChatId(...)` 把它**持久化**：一次猜测从此变成事实，
+     * 之后每次告警都往那儿发，而没有任何东西会质疑它。
+     *
+     * 不落盘之后的行为：每次没有已知群时才问一次接口，而调用方那条
+     * 「…已发到 <目标>」的日志**每次都打**，所以目标是猜的这件事在日志里看得见。
+     * 真正的「最近来过消息的群」由 `ws_daemon.onMessage` 每条消息调 `saveChatId` 记下
+     * —— 那才是这句语义的字面意思，且自维护。
+     */
+    if (g?.chat_id) return g.chat_id;
   } catch { /* 取不到就让调用方走"只进日志"那条路 */ }
   return null;
 }
