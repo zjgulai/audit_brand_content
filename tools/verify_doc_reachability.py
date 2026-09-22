@@ -803,16 +803,29 @@ def run_controls(root=ROOT, pinned=PINNED_UNREACHABLE, real=None):
         _ok_readme(),
         drop=("PMO/守衡-查名修复记录.md",))
 
-    # C12 历史缺陷必须能被抓住：把**真实的**仓数据里的 README 换回重写前那份存根，
+    # C12 历史缺陷必须能被抓住：把**真实的**仓数据里的两个起点都换回「没有链接的存根」，
     #     在内存里重算一次 —— ADR 必须全部不可达、总数必须超过钉住值。
     #     这条的价值是：重写前的那个读数（不可达 178）**今天仍然复现得出来**，
     #     不必依赖任何人的记忆，也不必把 README 改回去（§2.1：反向对照只在内存里做）。
+    #
+    # ★ 2026-09-22 修正：原来只存根 `README.md`（起点取并集，于是 `AGENTS.md` 还连着），
+    #   而**同一批改动里 AGENTS.md 长出了一条枢纽边** ——
+    #   它在讲 `sed` 那个坑时写了 `.ua/README.md`，于是
+    #   `AGENTS.md → .ua/README.md → 10 份诊断正文 → 全仓`，只靠 AGENTS.md 就能走遍 238 份文档、
+    #   不可达变成 **0**，C12 当场变红。
+    #   **这不是「检查坏了」，是它报出来的事实**：一条写进 AGENTS.md 的**顺带提及**
+    #   （叙述里提到某个文件）在口径上等价于一条**入口边**。
+    #   修法不是把那句话改得不提文件名（下一个提到它的人会再犯），而是：
+    #   ① 存根**两个**起点 —— 这才是「起点本身没有链接会怎样」的干净复现；
+    #   ② 把这条枢纽边作为**读数**打出来（下面 C22），让「D 的成色」看得见。
     if not real_tracked or not real_docs:
         UNTESTED.append("C12 拿不到真实仓数据，历史存根那条对照没跑")
         lines.append("  ⚠ C12 未测：拿不到真实仓数据，历史存根那条对照没跑")
     else:
+        STUB_BOTH = ("# audit_multi_content\n内容审计\n", "# AGENTS\n\n（起点存根：一个链接都没有）\n")
         stub_bodies = dict(real_bodies)
-        stub_bodies["README.md"] = "# audit_multi_content\n内容审计\n"
+        for _seed, _body in zip(SEEDS, STUB_BOTH):
+            stub_bodies[_seed] = _body
         r_stub = analyze(real_tracked, real_docs, stub_bodies, doc_only_relay=True)
         # 判据刻意写成三条**形状**断言，不是「总数必须等于 178」那种数字断言
         # （钉死数字的对照会随仓库演化变成误报，§2.1.1：会误报的检查器更糟）：
@@ -821,17 +834,30 @@ def run_controls(root=ROOT, pinned=PINNED_UNREACHABLE, real=None):
         pmo_all_dead = bool(r_stub["unreachable_pmo_fix"]) \
             and len(r_stub["unreachable_pmo_fix"]) == r_stub["pmo_fix_n"]
         if adr_index_dead and pmo_all_dead and r_stub["unreachable_n"] > pinned:
-            P.append("C12 把 README 换回 35 字节存根（内存里）→ ADR 索引与 %d 篇修复记录全部不可达、"
+            P.append("C12 把两个起点都换回无链接存根（内存里）→ ADR 索引与 %d 篇修复记录全部不可达、"
                      "总数 %d > 钉住值 %d" % (r_stub["pmo_fix_n"], r_stub["unreachable_n"], pinned))
             lines.append("  ✓ C12 换回历史存根 → ADR 索引不可达 · 修复记录 %d/%d 不可达 · 不可达总数 %d"
                          "（重写前的读数形状复现）"
                          % (len(r_stub["unreachable_pmo_fix"]), r_stub["pmo_fix_n"],
                             r_stub["unreachable_n"]))
         else:
-            F.append(("C12", "把 README 换回存根后仍不够红（ADR 索引不可达=%s / 修复记录全不可达=%s / "
+            F.append(("C12", "把两个起点都换回存根后仍不够红（ADR 索引不可达=%s / 修复记录全不可达=%s / "
                              "总数 %d vs 钉住值 %d）—— 本检查器抓不到它要抓的那个缺陷"
                       % (adr_index_dead, pmo_all_dead, r_stub["unreachable_n"], pinned)))
             lines.append("  ✗ C12 换回历史存根后仍不够红")
+
+        # C22 ★ 那条枢纽边本身作为**读数**打出来（不是断言好坏，是让成色可见）：
+        #     `AGENTS.md` 一条顺带提及就能走遍全仓 —— 于是 D 的「0 份不可达」主要由
+        #     E1/豁免分项与 `--readme-only` 那个更严的口径撑着，**不是**由「走不到」撑着。
+        only_agents = dict(real_bodies)
+        only_agents["README.md"] = STUB_BOTH[0]          # 只存根 README，AGENTS.md 保真
+        r_a = analyze(real_tracked, real_docs, only_agents, doc_only_relay=True)
+        hub = sorted(set(r_a["reachable_docs"]) - set(real_docs[:0]) - {"AGENTS.md"})
+        lines.append("  ℹ C22 只存根 README（AGENTS.md 保真）→ 从 AGENTS.md 单独出发可达文档 %d / %d，"
+                     "不可达 %d" % (r_a["reachable_docs_n"], r_a["docs_n"], r_a["unreachable_n"]))
+        lines.append("       ★ 这条读数说明：**AGENTS.md 现在自己就是一张枢纽** —— 全仓文档经 "
+                     "`.ua/README.md` 那一条边全部可达。所以 D「0 份不可达」的成色靠 "
+                     "E1/豁免分项，要更严的口径请用 `--readme-only`。")
 
     # C13 有红时也必须报出未测（H 段那条：只看最后一行的人会以为「其余都验过了」）
     v_mixed = verdict(3, 2, 1)
