@@ -25,7 +25,7 @@ import * as feishu from './agent/feishu.mjs';
 import { handleMessage, flushSeen, loadedTools, status } from './agent/agent.mjs';
 import { toCardOrText } from './reply-cards/envelope.mjs';
 import { shapeOf } from './reply-cards/registry.mjs';
-import { checkNow, checkPending, resolveChat, LARK_DOC_RE, bjDate, loadState, loadPendingState, saveState } from './agent/prd_baseline.mjs';
+import { checkNow, checkPending, resolveChat, LARK_DOC_RE, bjDate, loadState, loadPendingState, saveChatId } from './agent/prd_baseline.mjs';
 
 const PROBE     = process.argv.includes('--probe');
 const DUMP_ONLY = process.argv.includes('--dump-only');
@@ -155,7 +155,11 @@ async function safeSend(chatId, text) {
  */
 async function baselineWatch(reason, chatId) {
   try {
-    if (chatId) saveState({ ...loadState(), lastChatId: chatId });
+    // ★ `saveChatId`，不是 `saveState({ ...loadState(), lastChatId })` —— 后者有两个毛病：
+    //   ① `saveState` 默认写的是**基线那份状态文件**，而这里连待收那条链路也走同一个调用，
+    //      于是「待收」在写「基线」的文件，还靠 `{ ...loadState() }` 把陈年 `p_*` 键一路带下去；
+    //   ② 它住在基线检查的 read→跑子进程（最长 90 秒）→write 窗口里，会被旧快照抹掉。
+    if (chatId) saveChatId(chatId);
     const r = await checkNow({ reason });
     if (r.skipped) { log(`   · 基线检查跳过（${r.skipped}）`); return; }
     log(`   · 基线检查[${reason}] 退出码 ${r.code} —— ${r.why}${r.note ? ` · ${r.note}` : ''}`);
@@ -184,7 +188,7 @@ async function baselineWatch(reason, chatId) {
  */
 async function pendingWatch(reason, chatId) {
   try {
-    if (chatId) saveState({ ...loadState(), lastChatId: chatId });
+    if (chatId) saveChatId(chatId);   // 理由同 `baselineWatch`：这里原先写的是**基线**那份状态文件
     const r = await checkPending({ reason });
     if (r.skipped) { log(`   · 待收检查跳过（${r.skipped}）`); return; }
     log(`   · 待收检查[${reason}] 退出码 ${r.code} —— ${r.why}${r.note ? ` · ${r.note}` : ''}`);
