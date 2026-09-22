@@ -65,6 +65,19 @@ research/governance/skeleton/_data/backup-batchD/
 research/governance/skeleton/_data/backup-migration/
 research/governance/skeleton/_data/deprecated/
 
+# .ua/ · 结构性诊断工作目录（2026-09-22 · 分级依据 ADR-0013 §三，裁定 = Q38 选项 A）
+#   L1 已收：`*.md` 诊断正文 · `*.cjs` 复现入口 · `.understandignore` + `config.json`（管线输入）
+#            · `meta.json`（本次分析读的是哪个 commit 的快照 —— 正文的凭证）。
+#   下面**逐条列出**留在盘上、不进历史的部分 —— 刻意**不用 `.ua/*` 通配**：
+#   通配会让日后新出现的机器产物被静默吞掉，而这里要的恰恰是「新东西必须被看见」。
+.ua/knowledge-graph.json
+.ua/fingerprints.json
+.ua/dispatch/
+.ua/intermediate/
+.ua/.trash-1790050761/
+# ★ trash 目录名带随机后缀，所以这条是**字面量**：下一次管线跑出来的 `.trash-<新 id>/`
+#   不会被自动吞掉，而是出现在 `git status` 里等人认领 —— 与本节「不用通配」同一条道理。
+
 # 运行时日志与守护进程状态
 PMO/logs/
 PMO/shouheng-state/

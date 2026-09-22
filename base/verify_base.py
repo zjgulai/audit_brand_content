@@ -84,6 +84,31 @@ CONTRACT_VERSION = "verify-base-v1"
 #  `adr_ref=None` 表示**台账里没有它** ⇒ C 面红。
 # ──────────────────────────────────────────────────────────────────
 REGISTRY = [
+    # ── 结构性诊断工作目录（2026-09-22 · Q38 裁定 = 选项 A）─────────────
+    #   正文与复现入口进 L1（正文里一条条写着 `node .ua/xxx.cjs` —— 只收正文会让
+    #   那些命令指向不在库里的文件，正是 `AGENTS.md` §2.2 第 1 条的坑）；
+    #   管线产物留在盘上、不进历史。三条规则各自认领，**不用 `.ua/*` 通配**。
+    {"rules": [".ua/dispatch/"],
+     "class": "derived", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "generator": ".ua/gen-dispatch.cjs",
+     "inputs": [".ua/.understandignore"],
+     "why": "43 批喂给模型的分批输入 + `dispatch/data/` 的四个图（后者由 `gen-phase45.cjs` 产出）。"
+            "输入范围就是 L1 里那份 `.ua/.understandignore`，重跑管线即再得。"},
+    {"rules": [".ua/intermediate/"],
+     "class": "derived", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "generator": ".ua/assemble.cjs",
+     "inputs": [".ua/dispatch/"],
+     "why": "组装中间图（`assembled-graph.json`）。输入是上面那条已登记的 L2 产物。"},
+    {"rules": [".ua/knowledge-graph.json", ".ua/fingerprints.json"],
+     "class": "vendored", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "why": "由**第三方管线**（Understand-Anything，装在 gitignored 的 `skills/` 里）直接写出："
+            "1362 节点 / 2657 边的图谱与 455 个文件的指纹。本仓给不出生成脚本 —— "
+            "判据不适用（与 §三 那条「别人管的」同类）。★ 结论（正文）已在 L1，"
+            "这两个文件是那次运行的产物，不是新证据。"},
+    {"rules": [".ua/.trash-1790050761/"],
+     "class": "runtime", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "why": "Understand-Anything 覆盖文件时留下的回收站（11MB / 占 `.ua/` 总量 69%）。"
+            "进程跑完留下的东西，判据不适用；**不做删除** —— 删别人工具的数据不是本次的授权。"},
     # ── derived：可复算 ────────────────────────────────────────────
     {"rules": ["research/governance/skeleton/_data/records.json"],
      "class": "derived", "adr_ref": "§三 L2 · `skeleton/_data/records.json`",

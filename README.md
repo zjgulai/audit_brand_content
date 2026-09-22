@@ -8,8 +8,8 @@
 优先级高于任何单次会话的默认行为。本文件负责「东西在哪」，`AGENTS.md` 负责「怎么干」。
 
 ```
-git ls-files -z | tr '\0' '\n' | grep -c .                      # 468  已入库文件（2026-09-22 14:2x 读数）
-git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 226  其中文档
+git ls-files -z | tr '\0' '\n' | grep -c .                      # 497  已入库文件（2026-09-22 15:0x 读数）
+git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文档
 ```
 
 > 这两个数**会动**（本轮就一直在动：同一分钟内另一个会话连着提交了三次）。
@@ -139,6 +139,7 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 226  其中文
 | 入口 | 内容 |
 |---|---|
 | [`base/README.md`](./base/README.md) | 基座：`ContentUnit` 契约 + `judge(unit)` 适配层 |
+| [`.ua/README.md`](./.ua/README.md) | **2026-09-22 结构性诊断**（TOP20 的来源）：10 份正文 + 9 条复现入口，以及「哪些在库里、哪些只在盘上」的分级 |
 | [`kb2agent-research/企业Agent知识库体系调研报告.md`](./kb2agent-research/企业Agent知识库体系调研报告.md) | 企业 Agent 知识库体系调研 |
 | [`kb2agent-research/Kb2Agent-方法论调研报告.md`](./kb2agent-research/Kb2Agent-方法论调研报告.md) | Kb2Agent 方法论调研 |
 
@@ -166,6 +167,8 @@ python3 tools/verify_coverage.py                       # 覆盖登记表自身�
 python3 tools/verify_depad.py                          # 全仓库生成物可读性（read 工具打不开的文件）
 python3 tools/verify_doc_reachability.py               # 本 README 的可达性（口径与断言见文件头）
 python3 tools/verify_doc_reachability.py --controls    # 上面那一个的反向对照
+python3 tools/verify_reference_census.py               # 零引用可执行文件的棘轮（只许减不许增，基线 31）
+python3 tools/verify_reference_census.py --controls    # 上面那一个的反向对照（含「基线自毁」那一格）
 python3 tools/verify_shouheng_ops.py                   # 守衡自己还活着吗（没在跑 / 有读数未测 → 退 2）
 ```
 

@@ -34,10 +34,23 @@
 **提到它们**。若不排除，基线一落盘，那 31 个文件立刻各自多了一次提及、
 零引用集合变成空集，于是**「0 个零引用」这个读数看起来完美，而它只是基线的倒影**。
 
-所以提及池 = 在册文件 − {本脚本自身, 基线文件}。这不是装饰：
+所以提及池 = 在册文件 − 排除集。这不是装饰：
 `--controls` 的 B2 就是**反面对照**（不排除时，基线上被点名的文件必须从零引用里消失）。
 
-排除集**恰好**是那两个路径（A5 断言）—— 否则它会慢慢长成一张免死金牌。
+**2026-09-22 第二种同形的来路**（Q38 选项 A 落地时实测）：诊断正文进 L1 之后，
+`.ua/debt-engineering.md`（命中基线名单 29 个）· `.ua/debt-graph-and-crosscut.md`（31）·
+`.ua/reference-census.md`（31）· `.ua/runtime-surface.md`（31）**也在逐条列举这份名单**。
+三档实测（同一份在册集合上模拟）：
+
+| 排除方式 | 零引用读数 |
+|---|---|
+| 一份正文都不排除 | **0** ← 棘轮变成空壳，而 A2/A3 全绿 |
+| 只排除那 4 份「枚举者」 | **29** ← 另 6 份正文还在给别的文件作证，读数被文档牵着走 |
+| **整批正文排除** | **31** ← 与基线相等，读数当且仅当不变 |
+
+所以取第三档：**诊断正文整批不进提及池**，理由与基线同源 —— 正文里逐条引用着当时盘上的
+文件，那是**读数**，不是引用关系。清单写在 `POOL_EXCLUDE`（路径 → 理由），
+**逐条列、不许通配符**：一条 `.ua/*.md` 规则就是一张会自己长大的免死金牌。
 
 ## 断言
 
@@ -46,16 +59,17 @@
   A2 **棘轮**：当前零引用集合 ⊆ 基线集合（出现新面孔即红）
   A3 零引用数 <= 基线数（棘轮的字面判据，与 A2 互为冗余，两条都留着）
   A4 基线里每个文件仍在册、且仍在可执行面内（否则基线在拿不存在的文件充数）
-  A5 排除集恰好 == {本脚本, 基线文件}
+  A5a 结构性两条（本器自身 + 基线）**必须**在排除集里
+  A5b 排除集 == 声明的集合（多一条、少一条都红：不许有未申报的排除）
+  A5c 声明的路径必须仍在册（过期声明 = 提前发出去的免死金牌）
+  A5d 每条声明都要有理由（空理由 = 免死金牌）
+  A5e 「诊断正文」这一类只收 `.md`（防止把可执行文件塞进来，把死代码面整块藏掉）
   A6 已改善（基线里有、现在不再零引用）**不算红**，只报告 —— 棘轮只禁增长，
      而「锁住这次改善」需要人显式重钉基线（本脚本不会自动改基线，见 §2.4.4）
   A7 **池子里不许有人枚举这份名单**（同一个在册文件命中 ≥ `ENUM_RED` = 10 个基线
-     文件名即算）。这是 #19 与 #18 的接口露出来的一处耦合：**若 `.ua/` 哪天进 L1**
-     （Q38 的选项 A/C），`.ua/reference-census.md` 就会进池 —— 而它逐条列着这 31 个
-     文件，于是每一个都变成「有人提及」、零引用集合清空、**棘轮变空但全绿**。
-     实测（2026-09-22）：在册文件里最大命中数是 **1**，那份未入库的报告是 **31**。
-     修法是显式的：把它加进排除集（A5 会一起要求改），或者重钉基线。
-  B1–B9 `--controls`：纯函数喂合成树，正反两侧都证（§2.1：反向对照只在内存里做）
+     文件名即算）。实测（2026-09-22）：排除集之外的在册文件里最大命中数是 **1**，
+     而 `.ua/reference-census.md` 是 **31**。门槛取 10：离现状远、离真枚举近。
+  B1–B13 `--controls`：纯函数喂合成树，正反两侧都证（§2.1：反向对照只在内存里做）
 
 ## 退出码
 
@@ -92,6 +106,31 @@ EXTS = (".py", ".mjs", ".js", ".sh", ".plist")
 #: `tools/build_product_line_matrix.py` 各 1），而**未入库**的 `.ua/reference-census.md`
 #: 命中 **31**。门槛取 10：离现状足够远（不会误报），离真枚举足够近（抓得到）。
 ENUM_RED = 10
+
+#: 排除出提及池：路径 → **理由**。收三样东西，每样都必须写得出为什么：
+#:   ① 本器自身（一个文件不能给自己作证）；
+#:   ② 基线（它逐条列着这份名单 —— 不排除，落盘那一刻就把棘轮刷成空）；
+#:   ③ **诊断正文**（2026-09-22 那次审计的结论，2026-09-22 按 Q38 选项 A 进 L1）。
+#: ③ 的道理与 ② 同源：正文里**逐条引用着当时盘上的文件**，那是**读数**，不是引用关系。
+#: 实测（把 10 份正文加进在册集合后模拟）：不排除 → 零引用 **0**（棘轮变成空壳）；
+#: 只排除其中 4 份「枚举者」→ **29**；整批排除 → **31**（与基线相等，读数当且仅当不变）。
+#: ★ 必须**逐条列出来**、不许用通配符：一条 `.ua/*.md` 规则等于一张会自己长大的免死金牌。
+POOL_EXCLUDE = {
+    SELF_REL: "本器自身：一个文件不能给自己作证",
+    BASELINE_REL: "基线逐条列着那 31 个文件 —— 不排除，它落盘那一刻就把棘轮刷成空",
+    ".ua/debt-engineering.md": "诊断正文（工程债务）：正文里逐条点着当时零引用的文件（命中基线名单 29 个）—— 是读数，不是引用关系",
+    ".ua/debt-documentation.md": "诊断正文（文档债务）：同上，整批正文口径一致",
+    ".ua/debt-logic.md": "诊断正文（逻辑债务）：同上，整批正文口径一致",
+    ".ua/debt-graph-and-crosscut.md": "诊断正文（图与横切面）：逐条列出零引用文件（命中 31 个）",
+    ".ua/graph-diagnosis.md": "诊断正文（图谱诊断）：同上，整批正文口径一致",
+    ".ua/doc-reachability.md": "诊断正文（文档可达性）：同上，整批正文口径一致",
+    ".ua/reference-census.md": "诊断正文（引用普查）：它就是那份逐条列出 31 个文件的原报告（命中 31 个）",
+    ".ua/runtime-surface.md": "诊断正文（运行时可达面）：逐条列出可执行文件（命中 31 个）",
+    ".ua/duplication-check.md": "诊断正文（重复检查）：同上，整批正文口径一致",
+    ".ua/adr-status-check.md": "诊断正文（ADR 状态双源）：同上，整批正文口径一致",
+}
+#: 结构性的两条：A5a 要求它们**必须**在排除集里（其余条目则逐条声明、逐条给理由）。
+STRUCTURAL_EXCLUDE = (SELF_REL, BASELINE_REL)
 
 
 class Unreadable(Exception):
@@ -164,17 +203,48 @@ def census(tracked, texts, exts=EXTS, exclude=(), watch=()):
     return {"exe": exe, "zero": zero, "one": one, "enum": enum}
 
 
-def judge(cur, baseline_files, tracked, exclude) -> dict:
-    """纯函数：给定现场读数与基线，返回 problems / new / improved。"""
+def judge(cur, baseline_files, tracked, exclude, declared=None) -> dict:
+    """纯函数：给定现场读数与基线，返回 problems / new / improved。
+
+    `declared` = 允许被排除出提及池的路径 → 理由（默认 `POOL_EXCLUDE`）。
+    控制组喂自己的合成声明，所以本函数不碰盘。
+    """
     problems = []
     exe, zero = cur["exe"], set(cur["zero"])
     base = set(baseline_files)
+    decl = dict(POOL_EXCLUDE if declared is None else declared)
+    excl = set(exclude)
 
-    # A5 排除集恰好是两个路径（先判它：它错了，下面的读数就不可信）
-    if set(exclude) != {SELF_REL, BASELINE_REL}:
+    # A5 排除集：**逐条声明**（先判它：它错了，下面的读数就不可信）
+    missing_struct = [p for p in STRUCTURAL_EXCLUDE if p not in excl]
+    if missing_struct:
         problems.append(
-            "A5 排除集 == %s —— 实测是 %s。它长一条，棘轮就瞎一块"
-            % (sorted({SELF_REL, BASELINE_REL}), sorted(exclude))
+            "A5a 结构性排除项缺失：%s —— 这两条不排除，棘轮要么给自己作证、要么被基线刷空"
+            % missing_struct
+        )
+    if excl != set(decl):
+        problems.append(
+            "A5b 排除集与声明的集合不等：多出来 %s · 声明了却没排除 %s。"
+            "排除集每长一条，棘轮就瞎一块 —— 要排除就得**逐条写进 POOL_EXCLUDE 并给理由**，"
+            "不许用通配符（一条 `.ua/*.md` 规则就是一张会自己长大的免死金牌）"
+            % (sorted(excl - set(decl)), sorted(set(decl) - excl))
+        )
+    blank = sorted(p for p, why in decl.items() if not str(why).strip())
+    if blank:
+        problems.append("A5d 声明了却没有理由：%s —— 没理由的排除等于免死金牌" % blank)
+    stale = sorted(p for p in decl if p not in set(tracked))
+    if stale:
+        problems.append(
+            "A5c 声明的文件已经不在册：%s —— 过期声明就是一张提前发出去的免死金牌，删掉它"
+            % stale
+        )
+    notreport = sorted(
+        p for p in decl if p not in STRUCTURAL_EXCLUDE and not p.endswith(".md")
+    )
+    if notreport:
+        problems.append(
+            "A5e 声明里混进了非正文文件：%s —— 「诊断正文」这一类只收 `.md`；"
+            "把可执行文件塞进这一类，等于把死代码面整块藏起来" % notreport
         )
 
     # A7 池子里不许有人枚举这份名单（#19 与 #18 的耦合，2026-09-22 补）
@@ -184,9 +254,9 @@ def judge(cur, baseline_files, tracked, exclude) -> dict:
             "A7 有 %d 个在册文件在**枚举基线名单**（命中 ≥ %d / %d）:\n      %s\n      "
             "→ 它一旦留在池子里，被它点名的文件就全变成「有人提及」，棘轮当场变空 —— "
             "这正是基线自己要被排除的那个理由，只是换了个文件重演。"
-            "（典型来路：Q38 若选「把 `.ua/` 提进 L1」，`.ua/reference-census.md` 就会进池，"
-            "它逐条列着这 31 个文件。）修法只有两条，都要显式做：把它加进排除集"
-            "（`--controls` 的 A5 与本段会一起要求你改这句），或者重钉基线。"
+            "（2026-09-22 实测：把 `.ua/` 那 10 份诊断正文提进 L1 之后，不排除它们读数就是 **0**；"
+            "整批排除才是 **31**。）修法只有两条，都要显式做：把它逐条加进 `POOL_EXCLUDE`"
+            "并写明理由（A5b/A5d 会一起要求），或者重钉基线。"
             % (len(hot), ENUM_RED, len(base), "\n      ".join(f"{g}（{n} 个）" for n, g in hot))
         )
 
@@ -263,7 +333,10 @@ def controls() -> int:
         "tools/gamma.py": "x",
         "notes.md": "跑 tools/beta.py 就行",
     }
-    excl = {A, B}
+    # 声明表（合成）：A5b 判的是「排除集 == 声明的集合」，所以控制组也得自备一份声明。
+    decl = {A: "本器自身（合成树）：一个文件不能给自己作证",
+            B: "基线：逐条列着这份名单，不排除就把它自己钉住的文件全刷成「有人提及」"}
+    excl = set(decl)
     full = census(tracked, texts, EXTS, excl)
     no_excl = census(tracked, texts, EXTS, {A})          # 反面：不排除基线
     exe_only_self = census(tracked, texts, EXTS, {SELF_REL})
@@ -273,7 +346,7 @@ def controls() -> int:
     #   基线里必须含它，否则每一条控制都会先撞上「A2 新面孔 = A」。
     #   （第一版控制忘了这一点，B1/B3/B7 三条全红 —— 红的是**期望**，不是代码。）
     base_ok = [SELF_REL, "tools/alpha.py", "tools/gamma.py"]
-    j_ok = judge(full, base_ok, tracked, excl)
+    j_ok = judge(full, base_ok, tracked, excl, decl)
 
     # A7 的合成树：基线长到超过门槛（13 条），而池子里有一份把 13 条全抄了一遍的文档。
     # ★ 第一版直接拿 3 条的 base_ok 去喂，A7 当然不响（3 < 门槛 10）——
@@ -297,11 +370,11 @@ def controls() -> int:
          lambda: "tools/alpha.py" not in exe_only_self["zero"]),
         ("B3 棘轮有牙：基线漏掉一个零引用文件 → A2 必须红，且点得出是哪一个",
          lambda: (not j_ok["problems"]) and bool(
-             judge(full, ["tools/gamma.py"], tracked, excl)["problems"]
-         ) and "tools/alpha.py" in judge(full, ["tools/gamma.py"], tracked, excl)["new"]),
+             judge(full, ["tools/gamma.py"], tracked, excl, decl)["problems"]
+         ) and "tools/alpha.py" in judge(full, ["tools/gamma.py"], tracked, excl, decl)["new"]),
         ("B4 分母塌了（tracked 为空）→ 必须红，不许因为「没有零引用」而绿",
-         lambda: bool(judge(census([], {}, EXTS, excl), base_ok, [], excl)["problems"])
-         and any("A1" in p for p in judge(census([], {}, EXTS, excl), base_ok, [], excl)["problems"])),
+         lambda: bool(judge(census([], {}, EXTS, excl), base_ok, [], excl, decl)["problems"])
+         and any("A1" in p for p in judge(census([], {}, EXTS, excl), base_ok, [], excl, decl)["problems"])),
         ("B5 基线拿不在册的文件充数 → A4 必须红",
          lambda: any("A4" in p for p in
                      judge(full, base_ok + ["tools/deleted.py"], tracked, excl)["problems"])),
@@ -310,7 +383,7 @@ def controls() -> int:
                      judge(full, base_ok, tracked, excl | {"notes.md"})["problems"])),
         ("B7 改善不算红：基线里那条现在已经有人提及（beta）→ 只记 improved，不判红",
          lambda: (lambda j: (not j["problems"]) and j["improved"] == ["tools/beta.py"])(
-             judge(full, base_ok + ["tools/beta.py"], tracked, excl))),
+             judge(full, base_ok + ["tools/beta.py"], tracked, excl, decl))),
         ("B8 结论行不许撒谎：红 + 未测同时存在时，红优先**且必须报出未测**",
          lambda: verdict(1, ["x"])[0] == 1 and "未测" in verdict(1, ["x"])[1]),
         ("B8b 未测 ≠ 通过：只有未测时必须退 2，且那行里不许出现 ✅",
@@ -321,17 +394,38 @@ def controls() -> int:
          "（否则棘轮会被刷空）" % (len(base_many), ENUM_RED),
          lambda: any("A7" in p for p in judge(
              census(tracked_many, texts_many, EXTS, excl, watch_many),
-             base_many, tracked_many, excl)["problems"])),
-        ("★ B9b 反面对照：同一份枚举内容**被排除**之后，A7 必须闭嘴（证明它判的是池子，不是文本）",
+             base_many, tracked_many, excl, decl)["problems"])),
+        ("★ B9b 反面对照：同一份枚举内容**被声明并排除**之后，A7 必须闭嘴（证明它判的是池子，不是文本）",
          lambda: not any("A7" in p for p in judge(
              census(tracked_many, texts_many, EXTS, excl | {"docs/census.md"}, watch_many),
-             base_many, tracked_many, excl)["problems"])),
+             base_many, tracked_many, excl | {"docs/census.md"},
+             {**decl, "docs/census.md": "合成：正文枚举了名单"})["problems"])),
         ("B9c 反向对照：只提一两个名字（正常散文引用）不许触发 A7",
          lambda: (lambda t: not any(
              "A7" in p for p in judge(
                  census(tracked + ["docs/note.md"], {**t, "docs/note.md": "见 tools/alpha.py"},
                         EXTS, excl, [b.rsplit("/", 1)[-1] for b in base_ok]),
-                 base_ok, tracked + ["docs/note.md"], excl)["problems"]))(texts)),
+                 base_ok, tracked + ["docs/note.md"], excl, decl)["problems"]))(texts)),
+        ("B10 A5c：声明了但那个文件不在册（过期免死金牌）→ 必须红",
+         lambda: any("A5c" in p for p in judge(
+             full, base_ok, tracked, set(decl), {**decl, "docs/gone.md": "它早就不在了"})["problems"])),
+        ("B10b 反面对照：把那条过期声明去掉 → A5c 必须闭嘴",
+         lambda: not any("A5c" in p for p in judge(full, base_ok, tracked, excl, decl)["problems"])),
+        ("B11 A5d：声明的理由为空（免死金牌）→ 必须红",
+         lambda: any("A5d" in p for p in judge(
+             full, base_ok, tracked, excl, {**decl, A: "   "})["problems"])),
+        ("B12 A5e：往「诊断正文」这一类里塞一个可执行文件 → 必须红"
+         "（否则死代码面能被整块藏起来）",
+         lambda: any("A5e" in p for p in judge(
+             full, base_ok, tracked, excl | {"tools/alpha.py"},
+             {**decl, "tools/alpha.py": "假装它是正文"})["problems"])),
+        ("B12b 反面对照：正文（`.md`）声明进来时 A5e 必须闭嘴",
+         lambda: not any("A5e" in p for p in judge(
+             full, base_ok, tracked, excl | {"docs/note.md"},
+             {**decl, "docs/note.md": "正文"})["problems"])),
+        ("B13 A5a：把结构性两条从排除集里拿掉 → 必须红",
+         lambda: any("A5a" in p for p in judge(
+             full, base_ok, tracked, {"notes.md"}, {"notes.md": "只声明了这一条"})["problems"])),
     ]
     bad = 0
     print("=" * 72)
@@ -393,9 +487,9 @@ def main(argv) -> int:
                 % (len(unreadable), "；".join(unreadable[:5]))
             )
         watch = sorted({b.rsplit("/", 1)[-1] for b in baseline_files})
-        cur = census(tracked, texts, EXTS, {SELF_REL, BASELINE_REL}, watch)
+        cur = census(tracked, texts, EXTS, set(POOL_EXCLUDE), watch)
 
-    j = judge(cur, baseline_files, tracked, {SELF_REL, BASELINE_REL})
+    j = judge(cur, baseline_files, tracked, set(POOL_EXCLUDE))
     problems = j["problems"]
 
     print("=" * 72)
@@ -404,11 +498,24 @@ def main(argv) -> int:
     print(f"  口径        git ls-files -z · 可执行面 {' '.join(EXTS)}")
     print(f"  在册文件    {len(tracked)} 个（二进制跳过 {len(binary)} 个，不进提及池）")
     print(f"  可执行面    {j['n_exe']} 个")
+    blind_cjs = sorted(f for f in tracked if f.endswith(".cjs"))
+    print(
+        "  口径外      `.cjs` 在册 %d 个 —— **已知盲区**（继承口径只收 %s）。"
+        % (len(blind_cjs), " ".join(EXTS))
+    )
+    if blind_cjs:
+        print("              它们不进可执行面，所以既不会被报成零引用、也不会被棘轮拦住：")
+        for _f in blind_cjs:
+            print(f"                · {_f}")
     print(f"  零引用      {j['n_zero']} 个   ← 棘轮上界 {j['n_base']} 个（{BASELINE_REL}）")
     print(f"  恰 1 次提及 {len(cur['one'])} 个")
     hot = [(n, g) for n, g in (cur.get("enum") or []) if n >= ENUM_RED]
     print(f"  枚举基线者 {len(hot)} 个（同一文件里命中 ≥ {ENUM_RED} 个基线文件名即算；门槛理由见 ENUM_RED）")
-    print(f"  排除出池    {SELF_REL} · {BASELINE_REL}（不排除，基线会把它自己点名的清单刷没）")
+    print(f"  排除出池    {len(POOL_EXCLUDE)} 条（逐条声明 + 逐条理由，见 POOL_EXCLUDE）")
+    for _p in sorted(POOL_EXCLUDE):
+        if _p not in STRUCTURAL_EXCLUDE:
+            print(f"      · {_p}")
+    print(f"      （结构性两条：{STRUCTURAL_EXCLUDE[0]} · {STRUCTURAL_EXCLUDE[1]}）")
     if j["improved"]:
         print(f"  ★ 已改善    {len(j['improved'])} 个不再零引用（不判红；要锁住这次改善就重钉基线）:")
         for f in j["improved"]:
