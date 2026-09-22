@@ -187,8 +187,12 @@ function scrubInternal(kind, d) {
   let out = { ...d };
   for (const f of PUBLIC_FIELDS) {
     if (!out[f]) continue;
-    // 只认「机械可判」的内部标识，不猜语气
-    if (!/(tool_calls|tool_call_id|finishReason|reasoning_tokens|call_[0-9a-zA-Z]{10,})/.test(out[f])) continue;
+    // ★ 判据只有一处：`lintCopy` 的 `internalLeak`（registry.mjs）。
+    //   这里原先自带一条**更窄**的正则（少了栈帧与「连续同名工具 ≥3 次」），
+    //   于是「检测器报了的，动作未必搬」—— 同一个概念两份判据，
+    //   正是 §2.5「形态/判据只能有一处」要防的形状。现在只有一份。
+    const hitLeak = lintCopy(s(out[f])).find((h) => h.id === 'internalLeak');
+    if (!hitLeak) continue;
     const folded = out[f];
     const hit = foldIn(kind, { ...out, [f]: '' }, `（内部详情，排查用）\n${folded}`);
     if (hit[1] === null) continue;                       // 没地方放 → 留给降级处理
@@ -345,7 +349,30 @@ export function toCardOrText(reply) {
   const blk = extractCardBlock(raw);
 
   if (!blk) {
-    return { mode: 'text', text: raw, reason: null, moved: [], lint: lintCopy(raw), dropped: false };
+    const lint = lintCopy(raw);
+    const leak = lint.find((h) => h.id === 'internalLeak');
+    if (leak) {
+      // ★ 纯文本**没有折叠区可放**，而「内部详情只进折叠区」是 §2.4 点名的硬约束；
+      //   `agent-skills/守衡语域/SKILL.md` 第 7 条写得更直白：
+      //   「**不是改写，是不许写。** 内部详情只进折叠区」。
+      //
+      //   所以这里既不原样发、也不做改写（改写就违反「不是改写」那句话）——
+      //   换成一句诚实的降级说明，原文留在日志里。
+      //
+      //   2026-09-17 那条真事故（连列 19 次 `list_files` 的 434 字故障输出）**正是纯文本**：
+      //   当时它通过了除第 7 条以外的全部内容级检查，而第 7 条在**这条路径上没有执行点**。
+      //   检测器（`lintCopy`）一直是对的 —— 缺的是「动作」。
+      return {
+        mode: 'text',
+        text: '我这次没能把回答组织好 —— 正文里混进了内部调用记录，已经拦下没发出去。'
+            + '原始内容留在 PMO/logs，需要的话我重新答一次。',
+        reason: `正文含内部标识（internalLeak×${leak.count}），纯文本没有折叠区可放 → 不原样发`,
+        moved: [],
+        lint,
+        dropped: true,
+      };
+    }
+    return { mode: 'text', text: raw, reason: null, moved: [], lint, dropped: false };
   }
 
   // 找到了标记但数据不可用 → 剥掉整块（含标记与半截 JSON），只留可读的话。
@@ -410,8 +437,12 @@ export function toCardOrText(reply) {
 export function leaksInternalMark(text) {
   const src = s(text);
   return /\[\[card:/.test(src)
-      || /tool_calls|tool_call_id|finishReason|reasoning_tokens/.test(src)
-      || /"role"\s*:\s*"tool"/.test(src);
+      // ★ 判据只有一处：`lintCopy` 的 `internalLeak`。
+      //   这里原先自带一条**更窄**的正则 —— 只认 `tool_calls|tool_call_id|finishReason|
+      //   reasoning_tokens` 与 `"role":"tool"`，**连 `call_xxx` 与栈帧都不认**。
+      //   而 J2 段正是用这个函数断言「发出去的文本里没有内部标记」：
+      //   断言用的检测器比实际动作的判据还弱，等于给了它一张假的免罪符。
+      || lintCopy(src).some((h) => h.id === 'internalLeak');
 }
 
 /** 公开格（非折叠区）的文本。自证用它断言「对方一眼能看到的地方」是干净的。 */

@@ -247,11 +247,87 @@ def ws_fold(s):
 
 # ---------- 主流程 ----------
 
+def verdict(n_live, n_miss, n_unver, n_pun, n_wsq, n_hit, n_total):
+    """把结论行拆成纯函数 —— 好让 `--controls` 直接断言**这句话本身**不许撒谎。
+
+    与 `verify_prd_baseline.verdict` / `verify_shouheng_ops.verdict` 同口径，
+    三种退出码语义互不相同：
+
+    | 码 | 含义 | 它**不**代表 |
+    |---:|---|---|
+    | 0 | 全部条目**逐字**命中，且今天真抓过上游 | —— |
+    | 1 | 有失配 / 不可复核 / 只差排版形态 | —— |
+    | 2 | **未测**：今天 0 个来源被真抓（`--offline`，或全部走了已钉快照） | **不等于通过** |
+
+    为什么「0 个来源被真抓」必须是 2 而不是 0：逐字命中在**快照**上验过，
+    不等于在**上游**验过。`--offline` 报 ✅ 会说出一句当天确定错误的话
+    （「今日抓取」）—— 这正是 §2.4.1 那句自检「这句话比我的输入大吗？」。
+
+    有红且未测时，红优先（与 `verify_shouheng_ops.py` 的 H7 一致：
+    **有红时也必须把未测说出来**，否则只看最后一行的人会以为其余都验过了）。
+    """
+    untested_note = ""
+    if n_live == 0:
+        untested_note = ("；**另有未测**：今日 0 个来源被真抓，"
+                         "逐字命中只在快照上验过、没在上游验过")
+    if n_miss or n_unver or n_pun or n_wsq:
+        return 1, ("❌ 未通过：失配 %d / 不可复核 %d / 仅差排版形态 %d / 空位形态不齐 %d%s"
+                   % (n_miss, n_unver, n_pun, n_wsq, untested_note))
+    if n_live == 0:
+        return 2, ("⚠️  今日 0 个来源被真抓（`--offline`，或全部走了已钉快照）—— "
+                   "**未测**：逐字命中只在快照上验过，没在上游验过。退 2，不是通过。")
+    return 0, ("✅ %d/%d 条在该来源快照中**逐字**命中（无形态差、无空位差）"
+               % (n_hit, n_total))
+
+
+def controls():
+    """反向对照：把已知形状喂进 `verdict()`，断言结论行**不许撒谎**。
+
+    这是 §2.4.1「没红过的断言不算验证过它」的直接落实 ——
+    结论行本身也是断言，所以它也要被喂坏样本。
+    全部在内存里做，不落盘、不联网（§2.1：反向对照只在内存里做）。
+    """
+    cases = [
+        # (名称, 参数, 期望退出码, 结论行必须含, 结论行必须不含)
+        ("全过（今日真抓过）", (17, 0, 0, 0, 0, 62, 62), 0, ["逐字", "命中"], ["未测", "❌"]),
+        ("★ --offline：0 个来源被真抓，其余全过",
+         (0, 0, 0, 0, 0, 62, 62), 2, ["未测"], ["✅", "今日抓取"]),
+        ("有失配", (17, 1, 0, 0, 0, 61, 62), 1, ["失配 1"], ["✅"]),
+        ("只差排版形态（punct）", (17, 0, 0, 3, 0, 59, 62), 1, ["排版形态 3"], ["✅"]),
+        ("★ 又红又未测：红优先，但必须报出未测",
+         (0, 1, 0, 0, 0, 61, 62), 1, ["失配 1", "另有未测"], ["✅"]),
+    ]
+    n_ok = 0
+    for name, args, want_code, must, must_not in cases:
+        code, line = verdict(*args)
+        bad = []
+        if code != want_code:
+            bad.append("退出码 %d ≠ 期望 %d" % (code, want_code))
+        for m in must:
+            if m not in line:
+                bad.append("结论行里没有 %r" % m)
+        for m in must_not:
+            if m in line:
+                bad.append("结论行里不该有 %r" % m)
+        if bad:
+            print("  ❌ %s\n       %s\n       → %s" % (name, "；".join(bad), line))
+        else:
+            print("  ✅ %s → 退 %d" % (name, code))
+            n_ok += 1
+    print("\n反向对照 %d 项全过（含「原样必须全绿」这一条）" % n_ok)
+    return 0 if n_ok == len(cases) else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--offline", action="store_true", help="只用已钉快照，不联网")
     ap.add_argument("--only", default="", help="只处理这些来源，如 S11,S12")
+    ap.add_argument("--controls", action="store_true",
+                    help="只跑结论行的反向对照（离线，不读清单、不联网）")
     a = ap.parse_args()
+
+    if a.controls:
+        return controls()
 
     d = json.load(open(DRAFT, encoding="utf-8"))
     srcs = {s["id"]: s for s in d["sources"]}
@@ -288,6 +364,11 @@ def main():
         else:
             meta[sid] = (code or "ERR", len(vis) + len(emb), ua + "  [" + tried + "]")
         time.sleep(0.8)
+
+    # 今天**真抓过**的来源数：`--offline` 下 17 行来源表全是 `offline`，这里就是 0。
+    # 「逐字命中」在快照上成立，不等于在上游成立 —— 所以 0 是**未测**，不是通过。
+    n_offline = len([1 for m in meta.values() if str(m[2]) == "offline"])
+    n_live = len(meta) - n_offline
 
     hit, miss, unver = [], [], []
     pidx = pin_index()
@@ -337,9 +418,12 @@ def main():
     n_pin = len([h for h in hit if h[2].startswith("pin:")])
     n_pun = len([h for h in hit if h[3] == "punct"])
     print("=" * 80)
-    print("逐条核对：命中 %d（今日抓取：可见正文 %d / 仅内嵌数据块 %d；仓内钉住证据 %d）"
+    # ★ 口径必须自己说出来：`--offline` 下写「今日抓取」是一句**当天确定错误**的话。
+    src_desc = ("今日抓取" if n_live else
+                "**已钉快照（今日 0 个来源被真抓 —— 上游本次未测）**")
+    print("逐条核对：命中 %d（%s：可见正文 %d / 仅内嵌数据块 %d；仓内钉住证据 %d）"
           "  失配 %d  不可复核 %d  —— 共 %d 条"
-          % (len(hit), n_vis, n_emb, n_pin, len(miss), len(unver), len(entries)))
+          % (len(hit), src_desc, n_vis, n_emb, n_pin, len(miss), len(unver), len(entries)))
     print("=" * 80)
     if n_pin:
         print("\n· 靠仓内钉住证据命中的（今日无匿名取法拿到正文，改对钉住抓取件核）：")
@@ -381,13 +465,16 @@ def main():
     #   第一版把它们算作命中，于是在同一轮里掩盖了我自己造成的一次回归
     #   （批量空格正则删掉了右引号后的空格，条目从 exact 掉到 ws，而 exit 仍是 0）。
     #   逐字引用是这库的全部价值 —— 差一个字符就该红，并且要红得说明差在哪一层。
-    ok = not miss and not unver and not pun and not wsq
-    if ok:
-        print("✅ 全部条目在该来源快照中**逐字**命中（无形态差、无空位差）")
-    else:
-        print("❌ 未通过：失配 %d / 不可复核 %d / 仅差排版形态 %d / 空位形态不齐 %d"
-              % (len(miss), len(unver), len(pun), len(wsq)))
-    return 0 if ok else 1
+    #
+    # ★ 第二版修的（2026-09-22）：**`--offline` 下 0 个来源被真抓，却退 0 报 ✅**，
+    #   汇总行还写着「今日抓取：可见正文 38」。这与 `AGENTS.md` §2.4.2 记的那次事故
+    #   是同一个形状 —— 那个脚本第一次运行就把「一次网络都没发」报成了「16 项全过」。
+    #   同一个病活在同一个仓库的另一个检查器里。修法同款：结论行拆成纯函数，
+    #   让反向对照能**直接断言这句话本身不许撒谎**。
+    code, line = verdict(n_live, len(miss), len(unver), len(pun), len(wsq),
+                         len(hit), len(entries))
+    print(line)
+    return code
 
 
 if __name__ == "__main__":

@@ -42,7 +42,7 @@ function dumpRaw(kind, data) {
   catch (e) { log('⚠ 事件落盘失败:', e.message); }
 }
 
-const counters = { events: 0, handled: 0, replied: 0, skipped: 0, failed: 0 };
+const counters = { events: 0, handled: 0, replied: 0, skipped: 0, failed: 0, uncaught: 0 };
 
 /* ─────────────────────── 事件处理 ─────────────────────── */
 
@@ -250,14 +250,68 @@ async function shutdown(sig) {
   shuttingDown = true;
   log(`\n收到 ${sig}，正在收尾…`);
   flushSeen();                                  // 把去重表落盘，重启后不会重复回话
-  log(`本次统计：事件 ${counters.events} / 已回答 ${counters.handled} / 已发送 ${counters.replied} / 跳过 ${counters.skipped} / 失败 ${counters.failed}`);
+  log(`本次统计：事件 ${counters.events} / 已回答 ${counters.handled} / 已发送 ${counters.replied} / 跳过 ${counters.skipped} / 失败 ${counters.failed} / 未捕获 ${counters.uncaught}`);
   try { await ws.stop?.(); } catch {}
   process.exit(0);
 }
+/* ─────────── 未捕获异常：计数 + 越线在群里自报（**不退出**） ─────────── */
+
+/**
+ * ★ 为什么这两条钩子不能只记日志。
+ *
+ * 原先它们只 `log(...)`。后果是：进程带着**未知状态**继续在群里答话，
+ * 而 launchd **永远不会**重启它 —— `KeepAlive{SuccessfulExit:false}` 只在
+ * **非零退出**时拉起，而这两条钩子恰恰不退出。
+ * 于是「我已经处于未定义状态」这件事唯一痕迹是一行 stdout，
+ * 而它**和「一切正常」长得一模一样**（与 §2.7 记的
+ * 「`kill -TERM` → `exit 0` → 不拉起」是同一个后果面）。
+ *
+ * 处置选的是「继续服务，但让未知状态被看见」，而**不是**退出交给 launchd：
+ * 若异常是确定性的（每次启动就抛），退出会变成**重启风暴**，
+ * 而重启窗口里的群消息会被吃掉且事后补不回来 —— 正是 §2.7 要防的那件事。
+ *
+ * 窗口：同一分钟内累计到 `UNCAUGHT_REPORT_AT` 自报一次，之后每满一个窗口
+ * 再自报一次（不是只报第一次）—— 一条持续报错既不刷屏，也不会报过一次就永远闭嘴。
+ */
+const UNCAUGHT_REPORT_AT = 3;
+const UNCAUGHT_WINDOW_MS = 60_000;
+let crashWindow = { start: 0, n: 0 };
+
+function noteCrash(kind, e) {
+  counters.uncaught++;
+  log(`⚠ ${kind}:`, e?.stack ?? e?.message ?? e);
+
+  const now = Date.now();
+  if (now - crashWindow.start > UNCAUGHT_WINDOW_MS) crashWindow = { start: now, n: 0 };
+  crashWindow.n++;
+
+  if (crashWindow.n % UNCAUGHT_REPORT_AT === 0) void selfReportCrash(kind, crashWindow.n);
+}
+
+/**
+ * 在群里自报「我这边内部出错了」。
+ * 找不到可通报的群时**必须说清楚只进了日志** —— 不许沉默（§2.4.2：未测不许与通过长得一样）。
+ */
+async function selfReportCrash(kind, n) {
+  try {
+    const target = await resolveChat();
+    if (!target) {
+      log('   ⚠ 内部出错要自报，但还没有可通报的群 —— 只进日志（不许沉默）');
+      return;
+    }
+    await safeSend(target,
+      `⚠ 我这边内部出错了 ${n} 次（最近一次：${kind}），**可能答得不可靠**。\n`
+      + '已经记录下来；接下来的回答请以我重新查证过的为准。');
+    log(`   · 内部出错自报已发到 ${target}`);
+  } catch (e) {
+    log('   ⚠ 内部出错自报也失败了:', e?.message ?? e);
+  }
+}
+
 process.on('SIGINT',  () => shutdown('Ctrl-C'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('unhandledRejection', (e) => log('⚠ unhandledRejection:', e?.stack ?? e?.message ?? e));
-process.on('uncaughtException',  (e) => log('⚠ uncaughtException:',  e?.stack ?? e?.message ?? e));
+process.on('unhandledRejection', (e) => noteCrash('unhandledRejection', e));
+process.on('uncaughtException',  (e) => noteCrash('uncaughtException',  e));
 
 await ws.start({ eventDispatcher: dispatcher });
 log('✓ 长连接已启动，等待事件（断线由 SDK 自动重连）');
@@ -270,7 +324,7 @@ if (!DUMP_ONLY) void pendingWatch('startup');
 
 // 每 5 分钟打一次心跳，方便判断进程是活着还是卡死
 const hb = setInterval(() => {
-  log(`· 心跳 事件 ${counters.events} 已回答 ${counters.handled} 失败 ${counters.failed} | LLM 调用 ${status().llm.calls}`);
+  log(`· 心跳 事件 ${counters.events} 已回答 ${counters.handled} 失败 ${counters.failed} 未捕获 ${counters.uncaught} | LLM 调用 ${status().llm.calls}`);
   rotateLogIfHuge();
   // 每日兜底：**她"基于评估重新修改"已经推过的那一篇时，群里不会有新链接** ——
   // 这正是「只在收到链接时跑」漏掉的那一种，也是她原话描述的那一种。

@@ -417,6 +417,13 @@ head('J 信封 · 解析、上限执行、以及「标记不许漏进群」');
     ['括号不配平', `${CARD_MARK}query-answer]]\n{"title":"T","verdict":"V","evidence":["a"`],
     ['字段名全错', `${CARD_MARK}receipt]]\n{"标题":"乱写","结论":"乱写"}`],
     ['嵌套花括号', `${CARD_MARK}decision]]\n{"title":"定一下","ask":"选哪个？","options":[{"label":"A","cost":"x"}]}`],
+    // ★ 下面三条是本轮补的。原表 13 条里**没有一条是「含内部标记的纯文本」**，
+    //   而 2026-09-17 那条真事故（连列 19 次 list_files 的 434 字故障输出）
+    //   **正是纯文本** —— 断言没喂到那个形状，纯文本路径就一直没有执行点。
+    ['★ 纯文本 + tool_calls', '查完了。tool_calls=[] finishReason=stop'],
+    ['★ 纯文本 + 连列同名工具（2026-09-17 那条的形状）',
+     '我查了几轮还是没能得出可靠结论。我试过 list_files、list_files、list_files、list_files，call_abc1234567890'],
+    ['★ 纯文本 + 栈帧', '出错了。\n at handler (/Users/x/a.mjs:12:34)'],
   ];
   for (const [name, txt] of leakCases) {
     let r;
