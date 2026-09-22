@@ -327,6 +327,130 @@ def main():
     ck("M", "M5 fetch_file 不做任何网络调用（不下载、也不探测）",
        all(c not in HTTP_HELPERS for c in _calls), f"调用了：{_calls}")
 
+    # ---- H（2026-09-22 新增）：飞书 HTTP 助手只许有**一份** —— 防漂移复活
+    #
+    # 债 #16：`call(url, payload=None, token=None, method=None)` 曾在 4 个脚本里各有一份，
+    # **只有超时不同**（实测 60 / 60 / 30 / 25，sha256 逐份对过）。后果不是「不好看」，
+    # 而是同一个飞书接口在慢网络上 A 脚本成功、B 脚本失败 —— 差别只在当初抄了哪个数。
+    # 已收编到 `tools/lark_http.py`；本段是**防它复活**的判据：
+    # 谁再抄一份同名 `call()`，这里就红，并点出 `文件:行号`。
+    #
+    # ★ 判据刻意收在「函数名 == call 且函数体里有 urlopen」上，**不是**「任何含 urlopen 的函数」。
+    #   后者会立刻误报：本仓另有 `feishu_index._get/_post`、`lark_find.py`、`lark_people.py`、
+    #   `lp_fetch.py`、`shouheng.py::FeishuClient._request` 等十来处各自成立的 HTTP 助手，
+    #   它们**不是**这条债的形状（不同参数序、不同返回契约）。
+    #   一个会误报的检查器比没有检查器更糟（AGENTS.md §2.1.1）。
+    #   已知盲区（明着留着）：把 `call` 改名成别的名字再抄一份，本段抓不到 ——
+    #   H2 的名册同步只覆盖已声明的文件。
+    _re_t = re.compile(r"timeout\s*=\s*\d")
+
+    def _call_helpers(src):
+        """→ [(行号, 函数名)]：函数名 == `call` 且函数体里出现 `urlopen` 的定义。"""
+        out = []
+        for n in _ast.walk(_ast.parse(src)):
+            if not isinstance(n, _ast.FunctionDef) or n.name != "call":
+                continue
+            if any(isinstance(c, _ast.Call) and
+                   getattr(c.func, "id", getattr(c.func, "attr", "")) == "urlopen"
+                   for c in _ast.walk(n)):
+                out.append((n.lineno, n.name))
+        return out
+
+    def _timeout_literals(src):
+        """→ [(行号, 文本)]：字面量 `timeout=<数字>`。**整行注释不算代码**
+        （与本仓 verify_shouheng_ops C5、verify_cards J1a 同一条读法）。"""
+        out = []
+        for i, line in enumerate(src.splitlines(), 1):
+            if line.lstrip().startswith("#"):
+                continue
+            if _re_t.search(line):
+                out.append((i, line.strip()[:70]))
+        return out
+
+    _tools = os.path.join(REPO, "tools")
+
+    def _read(name):
+        try:
+            return open(name, encoding="utf-8").read()
+        except Exception:                                     # noqa: BLE001
+            return None
+
+    # 名册的唯一来源是 lark_http 自己（声明只有一处，见 AGENTS.md §2.5 的同一条精神）
+    try:
+        sys.path.insert(0, _tools)
+        import lark_http as _lh
+        _members, _non_members = list(_lh.MEMBERS), dict(_lh.NON_MEMBERS)
+        ck("H", "H0 名册可读（lark_http.MEMBERS / NON_MEMBERS）",
+           bool(_members) and bool(_non_members), "名册读不出，H 段只能落红")
+    except Exception as exc:                                  # noqa: BLE001
+        _members, _non_members = [], {}
+        ck("H", "H0 名册可读（lark_http.MEMBERS / NON_MEMBERS）", False,
+           f"import lark_http 失败：{type(exc).__name__}: {exc}")
+
+    # H1 全仓只许有一份 `call()` HTTP 助手（正身 = tools/lark_http.py）
+    dup = []
+    for fn in sorted(os.listdir(_tools)):
+        if not fn.endswith(".py") or fn == "lark_http.py":
+            continue
+        src = _read(os.path.join(_tools, fn))
+        if src is None:
+            continue
+        for ln, _nm in _call_helpers(src):
+            dup.append(f"{fn}:{ln}")
+    ck("H", "H1 tools/ 下 `call()` HTTP 助手只有 lark_http.py 一份（AST 级）", not dup,
+       f"又出现了 {len(dup)} 份副本：{dup[:4]} —— 超时又会各自漂移")
+
+    # H1b 成员必须真的走了共用实现
+    not_wired = [m for m in _members
+                 if "lark_http" not in (_read(os.path.join(REPO, m)) or "")]
+    ck("H", "H1b 名册里的成员都 import 了 lark_http", not not_wired,
+       f"没接上的：{not_wired}")
+
+    # H2 名册不许当免死金牌：非成员必须存在、必须真有一个 HTTP 助手、理由必须写
+    bad_non = []
+    for m, why in _non_members.items():
+        src = _read(os.path.join(REPO, m))
+        if src is None:
+            bad_non.append(f"{m}：盘上没有这个文件")
+            continue
+        funcs = [(n.lineno, n.name) for n in _ast.walk(_ast.parse(src))
+                 if isinstance(n, _ast.FunctionDef)
+                 and any(isinstance(c, _ast.Call) and
+                         getattr(c.func, "id", getattr(c.func, "attr", "")) == "urlopen"
+                         for c in _ast.walk(n))]
+        if not funcs:
+            bad_non.append(f"{m}：登记为「保留本地实现」，但源码里没有任何 HTTP 助手")
+        if len((why or "").strip()) < 20:
+            bad_non.append(f"{m}：理由太短（等于免死金牌）")
+    ck("H", "H2 NON_MEMBERS 每条都在盘上、真有本地实现、且写明了理由", not bad_non,
+       f"{bad_non[:3]}")
+
+    # H3 超时只许来自 lark_http.TIMEOUT —— 名册内文件不许再有字面量
+    lit = []
+    for m in list(_members) + list(_non_members):
+        src = _read(os.path.join(REPO, m))
+        if src is None:
+            continue
+        for ln, txt in _timeout_literals(src):
+            lit.append(f"{os.path.basename(m)}:{ln} {txt}")
+    ck("H", "H3 名册内文件没有字面量 timeout=<数字>（超时只有一处）", not lit,
+       f"{lit[:4]} —— 改这一处去 lark_http.TIMEOUT")
+
+    # H4 反向对照：本段的三个扫描器喂已知坏样本，**必须**红
+    _bad_src = ('def call(url, payload=None, token=None, method=None):\n'
+                '    with urllib.request.urlopen(url, timeout=25) as x:\n'
+                '        return x.read()\n')
+    _ok_a = len(_call_helpers(_bad_src)) == 1
+    _ok_b = bool(_timeout_literals(_bad_src))
+    ck("H", "H4 三个扫描器都真的会红（喂已知坏样本）", _ok_a and _ok_b,
+       f"抄来的 call() 检出 {len(_call_helpers(_bad_src))} 份、"
+       f"字面 timeout 检出 {len(_timeout_literals(_bad_src))} 处")
+    # H4b 名册本身也要能红：临时塞一个不存在的非成员，H2 的形状必须报出来
+    _probe_non = {"tools/这个文件不存在.py": "假装有个理由，其实盘上没有这个文件"}
+    _h2_bad = [m for m in _probe_non if _read(os.path.join(REPO, m)) is None]
+    ck("H", "H4b H2 的判据对「登记了但盘上没有」确实会红", bool(_h2_bad),
+       f"喂进去 1 条假登记，报出 {len(_h2_bad)} 条")
+
     # ---- 输出
     print("=" * 72)
     print(f"飞书资源索引验收 —— {os.path.relpath(INDEX, REPO)}")

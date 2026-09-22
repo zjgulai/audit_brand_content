@@ -24,10 +24,12 @@ import argparse
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# HTTP 调用是**唯一实现**，不许在本文件里再抄一份（超时/头/错误形状都在那里定义）。
+from lark_http import call  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 KB = ROOT / "research" / "kb"
@@ -42,19 +44,10 @@ ROUNDTRIP = KB / "_evidence" / "feishu-roundtrip.json"
 T_TEXT, T_SINGLE, T_DATE = 1, 3, 5
 
 
-def call(url, payload=None, token=None, method=None):
-    data = json.dumps(payload).encode() if payload is not None else None
-    r = urllib.request.Request(url, data=data, method=method or ("POST" if data else "GET"))
-    r.add_header("Content-Type", "application/json; charset=utf-8")
-    if token:
-        r.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(r, timeout=60) as x:
-            return json.loads(x.read())
-    except urllib.error.HTTPError as e:
-        return {"_http": e.code, "body": e.read().decode()[:400]}
-    except Exception as e:                                    # noqa: BLE001
-        return {"_err": f"{type(e).__name__}: {e}"}
+# ── HTTP：`call()` 已收编到 tools/lark_http.py（2026-09-22）──────────────
+#   本文件那份与 tools/kb_materials_lark.py 的那份**逐字节相同**（sha256 302e9f0d…），
+#   连超时都一样（60）。收编后唯一实现在 lark_http.call。
+#   行为等价的证据：`python3 tools/lark_http.py --controls`。
 
 
 def get_token():

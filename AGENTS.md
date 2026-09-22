@@ -61,6 +61,46 @@
 | DSH 的 `write` / `edit` 工具 | ✅ 不会 |
 | **反向对照脚本用 Python 改真实数据**（改坏 → 跑一遍 → 改回来） | ❌ **会** —— 见下方 2026-09-21 实测 |
 
+> ### ★ 2026-09-22 二次更正：上面这张表**漏了一整个维度 —— 后缀**
+>
+> 这张表读起来是「Python 写谁都会填充」，**这是错的**。实测矩阵（同一 23 字节内容，
+> 每格**独立新建目录**、用**外部** `stat -f %z` 读、重复 3 次一致）：
+>
+> | 写出方式 | `.md` | `.sh` | `.json` `.txt` `.py` `.mjs` `.yml` `.csv` … |
+> |---|---|---|---|
+> | Python `open().write` | **4119** ❌ | **4119** ❌ | 23 ✅ |
+> | shell `printf` / `cp` | 23 ✅ | 23 ✅ | 23 ✅ |
+> | Node `writeFileSync` | 23 ✅ | — | 23 ✅ |
+>
+> 后缀**自成一维，而且只有这两个**：`.markdown` 23 ✅、`.bash` 23 ✅、`.zsh` 23 ✅ ——
+> 只有 `.md` / `.sh` 命中。**与大小无关**：50000B 的 `.md` → 54096（+4096），同样 `.json` → 50000。
+>
+> 独立复现（2026-09-22 本轮，两方各自跑过、读数一致）：
+>
+> ```bash
+> $ cd /tmp && mkdir padprobe && cd padprobe
+> $ for ext in md sh json txt py; do python3 -c "open('a.$ext','w',encoding='utf-8').write('x'*23)"; \
+>     printf '%-6s python写: stat=%s 真实=%s\n' ".$ext" "$(stat -f %z a.$ext)" "$(python3 -c "print(len(open('a.$ext',encoding='utf-8').read()))")"; done
+> .md    python写: stat=4119 真实=23      ← 填充
+> .sh    python写: stat=4119 真实=23      ← 填充
+> .json  python写: stat=23 真实=23        ← 不填充
+> .txt   python写: stat=23 真实=23
+> .py    python写: stat=23 真实=23
+> ```
+>
+> **为什么这条更正值得写进来**：本文件此前所有关于填充的事故（`PRD/feishu/*.md`、
+> `lark_find.py readdoc > ….md`、`sed -i` 改文档）**恰好全是 `.md`** —— 所以一张缺了后缀
+> 这一维的错表**一直没被拆穿**，而它会让下一个人把 `.json` 也当成危险物，
+> 或者反过来以为「只要不是 Python 就安全」（Node 写 `.md` 确实安全，但那是因为**进程**，
+> 不是因为后缀）。
+>
+> **代价很轻**：落盘配方不变（照抄下面那三步），只是现在知道**只有 `.md` / `.sh` 需要它**。
+> ⚠️ 反过来说：`tools/verify_depad.py` 的 `EXTS` 里有 15 个后缀
+> （`.py .mjs .js .cjs .ts .json .yml .yaml .txt .csv .tsv .toml .cfg .ini .html .css`）
+> **按本矩阵永远不会命中填充**。那个扫描器**不是错**（它同时看「其他不一致」，
+> 且后缀集合将来可能变宽），但**别把「扫出 0 个」当成「我没有填充问题」的证据** ——
+> 真正在风险面上的只有 `.md` / `.sh`。
+
 > ⚠️ **判据是「写这个文件的进程是不是 Python」，不是「谁做的重定向」。** 这一格是
 > **2026-09-22 补的**，因为我按旧表的读法（「shell 重定向 → 安全」）去重拉上游文档：
 >

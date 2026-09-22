@@ -31,6 +31,11 @@ API = "https://open.feishu.cn/open-apis"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_OUT = os.path.join(REPO, "research", "kb", "_evidence")
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 只共用**超时常量**：`_req` 的契约与 lark_http.call() 不同（参数序、3 次退避重试、
+# HTTP 错误返回 {"code":...}），强行合并会改变失败语义 —— 理由写在 lark_http.NON_MEMBERS。
+import lark_http  # noqa: E402
+
 PAGE_SIZE = 500
 RETRY = 3
 RETRY_WAIT = 2.0
@@ -65,7 +70,7 @@ def _req(url, token, payload=None):
     last = None
     for attempt in range(RETRY):
         try:
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=lark_http.TIMEOUT) as r:
                 return json.loads(r.read())
         except urllib.error.HTTPError as e:
             body = e.read().decode()[:600]

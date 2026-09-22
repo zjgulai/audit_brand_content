@@ -17,9 +17,11 @@ import argparse
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# HTTP 调用是**唯一实现**，不许在本文件里再抄一份（超时/头/错误形状都在那里定义）。
+from lark_http import get_json, post_json_strict  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SK = ROOT / "research/governance/skeleton"
@@ -28,23 +30,19 @@ BASE = "https://open.feishu.cn/open-apis"
 APP = "B1oabL2veaFKbKs2hVAcvyKKnEe"
 
 
-def call(url, token):
-    r = urllib.request.Request(url, method="GET")
-    r.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(r, timeout=30) as x:
-            return json.loads(x.read())
-    except urllib.error.HTTPError as e:
-        return {"_http": e.code, "body": e.read().decode()[:300]}
+# ── HTTP：`call()` 已收编到 tools/lark_http.py（2026-09-22）──────────────
+#   本文件那份的**契约与另外四份不同**：只 GET、不带 Content-Type、
+#   只在 HTTPError 时返回 dict（超时/连接错误**原样抛出**，因为调用方靠它崩掉报错）。
+#   所以它对应的不是 lark_http.call()，而是 lark_http.get_json() —— 逐条保留那个契约。
+#   token() 同理：原来「一个异常都不吞」，现在用 post_json_strict()。
+#   行为等价的证据：`python3 tools/lark_http.py --controls`。
 
 
 def token():
     c = json.loads(Path(CRED).read_text())
-    d = json.dumps({"app_id": c["app_id"], "app_secret": c["app_secret"]}).encode()
-    r = urllib.request.Request(f"{BASE}/auth/v3/tenant_access_token/internal", data=d, method="POST")
-    r.add_header("Content-Type", "application/json; charset=utf-8")
-    with urllib.request.urlopen(r, timeout=25) as x:
-        return json.loads(x.read())["tenant_access_token"]
+    return post_json_strict(f"{BASE}/auth/v3/tenant_access_token/internal",
+                            {"app_id": c["app_id"], "app_secret": c["app_secret"]}
+                            )["tenant_access_token"]
 
 
 def fetch(T, tid):
@@ -53,7 +51,7 @@ def fetch(T, tid):
         u = f"{BASE}/bitable/v1/apps/{APP}/tables/{tid}/records?page_size=200"
         if pt:
             u += f"&page_token={pt}"
-        r = call(u, T)
+        r = get_json(u, T)
         if r.get("code") != 0:
             raise SystemExit(f"❌ 读 {tid} 失败：{json.dumps(r, ensure_ascii=False)[:300]}")
         out += r["data"].get("items", [])
@@ -87,7 +85,7 @@ def main():
 
     T = token()
     tabs = {x["name"]: x["table_id"]
-            for x in call(f"{BASE}/bitable/v1/apps/{APP}/tables?page_size=50", T)["data"]["items"]}
+            for x in get_json(f"{BASE}/bitable/v1/apps/{APP}/tables?page_size=50", T)["data"]["items"]}
     report = {"tables": {}, "ok": True}
 
     # ── 语境守卫词 ────────────────────────────────────────────────

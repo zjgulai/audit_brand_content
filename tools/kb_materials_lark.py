@@ -28,13 +28,13 @@ import argparse
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from kb_materials_data import MATERIALS, KB_CLASSES, readable, by_class  # noqa: E402
 import kb_classes  # noqa: E402
+# HTTP 调用是**唯一实现**，不许在本文件里再抄一份（超时/头/错误形状都在那里定义）。
+from lark_http import call  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 KB = ROOT / "research" / "kb"
@@ -46,19 +46,12 @@ STATE = KB / "_evidence" / "feishu-base.json"
 TABLES = KB / "_evidence" / "feishu-tables.json"
 
 
-def call(url, payload=None, token=None, method=None):
-    data = json.dumps(payload).encode() if payload is not None else None
-    r = urllib.request.Request(url, data=data, method=method or ("POST" if data else "GET"))
-    r.add_header("Content-Type", "application/json; charset=utf-8")
-    if token:
-        r.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(r, timeout=60) as x:
-            return json.loads(x.read())
-    except urllib.error.HTTPError as e:
-        return {"_http": e.code, "body": e.read().decode()[:400]}
-    except Exception as e:                                    # noqa: BLE001
-        return {"_err": f"{type(e).__name__}: {e}"}
+# ── HTTP：`call()` 已收编到 tools/lark_http.py（2026-09-22）──────────────
+#   原先本文件有一份 `call(url, payload=None, token=None, method=None)`；
+#   同一份函数在 4 个脚本里各有一份、**只有超时不同**（60/60/30/25），
+#   后果是同一个飞书接口在慢网络上 A 脚本成功、B 脚本失败。
+#   现在唯一实现在 lark_http.call，超时是 lark_http.TIMEOUT。
+#   行为等价的证据：`python3 tools/lark_http.py --controls`（离线 32 组样本 + 4 个反向对照）。
 
 
 def token():

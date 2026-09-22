@@ -22,9 +22,11 @@ import argparse
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# HTTP 调用是**唯一实现**，不许在本文件里再抄一份（超时/头/错误形状都在那里定义）。
+from lark_http import call  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SK = ROOT / "research/governance/skeleton"
@@ -39,19 +41,10 @@ OWNER_OPEN_ID = "ou_e5ada0b1c7a023c44e407c60ee8bd91b"   # 周健（app 的创建
 T_TEXT, T_SINGLE = 1, 3
 
 
-def call(url, payload=None, token=None, method=None):
-    data = json.dumps(payload).encode() if payload is not None else None
-    r = urllib.request.Request(url, data=data, method=method or ("POST" if data else "GET"))
-    r.add_header("Content-Type", "application/json; charset=utf-8")
-    if token:
-        r.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(r, timeout=30) as x:
-            return json.loads(x.read())
-    except urllib.error.HTTPError as e:
-        return {"_http": e.code, "body": e.read().decode()[:400]}
-    except Exception as e:
-        return {"_err": f"{type(e).__name__}: {e}"}
+# ── HTTP：`call()` 已收编到 tools/lark_http.py（2026-09-22）──────────────
+#   本文件那份超时是 **30**，而 kb_materials_lark.py 那份是 **60** ——
+#   同一个接口两套超时，就是「A 脚本成功、B 脚本失败」的来源。收编后是 lark_http.TIMEOUT。
+#   行为等价的证据：`python3 tools/lark_http.py --controls`。
 
 
 def get_token():

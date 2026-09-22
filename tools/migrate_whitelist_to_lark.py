@@ -21,9 +21,11 @@ import argparse
 import json
 import os
 import sys
-import urllib.error
-import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# HTTP 调用是**唯一实现**，不许在本文件里再抄一份（超时/头/错误形状都在那里定义）。
+from lark_http import call  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 CRED = os.path.expanduser("~/.dsh/credentials/shouheng-lark.json")
@@ -38,19 +40,11 @@ WL_JSON = ROOT / "research/governance/skeleton/whitelist-v1.json"
 T_TEXT, T_SINGLE, T_URL, T_MULTI = 1, 3, 15, 4
 
 
-def call(url, payload=None, token=None, method=None):
-    data = json.dumps(payload).encode() if payload is not None else None
-    r = urllib.request.Request(url, data=data, method=method or ("POST" if data else "GET"))
-    r.add_header("Content-Type", "application/json; charset=utf-8")
-    if token:
-        r.add_header("Authorization", "Bearer " + token)
-    try:
-        with urllib.request.urlopen(r, timeout=25) as x:
-            return json.loads(x.read())
-    except urllib.error.HTTPError as e:
-        return {"_http": e.code, "body": e.read().decode()[:500]}
-    except Exception as e:
-        return {"_err": f"{type(e).__name__}: {e}"}
+# ── HTTP：`call()` 已收编到 tools/lark_http.py（2026-09-22）──────────────
+#   本文件那份是全族里**最短的超时（25）+ 最长的错误串截断（500）**。
+#   超时收进 lark_http.TIMEOUT（族内最大值 60，只会变长不会变短）；
+#   截断收进 lark_http.ERR_BODY_MAX（500，不变）—— 两处都写在那一个模块里。
+#   行为等价的证据：`python3 tools/lark_http.py --controls`。
 
 
 def get_token():
