@@ -2254,6 +2254,46 @@
    "default_if_unanswered": "沉默 = 选项 B（不改号）：本仓的 `遗留 6` 继续指两件事，D38 加的表内标记继续是渲染后看不见的注释；别名唯一性由 V46b 守着，所以**机器侧不会出错** —— 会出错的是读源码的人以外的人。★ 因此本项的沉默代价是**不对称的**：机器全绿，人可能读错。",
    "where": "`ADR/ADR-0013-基座接口冻结与仓库入库分级.md`（§五 主表 + §8.5/§9.4/§10.6/§11.5/§12.6/§13.12/§14.9/§15.9/§16.5/§17.8 十张落点表）；`research/governance/skeleton/_data/遗留对账.json`（对账产物）；检查 `python3 tools/verify_engine_contract.py --only V46`。",
    "$origin": "第十二批（D38）落地时的实测。D38 的 `$artifact` 写明「`遗留#` 的号**未改**，只加了表内标记与带域别名；改号是 Q37」—— 这不是漏做，是**刻意留给 Owner 的那一半**：§五 的注写着「Owner 已按 6 号读过并据此裁定」，动号会把那些裁定变成悬空引用 —— 而改号与否是治理决定，不是开发者可以自行拍板的。"
+  },
+  {
+   "id": "Q38",
+   "kind": "governance_question",
+   "line": "repo",
+   "status": "open",
+   "owner": "Owner",
+   "raised_at": "2026-09-22",
+   "title": "结构性诊断的工作目录 `.ua/`（16MB / 253 文件）归哪一级 —— 忽略了诊断正文跟着丢，入库了把 11MB 机器垃圾带进历史",
+   "question": "2026-09-22 的结构性诊断把整条 Understand-Anything 管线跑在 `.ua/` 下，产物留在盘上。它**同时**装着三类东西，而 ADR-0013 §三 的三档判据各管一类：① **机器生成、可复算**（`knowledge-graph.json` 1.8MB、`fingerprints.json` 495KB、`dispatch/` 43 批、`intermediate/`）→ 判据指向 L2；② **不可复算的诊断正文**（`debt-engineering.md` 79KB · `debt-documentation.md` 89KB · `debt-logic.md` 117KB · `graph-diagnosis.md` · `doc-reachability.md` · `reference-census.md` …）→ 它们是**模型对 2026-09-22 那份快照的结论**，重跑同一条管线不会得到同一份，所以「可复算」不成立、L2 的理由不成立，而它们又确实不是「会被改、改了要回滚」的东西（L1 的理由也不成立）；③ **本次用的一次性脚本**（`assemble.cjs` / `gen-*.cjs` / `reference-census.cjs` / `adr-status-check.cjs` …）→ 人写的、会被改的，按判据是 L1。于是 `.ua/` 现在**哪一档都不在**：既没进历史，也没被忽略，`git status` 里就一行 `?? .ua/`。这一行就是风险面 —— `git add -A` 会一次带进 16MB，其中 11MB 是 Understand-Anything 自己的 `.trash-1790050761/`。★ 按 `.gitignore:9`「本文件只写 L2 / L3。其余一律入历史」与 `:10`「改动本文件 = 改动分级 = 需回到 ADR-0013 §三 同步」，回答这一问要**同时**动 `.gitignore` 与 ADR-0013 §三 —— 所以它不是开发者可以顺手定的。",
+   "evidence": "① 体量：`du -sh .ua/` → **16M**；`find .ua -type f | wc -l` → **253**；`du -sh .ua/.trash-1790050761` → **11M**（占总体量的 69%）。② 单件：`ls -l .ua/knowledge-graph.json .ua/fingerprints.json` → 1,795,419B / 494,959B。③ 三份诊断正文合计 285KB（`wc -c .ua/debt-*.md`）。④ 现场状态：`git status --porcelain | grep '.ua/'` → `?? .ua/`（**未忽略**）。⑤ 引用关系：`tools/verify_reference_census.py` 与 `tools/verify_doc_reachability.py` 的 docstring 都把 `.ua/` 下的报告当作口径出处引用 —— 它们**不在版本库里**，所以这两处引用在换台机器之后会指向不存在的文件（这是本项的一个具体后果，不是假设）。⑥ 检查入口：`python3 tools/verify_open_items.py`（本项会带着 raised_at / owner / 沉默后果出现在它的输出里）。",
+   "options": [
+    {
+     "key": "A",
+     "label": "拆开分级：诊断正文（`*.md`）与一次性脚本（`*.cjs`）提进 L1，机器产物（图/指纹/dispatch/intermediate/.trash）落 `.gitignore` 的 L2 段",
+     "recommended": true,
+     "impact": "唯一一种「什么都不丢、也不把垃圾带进历史」的做法：可复算的按判据进 L2（约 11MB 的 trash 与 2.3MB 的图/指纹不进历史），不可复算的诊断正文进 L1（约 285KB，一次性）。代价是**要一次把话说清楚**：哪些 `.md` 算「诊断正文」、哪些算「管线的中间产物」（例如 `dispatch/batch-*.md` 是管线给模型的分批输入，属于产物而非结论），这条线划过一次之后才能写进 ADR-0013 §三。落点是三个文件：`.gitignore`、ADR-0013 §三、以及本次的提交。"
+    },
+    {
+     "key": "B",
+     "label": "整个 `.ua/` 落 `.gitignore`（L2），一个字不进历史",
+     "recommended": false,
+     "impact": "改动最小、体积代价最低（16MB 全不进历史）。代价是**本次诊断的正文只活在本机** —— 包括那份 TOP20、以及复核时被推翻的三条（#15-2 / #15-3 / #9 的三个数）。它们**复现不出来**（同一管线重跑，模型输出不同），而 `AGENTS.md` §2.2 第 1 条与 ADR-0013 §15.3 恰恰把「读数要能复现」当作纪律。另有一处直接后果：两个 verifier 的 docstring 正引用着这些文件。"
+    },
+    {
+     "key": "C",
+     "label": "整个 `.ua/` 入 L1（现在就 `git add .ua/`）",
+     "recommended": false,
+     "impact": "什么都不丢，但 16MB / 253 个文件进历史，其中 11MB 是 Understand-Anything 自己的 trash 目录；而且管线**每重跑一次就再造一批**，于是每次审计都会往历史里塞一份新的 16MB diff 噪音 —— 这与 ADR-0013 §三 给 L2 的理由（「机器生成的、可复算的」）正好相反。"
+    },
+    {
+     "key": "D",
+     "label": "维持现状：既不提进 L1，也不写进 `.gitignore`（= 这一问先不答）",
+     "recommended": false,
+     "impact": "零动作。代价是那一行 `?? .ua/` 继续挂着 —— 它既不是「已在库里」（换机器就没了），也不是「已经被忽略」（`git add -A` 仍会一次带进 16MB / 253 个文件，且这次连同 11MB 的 `.trash-1790050761/` 一起进）。★ 这一项之所以必须**显式列出来**：`verify_engine_contract.py` 的 V30a 要求「沉默必须等价于某个选项，包括『什么都不做』那个」—— 本项第一版把 default 写成「沉默 = 现状」而选项里根本没有「现状」，**当场被 V30a 判红**（6 项未决 · Q38: default 没有指向任何一个具体选项）。那不是格式问题：它说明我当时写的三个选项**漏掉了真实会发生的那一种**。"
+    }
+   ],
+   "default_if_unanswered": "沉默 = 选项 D（维持现状）：`.ua/` 继续以一行 `?? .ua/` 挂在 `git status` 上，`git add -A` 仍会一次带进 16MB / 253 个文件；而诊断正文继续只存在于本机 —— 换台机器、或者这个工作目录被清掉，它就没了。★ 沉默的代价是**不对称的**：机器侧全绿（没有任何断言在看 `.ua/`），丢的是文件。",
+   "where": "`.ua/`（253 文件 / 16MB）· `.gitignore:9,10`（L2/L3 两段的准入规则与「改动本文件需回 ADR-0013 §三 同步」）· `ADR/ADR-0013-基座接口冻结与仓库入库分级.md` §三（L1/L2/L3 三张表）· 检查 `python3 tools/verify_open_items.py`。",
+   "$origin": "2026-09-22 结构性诊断 P2 #19 的复核。诊断原文是一条两件事合写的：「4 份**最新** PMO 文档（22.7KB / 13.5KB）**未入库**；`.ua/` 未忽略」。复核时把两半分开：★ 前半**不是决定问题**——那批 PMO 文档是**另一个并发会话**正在写的（2026-09-22 14:39 仍有写入，会话 transcript 里 `守衡-知识库构建完整方案` 出现 492 次、本会话 12 次），提交它们等于「提交写者正在编辑的文件」，要等那位写者收工；★ 后半（`.ua/` 的分级）才是需要 Owner 裁定的那一半，故立此项。"
   }
  ],
  "$id_aliases": {

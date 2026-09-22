@@ -53,9 +53,15 @@ REPO = Path(__file__).resolve().parent.parent
 QUEUE = REPO / "research" / "governance" / "skeleton" / "legal-decisions-v1.json"
 
 #: 棘轮：现状值。**2026-09-22 实测**（`python3 tools/verify_open_items.py` 自己算出来的）：
-#: `$decision_queue` 里 `status == "open"` 的 5 条 = Q23 Q24 Q25 Q26 Q37。
+#: `$decision_queue` 里 `status == "open"` 的 6 条 = Q23 Q24 Q25 Q26 Q37 **Q38**。
 #: 按 `AGENTS.md` §2.2 第 1 条 —— 这是**某时某刻的读数**，不是常量；重算方式是跑本脚本。
-OPEN_RATCHET = 5
+#:
+#: ★ 2026-09-22 · 5 → 6 是**故意抬的，而且这次抬的过程正是这条断言的用法**：
+#:   结构性诊断 P2 #19 复核时新开了 Q38（`.ua/` 的分级要 Owner 定，不是开发者能顺手定的），
+#:   加完先跑本脚本 —— A3 **当场变红**并打出「又开了题而没人看见」。
+#:   棘轮只许减，所以「开新题」这件事必须留下一次显式的动作：改这个常量。
+#:   值改小（有人答完题）随时可以；改大要在这段注释里写清**为什么值得再开一道**。
+OPEN_RATCHET = 6
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

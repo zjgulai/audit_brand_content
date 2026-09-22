@@ -158,6 +158,13 @@
       "subjects": [
         "research/governance/skeleton/legal-decisions-v1.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_reference_census.py",
+      "asserts": "零引用可执行文件的棘轮：只许减不许增；基线不许拿不在册的文件充数；分母塌了（git 取不到 / 口径被改）要红，而不是伪装成「0 个零引用」；基线自身排除出提及池（否则它把自己钉住的名单刷成有人提及）",
+      "subjects": [
+        "tools/reference-census-baseline.json"
+      ]
     }
   ]
 }
