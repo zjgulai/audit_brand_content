@@ -290,13 +290,116 @@ head('J 信封 · 解析、上限执行、以及「标记不许漏进群」');
   const { toCardOrText, extractCardBlock, enforceLimits, leaksInternalMark, publicTextOf, CARD_MARK } =
     await import(path.join(CARDS_DIR, 'envelope.mjs'));
 
-  // J1 三个上限常量真的被读了 —— 这是本轮修掉的真实缺口。
-  // 修之前：VERDICT_MAX / BOUNDARY_MAX / MAX_SECTIONS 定义在 cards.mjs 里，
-  // grep 全仓库只有定义行，没有任何引用。也就是「结论 ≤60 字」只是一句注释。
+  // J1 三个上限：**不查名字，查它真的会拦。**
+  //
+  // 旧版这里是 `new RegExp('\\b'+k+'\\b').test(envSrc)` —— 一个**源码文本存在性测试**：
+  // 只要常量名在 envelope.mjs 里出现过（哪怕只出现在 import 行或 ENFORCED 字面量里）
+  // 就算过。实测它当时正在它本该抓的缺陷上变绿：`MAX_SECTIONS = 3` 全仓
+  // 没有任何一行拿它做比较，J1 却是 ✅ —— AGENTS.md §2.4 点名的那个病，
+  // 在它自己的执行点断言里活了下来。
+  //
+  // 现在分三层，缺一层都不算：
+  //   J1a 源码级 —— 常量必须出现在一个**能改变行为的表达式**里（排除注释/import/export）
+  //   J1b 行为级 —— 喂一个超限样本，必须真的被拦下，且**内容一个字符不丢**
+  //   J1c 相容级 —— 现有 11 张样例卡都不许超限（否则是「上限与模版不相容」，病因同 MAX_SECTIONS=3）
   const envSrc = fs.readFileSync(path.join(CARDS_DIR, 'envelope.mjs'), 'utf8');
+  const envLines = envSrc.split('\n');
+  const isComment = (l) => {
+    const t = l.trim();
+    return t.startsWith('*') || t.startsWith('//') || t.startsWith('/*');
+  };
+  const { capSections } = await import(path.join(CARDS_DIR, 'envelope.mjs'));
+  const cardsMod2 = await import(path.join(CARDS_DIR, 'cards.mjs'));
+  const { md, MAX_SECTIONS: MS } = cardsMod2;
+  const cp = (x) => [...String(x)].length;
+
+  // J1a 的判据：常量必须**真的到达一个比较**，而不是只被转口。
+  //   排除的正是 MAX_SECTIONS=3 当时的形状 —— 只在 import 行与 ENFORCED 字面量里出现。
+  //   允许**一层默认值绑定**：`capSections(card, max = MAX_SECTIONS)` 里 `max` 被比较，
+  //   常量确实决定了行为，算数。这不是为了迁就写法 —— 是为了不逼着代码
+  //   为了过检查而写成更差的样子（教考试）。
+  const reachesComparison = (k) => {
+    const code = envLines.filter((l) => !isComment(l));
+    const cmp = (l) => /[<>]=?|Math\.(min|max)/.test(l);
+    if (code.some((l) => new RegExp(`\\b${k}\\b`).test(l) && cmp(l))) return '直接比较';
+    const binders = [];
+    for (const l of code) {
+      const m = l.match(new RegExp(`([A-Za-z_$][\\w$]*)\\s*=\\s*${k}\\b`));
+      if (m) binders.push(m[1]);
+    }
+    for (const b of binders) {
+      if (code.some((l) => new RegExp(`\\b${b}\\b`).test(l) && cmp(l))) return `经绑定 ${b}`;
+    }
+    return null;
+  };
+
   for (const k of ['VERDICT_MAX', 'BOUNDARY_MAX', 'MAX_SECTIONS']) {
-    if (!new RegExp(`\\b${k}\\b`).test(envSrc)) no(`J1 ${k} 有执行点`, `${k} 在 envelope.mjs 里没被引用，上限又变回注释了`);
-    else ok(`J1 ${k} 在 envelope.mjs 里被使用`);
+    const how = reachesComparison(k);
+    if (!how) {
+      const seen = envLines.filter((l) => !isComment(l) && new RegExp(`\\b${k}\\b`).test(l));
+      no(`J1a ${k} 有执行点`,
+        `${k} 在 envelope.mjs 里没有任何一条非注释语句拿它做比较 —— ` +
+        `只出现在 ${seen.length} 行里（${seen.map((l) => l.trim().slice(0, 40)).join(' | ') || '一行都没有'}），` +
+        `上限又变回注释了`);
+    } else {
+      ok(`J1a ${k} 到达了比较（${how}）`);
+    }
+  }
+
+  // J1b：行为级 —— 每个上限都要有一个「喂超限样本 → 真被拦下」的实证
+  {
+    // ① 结论超长
+    const vLong = '结'.repeat(300);
+    const r1 = enforceLimits('query-answer', { title: 't', verdict: vLong }, []);
+    const vAfter = r1.data.verdict ?? '';
+    if (cp(vAfter) > 60) no('J1b VERDICT_MAX 真的拦', `喂 300 字结论，出来还是 ${cp(vAfter)} 字`);
+    else ok(`J1b VERDICT_MAX 真的拦：300 → ${cp(vAfter)} 字`);
+
+    // ② 边界超长
+    const bLong = '边'.repeat(400);
+    const r2 = enforceLimits('query-answer', { title: 't', verdict: '短结论', boundary: bLong }, []);
+    const bAfter = r2.data.boundary ?? '';
+    if (cp(bAfter) > 90) no('J1b BOUNDARY_MAX 真的拦', `喂 400 字边界，出来还是 ${cp(bAfter)} 字`);
+    else ok(`J1b BOUNDARY_MAX 真的拦：400 → ${cp(bAfter)} 字`);
+
+    // ③ 段落超限 —— 造一张比 MAX_SECTIONS 多两段的卡
+    const n = MS + 2;
+    const over = {
+      schema: '2.0', config: { update_multi: true },
+      header: { title: { tag: 'plain_text', content: 'T' }, template: 'orange' },
+      body: { elements: Array.from({ length: n }, (_, i) => md(`第${i + 1}段`)) },
+    };
+    const beforeTxt = JSON.stringify(over.body.elements);
+    const capped = capSections(over);
+    const afterMd = capped.card.body.elements.filter((e) => e.tag === 'markdown').length;
+    const folded = capped.card.body.elements.find((e) => e.tag === 'collapsible_panel');
+    if (afterMd > MS) {
+      no('J1b MAX_SECTIONS 真的拦', `喂 ${n} 段，顶层还剩 ${afterMd} 段（上限 ${MS}）`);
+    } else if (!folded || folded.elements.length !== n - MS) {
+      no('J1b MAX_SECTIONS 真的拦', `${n} 段里只折叠了 ${folded ? folded.elements.length : 0} 段，其余不知去向`);
+    } else {
+      // 搬是搬，砍是砍：每一段的原文都必须还在
+      const afterTxt = JSON.stringify(capped.card.body.elements);
+      const lost = Array.from({ length: n }, (_, i) => `第${i + 1}段`).filter((t) => !afterTxt.includes(t));
+      if (lost.length) no('J1b MAX_SECTIONS 不丢内容', `搬走后找不到：${lost.join('、')}`);
+      else ok(`J1b MAX_SECTIONS 真的拦：${n} 段 → 顶层 ${afterMd} 段 + 折叠 ${folded.elements.length} 段，内容一个没丢`);
+    }
+
+    // J1c：现有模版必须都不超限 —— 否则是上限与模版不相容（MAX_SECTIONS=3 就是这么废的）
+    let worst = 0, worstKind = '';
+    for (const r of REGISTRY) {
+      const c = samples[r.kind];
+      if (!c) continue;
+      const m = (c.body?.elements ?? []).filter((e) => e.tag === 'markdown').length;
+      if (m > worst) { worst = m; worstKind = r.kind; }
+    }
+    if (worst > MS) {
+      no('J1c 上限与模版相容',
+        `「${worstKind}」顶层有 ${worst} 段，超过 MAX_SECTIONS=${MS} —— ` +
+        `上限比模版还小，等于每次都要搬，和当初 MAX_SECTIONS=3 是同一个病`);
+    } else {
+      ok(`J1c 上限与模版相容：11 张样例卡最紧的一张是「${worstKind}」${worst} 段 ≤ ${MS}`);
+    }
   }
 
   // J2 ★ 最要紧的一条：要发出去的**文本**里，任何输入都不许留下 [[card: 或内部记录。
@@ -534,17 +637,32 @@ head('I 数字 · 文档里写的自证项数必须等于实际项数');
     'tools/reply-cards/contract.md',
     'PMO/守衡-回复卡片模版与语域规程.md',
   ];
+
+  // ★ 期望值是**在本段开头一次性算出来的常量**，不是循环里边跑边读的 `pass`。
+  //
+  //   旧版写的是 `Math.abs(n - pass) > 12`（±12 容差），有两个毛病：
+  //   ① `pass` 每轮 ok() 都在涨，于是三份文档被拿去比的是**三个不同的基准**
+  //      （实测 229 / 230 / 231）—— 同一条断言自己跟自己不一致；
+  //   ② 容差 ±12 让「必须等于」变成「差一个数量级也行」，而段标题与
+  //      `contract.md:293` 的说明都写着「必须等于实际项数」。**断言比它声称的弱。**
+  //
+  //   现在：`docs.length` 是常量（每份文档无论走 ok 还是 no 都恰好贡献 1 条断言），
+  //   所以 `passBeforeI + docs.length` 是确定的终值 —— 与本段自己的判定无关，不自指。
+  const passBeforeI = pass;
+  const expected = passBeforeI + docs.length;
+
   for (const rel of docs) {
     const f = path.join(ROOT, rel);
     if (!fs.existsSync(f)) { no(`I ${rel}`, '文件不存在'); continue; }
     const md = fs.readFileSync(f, 'utf8');
     const claims = [...md.matchAll(/(\d+)\s*项(?:全过|通过)/g)].map((m) => Number(m[1]));
     if (!claims.length) { ok(`I ${rel} 未写死项数`); continue; }
-    // pass 是本文件跑到这里时的累计通过数；再算上本轮 I 段自己会加的几条，
-    // 用一个容差判断，避免这一段的断言数自己把自己算进去。
-    const wrong = claims.filter((n) => Math.abs(n - pass) > 12);
-    if (wrong.length) no(`I ${rel}`, `写着 ${wrong.join('/')} 项，实际跑到这里是 ${pass} 项（差得太多，说明数字是手写的）`);
-    else ok(`I ${rel} 的 ${claims.join('/')} 与实测 ${pass} 同量级`);
+    const wrong = claims.filter((n) => n !== expected);
+    if (wrong.length) {
+      no(`I ${rel}`, `写着 ${wrong.join('/')} 项，本脚本实际是 ${expected} 项`);
+    } else {
+      ok(`I ${rel} 的 ${claims.join('/')} == 实测 ${expected}`);
+    }
   }
 }
 

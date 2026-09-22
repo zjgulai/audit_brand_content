@@ -12,7 +12,7 @@
  * 因此它不会腐烂 —— 改代码不改这里，自证会红。
  */
 import {
-  BUILDERS, BUILDER_SOURCE_NAME, build, validateCard,
+  BUILDERS, BUILDER_SOURCE_NAME, build, validateCard, collapsible,
   VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, ALLOWED_TAGS, TEMPLATES, TONE, REMOVED_IN_V2,
 } from './cards.mjs';
 
@@ -493,7 +493,7 @@ export function sampleCards() {
 }
 
 export {
-  build, validateCard, BUILDERS, BUILDER_SOURCE_NAME,
+  build, validateCard, BUILDERS, BUILDER_SOURCE_NAME, collapsible,
   // 这三个上限以前只定义、不导出、不引用（grep 全仓库只有定义行）。
   // envelope.mjs 是它们现在唯一的执行点，所以必须从这里转出去。
   VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS,

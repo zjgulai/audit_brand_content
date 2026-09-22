@@ -341,7 +341,7 @@
 | 降级链（卡 → 文本，两处兜底合并为一处） | ✅ 完成 |
 | 提示词打包（类型清单与登记表现算，不手抄） | ✅ 完成（`persona.cardContract()`） |
 | 去 AI 味内容级检查（7 条） | ✅ 完成（`lintCopy()`） |
-| 自证 | ✅ `node tools/verify_cards.mjs`，227 项全过 |
+| 自证 | ✅ `node tools/verify_cards.mjs`，236 项全过 |
 | **接进 `ws_daemon.mjs` 的发送路径** | ✅ **已接入**。每条回复过 `toCardOrText()`，形态 / 搬迁 / 语域命中都落日志 |
 | **群里真实渲染效果** | ⚠️ **未由人眼确认**。探针只验了「接口收下」，没验「群里长什么样」 |
 | **按钮回调** | ❌ **未接住**。`ws_daemon` 收到 `card.action.trigger` 只记日志。所以模版里的按钮目前点不动 |

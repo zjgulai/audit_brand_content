@@ -184,7 +184,10 @@ def verdict(n_pass, n_fail, untested):
       拆成纯函数之后，`--controls` 可以直接断言**这句话本身**不会撒谎。
     """
     if n_fail:
-        return 1, f"❌ {n_pass + n_fail} 项中 {n_fail} 项失败"
+        # ★ 有红的时候更要把未测说出来 —— 只看最后一行的人会以为「红的就这几项，其余都验过了」。
+        #   这是 `verify_shouheng_ops.py` 的 H7 定下的同一条口径，两处保持一致。
+        tail = f"；另有 {len(untested)} 项未测（见 ⚠️ 行）" if untested else ""
+        return 1, f"❌ {n_pass + n_fail} 项中 {n_fail} 项失败{tail}"
     if untested:
         return 2, (f"⚠️  已测 {n_pass} 项全过，但 L3 **未测**（{len(untested)} 份："
                    f"{', '.join(untested)}）—— 退出码 2，**不是通过**")
@@ -305,8 +308,17 @@ def main():
     else:
         tok, err = tenant_token()
         if tok is None:
+            # ★ 取不到 token 是**未测**，不是失败。
+            #
+            #   原先这一支同时 `add(..., False, err)`，于是 n_fail ≥ 1 → `verdict` 退 **1** →
+            #   `tools/agent/prd_baseline.mjs:277` 按 `code === 1` 去解析漂移、`:281-283`
+            #   抠不到指纹就**造一条占位漂移** → 群里收到的是
+            #   「**上游 PRD 改版了**」。而真实原因只是凭据过期 —— **对外说错话**。
+            #
+            #   退 2 会走 `prd_baseline.mjs:147` 的未测分支，群里得到的是「没测成 ——
+            #   报『未测』，不报『没问题』」。两句话的分量差很远：一句会让对方去查自己
+            #   到底改了什么，另一句只是我们自己这边没测成（§2.4.2：对外说过的话优先）。
             untested = [d.get("file") for d in docs]
-            add("L3", "C1 取 tenant_access_token", False, err)
         else:
             add("L3", "C1 取 tenant_access_token", True, "ok")
             for d in docs:
@@ -360,10 +372,13 @@ def main():
             print("   动作（**别只改 sha256**，要重拉正文并重记全部读数）：")
             print(f"     python3 tools/lark_find.py readdoc {d['obj_token']} > "
                   f"'PRD/feishu/{d['file']}'")
-            print("       ★ 用 shell 重定向落盘 —— Python 写盘会被 +4096 填充（AGENTS.md §2.1）")
+            print("     # ★ 落盘后必须去填充 —— readdoc 的产出方是 python3，"
+                  "shell 重定向**挡不住** +4096（AGENTS.md §2.1，2026-09-22 实测更正）")
+            print("     python3 tools/verify_depad.py --fix       # 去填充 + 自动复验")
             print("     # 再更新 索引-v1.json 的 sha256 / chars / size_bytes / obj_edit_time_bj")
+            print("     #   旧读数写进该条的 prev_fingerprints，别丢")
             print("     python3 tools/verify_prd_baseline.py      # 复绿")
-            print("     python3 tools/verify_depad.py            # 顺带确认没被填充")
+            print("     python3 tools/verify_depad.py            # 复验：须「被填充 0 个」")
 
     code, line = verdict(len(PASS), len(FAIL), untested)
     print("\n" + line)

@@ -70,8 +70,24 @@ export const TONE = {
 export const VERDICT_MAX = 60;
 /** 单行边界声明的长度上限。超过说明又在写段落，不是在写边界。 */
 export const BOUNDARY_MAX = 90;
-/** 卡片正文里允许出现的段落数上限，防复读。 */
-export const MAX_SECTIONS = 3;
+/**
+ * 卡片正文里允许出现的**顶层 markdown 块**数上限，防复读。
+ *
+ * 口径（2026-09-22 定，写在代码里而不是文档里）：
+ *   「段落」只数 `body.elements` **顶层**的 `markdown` 块。
+ *   `hr` 是分隔线、`collapsible_panel` 是收起区（本来就不占观感）、
+ *   `column_set` / 字段排是字段表 —— 都不算段落。
+ *
+ * 值 = **实测上界**，不是拍出来的：11 张样例卡的顶层 markdown 块数最大是 4
+ * （`correction` 与 `find-nothing` 各 4，其余 ≤3），所以取 4。
+ * 原值 3 在三种口径下都拦不到东西（顶层块上界 4 / 承载正文块 6 / 全部 elements 7），
+ * 而且**整个仓库没有一行代码拿它做比较** —— 正是 §2.4 点名的那个病。
+ * 复现：`grep -rn MAX_SECTIONS tools/`，以及 `node tools/verify_cards.mjs` 的 J1。
+ *
+ * 执行点：`envelope.mjs` 的 `capSections()`，由 `toCardOrText()` 对建好的卡调用；
+ * 超出的段落**搬进折叠区**，不丢字符（§2.4「搬是搬，砍是砍」）。
+ */
+export const MAX_SECTIONS = 4;
 
 /* ═══════════════════════════ 子元素构造器 ═══════════════════════════ */
 

@@ -25,7 +25,7 @@
  * 并且降级理由写进正文（对方要能看出格式为什么变了）。
  */
 import {
-  BUILDERS, VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS,
+  BUILDERS, VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, collapsible,
   build, validateCard, renderText,
 } from './registry.mjs';
 import { lintCopy } from './registry.mjs';
@@ -277,6 +277,53 @@ export function enforceLimits(kind, data, extra = []) {
   return { data: d, moved };
 }
 
+/* ═══════════════ ②b 段落数上限 —— MAX_SECTIONS 的执行点 ═══════════════ */
+
+/**
+ * 卡片**顶层 markdown 块**超过 `MAX_SECTIONS` 时，把多出来的段落搬进折叠区。
+ *
+ * ★ 为什么在这里、而不在 `enforceLimits` 里：
+ *   `enforceLimits` 作用在**数据**上（verdict / boundary 这些格子），
+ *   而「顶层 markdown 块有几个」是**建出来的卡**才有的性质 ——
+ *   同一个字段在不同卡片类型里可能进正文、也可能进字段表或折叠区。
+ *   所以只能在 `build()` 之后数。
+ *
+ * ★ 口径（与 `cards.mjs` 里 `MAX_SECTIONS` 的注释同源 —— 改一处必须改两处）：
+ *   只数 `body.elements` **顶层**的 `markdown`。
+ *   `hr` 是分隔线、`collapsible_panel` 是收起区、`column_set` / 字段排是字段表，都不算段落。
+ *
+ * ★ 搬是搬，砍是砍：搬走的段落**一个字都不改**，整段进折叠区（§2.4）。
+ *   丢内容比格式难看严重得多。
+ *
+ * @param {object} card 已建好的卡
+ * @param {number} [max] 上限，默认取 MAX_SECTIONS
+ * @returns {{card: object, moved: Array}} 未被改动时 `moved` 为空数组
+ */
+export function capSections(card, max = MAX_SECTIONS) {
+  const els = card && card.body && card.body.elements;
+  if (!Array.isArray(els)) return { card, moved: [] };
+
+  const mdIdx = els
+    .map((e, i) => (e && e.tag === 'markdown' ? i : -1))
+    .filter((i) => i >= 0);
+  if (mdIdx.length <= max) return { card, moved: [] };
+
+  const overflowIdx = new Set(mdIdx.slice(max));
+  const overflow = els.filter((_, i) => overflowIdx.has(i));
+  const kept = els.filter((_, i) => !overflowIdx.has(i));
+  kept.push(collapsible(`其余 ${overflow.length} 段（已折叠 · 防复读）`, overflow));
+
+  return {
+    card: { ...card, body: { ...card.body, elements: kept } },
+    moved: overflow.map((e) => ({
+      field: 'sections',
+      to: 'collapsible',
+      chars: len(e.content || ''),
+      why: `顶层段落超过 ${max} 段，第 ${max + 1} 段起搬进折叠区`,
+    })),
+  };
+}
+
 /* ═══════════════ ③ 主入口 ═══════════════ */
 
 /**
@@ -319,7 +366,11 @@ export function toCardOrText(reply) {
   const built = (() => {
     const { data, moved } = enforceLimits(blk.kind, blk.data, extra);
     try {
-      return { card: build(blk.kind, data), data, moved, err: null };
+      // 先按数据把长度上限执行掉、再建卡，最后按**建出来的卡**数顶层段落。
+      // 顺序不能颠倒：段落数只有卡建出来才存在。
+      const capped = capSections(build(blk.kind, data));
+      if (capped.moved.length) moved.push(...capped.moved);
+      return { card: capped.card, data, moved, err: null };
     } catch (e) {
       return { card: null, data, moved, err: e.message };
     }
@@ -384,4 +435,4 @@ export function publicTextOf(card) {
 }
 
 /** 供 verify 与 CLI 用：哪些常量真的被读了 */
-export const ENFORCED = { VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, KINDS: Object.keys(BUILDERS), validateCard };
+export const ENFORCED = { VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, KINDS: Object.keys(BUILDERS), validateCard, capSections };

@@ -1,0 +1,145 @@
+{
+  "schema": "verifier-coverage/v1",
+  "why": [
+    "这文件存在的理由：图谱里 tested_by 边 = 0。25 个验算器覆盖了什么，",
+    "只活在每个 verifier 的源码文本里 —— 任何工具都读不到，改名/换路径不会有东西红。",
+    "所以这里把「谁验什么」显式声明成机器可读的，并由 tools/verify_coverage.py 反证：",
+    "① 每个 verify_* 必须在册（不许有孤儿验算器）；",
+    "② 每个 subjects 条目必须**在该 verifier 的源码里逐字出现**（改名/写错就红）；",
+    "③ 每个 subjects 条目必须在盘上存在，除非显式标 untracked 并写明原因；",
+    "④ 算不出静态目标的，必须显式写 dynamic 原因，不许留空。",
+    "★ 只声明不反证 = 又一处没有执行点的文档；本文件由 verify_coverage.py 消费。"
+  ],
+  "verifiers": [
+    {
+      "verifier": "tools/verify_engine_contract.py",
+      "asserts": "引擎契约（V 组闸门）：规则表结构、指纹、未决项唯一书写位置、处置分层",
+      "subjects": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/skeleton/engine-manifest.json",
+        "research/governance/skeleton/legal-decisions-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_kb.py",
+      "asserts": "知识库：G1 存在性 / E1 证据 / E7 外部承诺未逾期",
+      "subjects": [
+        "tools/kb_build.py",
+        "tools/kb_facts.py",
+        "tools/kb_gaps.py",
+        "tools/kb_query.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_cards.mjs",
+      "asserts": "模版 / 字段登记 / 文档三者一致 + 去 AI 味规则正反例 + 信封上限",
+      "subjects": [
+        "tools/reply-cards/cards.mjs",
+        "tools/reply-cards/registry.mjs",
+        "tools/reply-cards/contract.md",
+        "tools/reply-cards/README.md",
+        "PMO/守衡-回复卡片模版与语域规程.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_feishu_index.py",
+      "asserts": "飞书可达资源索引：租户判定 / 可达性 / 原文抽取 / 可达清单完整",
+      "subjects": [
+        "tools/feishu_index.py",
+        "research/feishu/资源索引-v1.json",
+        "research/feishu/可达清单.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_prd_baseline.py",
+      "asserts": "上游 PRD 基线漂移：L1 结构 / L2 副本=指纹 / L3 上游=指纹；L3 未测退 2",
+      "subjects": [
+        "PRD/feishu/索引-v1.json",
+        "tools/lark_find.py",
+        "tools/verify_depad.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_pending.py",
+      "asserts": "待收清单：承诺必须指得出上游原话；我方提问不许写成对方承诺（C2/C3）",
+      "subjects": [
+        "PMO/待收清单-v1.json",
+        "tools/agent/prd_baseline.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_shouheng_ops.py",
+      "asserts": "守衡运维：重启闸门默认拒绝 / 不许绕过 / KeepAlive 自愈 / 它现在还活着",
+      "subjects": [
+        "tools/ws_daemon.mjs",
+        "tools/restart_shouheng.sh",
+        "tools/com.shouheng.lark.plist"
+      ]
+    },
+    {
+      "verifier": "tools/verify_landing.py",
+      "asserts": "落地页抓取指标：一致性 / 稳定性 / 快照口径",
+      "subjects": [
+        "tools/lp_stability.py",
+        "research/landing/指标.json",
+        "research/landing/一致性分析.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_external.py",
+      "asserts": "外部标准库：条目必须在来源快照中逐字命中（无形态差、无空位差）",
+      "subjects": [
+        "research/kb/外部标准库-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_vocab_lark.py",
+      "asserts": "词表飞书 ↔ 本地逐词一致（回读值，不是写入返回码）",
+      "subjects": [
+        "research/governance/skeleton/context-guards-v1.json",
+        "research/governance/skeleton/whitelist-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_depad.py",
+      "asserts": "全仓生成物可读性：有没有文件被环境 +4096 填充成 read 工具打不开",
+      "subjects": [],
+      "dynamic": "目标是『全仓所有文本文件』，运行时递归枚举，没有可声明的静态子集"
+    },
+    {
+      "verifier": "tools/verify_coverage.py",
+      "asserts": "本登记表自身：名册双向完整 / 主体在盘上 / 主体在各自源码里可查 / 反向对照",
+      "subjects": [
+        "tools/verifier-coverage.json"
+      ]
+    },
+    {
+      "verifier": "research/distill/verify_citations.py",
+      "asserts": "distill 分片的引用可回溯到来源快照",
+      "subjects": [],
+      "dynamic": "目标按 research/distill/ 目录内容在运行时枚举"
+    },
+    {
+      "verifier": "base/verify_base.py",
+      "asserts": "基座自证：各模块自证通过 · L1 自足性 · 分级与 .gitignore 一致 · 无未登记产物",
+      "subjects": [
+        "base/contract.py",
+        "base/text_stage.py",
+        "base/judge_adapter.py",
+        "base/media.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_skill.py",
+      "asserts": "把规程文档里每条 bash 命令真跑一遍",
+      "subjects": [
+        "skills/内容合规审查/SKILL.md"
+      ],
+      "untracked": [
+        "skills/内容合规审查/SKILL.md 被 .gitignore:39 忽略、未入库，只存在于本机。",
+        "换一台机器这个 verifier 会直接 FileNotFoundError。",
+        "在册是为了让这件事可见 —— 不是为了让检查通过。"
+      ]
+    }
+  ]
+}
