@@ -104,6 +104,22 @@ CATCH-ALL（未覆盖）159 条 = 54.6%
 | `errorbook/错题本.md` | 错题本用法：怎么填、谁填、填完去哪 | ✓ |
 | `errorbook/errorbook_schema.md` | 25 个字段的定义、取值枚举、依据出处 | ✓ |
 
+### 第五部分 · 上面四部分漏挂的文件（2026-09-22 补录）
+
+> **这一节为什么存在**：本索引原先只列了「有名字的分片」，于是下面这些文件**在仓里没有任何入边** ——
+> 从 `README.md` 或 `AGENTS.md` 出发一份都走不到（实测：`python3 tools/verify_doc_reachability.py -v`）。
+> 其中 `receipts.LOSS.md` 是一份**事故记录**，而 `AGENTS.md` §2.2 正是把事故记录当作
+> 「别再踩的坑」的唯一存档 —— 走不到的事故记录等于没记。
+
+| 文件 | 说明 |
+|---|---|
+| `R4-metrics-and-transparency-evidence.md` | **R4 的一手证据包**（抓取日期 2026-09-15，原件在 `_evidence/R4/`）。`R4-trust-and-safety-ops.md` 是它的正文；上面「第三部分」的 R4 一行只挂了正文，没挂证据包 |
+| `判定引擎产品化-实测报告.md` | 批次 A + 第二批 D5–D11 的**实测报告**（语料 = `_data/records.json` 291 条真实广告记录）；配套决策是 `ADR/ADR-0012-判定引擎产品化与处置分层.md` |
+| `skeleton/迁移手册-机器词表.md` | **白名单 / 语境守卫的飞书侧迁移手册**（依据 ADR-0008、ADR-0009）；`skeleton/migrate_misrouted_guards.py` 的文件头就指着它的 §五 |
+| `skeleton/_data/receipts.LOSS.md` | ⚠ **事故记录**：2026-09-16 `cp` 参数写反，把真回执账本覆盖成 1 行测试回执。**这是「事故记录必须有入边」那条规矩的适用对象** |
+| `skeleton/_data/遗留对账.md` | ADR-0013 `遗留#` 对账表（**只读产物**，由 `python3 tools/_recon_legacy.py --write` 生成，手改无效） |
+| `annotations/annot_rater_A_notes.md` · `annotations/annot_rater_B_notes.md` | 两名标注者盲标的**备注**（TSV 严格三列，note 另存于此）；配套 `annotations/ANN-GUIDE-001-T1.4-T2.1.2.md` 与 `annotations/measure_alpha.py` |
+
 ---
 
 ## 已收敛的关键结论（随分片落地滚动更新）

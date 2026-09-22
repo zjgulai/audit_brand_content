@@ -2311,8 +2311,8 @@ L8  评测与回归层      Eval & Regression         ← 横切，不是终点
 | `kb2agent-research/raw/_sub-cx-vertical.md` | Sierra / Decagon / Harvey 一手调研（逐条列出打开过的 URL） | 624 |
 | `kb2agent-research/raw/_sub-health.md` | Abridge / Dragon Copilot（原 Nuance DAX）一手调研 | 700 |
 | `kb2agent-research/raw/_sub_legal.md` | Harvey 法律侧补充材料 | 484 |
-| `kb2agent-research/raw/B-part1..3.md` | 「知识 → Agent」方法论（Anthropic / 记忆分层 / GraphRAG / 编排模式） | 235 |
-| `kb2agent-research/raw/C-part1..2.md` | 合规审核三件套（OpenAI Moderation / Perspective API） | 163 |
+| `kb2agent-research/raw/B-part1.md` · `kb2agent-research/raw/B-part2.md` · `kb2agent-research/raw/B-part3.md` | 「知识 → Agent」方法论（Anthropic / 记忆分层 / GraphRAG / 编排模式） | 235 |
+| `kb2agent-research/raw/C-part1.md` · `kb2agent-research/raw/C-part2.md` | 合规审核三件套（OpenAI Moderation / Perspective API） | 163 |
 | `kb2agent-research/raw/D-part1.md` | 失败与踩坑复盘 | 132 |
 | `kb2agent-research/raw/E-守衡落地建议.md` | 本报告「附」章的底稿（缺口 G1–G11 + 演进路径） | 330 |
 | `kb2agent-research/raw/F-part1.md` | 补充检索 | 111 |
