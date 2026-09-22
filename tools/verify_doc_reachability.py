@@ -62,6 +62,14 @@
   D  每一份**非豁免**的第一方文档都可达
   E1 不可达集合 == 各豁免类之并（分项之和 = 总数，且未归类数为 0）
   E2 有自述文件的豁免类，其自述文件在盘上
+  G1 文档点名的 `.ua/*.cjs` 必须「在库」或「已在 `ON_DISK_ONLY` 声明」——
+     ★ 这一段是 2026-09-22 `Q38` 重裁（`.ua/` **只收正文**）的代价：正文里那些
+     `node .ua/<脚本>.cjs` 命令**换台机器就跑不了**。已接受的代价，但必须**可数**
+  G2 声明的文件必须**仍被文档点名**（过期声明 = 提前发出去的免死金牌）
+  G3 每条声明必须写理由｜G6 声明集非空（否则 G1 恒真）
+  G4 声明的文件必须**仍在盘上**（替一个不存在的东西背书）
+  G5 声明的文件必须**仍不在库**（回到 L1 之后必须撤声明 —— 与 `base/verify_base.py`
+     的 `derived_l2_generator` 那条对称：降级不许留成常设）
   F  未测与红必须长得不一样（退出码 2 ≠ 1 ≠ 0；结论行不许把未测说成通过）
 
 ## 退出码
@@ -155,6 +163,7 @@ TOPDIRS = (
 #   而 `E1`（分项之和 == 总数、未归类数 0）与 `D`（非豁免的第一方文档必须可达）两条
 #   **不依赖这个常量**，它们才是防漏的主力。
 PINNED_UNREACHABLE = 100
+
 
 # ── 豁免类 ────────────────────────────────────────────────────────────────
 # 每条：(id, 谓词, 为什么它「不可达」不算问题, 判据证据文件或 None)
@@ -423,12 +432,91 @@ def analyze(tracked, docs, bodies, seeds=SEEDS, doc_only_relay=True, wide=False)
     }
 
 
+# ── G 段 · 文档点名的**复现入口**在不在库里 ──────────────────────────────
+#
+# 这一段是 2026-09-22 `Q38` 重裁（Owner：`.ua/` **只收正文**）的直接结果。
+#
+# 10 份诊断正文里一条条写着 `node .ua/xxx.cjs` 这样的复现命令，而那 9 个 `.cjs`
+# 按裁定留在 L2（`.gitignore` 里逐条列出）。于是**正文里存在一批空头支票**：
+# 命令写在那里，文件换台机器就不在。这正是 `AGENTS.md` §2.2 第 1 条的坑
+# （本仓为同一个坑付过一次学费，见诊断 #6）。
+#
+# 裁定的代价是已知的、Owner 接受了；**但「已知」必须可数**。所以这一段做两件事：
+#   ① 把「哪些命令是空头支票」变成一张**逐条声明 + 逐条理由**的单子（下面这张）；
+#   ② 断言这张单子**不多不少** —— 新冒出来一条要红，留下一条没人用的也要红。
+#
+# ⚠️ **本段刻意只管 `.ua/`，不做全仓扫描。** 理由是实测的：按「文档里出现的
+# 路径形状 token」扫全仓，会命中约 400 条，而其中绝大多数**根本不是路径** ——
+# 它们是相对别的根的路径（`_evidence/R1/…`）、是别人的仓库里的路径
+# （`research/distill/` 那批是在描述**外部项目**的结构）、是散文里的文件名。
+# 一个把 400 条噪音报成红的检查器，会让人开始不看报告（§2.1.1：会误报的检查器比没有更糟）。
+# 口径收在 `.ua/` 上不是「假装查过了」，是把**这一次裁定真正造成的那笔账**查干净。
+#: ★ 文件名用 `[\w.\-]` 而不是 `[A-Za-z0-9_.\-]` —— 这条是**被自己的反向对照逼出来的**：
+#:   第一版只收 ASCII，于是 `dangling_refs("… `node .ua/中文名.cjs` …")` 一条都认不出来，
+#:   而 C15（「点名一个没声明的脚本 → G1 必须红」）当场变红。`\w` 在 Python 的 str 正则里
+#:   本来就含中日韩字符。**一个只认 ASCII 的扫描器，对中文名的脚本是瞎的。**
+UA_REF_RE = re.compile(r"\.ua/[\w.\-]+\.cjs")
+
+#: 被文档点名、但**不在库**的脚本 → 为什么它不在库。
+#: ★ 逐条列、不许通配（一条 `.ua/*.cjs` 规则就是一张会自己长大的免死金牌；
+#:   与 `tools/verify_reference_census.py` 的 `POOL_EXCLUDE` 同一条道理）。
+#: ★ **7 条，不是 9 条** —— 另外两个（`.ua/gen-dispatch.cjs` · `.ua/gen-phase45.cjs`）
+#:   是管线组装脚本，`ADR-0013` 里写作 `.ua/gen-*.cjs`（一个**通配写法**），
+#:   所以**没有任何文档点名它们**，它们不进这张单子。
+#:   本段第一次跑就把这件事打了出来（G2 报「2 条声明没人点名」）——
+#:   而那一版我确实是按「9 个都要登记」写的，把「进了 L2」与「被文档点名」混成了一件事。
+#: ★ 理由**逐条写全**（虽然 7 条同因）：G2/G4/G5 要能针对单条报错，
+#:   而「7 条共用一个理由」最容易演变成「加第 8 条时没人看理由」。
+ON_DISK_ONLY = {
+    p: "`Q38` 裁定（Owner：`.ua/` 只收正文）：本文件是那次结构性诊断的复现入口，"
+       "入盘不入历史。正文里那句 `node .ua/…` 因此**换台机器就跑不了** —— 已知并接受的代价。"
+    for p in (
+        ".ua/adr-status-check.cjs", ".ua/assemble.cjs", ".ua/doc-reachability.cjs",
+        ".ua/duplication-check.cjs", ".ua/graph-diagnosis.cjs",
+        ".ua/reference-census.cjs", ".ua/runtime-surface.cjs",
+    )
+}
+
+
+def dangling_refs(doc_bodies, tracked, exists, declared=None):
+    """纯函数：文档点名的 `.ua/*.cjs`，哪些是空头支票、有没有登记。
+
+    `doc_bodies` = {路径: 正文}（**只喂文档**，机器产物不点名命令）；
+    `tracked`    = 已跟踪文件集合；`exists` = 路径 → 是否在盘上的谓词；
+    `declared`   = 路径 → 理由（默认 `ON_DISK_ONLY`；控制组可注入自己的单子）。
+    """
+    decl = dict(ON_DISK_ONLY if declared is None else declared)
+    refs = {}
+    for path, body in doc_bodies.items():
+        for m in UA_REF_RE.finditer(body or ""):
+            refs.setdefault(m.group(0), []).append(path)
+
+    undeclared, now_tracked = [], []
+    for target, who in sorted(refs.items()):
+        if target in tracked:
+            if target in decl:
+                now_tracked.append((target, sorted(set(who))))
+            continue                      # 在库 = 那句命令跑得通，不需要声明
+        if target not in decl:
+            undeclared.append((target, sorted(set(who))))
+
+    missing_reason = [p for p, why in decl.items() if not (why or "").strip()]
+    stale = [p for p in decl if p not in refs]                 # 声明了，但没人点名
+    gone = [p for p in decl if not exists(p)]                  # 声明了，盘上却没有
+    return {"refs": refs, "undeclared": undeclared, "now_tracked": now_tracked,
+            "missing_reason": missing_reason, "stale": stale, "gone": gone,
+            "declared_n": len(decl)}
+
 # ══════════════════════════════════════════════════════════════════════════
 # 判定（纯函数，控制组直接喂它）
 # ══════════════════════════════════════════════════════════════════════════
 
-def check(reading, pinned, root=ROOT):
-    """把读数变成 (pass_list, fail_list)。未测由调用方另行处理，不在这里。"""
+def check(reading, pinned, root=ROOT, dangling=None):
+    """把读数变成 (pass_list, fail_list)。未测由调用方另行处理，不在这里。
+
+    `dangling` = `dangling_refs(...)` 的结果（G 段）。传 `None` 就跳过 G 段 ——
+    控制组里那些只造文档图的样本用得上；**主流程永远传它**。
+    """
     P, F = [], []
 
     # A / B / B2 —— 每条都先查分母。**分母为 0 的断言是恒真的**（§2.4：
@@ -498,6 +586,48 @@ def check(reading, pinned, root=ROOT):
     else:
         n_ev = len([1 for _c, _p, _w, ev in EXEMPT_CLASSES if ev])
         P.append("E2 %d 个有自述文件的豁免类，其判据文件都在盘上" % n_ev)
+
+    # ── G 段 · 文档点名的复现入口在不在库里（`Q38` 重裁的代价，见 `ON_DISK_ONLY`）──
+    if dangling is not None:
+        d = dangling
+        if d["undeclared"]:
+            F.append(("G1", "文档点名了 %d 个**既不在库、也没登记**的 `.ua/*.cjs` —— "
+                            "那些命令是空头支票，而且是**没被记下来的**空头支票：%s"
+                      % (len(d["undeclared"]),
+                         "; ".join("%s（%s 提到）" % (t, ",".join(w[:2]))
+                                   for t, w in d["undeclared"][:5]))))
+        else:
+            P.append("G1 文档点名的 %d 个 `.ua/*.cjs` 全部「在库」或「已在册声明」"
+                     % len(d["refs"]))
+        # G2/G3/G6 · 声明的三种过期形态。**「发了免死金牌却没人用」比漏发更隐蔽**：
+        #   漏发会在 G1 立刻响，而过期声明只会让这张单子慢慢变成一纸空文。
+        if d["stale"]:
+            F.append(("G2", "有 %d 条声明**已经没人点名**了（过期声明 = 提前发出去的免死金牌）：%s"
+                      % (len(d["stale"]), ", ".join(sorted(d["stale"])[:5]))))
+        else:
+            P.append("G2 %d 条声明逐条都仍被文档点名（没有白发的免死金牌）" % d["declared_n"])
+        if d["missing_reason"]:
+            F.append(("G3", "有 %d 条声明没写理由（没理由 = 免死金牌）：%s"
+                      % (len(d["missing_reason"]), ", ".join(sorted(d["missing_reason"])[:5]))))
+        else:
+            P.append("G3 %d 条声明逐条都写了理由" % d["declared_n"])
+        if d["declared_n"] == 0:
+            # 分母为 0 的断言恒真（§2.4：本仓最贵的那个形状）。空单子必须自己塌掉。
+            F.append(("G6", "声明集为空 —— 那 G1 就对任何 `node .ua/*.cjs` 都不会红，"
+                            "这条断言变成恒真。要么补声明，要么删掉整个 G 段"))
+        else:
+            P.append("G6 声明集非空（%d 条），G1 不是恒真" % d["declared_n"])
+        if d["gone"]:
+            F.append(("G4", "有 %d 条声明**盘上根本没有这个文件** —— 那句命令在哪台机器上都跑不了，"
+                            "声明在替一个不存在的东西背书：%s"
+                      % (len(d["gone"]), ", ".join(sorted(d["gone"])[:5]))))
+        if d["now_tracked"]:
+            F.append(("G5", "有 %d 条声明**其实已经回到库里了** —— 声明必须撤掉，"
+                            "否则这张单子会把「已经修好的」继续列成欠账：%s"
+                      % (len(d["now_tracked"]),
+                         ", ".join("%s（%s）" % (t, ",".join(w[:2])) for t, w in d["now_tracked"][:5]))))
+        else:
+            P.append("G5 没有「已回到库里却还挂着声明」的条目")
 
     return P, F
 
@@ -712,6 +842,56 @@ def run_controls(root=ROOT, pinned=PINNED_UNREACHABLE, real=None):
         F.append(("C13", "混合态结论行漏报了红或未测：%r" % v_mixed))
         lines.append("  ✗ C13 混合态结论行漏报：%r" % v_mixed)
 
+    # ── C14–C18 · G 段（`.ua/` 空头支票那张单子）的反向对照 ──────────────
+    #     一律喂**内存样本**：`dangling_refs` 是纯函数，声明表可注入。
+    DOC = "fake/正文.md"
+    DECL = {".ua/gone.cjs": "因为 Q38"}
+
+    def g(ref_body, tracked=(DOC,), declared=None, on_disk=(".ua/gone.cjs",)):
+        return dangling_refs({DOC: ref_body}, set(tracked),
+                             lambda p: p in on_disk,
+                             DECL if declared is None else declared)
+
+    g_cases = [
+        ("C14 正样本：点名的脚本不在库、但已在册且有理由 → G1/G2/G3/G5 全闭嘴",
+         lambda: not (g("跑 `node .ua/gone.cjs` 看看").__getitem__("undeclared")
+                      or g("跑 `node .ua/gone.cjs` 看看").__getitem__("stale")
+                      or g("跑 `node .ua/gone.cjs` 看看").__getitem__("missing_reason")
+                      or g("跑 `node .ua/gone.cjs` 看看").__getitem__("now_tracked"))),
+        ("★ C15 坏样本：点名一个不在库、又没声明的脚本 → G1 必须红（新冒出来的空头支票）",
+         lambda: bool(g("跑 `node .ua/没人登记过.cjs` 看看").__getitem__("undeclared"))),
+        ("★ C16 坏样本：声明了一条**没人点名**的 → G2 必须红（过期声明）",
+         lambda: bool(g("正文里一个 `.ua/*.cjs` 都没提").__getitem__("stale"))),
+        ("C17 坏样本：声明没写理由 → G3 必须红",
+         lambda: bool(g("跑 `node .ua/gone.cjs`",
+                        declared={".ua/gone.cjs": "   "}).__getitem__("missing_reason"))),
+        ("★ C18 坏样本：声明的文件**其实已回到库里** → G5 必须红（降级不许留成常设）",
+         lambda: bool(g("跑 `node .ua/gone.cjs`",
+                        tracked=(DOC, ".ua/gone.cjs")).__getitem__("now_tracked"))),
+        ("C19 坏样本：声明的文件**盘上根本没有** → G4 必须红（替不存在的东西背书）",
+         lambda: bool(g("跑 `node .ua/gone.cjs`", on_disk=()).__getitem__("gone"))),
+        ("★ C20 反向对照：在库的脚本不需要声明，也不会被误报（上面几条不是恒红）",
+         lambda: not g("跑 `node .ua/在库.cjs` 看看",
+                       tracked=(DOC, ".ua/在库.cjs")).__getitem__("undeclared")),
+        ("★ C21 反向对照：真实仓数据上的 G 段**现在应当是白的**"
+         "（拿真的 bodies + 真的 tracked + 默认真声明表算一遍）",
+         lambda: bool(real_bodies) and not (
+             (lambda d: d["undeclared"] or d["stale"] or d["missing_reason"]
+              or d["gone"] or d["now_tracked"])(
+                 dangling_refs({x: real_bodies[x] for x in real_docs if x in real_bodies},
+                               real_tracked, lambda p: os.path.exists(os.path.join(root, p)))))) ,
+    ]
+    for label, fn in g_cases:
+        try:
+            good, err = bool(fn()), ""
+        except Exception as e:  # noqa: BLE001
+            good, err = False, "（抛异常 %s: %s）" % (type(e).__name__, e)
+        if good:
+            P.append(label)
+        else:
+            F.append((label, "G 段的反向对照不成立%s" % err))
+        lines.append("  %s %s" % ("✓" if good else "✗", label))
+
     return P, F, lines
 
 
@@ -752,6 +932,8 @@ def main(argv):
 
     seeds = ("README.md",) if readme_only else SEEDS
     r = analyze(tracked, docs, bodies, seeds=seeds)
+    dang = dangling_refs({d: bodies[d] for d in docs if d in bodies},
+                         tracked, lambda p: os.path.exists(os.path.join(root, p)))
 
     print("已跟踪文件 %d · 其中文档 %d · 闭包内文件 %d · 可达文档 %d · 不可达文档 %d"
           % (r["tracked_n"], r["docs_n"], r["closure_files_n"],
@@ -760,7 +942,25 @@ def main(argv):
           % (_readme_stat(root)))
     print()
 
-    P, F = check(r, PINNED_UNREACHABLE, root=root)
+    P, F = check(r, PINNED_UNREACHABLE, root=root, dangling=dang)
+
+    # ── G 段读数（P/F 已在 check 里算好，这里只打印口径）────────────────
+    print("文档点名的复现入口（G 段 · `Q38` 重裁「只收正文」的代价）：")
+    print("  文档里出现的 `.ua/*.cjs` 引用 %d 处，涉及 %d 个不同脚本"
+          % (sum(len(v) for v in dang["refs"].values()), len(dang["refs"])))
+    print("  其中「在库」%d 个 · 「不在库但已在册声明」%d 个 · **未登记** %d 个"
+          % (len([t for t in dang["refs"] if t in tracked]),
+             len([t for t in dang["refs"] if t not in tracked]),
+             len(dang["undeclared"])))
+    print("  ★ 声明集 `ON_DISK_ONLY` %d 条，逐条列出、逐条给理由（不许通配）："
+          % dang["declared_n"])
+    for p in sorted(ON_DISK_ONLY):
+        who = dang["refs"].get(p, [])
+        print("      · %-32s ← %s" % (p, ", ".join(sorted(set(who))[:2]) or "**没人点名**"))
+    print("  ★ 这一段**只管 `.ua/`**，不做全仓扫描 —— 理由是实测的：按路径形状扫全仓会命中"
+          "约 400 条，绝大多数是相对别的根的路径、别人仓库的结构、散文里的文件名；"
+          "把 400 条噪音报成红，等于让人开始不看报告（§2.1.1）。")
+    print()
 
     # 与 .ua 诊断的口径对照（同一条命令、两种读法）
     wide = analyze(tracked, docs, bodies, seeds=seeds, doc_only_relay=False, wide=True)

@@ -32,12 +32,28 @@
 | 类 | 含义 | 判据 |
 |---|---|---|
 | `derived` | 可复算：给生成脚本 + 输入，跑出来是同一份 | **必须有** git 跟踪的生成脚本 + 可追溯的输入 |
+| `derived_l2_generator` | ★ **可复算，但生成脚本自己不在 L1**（2026-09-22 新增） | ★ **判据不成立，而且这是「降级」不是「不适用」** —— 见下 |
 | `addressed` | 内容寻址：文件名就是指纹，自证 | 判据不适用 —— 它自己证明自己 |
 | `primary` | **本身是账本，不可复算** | ★ **判据不适用**，且必须写清为什么 |
 | `runtime` | 进程运行态（日志、会话） | 判据不适用；但**必须在 ADR §三 里有出处** |
 | `vendored` | 别人管的（含自己的 .git） | 判据不适用 |
 
-**`primary` 这一类是本检查最该说清的地方。** ADR-0013 §三 把 `receipts.jsonl` 判为 L2，
+**`derived_l2_generator` 这一类是 2026-09-22 新加的，加它的理由值得单独记。**
+
+Q38 的裁定（Owner：`.ua/` **只收正文**）把 9 个 `.cjs` 复现入口移出了 L1 —— 于是
+`.ua/dispatch/` 与 `.ua/intermediate/` 这两个「机器生成、可复算」的产物**忽然失去了
+L1 里的生成脚本**。异议一那条判据（生成脚本在 L1 + 输入可追溯）对它们**不再成立**。
+
+**这件事有两种处理方式，而只有一种是对的**：把它悄悄归进「判据不适用」
+（`runtime` / `vendored` 那种），等于**把一次降级写成了一条中性说明** ——
+读的人会以为「这一格本来就查不了」，而真相是「它本来查得了，是我们自己把它弄丢的」。
+所以给它一个**自己的类名**，B 面单独计数、单独打印，并且有两条反向对照盯着它：
+
+* 生成脚本**连盘上都没有** ⇒ 红（那是假的）；
+* 生成脚本**其实已被跟踪** ⇒ 红（**降级是暂时的，不许留成常设** ——
+  一条「因为它不在 L1 所以不查」的规则，在它回到 L1 之后会变成一张免死金牌）。
+
+`primary` 这一类则是本检查最该说清的地方。ADR-0013 §三 把 `receipts.jsonl` 判为 L2，
 给的理由是「**追加型账本**：只会增长，不需要 diff 与回滚」——
 **不是**「可复算」。一条回执记录的是「当时判了什么」，L1 里**没有第二份**，
 所以异议一那条判据（生成脚本 + 输入指纹）在它身上**根本不成立**。
@@ -84,31 +100,54 @@ CONTRACT_VERSION = "verify-base-v1"
 #  `adr_ref=None` 表示**台账里没有它** ⇒ C 面红。
 # ──────────────────────────────────────────────────────────────────
 REGISTRY = [
-    # ── 结构性诊断工作目录（2026-09-22 · Q38 裁定 = 选项 A）─────────────
-    #   正文与复现入口进 L1（正文里一条条写着 `node .ua/xxx.cjs` —— 只收正文会让
-    #   那些命令指向不在库里的文件，正是 `AGENTS.md` §2.2 第 1 条的坑）；
-    #   管线产物留在盘上、不进历史。三条规则各自认领，**不用 `.ua/*` 通配**。
+    # ── 结构性诊断工作目录（2026-09-22 · Q38 裁定：Owner 最终裁定「只收正文」）──
+    #   ★ L1 只收那 10 份正文（+ 入口 README），**9 个 `.cjs` 复现入口留在 L2**。
+    #     这条裁定顺手造成一次降级：下面两条 `derived` 的生成脚本因此不在 L1 ——
+    #     故改判 `derived_l2_generator`（新增类，B 面单独计数、单独打印 + 两条反向对照）。
     {"rules": [".ua/dispatch/"],
-     "class": "derived", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "class": "derived_l2_generator", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `.*` 配置之外的一切",
      "generator": ".ua/gen-dispatch.cjs",
      "inputs": [".ua/.understandignore"],
      "why": "43 批喂给模型的分批输入 + `dispatch/data/` 的四个图（后者由 `gen-phase45.cjs` 产出）。"
-            "输入范围就是 L1 里那份 `.ua/.understandignore`，重跑管线即再得。"},
+            "★ **降级**（2026-09-22，Q38「只收正文」）：这两个 `.cjs` 生成脚本**不在 L1**，"
+            "所以异议一那条判据（L1 里找得到生成脚本）对它**不再成立** —— 本格据实记为"
+            "`derived_l2_generator`，不许混进「判据不适用」。可复算性本身没变（脚本在盘上、"
+            "输入在 L1），丢的是**换台机器之后的**可复算性。"},
     {"rules": [".ua/intermediate/"],
-     "class": "derived", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "class": "derived_l2_generator", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `.*` 配置之外的一切",
      "generator": ".ua/assemble.cjs",
      "inputs": [".ua/dispatch/"],
-     "why": "组装中间图（`assembled-graph.json`）。输入是上面那条已登记的 L2 产物。"},
+     "why": "组装中间图（`assembled-graph.json`）。输入是上面那条已登记的 L2 产物。"
+            "★ 与上一条同因同判：生成脚本 `.ua/assemble.cjs` 按 Q38 留在 L2。"},
     {"rules": [".ua/knowledge-graph.json", ".ua/fingerprints.json"],
-     "class": "vendored", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "class": "vendored", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `.*` 配置之外的一切",
      "why": "由**第三方管线**（Understand-Anything，装在 gitignored 的 `skills/` 里）直接写出："
             "1362 节点 / 2657 边的图谱与 455 个文件的指纹。本仓给不出生成脚本 —— "
             "判据不适用（与 §三 那条「别人管的」同类）。★ 结论（正文）已在 L1，"
             "这两个文件是那次运行的产物，不是新证据。"},
     {"rules": [".ua/.trash-1790050761/"],
-     "class": "runtime", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `*.cjs` / `.*` 配置之外的一切",
+     "class": "runtime", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `.*` 配置之外的一切",
      "why": "Understand-Anything 覆盖文件时留下的回收站（11MB / 占 `.ua/` 总量 69%）。"
             "进程跑完留下的东西，判据不适用；**不做删除** —— 删别人工具的数据不是本次的授权。"},
+    # ★ 9 个复现入口（2026-09-22 · Q38 改判「只收正文」的直接结果）。
+    #   为什么**逐条列、不用 `.ua/*.cjs` 通配**：与本节其余各条同一条道理 ——
+    #   通配会把日后新出现的脚本静默吞掉，而这里要的恰恰是「新东西必须被看见」。
+    #   为什么给 `why` 而不是留空：这一组不是因为判据不适用才留在盘上，
+    #   而是**一次治理裁定**（正文进历史、入口留盘），而它有一条**可核的代价**：
+    #   正文里那些 `node .ua/xxx.cjs` 命令换台机器就指向不存在的文件 ——
+    #   逐条登记在 `tools/verify_doc_reachability.py` 的 `ON_DISK_ONLY`（G 段）。
+    {"rules": [".ua/adr-status-check.cjs", ".ua/assemble.cjs", ".ua/doc-reachability.cjs",
+               ".ua/duplication-check.cjs", ".ua/gen-dispatch.cjs", ".ua/gen-phase45.cjs",
+               ".ua/graph-diagnosis.cjs", ".ua/reference-census.cjs", ".ua/runtime-surface.cjs"],
+     "class": "primary", "adr_ref": "§三 L2 · `.ua/` 里除 `*.md` / `.*` 配置之外的一切（Q38 改判：只收正文）",
+     "why": "**本仓没有第二份**：这 9 个是一次性写出来的诊断脚本，只在 `.ua/` 下存在，"
+            "没有任何生成器能再产出它们 —— 与 `receipts.jsonl` 同属「L1 里找不到第二份」那一类，"
+            "所以 `derived` 的判据（生成脚本 + 输入指纹）对它不适用。"
+            "★ 与 `primary` 的定义有一处**刻意的偏差**，写在这里而不是含糊过去：它们是**代码**、"
+            "不是账本。之所以仍归这一类，是因为现有五类里只有它表达「L1 里没有第二份」；"
+            "而真正的理由是一次**治理裁定**（Owner：`.ua/` 只收正文），不是技术判据 ——"
+            "把它写成 `derived` 会让 B 面去找一个不存在的生成器，写成 `vendored` 则是说谎"
+            "（它不是别人管的）。"},
     # ── derived：可复算 ────────────────────────────────────────────
     {"rules": ["research/governance/skeleton/_data/records.json"],
      "class": "derived", "adr_ref": "§三 L2 · `skeleton/_data/records.json`",
@@ -368,6 +407,20 @@ def face_B() -> list[str]:
     by_class: dict[str, int] = {}
     for e in REGISTRY:
         by_class[e["class"]] = by_class.get(e["class"], 0) + len(e["rules"])
+        if e["class"] == "derived_l2_generator":
+            # ★ 2026-09-22 新增：**降级**，不是「判据不适用」。
+            #   两条反向对照（face_F 的第 4/5 条）证明这两条断言真会红。
+            g = e["generator"]
+            if not (ROOT / g).exists():
+                bad.append(f"✗ {g} 连盘上都没有 —— {e['rules'][0]} 既不在 L1 也不在 L2，"
+                           f"「可复算」这个字在这里是假的")
+            elif git_tracked(g):
+                bad.append(f"✗ {g} **其实已被 git 跟踪** —— {e['rules'][0]} 的降级理由"
+                           f"（生成脚本不在 L1）已经不成立，class 必须改回 `derived`。"
+                           f"一条「因为它不在 L1 所以不查」的规则，在它回到 L1 之后就是免死金牌")
+            for i in e["inputs"]:
+                if not (ROOT / i).exists():
+                    bad.append(f"✗ {e['rules'][0]} 的输入 {i} 不存在")
         if e["class"] != "derived":
             continue
         g = e["generator"]
@@ -387,7 +440,18 @@ def face_B() -> list[str]:
     print(f"  按类计数：{by_class}")
     n_derived = sum(1 for e in REGISTRY if e["class"] == "derived")
     print(f"  derived 产物 {n_derived} 组，逐组查「生成脚本在 L1 + 输入可追溯」")
-    n_other = sum(1 for e in REGISTRY if e["class"] != "derived")
+    n_down = [e for e in REGISTRY if e["class"] == "derived_l2_generator"]
+    if n_down:
+        print(f"  ★ 另 {sum(len(e['rules']) for e in n_down)} 条**降级**（`derived_l2_generator`）—— "
+              f"它们**本来查得了**，是 2026-09-22 Q38 裁定「只收正文」把生成脚本移出 L1 造成的：")
+        for e in n_down:
+            print(f"      · {e['rules'][0]} ← 生成脚本 {e['generator']} 现在在 L2"
+                  f"（盘上 {ROOT / e['generator']} / 已跟踪={git_tracked(e['generator'])}）")
+        print(f"      ★ 这一格**不许**被读成「判据不适用」：可复算性没变，丢的是"
+              f"**换台机器之后的**可复算性。生成脚本一旦回到 L1，上面两条断言会立刻报红，"
+              f"逼着把 class 改回 derived（两个方向都有反向对照）")
+    n_other = sum(1 for e in REGISTRY
+                  if e["class"] not in ("derived", "derived_l2_generator"))
     print(f"  ★ 另 {n_other} 组**判据不适用**（addressed / primary / runtime / vendored / forbidden）"
           f"—— 异议一那条检查只对 derived 成立，这一点必须说出来，不能假装全查了")
     return bad
@@ -499,6 +563,33 @@ def face_F() -> list[str]:
             bad.append("✗ 反向对照失败：输入不存在，face_B 没报")
         else:
             print("  ✓ 必红：derived 产物的输入不存在 → face_B 报出该路径")
+    finally:
+        REGISTRY[:] = saved
+    # 4) ★ 2026-09-22：`derived_l2_generator` 的**两个方向**都必须会红。
+    #    这一类是新加的「降级」格，它的危险不是写错，是**变成永久的免死金牌** ——
+    #    所以既要拦住「生成脚本连盘上都没有」，也要拦住「它其实已经回到 L1 了却还挂着降级」。
+    try:
+        REGISTRY.append({"rules": ["假产物/"], "class": "derived_l2_generator",
+                         "adr_ref": "§三", "generator": "tools/根本没有这个脚本.py",
+                         "inputs": [], "why": ""})
+        got = face_B()
+        if not any("连盘上都没有" in x for x in got):
+            bad.append("✗ 反向对照失败：降级项的生成脚本不存在，face_B 没报")
+        else:
+            print("  ✓ 必红：derived_l2_generator 的生成脚本连盘上都没有 → face_B 报「可复算是假的」")
+    finally:
+        REGISTRY[:] = saved
+    # 5) 反向对照：降级项的生成脚本**已被跟踪**（= 它回到 L1 了）→ 必须红
+    try:
+        REGISTRY.append({"rules": ["假产物2/"], "class": "derived_l2_generator",
+                         "adr_ref": "§三", "generator": "base/build_ocr.sh",
+                         "inputs": [], "why": ""})
+        got = face_B()
+        if not any("其实已被 git 跟踪" in x for x in got):
+            bad.append("✗ 反向对照失败：降级项的生成脚本其实已被跟踪，face_B 没报 "
+                       "—— 这条不红，降级就会变成永久免死金牌")
+        else:
+            print("  ✓ 必红：降级项的生成脚本其实已被跟踪 → face_B 报「降级理由已不成立，改回 derived」")
     finally:
         REGISTRY[:] = saved
     return bad

@@ -165,6 +165,15 @@
       "subjects": [
         "tools/reference-census-baseline.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_browser_ext_artifact.py",
+      "asserts": "L1 里那件 418KB 产物（Q39 选项 A）：跑一遍构建配方再逐文件 sha256 对回 dsh-browser-ext/ —— A2 产物都在且都被 git 跟踪 · A3 配方退 0 · A4 文件集合与内容全等 · A5 分母钉在 16；`.vendor/` 不在盘上（换台机器就是这样）→ **退 2 未测**，不是绿。★ 配方本体（`cd .vendor/dsh-browser-main/extensions/dsh-browser && node scripts/build.mjs`）就在这个文件的 docstring 里。★ 已知的口径缺口，明着写在这里而不是绕过去：本器**真正依赖的 `.vendor/…` 不在 subjects 里** —— verify_coverage.py 的 `untracked` 是**每条目一个开关**（face E 会对该条目的**所有** subjects 要求未被跟踪），所以「已跟踪主体 + 未跟踪主体」这个组合它目前表达不了；本器选前者。",
+      "subjects": [
+        "dsh-browser-ext/panel/assets/index.js",
+        "dsh-browser-ext/manifest.json",
+        "ADR/ADR-0013-基座接口冻结与仓库入库分级.md"
+      ]
     }
   ]
 }

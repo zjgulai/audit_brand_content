@@ -1,7 +1,7 @@
 {
  "source": "ADR/ADR-0013-基座接口冻结与仓库入库分级.md",
- "source_sha256": "74754d582a1cb5bb2d0b5bb5428a117061249361cdd42965ee5efe1653f7b071",
- "source_lines": 1951,
+ "source_sha256": "72b28e13c7eb105eb631d6e0868e2b0d69c3474003b66d423fcb46f9a975e3ff",
+ "source_lines": 1969,
  "tables": 11,
  "rows": 52,
  "distinct_numbers": 40,
@@ -19,8 +19,8 @@
    "occurrences": [
     {
      "num": 1,
-     "line": 250,
-     "table_line": 248,
+     "line": 268,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -40,8 +40,8 @@
    "occurrences": [
     {
      "num": 2,
-     "line": 251,
-     "table_line": 248,
+     "line": 269,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -61,8 +61,8 @@
    "occurrences": [
     {
      "num": 3,
-     "line": 252,
-     "table_line": 248,
+     "line": 270,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -82,8 +82,8 @@
    "occurrences": [
     {
      "num": 4,
-     "line": 253,
-     "table_line": 248,
+     "line": 271,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -103,8 +103,8 @@
    "occurrences": [
     {
      "num": 5,
-     "line": 254,
-     "table_line": 248,
+     "line": 272,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -125,8 +125,8 @@
    "occurrences": [
     {
      "num": 6,
-     "line": 255,
-     "table_line": 248,
+     "line": 273,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -135,8 +135,8 @@
     },
     {
      "num": 20,
-     "line": 1270,
-     "table_line": 1266,
+     "line": 1288,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -156,8 +156,8 @@
    "occurrences": [
     {
      "num": 6,
-     "line": 515,
-     "table_line": 513,
+     "line": 533,
+     "table_line": 531,
      "section": "8.5 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -177,8 +177,8 @@
    "occurrences": [
     {
      "num": 7,
-     "line": 516,
-     "table_line": 513,
+     "line": 534,
+     "table_line": 531,
      "section": "8.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -199,8 +199,8 @@
    "occurrences": [
     {
      "num": 7,
-     "line": 256,
-     "table_line": 248,
+     "line": 274,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -209,8 +209,8 @@
     },
     {
      "num": 22,
-     "line": 1272,
-     "table_line": 1266,
+     "line": 1290,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -230,8 +230,8 @@
    "occurrences": [
     {
      "num": 8,
-     "line": 517,
-     "table_line": 513,
+     "line": 535,
+     "table_line": 531,
      "section": "8.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -252,8 +252,8 @@
    "occurrences": [
     {
      "num": 8,
-     "line": 257,
-     "table_line": 248,
+     "line": 275,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -262,8 +262,8 @@
     },
     {
      "num": 21,
-     "line": 1271,
-     "table_line": 1266,
+     "line": 1289,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -284,8 +284,8 @@
    "occurrences": [
     {
      "num": 9,
-     "line": 258,
-     "table_line": 248,
+     "line": 276,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -294,8 +294,8 @@
     },
     {
      "num": 24,
-     "line": 1274,
-     "table_line": 1266,
+     "line": 1292,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -315,8 +315,8 @@
    "occurrences": [
     {
      "num": 9,
-     "line": 579,
-     "table_line": 577,
+     "line": 597,
+     "table_line": 595,
      "section": "9.4 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -336,8 +336,8 @@
    "occurrences": [
     {
      "num": 10,
-     "line": 676,
-     "table_line": 674,
+     "line": 694,
+     "table_line": 692,
      "section": "10.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -359,8 +359,8 @@
    "occurrences": [
     {
      "num": 10,
-     "line": 259,
-     "table_line": 248,
+     "line": 277,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -369,8 +369,8 @@
     },
     {
      "num": 16,
-     "line": 899,
-     "table_line": 897,
+     "line": 917,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -379,8 +379,8 @@
     },
     {
      "num": 23,
-     "line": 1273,
-     "table_line": 1266,
+     "line": 1291,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -389,8 +389,8 @@
     },
     {
      "num": 16,
-     "line": 1278,
-     "table_line": 1266,
+     "line": 1296,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -410,8 +410,8 @@
    "occurrences": [
     {
      "num": 11,
-     "line": 677,
-     "table_line": 674,
+     "line": 695,
+     "table_line": 692,
      "section": "10.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -432,8 +432,8 @@
    "occurrences": [
     {
      "num": 12,
-     "line": 678,
-     "table_line": 674,
+     "line": 696,
+     "table_line": 692,
      "section": "10.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -442,8 +442,8 @@
     },
     {
      "num": 15,
-     "line": 753,
-     "table_line": 749,
+     "line": 771,
+     "table_line": 767,
      "section": "11.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -463,8 +463,8 @@
    "occurrences": [
     {
      "num": 13,
-     "line": 751,
-     "table_line": 749,
+     "line": 769,
+     "table_line": 767,
      "section": "11.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -484,8 +484,8 @@
    "occurrences": [
     {
      "num": 14,
-     "line": 752,
-     "table_line": 749,
+     "line": 770,
+     "table_line": 767,
      "section": "11.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -505,8 +505,8 @@
    "occurrences": [
     {
      "num": 17,
-     "line": 900,
-     "table_line": 897,
+     "line": 918,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -515,8 +515,8 @@
     },
     {
      "num": 17,
-     "line": 1268,
-     "table_line": 1266,
+     "line": 1286,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -536,8 +536,8 @@
    "occurrences": [
     {
      "num": 18,
-     "line": 901,
-     "table_line": 897,
+     "line": 919,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -546,8 +546,8 @@
     },
     {
      "num": 18,
-     "line": 1279,
-     "table_line": 1266,
+     "line": 1297,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -567,8 +567,8 @@
    "occurrences": [
     {
      "num": 19,
-     "line": 902,
-     "table_line": 897,
+     "line": 920,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -577,8 +577,8 @@
     },
     {
      "num": 19,
-     "line": 1269,
-     "table_line": 1266,
+     "line": 1287,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -598,8 +598,8 @@
    "occurrences": [
     {
      "num": 25,
-     "line": 1275,
-     "table_line": 1266,
+     "line": 1293,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -608,8 +608,8 @@
     },
     {
      "num": 25,
-     "line": 1515,
-     "table_line": 1513,
+     "line": 1533,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -629,8 +629,8 @@
    "occurrences": [
     {
      "num": 26,
-     "line": 1276,
-     "table_line": 1266,
+     "line": 1294,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -639,8 +639,8 @@
     },
     {
      "num": 26,
-     "line": 1516,
-     "table_line": 1513,
+     "line": 1534,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -660,8 +660,8 @@
    "occurrences": [
     {
      "num": 27,
-     "line": 1277,
-     "table_line": 1266,
+     "line": 1295,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "归属列已结",
@@ -670,8 +670,8 @@
     },
     {
      "num": 27,
-     "line": 1517,
-     "table_line": 1513,
+     "line": 1535,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": true,
      "closed_evidence": "归属列空",
@@ -691,8 +691,8 @@
    "occurrences": [
     {
      "num": 28,
-     "line": 1518,
-     "table_line": 1513,
+     "line": 1536,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -712,8 +712,8 @@
    "occurrences": [
     {
      "num": 29,
-     "line": 1519,
-     "table_line": 1513,
+     "line": 1537,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -733,8 +733,8 @@
    "occurrences": [
     {
      "num": 30,
-     "line": 1661,
-     "table_line": 1659,
+     "line": 1679,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -754,8 +754,8 @@
    "occurrences": [
     {
      "num": 31,
-     "line": 1662,
-     "table_line": 1659,
+     "line": 1680,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -775,8 +775,8 @@
    "occurrences": [
     {
      "num": 32,
-     "line": 1663,
-     "table_line": 1659,
+     "line": 1681,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -796,8 +796,8 @@
    "occurrences": [
     {
      "num": 33,
-     "line": 1664,
-     "table_line": 1659,
+     "line": 1682,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -817,8 +817,8 @@
    "occurrences": [
     {
      "num": 34,
-     "line": 1665,
-     "table_line": 1659,
+     "line": 1683,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -838,8 +838,8 @@
    "occurrences": [
     {
      "num": 35,
-     "line": 1750,
-     "table_line": 1748,
+     "line": 1768,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -859,8 +859,8 @@
    "occurrences": [
     {
      "num": 36,
-     "line": 1751,
-     "table_line": 1748,
+     "line": 1769,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -880,8 +880,8 @@
    "occurrences": [
     {
      "num": 37,
-     "line": 1752,
-     "table_line": 1748,
+     "line": 1770,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -901,8 +901,8 @@
    "occurrences": [
     {
      "num": 38,
-     "line": 1753,
-     "table_line": 1748,
+     "line": 1771,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -922,8 +922,8 @@
    "occurrences": [
     {
      "num": 39,
-     "line": 1949,
-     "table_line": 1947,
+     "line": 1967,
+     "table_line": 1965,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -943,8 +943,8 @@
    "occurrences": [
     {
      "num": 40,
-     "line": 1950,
-     "table_line": 1947,
+     "line": 1968,
+     "table_line": 1965,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1066,12 +1066,12 @@
    "key": "抽样偏差本次样本取自已成功抓取的页面获取成功率100%部分是构造出来的",
    "detail": [
     {
-     "line": 900,
+     "line": 918,
      "section": "12.6 落进 §五「遗留」",
      "closed": false
     },
     {
-     "line": 1268,
+     "line": 1286,
      "section": "13.12 落进 §五「遗留」",
      "closed": true
     }
@@ -1084,12 +1084,12 @@
    "key": "CLAIM_PATTERNS已修正批次C制品需重跑本轮已跑lp_consistency.py整改路由.json/指标.j",
    "detail": [
     {
-     "line": 902,
+     "line": 920,
      "section": "12.6 落进 §五「遗留」",
      "closed": false
     },
     {
-     "line": 1269,
+     "line": 1287,
      "section": "13.12 落进 §五「遗留」",
      "closed": true
     }
@@ -1209,8 +1209,8 @@
    "occurrences": [
     {
      "num": 1,
-     "line": 250,
-     "table_line": 248,
+     "line": 268,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1230,8 +1230,8 @@
    "occurrences": [
     {
      "num": 2,
-     "line": 251,
-     "table_line": 248,
+     "line": 269,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1251,8 +1251,8 @@
    "occurrences": [
     {
      "num": 3,
-     "line": 252,
-     "table_line": 248,
+     "line": 270,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1272,8 +1272,8 @@
    "occurrences": [
     {
      "num": 4,
-     "line": 253,
-     "table_line": 248,
+     "line": 271,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1293,8 +1293,8 @@
    "occurrences": [
     {
      "num": 7,
-     "line": 516,
-     "table_line": 513,
+     "line": 534,
+     "table_line": 531,
      "section": "8.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1315,8 +1315,8 @@
    "occurrences": [
     {
      "num": 7,
-     "line": 256,
-     "table_line": 248,
+     "line": 274,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1325,8 +1325,8 @@
     },
     {
      "num": 22,
-     "line": 1272,
-     "table_line": 1266,
+     "line": 1290,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1346,8 +1346,8 @@
    "occurrences": [
     {
      "num": 8,
-     "line": 517,
-     "table_line": 513,
+     "line": 535,
+     "table_line": 531,
      "section": "8.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1368,8 +1368,8 @@
    "occurrences": [
     {
      "num": 8,
-     "line": 257,
-     "table_line": 248,
+     "line": 275,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1378,8 +1378,8 @@
     },
     {
      "num": 21,
-     "line": 1271,
-     "table_line": 1266,
+     "line": 1289,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1399,8 +1399,8 @@
    "occurrences": [
     {
      "num": 9,
-     "line": 579,
-     "table_line": 577,
+     "line": 597,
+     "table_line": 595,
      "section": "9.4 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1420,8 +1420,8 @@
    "occurrences": [
     {
      "num": 10,
-     "line": 676,
-     "table_line": 674,
+     "line": 694,
+     "table_line": 692,
      "section": "10.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1443,8 +1443,8 @@
    "occurrences": [
     {
      "num": 10,
-     "line": 259,
-     "table_line": 248,
+     "line": 277,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1453,8 +1453,8 @@
     },
     {
      "num": 16,
-     "line": 899,
-     "table_line": 897,
+     "line": 917,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1463,8 +1463,8 @@
     },
     {
      "num": 23,
-     "line": 1273,
-     "table_line": 1266,
+     "line": 1291,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1473,8 +1473,8 @@
     },
     {
      "num": 16,
-     "line": 1278,
-     "table_line": 1266,
+     "line": 1296,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1494,8 +1494,8 @@
    "occurrences": [
     {
      "num": 11,
-     "line": 677,
-     "table_line": 674,
+     "line": 695,
+     "table_line": 692,
      "section": "10.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1516,8 +1516,8 @@
    "occurrences": [
     {
      "num": 12,
-     "line": 678,
-     "table_line": 674,
+     "line": 696,
+     "table_line": 692,
      "section": "10.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1526,8 +1526,8 @@
     },
     {
      "num": 15,
-     "line": 753,
-     "table_line": 749,
+     "line": 771,
+     "table_line": 767,
      "section": "11.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1547,8 +1547,8 @@
    "occurrences": [
     {
      "num": 13,
-     "line": 751,
-     "table_line": 749,
+     "line": 769,
+     "table_line": 767,
      "section": "11.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1568,8 +1568,8 @@
    "occurrences": [
     {
      "num": 14,
-     "line": 752,
-     "table_line": 749,
+     "line": 770,
+     "table_line": 767,
      "section": "11.5 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1589,8 +1589,8 @@
    "occurrences": [
     {
      "num": 17,
-     "line": 900,
-     "table_line": 897,
+     "line": 918,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1599,8 +1599,8 @@
     },
     {
      "num": 17,
-     "line": 1268,
-     "table_line": 1266,
+     "line": 1286,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -1620,8 +1620,8 @@
    "occurrences": [
     {
      "num": 18,
-     "line": 901,
-     "table_line": 897,
+     "line": 919,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1630,8 +1630,8 @@
     },
     {
      "num": 18,
-     "line": 1279,
-     "table_line": 1266,
+     "line": 1297,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1651,8 +1651,8 @@
    "occurrences": [
     {
      "num": 19,
-     "line": 902,
-     "table_line": 897,
+     "line": 920,
+     "table_line": 915,
      "section": "12.6 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1661,8 +1661,8 @@
     },
     {
      "num": 19,
-     "line": 1269,
-     "table_line": 1266,
+     "line": 1287,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -1682,8 +1682,8 @@
    "occurrences": [
     {
      "num": 26,
-     "line": 1276,
-     "table_line": 1266,
+     "line": 1294,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1692,8 +1692,8 @@
     },
     {
      "num": 26,
-     "line": 1516,
-     "table_line": 1513,
+     "line": 1534,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1713,8 +1713,8 @@
    "occurrences": [
     {
      "num": 29,
-     "line": 1519,
-     "table_line": 1513,
+     "line": 1537,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1734,8 +1734,8 @@
    "occurrences": [
     {
      "num": 30,
-     "line": 1661,
-     "table_line": 1659,
+     "line": 1679,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1755,8 +1755,8 @@
    "occurrences": [
     {
      "num": 31,
-     "line": 1662,
-     "table_line": 1659,
+     "line": 1680,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1776,8 +1776,8 @@
    "occurrences": [
     {
      "num": 32,
-     "line": 1663,
-     "table_line": 1659,
+     "line": 1681,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1797,8 +1797,8 @@
    "occurrences": [
     {
      "num": 33,
-     "line": 1664,
-     "table_line": 1659,
+     "line": 1682,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1818,8 +1818,8 @@
    "occurrences": [
     {
      "num": 34,
-     "line": 1665,
-     "table_line": 1659,
+     "line": 1683,
+     "table_line": 1677,
      "section": "15.9 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1839,8 +1839,8 @@
    "occurrences": [
     {
      "num": 35,
-     "line": 1750,
-     "table_line": 1748,
+     "line": 1768,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1860,8 +1860,8 @@
    "occurrences": [
     {
      "num": 36,
-     "line": 1751,
-     "table_line": 1748,
+     "line": 1769,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1881,8 +1881,8 @@
    "occurrences": [
     {
      "num": 37,
-     "line": 1752,
-     "table_line": 1748,
+     "line": 1770,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1902,8 +1902,8 @@
    "occurrences": [
     {
      "num": 38,
-     "line": 1753,
-     "table_line": 1748,
+     "line": 1771,
+     "table_line": 1766,
      "section": "16.5 落进 §五 遗留",
      "closed": false,
      "closed_evidence": "",
@@ -1923,8 +1923,8 @@
    "occurrences": [
     {
      "num": 39,
-     "line": 1949,
-     "table_line": 1947,
+     "line": 1967,
+     "table_line": 1965,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1944,8 +1944,8 @@
    "occurrences": [
     {
      "num": 40,
-     "line": 1950,
-     "table_line": 1947,
+     "line": 1968,
+     "table_line": 1965,
      "section": "17.8 落进 §五「遗留」",
      "closed": false,
      "closed_evidence": "",
@@ -1967,8 +1967,8 @@
    "occurrences": [
     {
      "num": 5,
-     "line": 254,
-     "table_line": 248,
+     "line": 272,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -1989,8 +1989,8 @@
    "occurrences": [
     {
      "num": 6,
-     "line": 255,
-     "table_line": 248,
+     "line": 273,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -1999,8 +1999,8 @@
     },
     {
      "num": 20,
-     "line": 1270,
-     "table_line": 1266,
+     "line": 1288,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -2020,8 +2020,8 @@
    "occurrences": [
     {
      "num": 6,
-     "line": 515,
-     "table_line": 513,
+     "line": 533,
+     "table_line": 531,
      "section": "8.5 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -2042,8 +2042,8 @@
    "occurrences": [
     {
      "num": 9,
-     "line": 258,
-     "table_line": 248,
+     "line": 276,
+     "table_line": 266,
      "section": "五、遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -2052,8 +2052,8 @@
     },
     {
      "num": 24,
-     "line": 1274,
-     "table_line": 1266,
+     "line": 1292,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -2073,8 +2073,8 @@
    "occurrences": [
     {
      "num": 25,
-     "line": 1275,
-     "table_line": 1266,
+     "line": 1293,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "删除线",
@@ -2083,8 +2083,8 @@
     },
     {
      "num": 25,
-     "line": 1515,
-     "table_line": 1513,
+     "line": 1533,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": true,
      "closed_evidence": "删除线",
@@ -2104,8 +2104,8 @@
    "occurrences": [
     {
      "num": 27,
-     "line": 1277,
-     "table_line": 1266,
+     "line": 1295,
+     "table_line": 1284,
      "section": "13.12 落进 §五「遗留」",
      "closed": true,
      "closed_evidence": "归属列已结",
@@ -2114,8 +2114,8 @@
     },
     {
      "num": 27,
-     "line": 1517,
-     "table_line": 1513,
+     "line": 1535,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": true,
      "closed_evidence": "归属列空",
@@ -2135,8 +2135,8 @@
    "occurrences": [
     {
      "num": 28,
-     "line": 1518,
-     "table_line": 1513,
+     "line": 1536,
+     "table_line": 1531,
      "section": "14.9 落进 §五 遗留",
      "closed": true,
      "closed_evidence": "删除线",

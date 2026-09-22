@@ -53,7 +53,7 @@ REPO = Path(__file__).resolve().parent.parent
 QUEUE = REPO / "research" / "governance" / "skeleton" / "legal-decisions-v1.json"
 
 #: 棘轮：现状值。**2026-09-22 实测**（`python3 tools/verify_open_items.py` 自己算出来的）：
-#: `$decision_queue` 里 `status == "open"` 的 7 条 = Q23 Q24 Q25 Q26 Q37 **Q38 Q39**。
+#: `$decision_queue` 里 `status == "open"` 的 **5** 条 = Q23 Q24 Q25 Q26 Q37。
 #: 按 `AGENTS.md` §2.2 第 1 条 —— 这是**某时某刻的读数**，不是常量；重算方式是跑本脚本。
 #:
 #: ★ 2026-09-22 · 5 → 6 → 7 两次都是**故意抬的，而且抬的过程正是这条断言的用法**：
@@ -63,7 +63,16 @@ QUEUE = REPO / "research" / "governance" / "skeleton" / "legal-decisions-v1.json
 #:   两次加完先跑本脚本，A3 都**当场变红**并打出「又开了题而没人看见」。
 #:   棘轮只许减，所以「开新题」必须留下一次显式的动作：改这个常量。
 #:   值改小（有人答完题）随时可以；改大要在这段注释里写清**为什么值得再开一道**。
-OPEN_RATCHET = 7
+#:
+#: ★ **7 → 5（2026-09-22 同日）**：Q38 与 Q39 都被 Owner 答了，两条各自结案为
+#:   `D39` / `D40`（`answered_at` / `answered_by` / `record` 齐备，`verify_engine_contract.py`
+#:   的 V30b 会逐条查）。**这一格就是「棘轮只许减」在真实使用中的样子**：
+#:   加的时候必须写清为什么（上面那段），减的时候只要真答完了就随时可以。
+#:   ★ 顺带一处**本条立题时没想到的收益**：Q38/Q39 两条把「`$decision_queue` 里 open 项」
+#:   当成了执行点，于是它们**必须**被真的答掉、真的记 `D#`，否则会一直挂在
+#:   `python3 tools/verify_open_items.py` 的输出里带着天数 —— 这正是 §2.4.2 说的
+#:   「承诺要有执行点」反过来的那一半：**待决事项也要有执行点**。
+OPEN_RATCHET = 5
 
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

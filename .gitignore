@@ -65,11 +65,29 @@ research/governance/skeleton/_data/backup-batchD/
 research/governance/skeleton/_data/backup-migration/
 research/governance/skeleton/_data/deprecated/
 
-# .ua/ · 结构性诊断工作目录（2026-09-22 · 分级依据 ADR-0013 §三，裁定 = Q38 选项 A）
-#   L1 已收：`*.md` 诊断正文 · `*.cjs` 复现入口 · `.understandignore` + `config.json`（管线输入）
+# .ua/ · 结构性诊断工作目录（2026-09-22 · 分级依据 ADR-0013 §三）
+#   ★ 2026-09-22 **重裁**（Q38 首答「正文+入口」，Owner 随后改判为**只收正文**）：
+#   L1 已收：`*.md` 诊断正文（10 份）· `.understandignore` + `config.json`（管线输入）
 #            · `meta.json`（本次分析读的是哪个 commit 的快照 —— 正文的凭证）。
 #   下面**逐条列出**留在盘上、不进历史的部分 —— 刻意**不用 `.ua/*` 通配**：
 #   通配会让日后新出现的机器产物被静默吞掉，而这里要的恰恰是「新东西必须被看见」。
+#
+#   ★ 9 个 `*.cjs` 复现入口也在这张单子上（重裁的结果）。代价写在明处、不藏着：
+#     正文里那些 `node .ua/xxx.cjs` 命令**换台机器之后会指向不存在的文件** ——
+#     这是裁定的已知代价，不是疏忽。逐条登记在 `tools/verify_doc_reachability.py`
+#     的 `ON_DISK_ONLY`（G 段），由 G1–G4 盯着：**不许悄悄多出一条**，也不许留下
+#     过期声明（发了免死金牌却没人用）。另一处连带代价在 `base/verify_base.py`：
+#     `.ua/dispatch/` 与 `.ua/intermediate/` 的生成脚本因此不在 L1，异议一那条判据
+#     对它们**降级**（class 由 `derived` 改为 `derived_l2_generator`，B 面逐条打印）。
+.ua/adr-status-check.cjs
+.ua/assemble.cjs
+.ua/doc-reachability.cjs
+.ua/duplication-check.cjs
+.ua/gen-dispatch.cjs
+.ua/gen-phase45.cjs
+.ua/graph-diagnosis.cjs
+.ua/reference-census.cjs
+.ua/runtime-surface.cjs
 .ua/knowledge-graph.json
 .ua/fingerprints.json
 .ua/dispatch/
