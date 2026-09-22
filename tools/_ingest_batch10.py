@@ -421,6 +421,18 @@ BATCH_NOTE_2 = (
 
 def main() -> int:
     check_only = "--check" in sys.argv
+    # ★ 2026-09-22 补的写盘门。**这是本批唯一一次真正的写盘，目标又恰好是「唯一台账」。**
+    #
+    # 修之前：不带任何参数直接 `python3 tools/_ingest_batch10.py` 就会**静默改写**
+    # `research/governance/skeleton/legal-decisions-v1.json`（`$decision_queue` 的唯一书写位置）。
+    # 而同族的 `_ingest_batch12.py:92` / 同批的 `_migrate_ids_batch11.py:39` **都有 `--write` 门** ——
+    # 只有这一个漏了。诊断 #17 点的就是它。
+    #
+    # 为什么这条值得专门补：一次误跑**不会报错、不会变红**，只会让唯一台账多出 8 条决定
+    # 与 9 道题（而且看起来完全正常，因为那正是它本来要写的东西）——
+    # 于是「这份台账是谁在什么时候因为什么改的」这个问题的答案就没了。
+    # 加门之后：**默认只预演、不写盘**，写盘必须显式 `--write`。
+    write = "--write" in sys.argv
     doc = json.loads(LEDGER.read_text(encoding="utf-8"))
 
     have_d = {d["id"] for d in doc["decisions"]}
@@ -435,6 +447,9 @@ def main() -> int:
           f"{len(add_q)} 道题 {[q['id'] for q in add_q]}"
           f"（其中 open：{[q['id'] for q in add_q if q['status'] == 'open']}）")
     if check_only:
+        return 0
+    if not write:
+        print("\n（预演，未写盘。加 --write 落盘）")
         return 0
     if not add_d and not add_q:
         print("已幂等，无改动。")

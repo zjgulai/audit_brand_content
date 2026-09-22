@@ -14,6 +14,10 @@ import os
 import subprocess
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from depad import depad, external_size  # noqa: E402  —— cp 往返 + 外部 stat，见上面的说明
+import sys
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KB = "research/kb"
 LEDGER = "research/governance/skeleton/legal-decisions-v1.json"
@@ -88,6 +92,22 @@ def main():
             if after != before:
                 print(f"  ❌ {name}\n     还原失败！sha256 {before[:16]} → {after[:16]}")
                 ok = False
+            # ★ 2026-09-22 补：**还原本身也是一次 Python 写盘**，而目标里有 `.md`
+            #   （`KB/README.md`、`KB/查询手册.md`）—— 实测「Python 写 `.md`」会让
+            #   `stat` 比真实内容多 4096，于是 `read` 工具读不出这个文件
+            #   （`AGENTS.md` §2.1 的 2026-09-22 二次更正：填充**只**命中 `.md` / `.sh`）。
+            #   也就是说：**这份反向对照跑一次，sha256 完全复原，而它为了验证判据
+            #   而改过的那几份文档会变成打不开的样子。** 修法是补一次 cp 往返（§2.1 的规矩：
+            #   非要动盘就事后 depad），并在填充还在时报出来 —— 不许静默。
+            why = depad(p)
+            if why:
+                print(f"  ❌ {name}\n     depad 失败：{why}")
+                ok = False
+            else:
+                ext, real = external_size(p), os.path.getsize(p)
+                if ext is not None and ext != real:
+                    print(f"  ❌ {name}\n     仍在填充态：stat {ext} vs 真实 {real}")
+                    ok = False
 
     # 全还原之后，判据必须重新变绿 —— 否则「绿」可能只是判据坏了
     r = subprocess.run(KBV, cwd=ROOT, capture_output=True, text=True)

@@ -29,6 +29,9 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from depad import depad, external_size  # noqa: E402  —— cp 往返 + 外部 stat，理由见下面的「还原」段
+
 ADR = os.path.join(REPO, "ADR", "ADR-0013-基座接口冻结与仓库入库分级.md")
 LED = os.path.join(REPO, "research", "governance", "skeleton", "legal-decisions-v1.json")
 PLAN = os.path.join(REPO, "PMO", "守衡-创建全景图与知识库体系-讨论稿-v1.md")
@@ -155,6 +158,22 @@ def main():
                     f.write(blob)
             if open(p, "rb").read() != blob:
                 results.append((f"  ↳ 还原 {os.path.basename(p)}", False, "❌ 还原后与快照不一致"))
+            # ★ 2026-09-22 补：**还原本身也是一次 Python 写盘**，而快照里的 `ADR` 与 `PLAN`
+            #   都是 `.md` —— 实测「Python 写 `.md`」会让 `stat` 比真实内容多 4096，
+            #   于是这份文件对 `read` 工具来说**变成了打不开的**（内容是对的、sha256 一致，
+            #   所以它不报错、也不会被本脚本的任何断言抓到）。见 `AGENTS.md` §2.1 的
+            #   2026-09-22 二次更正：填充**只**命中 `.md` / `.sh`。
+            #   也就是说：这份反向对照每跑一次，就把它为验证判据而改过的那几份 **`.md`**
+            #   弄成打不开的样子。修法是补一次 cp 往返（§2.1：非要动盘就事后 depad），
+            #   并在填充还在时报出来 —— 不许静默。
+            why = depad(p)
+            if why:
+                results.append((f"  ↳ depad {os.path.basename(p)}", False, why))
+            else:
+                ext, real = external_size(p), os.path.getsize(p)
+                if ext is not None and ext != real:
+                    results.append((f"  ↳ depad {os.path.basename(p)}", False,
+                                    f"❌ 仍在填充态：stat {ext} vs 真实 {real}"))
 
     # ── 关键收尾：还原之后，全量验收必须重新全绿 ──
     full = run("python3 tools/verify_engine_contract.py")
