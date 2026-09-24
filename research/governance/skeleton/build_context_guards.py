@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
-"""build_context_guards.py —— 从现网 `豁免词` 抽出独立的「语境守卫」表（决策 4）
+"""
 
-背景（ADR-0008 §2.1）：现网把三种机制塞进两个字段。第三处实例是 `豁免词`：
-它同时装着 **白名单词**（客观事实 → 放行）和 **语境守卫词**（否定/免责 → 降级）。
-94 个条目里只有 84 个是真守卫，另 10 个是白名单词的重复登记。
+★★ 2026-09-23（Q46 = 选项 A 裁定）：**这个文件已经不是生成器了，它是一次性迁移脚本。**
 
-本脚本做一件可复现的事：
-    现网 `豁免词` (94)
-      − 白名单表已有的词 (10)          ← 它们属于 whitelist-v1.json，不是这里
-      = 语境守卫 (84)                  → context-guards-v1.json
+   守卫表 `context-guards-v1.json` 从今天起是一份**手工维护的契约** —— `wired` / `status` 由
+   逐词裁定写入（Q23 接通 18 个、Q26 接通 16 个、Q24 剔除 1 个、Q25 移出 3 个），
+   **不是**从这个脚本重算出来的。判据在 `tools/verify_engine_contract.py`
+   （V45a–V45d / V57a–V57c / V58a–V58c / **V59a–V59b**），不在「重新生成一遍」上。
 
-判据是**结构性的，不是字段里的字符串**：
-    band 的 `effect` 落点是 `auto_pass`  → 放行通道 → 白名单的活
-    band 的 `effect` 落点是 `manual_review` → 降级通道 → 语境守卫的活
+   ★ 为什么必须写这一句：本脚本的 `wired` 是按 `rules-v1.json` 的 `downgrade_band.keywords`
+     重算的，而那批词在 **ADR-0008 分表时已经搬进本表**、原字段早已清空 ——
+     所以它今天重算出的「已接线」是 **0**，而入库值是 **79**。
+     实测跑一次：**353 插入 / 457 删除**，而输出照样打印「✅ 已写入」。
+     这与 `AGENTS.md` §2.1 的 `readdoc > 文件`、§2.4.4 的 `--selftest` 是同一个形状：
+     **照文档里的命令做，就会破坏它要保护的东西。**
 
-用法：
-  python3 build_context_guards.py            # 生成
-  python3 build_context_guards.py --dry-run  # 只报告，不写文件
+   ★ 现在的两道防线（缺一条都不够）：
+     ① 写盘前的锁：重算结果与入库值不一致 → **拒绝写盘并退 2**（`--force` 才覆盖）；
+     ② 表头如实描述（`derivation_note` / `source`）—— 表不再声称自己可以重新生成。
+
+   ★ 文件名保留 `build_context_guards.py` 是**故意的**：改名要动那份派生物索引
+     （`research/kb/索引-本地资产.json`，可重算），而收益只是名字好听一点。
+     名字会骗人这件事，这里**明着写出来**，而不是靠读者从文件名推断角色。
+
+跑法（它现在只有两个有意义的开法）：
+  python3 research/governance/skeleton/build_context_guards.py --dry-run   # 只算不写，看差异
+  python3 research/governance/skeleton/build_context_guards.py --force     # 明知会抹掉接线决定才用
 """
 import argparse
 import json

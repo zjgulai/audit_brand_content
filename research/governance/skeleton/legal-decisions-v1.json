@@ -2576,7 +2576,7 @@
       "id": "Q46",
       "kind": "engineering_question",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "Owner",
       "raised_at": "2026-09-23",
       "title": "`build_context_guards.py` 重算不出已入库的守卫表 —— 照它跑一次会抹掉 46 条接线决定",
@@ -2603,7 +2603,11 @@
         }
       ],
       "default_if_unanswered": "沉默 = **选项 C**（维持现状，锁就是答案）。★ 沉默的代价是**不对称的**：机器侧全绿（没有任何断言在看表头那句话），而人一旦照着表头去重跑或去写新脚本，丢掉的是 46 条接线决定 —— 与 Q38/Q39 同一个形状：机器看不见，丢的是人的东西。",
-      "where": "`research/governance/skeleton/build_context_guards.py`（抬头与写盘前那道锁） · `research/governance/skeleton/context-guards-v1.json`（`derivation_note` / `source` / `stats`）"
+      "where": "`research/governance/skeleton/build_context_guards.py`（抬头与写盘前那道锁） · `research/governance/skeleton/context-guards-v1.json`（`derivation_note` / `source` / `stats`）",
+      "answered_at": "2026-09-23",
+      "answered_by": "Owner",
+      "answer": "选项 A —— 把守卫表定为手工维护的契约，生成器降为一次性迁移脚本并在抬头写明",
+      "record": "① `build_context_guards.py` 的抬头**整段改写**：明说「这个文件已经不是生成器了，它是一次性迁移脚本」，并写明三条：为什么（`wired` 按已清空的 `downgrade_band.keywords` 重算 → 恒为 0，而入库是 79；实测一次覆盖 353 插入/457 删除却照样打印「✅ 已写入」）、两道防线（写盘前的锁 + 表头如实描述）、以及**为什么保留这个会骗人的文件名**（改名要动 `research/kb/索引-本地资产.json` 那份派生物索引，收益只是名字好听）。② 守卫表表头如实描述：`derivation_note` 改成「本表已不再是生成物，而是一份手工维护的契约」，逐词裁定的来源点名（Q23 接通 18 / Q26 接通 16 / Q24 剔除 1 / Q25 移出 3）；`source.split_rule` 标注为【历史推导，一次性】；新增 `source.$now` 指出**本表 `wired` 的真源就是它自己**（引擎读的是 `V.guards` = 本表 `status=active` 的行）。③ 判据：V59a（表头必须如实声明且指得出真源）、V59b（**行为级** —— 真跑一次脚本，必须退 2 拒绝写盘且表**一字节未变**）。④ 代价写在裁定里：从此「重算一遍」这条路没有了，表的正确性靠判据（V45/V57/V58/V59）与法务的逐词定性守，不靠重新生成。"
     },
     {
       "$origin": "Q26 = 选项 A 的另一半（2026-09-23 裁定）",

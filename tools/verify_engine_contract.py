@@ -3053,6 +3053,31 @@ def main() -> int:
               f"命中规则：{len(_m58)} 字节（原 {len(_txt58)}）· 遮掉 4 个字节 · "
               f"别的规则拿到的是否原样={_m58b == 'x cure y'}")
 
+        # ── V59（Q46）守卫表是**手工维护的契约**，那个脚本不再能覆盖它 ──────────────
+        #   背景：`build_context_guards.py` 的 `wired` 按 `downgrade_band.keywords` 重算，而那批词
+        #   在 ADR-0008 分表时已搬进本表 → 重算恒为 0，入库是 79。实测跑一次 353 插入/457 删除，
+        #   而输出照样打印「✅ 已写入」。与 §2.1 的 `readdoc > 文件` 同一个形状。
+        _doc59 = " ".join((_g57.get("derivation_note") or []))
+        check("V59a", "★ Q46=A：守卫表表头必须**如实声明**它是手工维护的契约（不再是生成物），"
+                      "且指得出「真源就是本表自己」",
+              ("手工维护" in _doc59) and ("一次性迁移" in _doc59)
+              and ("真源" in (_g57.get("source") or {}).get("$now", "")),
+              f"derivation_note 含「手工维护」={'手工维护' in _doc59}、"
+              f"含「一次性迁移」={'一次性迁移' in _doc59} · source.$now 指得出真源="
+              f"{'真源' in (_g57.get('source') or {}).get('$now', '')}")
+
+        # ★ 行为级（§2.4.2：承诺要有执行点）：真跑一次那个脚本，**必须拒写**且表一字节未变。
+        _gp59 = SKEL / "context-guards-v1.json"
+        _before59 = _gp59.read_bytes()
+        _o59 = subprocess.run([sys.executable, "research/governance/skeleton/build_context_guards.py"],
+                              cwd=str(ROOT), capture_output=True, text=True)
+        check("V59b", "★ 行为级：脚本在不带 `--force` 时**拒绝写盘（退 2）**，且守卫表一字节未变 —— "
+                      "「重算不出就覆盖」这条路已经被封住",
+              _o59.returncode == 2 and _gp59.read_bytes() == _before59
+              and "拒绝写盘" in (_o59.stdout + _o59.stderr),
+              f"退出码={_o59.returncode}（应 2）· 表字节未变={_gp59.read_bytes() == _before59} · "
+              f"输出含「拒绝写盘」={'拒绝写盘' in (_o59.stdout + _o59.stderr)}")
+
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
     if a.json:
