@@ -70,6 +70,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -194,6 +195,106 @@ def verdict(n_pass, n_fail, untested):
     return 0, f"✅ {n_pass} 项全过（含 L3：上游与指纹一致）"
 
 
+# ─────────────────────────── R 段：章节引用（Q41 = 选项 A 的执行点） ───────────────────────────
+#
+# ★ 它治的病：上游 PRD 在 2026-09-22 从 v1.0 改成 v1.2 时**重排了章节号**
+#   （§5.5–§5.9 拆成 §8.1/§8.2/§9/§7/§10，原 §6 JSON 规范挪到 §5.4，原 §7 → §11、原 §11 → §15，
+#   并新增一整章 §6）。而既有文档里的 `PRD §X` 引用写于重排之前 —— 于是引用会
+#   **静默取到别的格子**（例：**v1.0 的** `PRD §7.2` 今天是「母婴品类场景域规则覆盖」，不再是「证据链」）。
+#
+# ★ 为什么 L1–L3 拦不住它（这一条必须写下来，否则下一个人会以为基线绿了就没事）：
+#   **漂移检测抓的是正文，抓不到引用。** 基线本身是对的（指纹 == 副本 == 上游），
+#   而引用一个**存在的、但不相关**的节号，是查不出来的 —— `AGENTS.md` §2.4.1 第 1 行的形状：
+#   假数据跟真数据长得一模一样。所以这一层必须单独有断言。
+#
+# ★ 判据的形状：每处引用都要**指到 v1.2 里那一节的名字**（登记表 `PRD/feishu/章节引用-v1.json`）。
+#   上游再重排一次 → R1 当场红。
+REFS = BASE_DIR / "章节引用-v1.json"
+REF_RE = re.compile(r"PRD\s*§\s*(\d+(?:\.\d+)*)")
+# ★ 负向后顾 `(?<!-)` 是**实测补的**：文件名 `内容审查Agent-PRD-v1.0.md` 里也有 "v1.0"，
+#   而那份文件装的是 **v1.2** 正文（上游没改文件名）。第一版判据因此把一处**活引用**
+#   误判成历史叙述 —— 会误报的检查器比没有检查器更糟（§2.1.1），它会让人开始不看报告。
+HIST_MARKER = re.compile(r"(?<!-)v1\.0|旧版|旧编号|重排前")
+_SECTION_LINE = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+(\S.*?)\s*$")
+_SKIP_PARTS = (".git/", ".ua/", "node_modules/", "research/repos/", "research/utopia/",
+               "skills/", ".vendor/", "_history/")
+_SCAN_EXT = (".md", ".py", ".mjs", ".json", ".sh")
+PRD_BODY = "内容审查Agent-PRD-v1.0.md"
+
+
+def prd_headings(text):
+    """从 PRD 正文里抠出「节号 → 节名」。
+
+    ★ v1.2 的正文用的是**纯文本编号行**（`7.2 母婴品类场景域规则覆盖`），不是 markdown 标题。
+      按 `^#{1,3} ` 去抠会**一条都抠不到**，而那种「抠不到」的表现是「全部条目的节号都不存在」——
+      看起来像「文档格式变了」，实际是判据写错了。这里是照着正文真实形态写的。
+    """
+    out = {}
+    for ln in text.splitlines():
+        m = _SECTION_LINE.match(ln)
+        if m and len(m.group(2)) < 40:
+            out.setdefault(m.group(1), m.group(2))
+    return out
+
+
+def scan_refs(root):
+    """扫全仓每一处 `PRD §N`，返回 `{(相对路径, 节号): {"marker": 该行有没有版本标记}}`。"""
+    found = {}
+    for p in sorted(Path(root).rglob("*")):
+        if p.is_dir() or p.suffix not in _SCAN_EXT:
+            continue
+        s = str(p.relative_to(root))
+        if any(x in s for x in _SKIP_PARTS) or PRD_BODY in s:
+            continue
+        try:
+            lines = p.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for ln in lines:
+            for m in REF_RE.finditer(ln):
+                e = found.setdefault((s, m.group(1)), {"marker": False})
+                e["marker"] = e["marker"] or bool(HIST_MARKER.search(ln))
+    return found
+
+
+def refs_problems(heads, reg, scanned):
+    """纯判据：登记表 × v1.2 标题 × 扫描结果。返回问题列表（空 = 全过）。
+
+    `controls()` 靠它喂合成坏样本 —— 判据必须能**离线**证明自己会红。
+    """
+    bad = []
+    reg_map = {}
+    for r in reg.get("refs") or []:
+        key = (r.get("file"), r.get("section"))
+        reg_map[key] = r
+        sec, kind = r.get("section"), r.get("kind")
+        if kind == "current":
+            if sec not in heads:
+                bad.append(f"R1 · {r.get('file')} §{sec}：v1.2 里**没有这一节**")
+            elif r.get("heading") != heads[sec]:
+                bad.append(f"R1 · {r.get('file')} §{sec}：登记的名字是「{r.get('heading')}」，"
+                           f"而 v1.2 里 §{sec} 的标题是「{heads.get(sec)}」"
+                           f" —— ★ 上游可能又重排了章节")
+        elif kind == "history":
+            if not r.get("from_version"):
+                bad.append(f"R3 · {r.get('file')} §{sec}：历史条目没写 from_version")
+            if r.get("maps_to") not in heads:
+                bad.append(f"R3 · {r.get('file')} §{sec}：maps_to=「{r.get('maps_to')}」"
+                           f"在 v1.2 里不存在")
+            if not (scanned.get(key) or {}).get("marker"):
+                bad.append(f"R3 · {r.get('file')} §{sec}：登记成历史叙述，"
+                           f"但那一行**没有版本标记**（v1.0 / 旧版 / 旧编号 / 重排前）"
+                           f" —— 读者分不清 `PRD §{sec}` 指的是哪一版")
+        else:
+            bad.append(f"R? · {r.get('file')} §{sec}：kind 只能是 current / history")
+    for k in sorted(set(scanned) - set(reg_map)):
+        bad.append(f"R2 · {k[0]} §{k[1]}：仓库里有这处引用，登记表里没有"
+                   f"（新引用要登记 —— 登记时填的那一栏就是「指到 v1.2 里那一节的名字」）")
+    for k in sorted(set(reg_map) - set(scanned)):
+        bad.append(f"R2 · {k[0]} §{k[1]}：登记表里有，仓库里的引用已经没了（陈旧登记）")
+    return bad
+
+
 # ─────────────────────────── 反向对照（离线） ───────────────────────────
 
 def controls():
@@ -245,6 +346,50 @@ def controls():
          lambda: verdict(23, 0, [])[0] == 0 and "含 L3" in verdict(23, 0, [])[1]),
         ("有红 → 退出码 1（哪怕同时有未测）",
          lambda: verdict(20, 3, ["a.md"])[0] == 1),
+        # ── ★ R 段（Q41）的反向对照：喂合成坏样本，`refs_problems` 必须**真会红**。
+        #    每条只把一个变量弄坏；最后两条是「全对必须没意见」与「文件名不许触发标记」。
+        ("★ R1：登记的名字与 v1.2 标题差一个字 → 红（上游重排的探测器）",
+         lambda: any("R1" in m for m in refs_problems(
+             {"7.1": "四类知识库"},
+             {"refs": [{"file": "a.md", "section": "7.1", "kind": "current",
+                        "heading": "四类知识库全"}]},
+             {("a.md", "7.1"): {"marker": False}}))),
+        ("R1：登记到 v1.2 里不存在的节号 → 红",
+         lambda: any("R1" in m for m in refs_problems(
+             {"7.1": "四类知识库"},
+             {"refs": [{"file": "a.md", "section": "5.8", "kind": "current", "heading": "四类"}]},
+             {("a.md", "5.8"): {"marker": False}}))),
+        ("R2：仓库里有、登记表里没有 → 红（新引用必须登记）",
+         lambda: any("R2" in m for m in refs_problems(
+             {"7.1": "四类知识库"}, {"refs": []}, {("a.md", "7.1"): {"marker": False}}))),
+        ("R2：登记表里有、仓库里没有 → 红（陈旧登记）",
+         lambda: any("R2" in m for m in refs_problems(
+             {"7.1": "四类知识库"},
+             {"refs": [{"file": "a.md", "section": "7.1", "kind": "current",
+                        "heading": "四类知识库"}]}, {}))),
+        ("★ R3：历史条目那一行没有版本标记 → 红（读者分不清指哪一版）",
+         lambda: any("R3" in m for m in refs_problems(
+             {"7.1": "四类知识库", "15": "验收标准"},
+             {"refs": [{"file": "a.md", "section": "5.8", "kind": "history",
+                        "from_version": "v1.0", "maps_to": "7.1"}]},
+             {("a.md", "5.8"): {"marker": False}}))),
+        ("R3：历史条目的 maps_to 指向不存在的节 → 红",
+         lambda: any("R3" in m for m in refs_problems(
+             {"7.1": "四类知识库"},
+             {"refs": [{"file": "a.md", "section": "5.8", "kind": "history",
+                        "from_version": "v1.0", "maps_to": "9.9"}]},
+             {("a.md", "5.8"): {"marker": True}}))),
+        ("★ 全对的一组 → **必须一条问题都没有**（证明上面六条不是恒红）",
+         lambda: refs_problems(
+             {"7.1": "四类知识库", "15": "验收标准"},
+             {"refs": [{"file": "a.md", "section": "7.1", "kind": "current",
+                        "heading": "四类知识库"},
+                       {"file": "b.md", "section": "5.8", "kind": "history",
+                        "from_version": "v1.0", "maps_to": "7.1"}]},
+             {("a.md", "7.1"): {"marker": False}, ("b.md", "5.8"): {"marker": True}}) == []),
+        ("★ 版本标记不许被**文件名**触发：`…PRD-v1.0.md` 里装的是 v1.2 正文（实测误报过一次）",
+         lambda: not HIST_MARKER.search("见 `PRD/feishu/内容审查Agent-PRD-v1.0.md`")
+         and bool(HIST_MARKER.search("旧版 `PRD §5.8 四类`"))),
     ]
 
     print("=" * 72)
@@ -339,6 +484,31 @@ def main():
             add(g, f"{n} · {f}", ok, det)
         # ★ 这里**不**再补一条「见下方动作」的失败项：FAIL 里只能有真断言，
         #   合成一条凑数的失败会让「几项失败」这个数变成假的（§2.2 第 1 条）。
+
+    # ── R 段：章节引用（Q41）—— 与上面 L1–L3 **是两件事**：
+    #   那段抓**正文**漂移，这段抓**引用**指错格子。基线全绿时引用照样可以是错的。
+    heads, reg = None, None
+    try:
+        heads = prd_headings((BASE_DIR / PRD_BODY).read_text(encoding="utf-8"))
+        add("R", "H0 v1.2 正文抠得出节名", len(heads) >= 10, f"{len(heads)} 节")
+    except Exception as e:                                    # noqa: BLE001
+        add("R", "H0 v1.2 正文可读", False, f"{type(e).__name__}: {e}")
+    try:
+        reg = json.loads(REFS.read_text(encoding="utf-8"))
+    except Exception as e:                                    # noqa: BLE001
+        add("R", "H1 引用登记表可解析", False, f"{REFS.name}：{type(e).__name__}: {e}")
+    if reg is not None:
+        add("R", "H1 引用登记表可解析", True, f"{len(reg.get('refs') or [])} 条登记")
+    if heads and reg is not None:
+        scanned = scan_refs(ROOT)
+        add("R", "H2 全仓扫得到 `PRD §N` 引用", len(scanned) > 0,
+            f"{len(scanned)} 处（文件 × 节号）")
+        probs = refs_problems(heads, reg, scanned)
+        if not probs:
+            add("R", "H3 每处引用都指到 v1.2 里那一节的名字", True,
+                f"{len(scanned)} 处全部对上（上游再重排一次，这一条会红）")
+        for m in probs:
+            add("R", "H3 每处引用都指到 v1.2 里那一节的名字", False, m)
 
     # ── 输出
     print("=" * 72)

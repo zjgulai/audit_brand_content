@@ -1,0 +1,298 @@
+{
+  "$schema_version": "prd-section-refs-v1",
+  "$why": "Q41 = 选项 A 的执行点。上游 PRD 在 2026-09-22 从 v1.0 改成 v1.2 时**重排了章节号**，既有文档里的 `PRD §X` 引用于是会**静默取到别的格子** —— 引用一个存在的、但不相关的节号是查不出来的（`AGENTS.md` §2.4.1 第 1 行：假数据跟真数据长得一模一样）。这份登记表把每一处引用钉到 v1.2 里那一节的**名字**上；上游再重排一次，R1 当场红。",
+  "$how_to_add": "新写一处 `PRD §N` 引用 → 在这里加一条。`kind=current` 必须写 `heading`，而它必须**逐字等于**正文里 §N 的标题；`kind=history`（讲旧编号的叙述，例如说明 v1.0 的 `PRD §7.2` 当时指什么）必须写 `from_version` 与 `maps_to`，**且那一行要带版本标记**（v1.0 / 旧版 / 旧编号 / 重排前）—— 否则读者分不清那个节号指的是哪一版。",
+  "$marker_re": "(?<!-)v1\\.0|旧版|旧编号|重排前",
+  "$marker_note": "★ 负向后顾 `(?<!-)` 是**实测补的**：上游那份正文的**文件名**里也有 \"v1.0\"（内容审查Agent-PRD-v1.0.md），而它装的是 **v1.2** 正文（文件名没改）。第一版判据因此把一处**活引用**误判成历史叙述 —— 会误报的检查器比没有检查器更糟。",
+  "$scope_note": "★ 扫描范围**不给自己开后门**：连这份登记表自己的说明文字、以及 `tools/verify_prd_baseline.py` 自己的注释，只要写了 `PRD §N` 就要按同一条规矩登记（它们都在下面的 refs 里，且都是 history）。要豁免某个文件，就得在这里写清为什么 —— 而「这个文件特殊」从来不是一个理由。",
+  "refs": [
+    {
+      "file": "PMO/守衡-Utopia结合方案-20260923.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "PMO/守衡-Utopia结合方案-20260923.md",
+      "section": "5.2",
+      "kind": "current",
+      "heading": "审查能力"
+    },
+    {
+      "file": "PMO/守衡-Utopia结合方案-20260923.md",
+      "section": "7.2",
+      "kind": "current",
+      "heading": "母婴品类场景域规则覆盖"
+    },
+    {
+      "file": "PMO/守衡-Utopia结合方案-20260923.md",
+      "section": "8.1",
+      "kind": "current",
+      "heading": "飞书群交互"
+    },
+    {
+      "file": "PMO/守衡-Utopia结合方案-20260923.md",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "11.2",
+      "kind": "current",
+      "heading": "保障机制"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "14",
+      "kind": "current",
+      "heading": "里程碑（1 个月试用）"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "15",
+      "kind": "current",
+      "heading": "验收标准"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "5.4",
+      "kind": "current",
+      "heading": "结构化 JSON 规范"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "7.1",
+      "kind": "current",
+      "heading": "四类知识库"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "11",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "15"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "5.1",
+      "kind": "current",
+      "heading": "输入方式"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "5.8",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "7.1"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "6",
+      "kind": "current",
+      "heading": "规则优先级与分层审查机制"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "7.1",
+      "kind": "current",
+      "heading": "四类知识库"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "7.2",
+      "kind": "current",
+      "heading": "母婴品类场景域规则覆盖"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "7.3",
+      "kind": "current",
+      "heading": "一票否决项（P0 级，命中即 BLOCK）"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "PMO/守衡-知识库构建完整方案-20260922.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "PMO/守衡-知识库构建完整方案-20260922.md",
+      "section": "11.2",
+      "kind": "current",
+      "heading": "保障机制"
+    },
+    {
+      "file": "PMO/待收清单-v1.json",
+      "section": "11.2",
+      "kind": "current",
+      "heading": "保障机制"
+    },
+    {
+      "file": "PRD/feishu/章节引用-v1.json",
+      "section": "7.2",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "11.2"
+    },
+    {
+      "file": "research/governance/skeleton/clause_ref.py",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "research/governance/skeleton/evidence_origin.py",
+      "section": "5.2",
+      "kind": "current",
+      "heading": "审查能力"
+    },
+    {
+      "file": "research/governance/skeleton/judge.py",
+      "section": "5.2",
+      "kind": "current",
+      "heading": "审查能力"
+    },
+    {
+      "file": "research/governance/skeleton/judge.py",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "11.2",
+      "kind": "current",
+      "heading": "保障机制"
+    },
+    {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "15",
+      "kind": "current",
+      "heading": "验收标准"
+    },
+    {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "7.2",
+      "kind": "current",
+      "heading": "母婴品类场景域规则覆盖"
+    },
+    {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "7.2",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "11.2"
+    },
+    {
+      "file": "research/kb/README.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "research/kb/README.md",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "tools/kb_backfill.py",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "tools/kb_backfill.py",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "tools/kb_clause.py",
+      "section": "5.2",
+      "kind": "current",
+      "heading": "审查能力"
+    },
+    {
+      "file": "tools/kb_clause.py",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "tools/verify_kb.py",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "tools/verify_kb.py",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "tools/verify_kb.py",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "tools/verify_prd_baseline.py",
+      "section": "5.8",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "7.1"
+    },
+    {
+      "file": "tools/verify_prd_baseline.py",
+      "section": "7.2",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "11.2"
+    }
+  ]
+}
