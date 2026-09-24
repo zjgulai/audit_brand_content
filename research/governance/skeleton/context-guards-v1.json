@@ -44,12 +44,12 @@
   "guards": 81,
   "from_live": 76,
   "from_skeleton_only": 5,
-  "wired": 45,
-  "not_wired": 36,
+  "wired": 63,
+  "not_wired": 18,
   "g3_violations": 0,
   "by_status": {
-   "active": 45,
-   "pending": 36,
+   "active": 63,
+   "pending": 18,
    "misrouted": 0
   },
   "by_type": {
@@ -189,16 +189,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（can't cure）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "cannot cure",
@@ -233,16 +234,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（cannot cure）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "do not cure",
@@ -255,16 +257,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（do not treat）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "do not treat",
@@ -299,16 +302,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（does not treat）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "does not treat",
@@ -871,16 +875,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不可以治疗",
@@ -893,16 +898,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不可治疗",
@@ -915,16 +921,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不是治疗",
@@ -937,16 +944,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不用于治疗",
@@ -959,16 +967,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不能治愈",
@@ -981,16 +990,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不能治疗",
@@ -1003,16 +1013,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "并非治疗",
@@ -1025,16 +1036,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "无法治疗",
@@ -1047,16 +1059,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "may help your flow",
@@ -1201,16 +1214,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不可以预防乳腺炎",
@@ -1245,16 +1259,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不能治愈乳腺炎",
@@ -1267,16 +1282,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不能治疗乳腺炎",
@@ -1289,16 +1305,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "不能预防乳腺炎",
@@ -1355,16 +1372,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q23 = 选项 A（2026-09-23 裁定）：与同族已接线词同处置 —— 「一条语境规则该不该存在」是法务的决定（ADR-0008 §三），不是开发者的。接线后它把该规则从 auto_reject 降到 manual_review（**不是放行**）。"
   },
   {
    "word": "自然奶阵",

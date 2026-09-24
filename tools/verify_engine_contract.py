@@ -114,7 +114,10 @@ def main() -> int:
     CASES = {
         "reject": "FDA approved wearable breast pump",
         "downgrade": "Our pump does not treat any disease",
-        "near_miss": "Our pump does not cure any disease",
+        # ★ 2026-09-23（Q23=A）：原样本是 `does not cure` —— 它在这一轮**被接通了**，
+        #   于是「本可降级但守卫未接线」这条路上**一个实例都没有了**（V8a/V8c 转红）。
+        #   换成仍未接线的 `relieves engorgement`（目标规则同为 T1.1），机制same，实例仍在。
+        "near_miss": "Our pump treats engorgement and relieves engorgement",
         "pass_band": "FDA approved and FDA cleared wearable breast pump",
         "no_match": "Buy our lovely organic cotton baby blanket, soft and warm",
         "stem": "Painlessly pump with high efficiency",
@@ -299,13 +302,13 @@ def main() -> int:
         nm = R["near_miss"]["hits"][0].get("unwired_guard_near_miss", [])
         names = {x["word"] for x in nm}
         check("V8a", "『本可降级但守卫未接线』被具名报出",
-              "does not cure" in names, f"报出 {sorted(names)}")
+              "relieves engorgement" in names, f"报出 {sorted(names)}")
         check("V8b", "对照：接线后同一句式确实会降级",
               R["downgrade"]["hits"][0]["disposition"] == "manual_review"
               and R["near_miss"]["hits"][0]["disposition"] == "auto_reject",
-              f"does not treat → {R['downgrade']['hits'][0]['disposition']}；"
-              f"does not cure → {R['near_miss']['hits'][0]['disposition']}")
-        gap = next((x.get("wire_gap") for x in nm if x["word"] == "does not cure"), None)
+              f"does not treat（已接线）→ {R['downgrade']['hits'][0]['disposition']}；"
+              f"relieves engorgement（未接线）→ {R['near_miss']['hits'][0]['disposition']}")
+        gap = next((x.get("wire_gap") for x in nm if x["word"] == "relieves engorgement"), None)
         check("V8c", "给出缺口成因（不是只说『未接线』）", bool(gap), str(gap))
 
     # ── V9 放行带会响（正对照）────────────────────────────────────
@@ -2143,7 +2146,7 @@ def main() -> int:
     #   非主张词形遮罩（`treat yourself` 不再因裸 `treat` 命中 T1.1）把那 3 条假阳性消掉了；
     #   同时「变成降级」13 → 12（那个词从守卫表移除，不再有降级可算）。
     #   本门**自己报红要求收紧** —— 这正是它设计的样子：不收紧就等于守着一个过期的现状。
-    _N_GONE, _N_FP = 21, 0
+    _N_GONE, _N_FP = 3, 0
     _n_fp = (((_mf or {}).get("totals", {}) or {}).get("分歧_迁移回归_假阳性"))
     _ctrl_c = ((_n_gone is None or _n_gone + 1 > _N_GONE)
                and (_n_fp is None or _n_fp + 1 > _N_FP))
@@ -2221,7 +2224,7 @@ def main() -> int:
     _mut_claimed = {y for q in _mut for y in (q.get("covers_unwired_guards") or [])}
     _ctrl_u = bool(_unwired_problems(_unwired, _mut)) or any(
         w for w in _unwired if w not in _mut_claimed)
-    _N_UNWIRED = 36
+    _N_UNWIRED = 18
     _relax_u = (f"未接线 {len(_unwired)} < {_N_UNWIRED}" if len(_unwired) < _N_UNWIRED else "")
     check("V45d", f"每个未接线的守卫词都指向一条**可决策的**未决项（被 ≥1 条 open 认领，"
                   f"或词条点名一条已答的 Q/D）；认领并集恰好等于未接线集合；未接线 ≤ {_N_UNWIRED}",
