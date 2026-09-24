@@ -1800,7 +1800,7 @@
       "id": "Q25",
       "kind": "legal_question",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "法务（经 Owner 转达）",
       "raised_at": "2026-09-17",
       "title": "「非主张」词无家可归：`treat yourself` / `or cure` / `or treat` 该走哪条通道",
@@ -1828,10 +1828,11 @@
       ],
       "default_if_unanswered": "沉默 = 选项 C（维持降级）：现状即如此 —— `treat yourself` 继续造成约 3 条/批的误拦，`or cure` / `or treat` 继续无带，「非主张」这一档继续不存在，下一个同类词还会被塞进降级通道。",
       "where": "`research/governance/skeleton/context-guards-v1.json` 的 `mechanism.semantics`；`research/governance/skeleton/whitelist-v1.json` 的 `admission_criterion`。",
-      "covers_unwired_guards": [
-        "or cure",
-        "or treat"
-      ]
+      "covers_unwired_guards": [],
+      "answered_at": "2026-09-23",
+      "answered_by": "法务（经 Owner 转达）",
+      "answer": "选项 A —— 不改通道、改准入：非主张词形走准入过滤，不再作为守卫词存在",
+      "record": "① **机制**：新增 `matcher.mask_non_claims()` —— 在**该规则**匹配前，把非主张词形跨度之内的 `suppress` 词替换成**等长**填充（长度不变 → 位置读数、`input_sha256`、别的规则的命中都不受影响）。数据走 `context-guards-v1.json` 的新区 `$non_claims.entries`，经 `vocab.Vocab.non_claims` 进引擎；**空表时逐字返回原文本**，行为与改动前完全一致。② **只收「确实是另一个主张」的词形**：今天 1 条 —— `treat yourself`（T1.1.medical-cure / suppress `treat`，status=proposed，待法务裁）。它从守卫表移除（84 → **81** 词，`wired` 46 → **45**）。★ 语料实测 6 处全是「Treat yourself to total comfort!」（自我照护建议），移除守卫 + 加遮罩后**不再命中 T1.1** —— 那 3 条误拦从**根上**消失（不是靠降级和稀泥）。③ ★★ **写这张表时差点犯的错，记在表里**：`or cure` / `or treat` 一度也被塞进非主张清单，而 `prevent or cure` 是**典型的主张** —— 遮掉它等于把 `T1.1.medical-cure` 关掉一半。实测 `prevent or cure mastitis` 在遮罩版下仍 `auto_reject`（对照成立），但不该靠运气：这两个词改入新区 **`$admission_pending`**（从守卫表移除，定性**交法务**）。语料实测 **0 处**出现，所以移除对 291 条存量**零行为变化**。④ 判据 V58a–V58c；棘轮收紧：未接线 39 → **36**（`_N_UNWIRED` 跟着改），`covers_unwired_guards` 清空（那两个词已不在守卫表）。⑤ 仍未定：`gently`（`未归类` 且 **已接线**、在生效）与 `treat yourself` 同族，但它既不是非主张、也不在 Q26 的 18 个未接线词里 —— V57c 只是逼它**被提到**，它的定性仍要法务给。"
     },
     {
       "id": "Q26",

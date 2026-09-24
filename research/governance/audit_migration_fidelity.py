@@ -220,6 +220,12 @@ def axis1_exception_drift(recs, raw, rules, wl, gd):
     keep = [x for x in st if x["实测带"] == "pass"]
     down = [x for x in st if x["实测带"] == "downgrade"]
     gone = [x for x in st if x["实测带"] == "无带"]
+    # ★ 2026-09-23 第四桶（Q25 = 选项 A）：自我触发的词里，有的**已经不再让规则命中** ——
+    #   它们被「非主张词形」遮罩挡在**匹配之前**（`matcher.mask_non_claims()`），
+    #   所以既不放行、也不降级、也谈不上「满档判险」。
+    #   这一桶必须显式存在：否则「三桶之和 = 自我触发词数」这条守恒会在**引擎变好时断掉**，
+    #   而断掉的原因恰恰是好事 —— 那种红会教人忽略守恒式（§2.1.1）。
+    idle = [x for x in st if x["实测带"] == "未自我触发"]
 
     # 这条词实际翻掉了哪些记录：源表没命中、引擎命中了它所降级的那条规则
     flipped = collections.Counter()
@@ -242,7 +248,7 @@ def axis1_exception_drift(recs, raw, rules, wl, gd):
         "守卫类型分布": dict(collections.Counter(
             (gd_map.get(x["词"].lower()) or {}).get("guard_type") for x in rows
             if gd_map.get(x["词"].lower()))),
-        # ── 实测三桶（守恒：三者之和 = 自我触发词数）──────────────
+        # ── 实测**四**桶（守恒：四者之和 = 自我触发词数）──────────────
         "自我触发词数": len(st),
         "仍放行": sorted(x["词"] for x in keep),
         "仍放行_条数": len(keep),
@@ -250,6 +256,8 @@ def axis1_exception_drift(recs, raw, rules, wl, gd):
         "变成降级_条数": len(down),
         "满档判险_无带": sorted(x["词"] for x in gone),
         "满档判险_无带_条数": len(gone),
+        "准入过滤_不命中": sorted(x["词"] for x in idle),
+        "准入过滤_不命中_条数": len(idle),
         "翻掉记录的词": dict(flipped),
         "逐词": rows,
     }

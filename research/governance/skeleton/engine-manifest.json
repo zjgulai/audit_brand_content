@@ -1,8 +1,8 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-24T08:26:20+00:00",
-  "engine_version": "65f4b6887dc7321f",
-  "code_version": "e6e33ea20ee09592",
+  "generated_at": "2026-09-24T09:17:37+00:00",
+  "engine_version": "bd8367a83fd8040c",
+  "code_version": "d811f61fa4e1f79e",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
@@ -30,14 +30,14 @@
     },
     "context_guards": {
       "file": "context-guards-v1.json",
-      "bytes": 58695,
-      "sha256": "a7e18aa8412393a29720371cbf79f17f37a51a8ceebca9135feae4f53b680b59",
+      "bytes": 60418,
+      "sha256": "b6adca01766a5f831224c785a9705d178763beeb81e78d76b6b3cda4369dd8a5",
       "why": "语境守卫词（取消/弱化主张，绝不放行）",
       "counts": {
-        "words": 84,
-        "active": 46,
-        "wired": 46,
-        "pending": 38
+        "words": 81,
+        "active": 45,
+        "wired": 45,
+        "pending": 36
       }
     },
     "topic_tree": {
@@ -77,20 +77,20 @@
   },
   "code": {
     "matcher.py": {
-      "sha256": "c1ce4251144404c497dcde0a824b4cc730045dd87d8e76e35aac2d53e2eeabe4",
-      "bytes": 9695
+      "sha256": "e8449f1589fbb8d4e3d6a159c7bb801bd3e8664480c29458208591dbe78af07c",
+      "bytes": 11580
     },
     "score.py": {
-      "sha256": "8ff438ae59a4e6c042c328127929af71bc4c994278fc88209308bf848e42c8ea",
-      "bytes": 34263
+      "sha256": "799a7f1be7152bd82ab77e5dee330593731192df900e414de29936f8f4e2693a",
+      "bytes": 34765
     },
     "judge.py": {
       "sha256": "93b8dd17a640e101c87cd8840b765cafe690f61fb47b136f3c781bff3afae9d7",
       "bytes": 65641
     },
     "vocab.py": {
-      "sha256": "b0b938687bb53721d87e249b630b9ed1c6f937adde0a002feae38c52b4533954",
-      "bytes": 12892
+      "sha256": "0ea2e53652e32a59cedd17577a983dc0d04958ce4bac2fa14f55cee9a23b64d7",
+      "bytes": 13582
     },
     "severity.py": {
       "sha256": "c60a2248763770da49d2bbd80e7a504ea3ae8dfa1483017dbd69615434853b9b",

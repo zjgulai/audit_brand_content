@@ -1199,9 +1199,9 @@ def main():
               f"{'不动 ✅' if _after9b == _got9b else '❌变了'}")
 
         # T9c · 可重算 + 只增不删（同一日重建逐字相同；跨日只许 次数+1）
-        _merged = BF.merge(_bf_rows, _bf_new, (os.environ.get("KB_T9_TODAY") or "2026-09-23"))
+        _merged, _mdropped = BF.merge(_bf_rows, _bf_new, (os.environ.get("KB_T9_TODAY") or "2026-09-23"))
         _same_today = [(r.get("记录"), r.get("次数"), r.get("首次出现")) for r in _merged]
-        _cross = BF.merge(_bf_rows, _bf_new, "2026-09-24")
+        _cross, _ = BF.merge(_bf_rows, _bf_new, "2026-09-24")
 
         def _content(r):
             return {k: r.get(k) for k in ("记录", "分歧", "源表判定", "引擎判定")}
@@ -1224,13 +1224,15 @@ def main():
 
         _rs9d = json.loads(json.dumps(_bf_rows, ensure_ascii=False))
         _rs9d[0]["去向"] = "新条目"
-        _keep_ok = not _lost_targets(_rs9d, BF.merge(_rs9d, _bf_new, "2026-09-24"))
+        _keep_ok = not _lost_targets(_rs9d, BF.merge(_rs9d, _bf_new, "2026-09-24")[0])
         # ★ 反向对照：把旧账里的去向**抽掉**（模拟「重建时被重算」那个 bug），
         #   同一条判据必须报出来 —— 否则「保住了去向」这句话是恒真的。
         _stripped9d = [({k: v for k, v in r.items() if k != "去向"}) for r in _rs9d]
-        _c9c["重建重算掉去向"] = _lost_targets(_rs9d, BF.merge(_stripped9d, _bf_new, "2026-09-24"))
+        _c9c["重建重算掉去向"] = _lost_targets(_rs9d, BF.merge(_stripped9d, _bf_new, "2026-09-24")[0])
         c.add("T9c", "回填账本可重算（同一日逐行相同；跨日只许 次数+1、首次出现不动）"
-                     "且只增不删、**重建不许抹掉人写过的去向**",
+                     "且**已有的行不许被抹掉、人写过的去向不许丢**"
+                     "（2026-09-23 更正：原先写「只增不删」，它与 T9b 的「条数 ≡ 重算」不可能同时成立；"
+                     "已不再分歧的行移出主账、记入 `回流-撤销-v1.jsonl`，有非默认去向时**拒绝重建**）",
               _content_ok and _once_ok and all(_c9c.values()) and _keep_ok
               and len(_same_today) == len(_bf_rows),
               f"重算 {len(_bf_new)} 条 与账上 {len(_bf_rows)} 条逐行同内容；跨日 → 次数各 +1、"

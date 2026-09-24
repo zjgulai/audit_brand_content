@@ -167,6 +167,49 @@ def _locate(text: str, term_lower: str, kw_for_log: str, via: str,
     return out
 
 
+def mask_non_claims(text: str, rule_key: str, entries) -> str:
+    """★ Q25 = 选项 A（2026-09-23 裁定）：把「非主张词形」里那一处**词形命中**遮掉。
+
+    它治的既不是放行、也不是降级 —— 是「**不该让规则因这个词形而命中**」：
+
+      `treat yourself` 之所以命中 `T1.1.medical-cure`，是因为那条规则的匹配词里有**裸** `treat`；
+      命中的不是「疗效主张」，是**词形**。旧系统把这类词当 `exceptions` 用（= 放行），
+      新系统把 `treat yourself` 接成了降级（= 比旧系统更严）—— 两个方向都不对：
+      它其实是**另一个主张**（自我照护建议），既不该免责、也不该判险。
+
+    做法：对每个 `{rule, phrase, suppress}` 条目，在 `text` 里找出 `phrase` 的跨度，
+    把**跨度之内**的 `suppress` 出现替换成**等长**填充 —— 长度不变，所以位置读数、
+    `input_sha256`、以及别的规则的命中都不受影响；且只在**该规则**匹配前做。
+
+    ★ 逐规则生效：同一次 `assess()` 里，别的规则照原文本匹配。
+    """
+    if not entries:
+        return text
+    out = text
+    low = text.lower()
+    for e in entries:
+        if e.get("rule") != rule_key:
+            continue
+        phrase = str(e.get("phrase") or "").lower()
+        sup = str(e.get("suppress") or "").lower()
+        if not phrase or not sup:
+            continue
+        start = 0
+        while True:
+            i = low.find(phrase, start)
+            if i < 0:
+                break
+            start = i + 1
+            j = i
+            while True:
+                k = low.find(sup, j, i + len(phrase))
+                if k < 0:
+                    break
+                out = out[:k] + "\x00" * len(sup) + out[k + len(sup):]
+                j = k + len(sup)
+    return out
+
+
 def find_matches(text: str, rule: dict) -> tuple[list[Match], str]:
     """返回 `(命中列表, 命中方式)`。关键词与正则是 OR 关系（与现行表一致）。
 

@@ -79,7 +79,7 @@ def band_target(rule, word=None):
 
 class Vocab:
     __slots__ = ("rules", "match", "pass_bands", "down_bands", "targets",
-                 "whitelist", "guards", "sources")
+                 "whitelist", "guards", "non_claims", "sources")
 
     def __init__(self):
         self.rules = {}
@@ -89,6 +89,9 @@ class Vocab:
         self.targets = {}      # rule_key → 'auto_pass' | 'manual_review' | 'none'
         self.whitelist = []
         self.guards = []
+        # ★ Q25 = 选项 A：「非主张词形」—— 它**不是**第三个通道，是**准入过滤**：
+        #   这些词形不该让规则命中（详见 matcher.mask_non_claims）。默认空 = 行为不变。
+        self.non_claims = []
         self.sources = []
 
     def downgrade_of(self, rule_key):
@@ -113,10 +116,14 @@ def load_vocab(skeleton_dir=None):
     V.down_bands = {k: set() for k in V.rules}
     V.whitelist = wl.get("words", [])
     V.guards = [w for w in gd.get("words", []) if w.get("status") == "active"]
+    # ★ Q25：非主张词形（`$non_claims.entries`）。**取全部**，不按 status 过滤 ——
+    #   过滤会把「已裁定」与「研究稿」混成一个开关；要不要生效由那张表自己的 `status` 表达。
+    V.non_claims = (gd.get("$non_claims") or {}).get("entries") or []
     V.sources = [
         "rules-v1.json            → match.keywords（判险词，唯一产生命中的来源）",
         "whitelist-v1.json        → exempts_rule_keys（放行；隔离词走降级）",
         "context-guards-v1.json   → downgrades（降级；绝不放行）",
+        "context-guards-v1.json   → $non_claims（**准入过滤**：这些词形不让规则命中，见 Q25）",
     ]
 
     # ── 放行带 / 降级带：按通道组装，不按字段组装 ────────────────────

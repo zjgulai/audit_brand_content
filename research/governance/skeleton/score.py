@@ -415,7 +415,12 @@ class Engine:
         """
         hits = []
         for r in self.rules_for(product_line):
-            ms, how = find_matches(text, r)
+            # ★ Q25 = 选项 A（2026-09-23）：**非主张词形逐规则遮罩** —— 见 `matcher.mask_non_claims()`。
+            #   它治的是「不该让规则因这个词形而命中」：`treat yourself` 命中的不是疗效主张，是裸 `treat`。
+            #   `non_claims` 为空时逐字返回原文本 —— 行为与改动前**完全一致**。
+            ms, how = find_matches(
+                _m.mask_non_claims(text, r["rule_key"],
+                                   getattr(self.vocab, "non_claims", None)), r)
             if not ms:
                 continue
             keys, seen = [], set()

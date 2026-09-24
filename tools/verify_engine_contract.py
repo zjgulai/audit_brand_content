@@ -38,6 +38,7 @@ import judge as J  # noqa: E402
 import score as S  # noqa: E402
 import engine_manifest as EM  # noqa: E402
 import evidence_origin as EO  # noqa: E402
+import matcher as _mm  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
 
@@ -63,8 +64,15 @@ REQUIRED_VERSIONS = ["engine_version", "code_version", "rule_version", "vocab_ve
 REQUIRED_LAYER = ["id", "name", "who", "final_action", "machine_may_finalize"]
 
 # 存量语料基线（`score.py` 在 291 条记录上的混淆矩阵；改造前后必须逐字一致）
-BASELINE = {"precision": 0.970, "recall": 0.962, "f1": 0.966,
-            "catch_all": 159, "records": 291}
+#
+# ★ 2026-09-23 变更一次（Q25 = 选项 A），**是变好，且是显式收紧**：
+#   非主张词形遮罩（`matcher.mask_non_claims()`）让 3 条记录不再因裸 `treat` 命中 T1.1 ——
+#   那 3 条本来就是误拦（语料实测 6 处 `treat yourself` 全是「Treat yourself to total comfort!」）。
+#     precision 0.970 → 0.983 · f1 0.966 → 0.972 · recall 0.962 **不变** · catch_all 159 → 162
+#   `catch_all` 上升不是退步：那 3 条从「被一条不成立的规则命中」变成「规则库确实没覆盖它」——
+#   这是**如实**，而不是把未覆盖读成已检查（§catch_all 的注释）。recall 未动说明没漏放。
+BASELINE = {"precision": 0.983, "recall": 0.962, "f1": 0.972,
+            "catch_all": 162, "records": 291}
 
 
 def main() -> int:
@@ -878,8 +886,10 @@ def main() -> int:
             _res = J.judge(S.rec_text(_r), ad_type=_r.get("广告类型") or None)
             _dp0 += _res["verdict"]["layer"]["id"] == "DP0"
             _blank += _res["verdict"]["blank_register"]["enters"]
-        check("V26e", "存量 291 条实测：DP0=59（20.3%）、空白清单=100（34.4%）",
-              _dp0 == 59 and _blank == 100,
+        check("V26e", "存量 291 条实测：DP0=59（20.3%）、空白清单=103（35.4%）"
+                      "（空白清单 100 → 103 是 Q25 遮罩的连带读数：那 3 条不再被规则命中，"
+                      "于是落进空白清单 —— 与 `catch_all 159 → 162` 同一件事的两处记账）",
+              _dp0 == 59 and _blank == 103,
               f"DP0={_dp0} · 空白清单={_blank} · 其余 {291 - _dp0 - _blank} 条不走这两条路")
 
     # ── V27 ESC-003 关闭，且关闭有实测依据（D7）────────────────────
@@ -2119,13 +2129,21 @@ def main() -> int:
     _n_pass, _n_down = _a1m.get("仍放行_条数"), _a1m.get("变成降级_条数")
     _n_gone = _a1m.get("满档判险_无带_条数")
     # 守恒：三桶之和必须等于自我触发词数（漏一类就断）
-    _mig_cons = (None not in (_n_self, _n_pass, _n_down, _n_gone)
-                 and _n_pass + _n_down + _n_gone == _n_self)
+    # ★ 2026-09-23 起是**四**桶：Q25 的准入过滤让一部分自我触发词**不再让规则命中**
+    #   （既不放过、也不降级、也不是满档判险）—— 见 `audit_migration_fidelity.py` 的 `idle`。
+    _n_idle = _a1m.get("准入过滤_不命中_条数")
+    _mig_cons = (None not in (_n_self, _n_pass, _n_down, _n_gone, _n_idle)
+                 and _n_pass + _n_down + _n_gone + _n_idle == _n_self)
     # 反向对照：把「仍放行」减一，守恒必须断
     _mig_ctrl = (_n_pass is not None
-                 and _n_pass - 1 + (_n_down or 0) + (_n_gone or 0) != _n_self)
+                 and _n_pass - 1 + (_n_down or 0) + (_n_gone or 0) + (_n_idle or 0) != _n_self)
     # 棘轮：满档判险（最重的一桶）与已发生的假阳性都只许减不许增
-    _N_GONE, _N_FP = 21, 3
+    #
+    # ★ 2026-09-23 收紧一次（Q25 = 选项 A）：迁移回归假阳性 **3 → 0**。
+    #   非主张词形遮罩（`treat yourself` 不再因裸 `treat` 命中 T1.1）把那 3 条假阳性消掉了；
+    #   同时「变成降级」13 → 12（那个词从守卫表移除，不再有降级可算）。
+    #   本门**自己报红要求收紧** —— 这正是它设计的样子：不收紧就等于守着一个过期的现状。
+    _N_GONE, _N_FP = 21, 0
     _n_fp = (((_mf or {}).get("totals", {}) or {}).get("分歧_迁移回归_假阳性"))
     _ctrl_c = ((_n_gone is None or _n_gone + 1 > _N_GONE)
                and (_n_fp is None or _n_fp + 1 > _N_FP))
@@ -2139,8 +2157,8 @@ def main() -> int:
           _mig_cons and _mig_ctrl
           and (_n_gone is not None and _n_gone <= _N_GONE)
           and (_n_fp is not None and _n_fp <= _N_FP) and _ctrl_c,
-          f"实测 {_n_pass} 放行 + {_n_down} 降级 + {_n_gone} 满档判险 = "
-          f"{(_n_pass or 0) + (_n_down or 0) + (_n_gone or 0)} vs 自我触发 {_n_self}"
+          f"实测 {_n_pass} 放行 + {_n_down} 降级 + {_n_gone} 满档判险 + {_n_idle} 准入过滤 = "
+          f"{(_n_pass or 0) + (_n_down or 0) + (_n_gone or 0) + (_n_idle or 0)} vs 自我触发 {_n_self}"
           f" · 假阳性 {_n_fp}/{_N_FP} · "
           + (f"★ 已改善：{('；'.join(_relax_mf))} —— 本门转红是**故意的**："
              f"请把阈值收紧到当前值再提交，否则这条门守的是一个过期的现状"
@@ -2203,7 +2221,7 @@ def main() -> int:
     _mut_claimed = {y for q in _mut for y in (q.get("covers_unwired_guards") or [])}
     _ctrl_u = bool(_unwired_problems(_unwired, _mut)) or any(
         w for w in _unwired if w not in _mut_claimed)
-    _N_UNWIRED = 38
+    _N_UNWIRED = 36
     _relax_u = (f"未接线 {len(_unwired)} < {_N_UNWIRED}" if len(_unwired) < _N_UNWIRED else "")
     check("V45d", f"每个未接线的守卫词都指向一条**可决策的**未决项（被 ≥1 条 open 认领，"
                   f"或词条点名一条已答的 Q/D）；认领并集恰好等于未接线集合；未接线 ≤ {_N_UNWIRED}",
@@ -2974,6 +2992,40 @@ def main() -> int:
               not _orphan57 and _ctrl57c,
               f"已接线且未归类 {len(_wired_uc)} 个：{_wired_uc} · 没有任何未决项提到的："
               f"{_orphan57 or '无'} · 反向对照（一个不存在的名字必须不在文本里）→ {_ctrl57c}")
+
+        # ── V58（Q25）非主张词形走**准入过滤**，不是第三个通道 ──────────────────
+        #   A 的要点：既不放行、也不降级 —— **不该让规则因这个词形而命中**。
+        _nc58 = (_g57.get("$non_claims") or {}).get("entries") or []
+        _ap58 = (_g57.get("$admission_pending") or {}).get("items") or []
+        check("V58a", "★ Q25=A：非主张清单只收「**确实是另一个主张**」的词形；从守卫表移除的词要么在这里、"
+                      "要么在「定性待法务」区 —— 两处都指得出一条真实的决定",
+              bool(_nc58) and all(e.get("status") and e.get("decision") for e in _nc58)
+              and len(_ap58) == 2
+              and all(i.get("status") == "pending_legal" and i.get("decision") for i in _ap58)
+              and not ({"treat yourself", "or cure", "or treat"} & set(_w57)),
+              f"非主张 {[e['phrase'] for e in _nc58]} · 定性待法务 {[i['word'] for i in _ap58]} · "
+              f"守卫表 {len(_w57)} 词（三者都不在里面）")
+
+        _r58a = J.judge("Treat yourself to total comfort!", origin="test")
+        _r58b = J.judge("prevent or cure mastitis", origin="test")
+        _h58a = sorted({h["rule_key"] for h in _r58a["hits"]})
+        _h58b = sorted({h["rule_key"] for h in _r58b["hits"]})
+        check("V58b", "★ 行为级：`Treat yourself to total comfort!` **不再**命中 `T1.1.medical-cure`"
+                      "（那 3 条误拦从根上消失），而 `prevent or cure mastitis` **仍然**命中"
+                      "（证明过滤器不是把这条规则关掉）",
+              "T1.1.medical-cure" not in _h58a and "T1.1.medical-cure" in _h58b,
+              f"treat yourself → {_h58a or '零命中（落 catch_all）'} · prevent or cure → {_h58b}")
+
+        _txt58 = "a cure or cure b"
+        _m58 = _mm.mask_non_claims(_txt58, "T1.1.medical-cure",
+                                   [{"rule": "T1.1.medical-cure", "phrase": "or cure", "suppress": "cure"}])
+        _m58b = _mm.mask_non_claims("x cure y", "T9.别的规则",
+                                    [{"rule": "T1.1.medical-cure", "phrase": "or cure", "suppress": "cure"}])
+        check("V58c", "★ 遮罩必须**逐规则**且**等长**：别的规则拿到的还是原文本；长度一个字节都不许变"
+                      "（变了会让位置读数与 `input_sha256` 失真）",
+              len(_m58) == len(_txt58) and _m58.count("\x00") == 4 and _m58b == "x cure y",
+              f"命中规则：{len(_m58)} 字节（原 {len(_txt58)}）· 遮掉 4 个字节 · "
+              f"别的规则拿到的是否原样={_m58b == 'x cure y'}")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

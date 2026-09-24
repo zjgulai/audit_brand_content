@@ -41,15 +41,15 @@
  "stats": {
   "live_field_total": 94,
   "duplicated_from_whitelist": 14,
-  "guards": 84,
-  "from_live": 79,
+  "guards": 81,
+  "from_live": 76,
   "from_skeleton_only": 5,
-  "wired": 46,
-  "not_wired": 38,
+  "wired": 45,
+  "not_wired": 36,
   "g3_violations": 0,
   "by_status": {
-   "active": 46,
-   "pending": 38,
+   "active": 45,
+   "pending": 36,
    "misrouted": 0
   },
   "by_type": {
@@ -58,10 +58,10 @@
    "溯源/同源表述": 14,
    "风险降低表述": 7,
    "免责声明": 6,
-   "未归类": 6
+   "未归类": 3
   },
   "by_lang": {
-   "en": 60,
+   "en": 57,
    "zh": 24
   }
  },
@@ -575,50 +575,6 @@
    "source": "现网 `豁免词`"
   },
   {
-   "word": "or cure",
-   "lang": "en",
-   "guard_type": "未归类",
-   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-   "downgrades": [
-    "T1.1.medical-cure"
-   ],
-   "downgrades_legacy": [
-    "H01"
-   ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
-   "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-   "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
-  },
-  {
-   "word": "or treat",
-   "lang": "en",
-   "guard_type": "未归类",
-   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-   "downgrades": [
-    "T1.1.medical-cure"
-   ],
-   "downgrades_legacy": [
-    "H01"
-   ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
-   "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-   "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
-  },
-  {
    "word": "reduce the risk of clogged",
    "lang": "en",
    "guard_type": "风险降低表述",
@@ -902,28 +858,6 @@
    "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
    "source_legacy": "H01",
    "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
-  },
-  {
-   "word": "treat yourself",
-   "lang": "en",
-   "guard_type": "未归类",
-   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-   "downgrades": [
-    "T1.1.medical-cure"
-   ],
-   "downgrades_legacy": [
-    "H01"
-   ],
-   "effect_target": "manual_review",
-   "effect": "auto_reject → manual_review",
-   "wired": true,
-   "channel_verdict": "downgrade",
-   "g3_violation": null,
-   "status": "active",
-   "status_note": null,
-   "source_legacy": "H01",
-   "wire_gap": null,
    "source": "现网 `豁免词`"
   },
   {
@@ -2016,6 +1950,65 @@
     "why": "它**就是 H02 要抓的那个主张本身**（`乳腺炎` 是 H02 的匹配词），不是免责声明 —— 旧系统把它写在 `豁免词` 里，等于对这条主张放行。",
     "decision": "Q24",
     "action": "交法务确认是否补召回；**不要**迁移成放行项，也不要当成普通降级词"
+   }
+  ]
+ },
+ "$non_claims": {
+  "$note": [
+   "★ Q25 = 选项 A（2026-09-23 裁定）：这些**不是第三个通道**，是**准入过滤** ——",
+   "「非主张」既不该放行、也不该降级，而是**不该让规则因它们而命中**。",
+   "机制：`matcher.mask_non_claims()` 在**该规则**匹配前，把 `phrase` 跨度之内的 `suppress`",
+   "词形替换成**等长**填充（长度不变 → 位置读数与别的规则的命中都不受影响）。",
+   "★ 为什么它不是守卫词：守卫的机制语义是「表明该主张**并未被作出**」；",
+   "而 `treat yourself` 不是取消主张，它是**另一个主张**（自我照护建议）。",
+   "★ 命中的不是「疗效主张」，是**词形**：`T1.1.medical-cure` 的匹配词里有**裸** `treat`。",
+   "★ **只收「确实是另一个主张」的词形** —— 写这张表时差点犯的错记在这里：",
+   "   `or cure` / `or treat` 一度也被塞进来，而 `prevent or cure` 是**典型的主张**，",
+   "   遮掉它等于把 `T1.1.medical-cure` 关掉一半。它们现在进 `$admission_pending`（定性交法务）。",
+   "★ 全部条目 `status=proposed` —— 需要**法务裁一次「哪些词形不算主张」**（Q25 的代价里点名的）。",
+   "判据：`tools/verify_engine_contract.py` 的 V58a–V58c。"
+  ],
+  "entries": [
+   {
+    "phrase": "treat yourself",
+    "rule": "T1.1.medical-cure",
+    "legacy_rule": "H01",
+    "suppress": "treat",
+    "why": "它命中 `T1.1.medical-cure` 靠的是裸 `treat` —— 命中的是词形，不是疗效主张；而它本身是**自我照护建议**（另一个主张），既不该被免责、也不该被判险。",
+    "evidence": "实测：`treat yourself` 曾被接成降级（旧系统是**放行**），已造成约 3 条/批误拦；`or cure` / `or treat` 同为未归类、未接线、拿不到带 —— 两个方向都不对。",
+    "status": "proposed",
+    "decision": "Q25"
+   }
+  ]
+ },
+ "$admission_pending": {
+  "$note": [
+   "★ Q25 = 选项 A 的另一半：这些词从守卫表里**移除**了，但它们的定性**还没定** ——",
+   "既不能按守卫接（降级）、也不能按非主张遮（准入过滤），因为**没人裁定过它们是主张还是非主张**。",
+   "★ 为什么不能一刀切：`or cure` 在 `prevent or cure` 里是**主张的一部分**，",
+   "而在别处可能是免责句的一部分（旧系统把它写在 `exceptions` 里 = 放行）。",
+   "两种读法都说得通 —— 所以它是一个**法务要裁的问题**，不是一个开发者能改的字符串。",
+   "★ 今天的行为：它们**不在守卫表里**，因此不产生任何降级（与移除前一致：它们本来就是 `wired=false`）。",
+   "语料实测 **0 处**出现，所以移除对 291 条存量**零行为变化**。",
+   "★ 法务裁完之后：判「非主张」→ 进 `$non_claims`；判「守卫」→ 加回 `words`；判「都不算」→ 删掉这一条。",
+   "判据：V58a（每个待裁词都必须指向一条未决/待收项）。"
+  ],
+  "items": [
+   {
+    "word": "or cure",
+    "legacy_rule": "H01",
+    "was": "未接线守卫（wired=false）",
+    "why_pending": "在 `prevent or cure` 里它是**主张的一部分**；在别的句式里可能是免责句的一部分。",
+    "status": "pending_legal",
+    "decision": "Q25"
+   },
+   {
+    "word": "or treat",
+    "legacy_rule": "H01",
+    "was": "未接线守卫（wired=false）",
+    "why_pending": "同 `or cure`。",
+    "status": "pending_legal",
+    "decision": "Q25"
    }
   ]
  }

@@ -42,8 +42,18 @@ PRD §9 写的是「**人工复核结论回流知识库，更新规则权重和�
 
 ## 三条设计约束（每条对应本项目踩过的坑）
 
-1. **只增不删。** 与 `缺口账-v1.jsonl` 同形：重建时已有行保留 `首次出现`，
-   `次数` 递增；消失的行**不删**（它曾经发生过）。删行会让「回流发生过几次」随时间变小。
+1. **已有的行不许被重建抹掉，但「已不再分歧」的行必须离开主账。**
+   ★ 2026-09-23 更正（Q25 落地时撞出来的）：原先这里写的是「**只增不删** …… 消失的行不删
+   （它曾经发生过）」。它与 T9b 的判据**不可能同时成立** —— T9b 要求
+   「账上条数 ≡ 源表列 vs 引擎列不一致的行数」，而引擎一改，重算数就会变小（实测 13 → 10），
+   于是工具**达不到自己验收器要求的那个状态**。
+   正确的口径：这本账是**派生量**（「现在有哪些分歧」），不是事件史 ——
+   「发生过」的是**人做过那次复核**，不是**那次分歧**。所以：
+     · 已有行的 `首次出现` / `次数` / **人写过的 `去向`** 一律保留（重建不许抹掉人的东西）；
+     · 已不再分歧的行**移出主账**，但**不销毁** —— 追加进 `research/kb/回流-撤销-v1.jsonl`
+       并写明撤销时刻与原因（`receipts.LOSS.md` 的老规矩：丢了就留一份成文的记录）；
+     · ★ 若待撤销的行**有非默认 `去向`**（有人写过），**拒绝重建并退 2** ——
+       那种行不能用「引擎算不出来了」当理由丢掉。
 2. **逐行可回查。** 每条都带 `记录`（`records.json` 的行号）与源表原话 ——
    读者不需要相信本模块的转述，他可以自己去翻那一行。
 3. **`--today=` 是 dry-run，不落盘。** （`AGENTS.md` §2.4.4：看一眼前提不能改掉将来要发生的事。）
@@ -68,6 +78,8 @@ KB = os.path.join(REPO, "research", "kb")
 FIDELITY = os.path.join(SKEL, "_data", "迁移保真度.json")
 RECORDS = os.path.join(SKEL, "_data", "records.json")
 LEDGER = os.path.join(KB, "回流-v1.jsonl")
+#: ★ 2026-09-23：已不再分歧的行**移出主账但不销毁**，追加到这里并写明撤销时刻与原因。
+REVOKED = os.path.join(KB, "回流-撤销-v1.jsonl")
 
 #: `去向` 的取值域（枚举，不许自由字符串 —— 与 origin 四档、原因码同一条规矩）。
 #: 「待定」是**默认值**，也是今天**唯一**用到的值：定去向是人的动作。
@@ -146,7 +158,8 @@ def derived_rows():
 
 
 def merge(old_rows, new_rows, today):
-    """只增不删：已有的保留 `首次出现` 并 `次数+1`；新的记 `首次出现=today`；消失的不删。"""
+    """已有的保留 `首次出现` 并 `次数+1`；新的记 `首次出现=today`；
+    消失的**移出主账、记进撤销账**（见抬头第 1 条 2026-09-23 的更正）。"""
     key = lambda r: (r.get("记录"), r.get("分歧"))
     old = {key(r): r for r in old_rows}
     out = []
@@ -161,14 +174,20 @@ def merge(old_rows, new_rows, today):
         if (prev or {}).get("$去向_note"):
             row["$去向_note"] = prev["$去向_note"]
         out.append(row)
-    for r in old_rows:                      # ← 已消失的历史行：原样留下，不删
-        if key(r) in old:
-            out.append(r)
-    return out
+    # ★ 2026-09-23：已消失的行不再留在主账里 —— 它们进撤销账（有人写过去向的会被上面挡住）。
+    dropped = [r for r in old_rows if key(r) in old]
+    return out, dropped
 
 
 def load_ledger():
     return _read_jsonl(LEDGER)
+
+
+def _write_jsonl(path, rows):
+    """追加写（撤销账）或覆盖写（主账）—— 两者都走这里，保证格式一致。"""
+    with open(path, "a" if path == REVOKED else "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
 def counts(rows):
@@ -197,14 +216,30 @@ def main() -> int:
     today = a.today or __import__("datetime").date.today().isoformat()
 
     if a.rebuild:
-        rows = merge(old, new, today)
+        rows, dropped = merge(old, new, today)
+        # ★ 2026-09-23：待撤销的行里只要有一条**有人写过的去向**，就拒绝重建 ——
+        #   「引擎算不出来了」不是丢掉人的结论的理由。
+        human = [r for r in dropped if str(r.get("去向") or "待定") != "待定"]
+        if human:
+            print(f"❌ 拒绝重建：{len(human)} 行已不再分歧，但它们的 `去向` 是人写过的 ——")
+            for r in human:
+                print(f"   · 记录#{r.get('记录')} {r.get('分歧')} → 去向「{r.get('去向')}」")
+            print("   处置：这些行的结论**仍然成立**（人做过那次复核），所以它们不该被引擎的改动带走。")
+            print("   要么把它们并入知识库条目/规则，要么明确写出为什么作废 —— 但不能只因为重算不出来就删。")
+            return 2
+        if dropped:
+            _write_jsonl(REVOKED, [dict(r, **{"$撤销于": today,
+                                               "$撤销原因": "引擎修正后不再分歧（该行是派生量，不是事件史）"})
+                                   for r in dropped])
+            print(f"  ↳ {len(dropped)} 行已不再分歧 → 移出主账，记入 "
+                  f"{os.path.relpath(REVOKED, REPO)}（不销毁）")
         _write_jsonl(LEDGER, rows)
         print(f"✓ 已写 {os.path.relpath(LEDGER, REPO)}：{len(rows)} 行"
               f"（重算应有 {len(new)} 条，账上原有 {len(old)} 条）")
         print(json.dumps(counts(rows), ensure_ascii=False))
         return 0
 
-    rows = old or merge([], new, today)
+    rows = old or merge([], new, today)[0]      # ★ merge 现在返回 (rows, dropped)
     c = counts(rows)
     if a.pending:
         for r in rows:
