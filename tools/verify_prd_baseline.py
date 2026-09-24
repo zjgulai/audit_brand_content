@@ -438,6 +438,25 @@ def main():
         add("L1", "A0 索引可解析", True, str(INDEX.relative_to(ROOT)))
         docs = idx.get("docs") or []
         add("L1", "A5 docs 非空", len(docs) > 0, f"{len(docs)} 份")
+        # ★ 2026-09-24 加（代价是一次真实的读错）：`obj_edit_time_bj` 此前**没有任何断言在看**，
+        #   而它是索引里唯一的「上游什么时候改的」读数。我这次重记指纹时把它当**毫秒**算，
+        #   得到 `58700-09-17 05:40:00` —— 一个**看得见的荒唐值，却没有任何东西会红**
+        #   （API 字段 `latest_modify_time` 是**秒的数字符串**，实测 `1790248254` = 2026-09-24 19:10:54）。
+        #   判据：可解析、且落在 [节点创建时间, 现在 + 1 天] 之内。跨年/未来/上古都会被拦下。
+        import datetime as _dt
+        _bads = []
+        for _d in docs:
+            _f, _v = _d.get("file"), str(_d.get("obj_edit_time_bj") or "")
+            try:
+                _t = _dt.datetime.strptime(_v, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                _bads.append(f"{_f}: `{_v}` 解析不了"); continue
+            _now = _dt.datetime.now() + _dt.timedelta(days=1)
+            _floor = _dt.datetime(2020, 1, 1)
+            if not (_floor <= _t <= _now):
+                _bads.append(f"{_f}: `{_v}` 不在 [{_floor:%Y-%m-%d}, {_now:%Y-%m-%d}] 内")
+        add("L1", "A6 obj_edit_time_bj 可解析且落在合理区间（★ 秒 vs 毫秒读错会在这里红）",
+            not _bads, "全部合理" if not _bads else "；".join(_bads))
     else:
         docs = []
 
