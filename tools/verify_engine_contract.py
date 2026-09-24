@@ -37,6 +37,7 @@ sys.path.insert(0, str(SKEL))
 import judge as J  # noqa: E402
 import score as S  # noqa: E402
 import engine_manifest as EM  # noqa: E402
+import evidence_origin as EO  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
 
@@ -2707,6 +2708,107 @@ def main() -> int:
                       "（证明它不只是自证里成立）",
               _o53.returncode == 0 and "可追溯" in _o53.stdout,
               f"rc={_o53.returncode} · 输出含「可追溯」={'可追溯' in _o53.stdout}")
+
+        # ── V54（Q44）门二「**没问过**」与「问过没意见」必须长得不一样 ──────────────
+        #   门二的开口条件是「**确实引用了条款**才判」，理由是对的：没有依据 ≠ 依据很弱。
+        #   于是 PASS 档里那条**自己声明不引外部条款**（`no_external_basis`）的规则一旦被命中，
+        #   这一路是「门二没问过」—— 而它此前与「门二问过、没意见」在产出里**一模一样**
+        #   （两边都没有 `origin_narrowed`）。§2.4.2 的口径：**未测不许与通过长得一样**。
+        _rules54 = json.loads((SKEL / "rules-v1.json").read_text(encoding="utf-8"))["rules"]
+        _bykey54 = {r.get("rule_key"): r for r in _rules54}
+
+        def _undeclared54(rows):
+            """PASS 档 + 引用集为空 + **没有**显式声明 `no_external_basis` 的规则。"""
+            return sorted(r["rule_key"] for r in rows
+                          if r.get("disposition") in J.PASS_DISPOSITIONS
+                          and not (r.get("external_ref") or [])
+                          and not (r.get("no_external_basis") or "").strip())
+
+        _nobasis54 = sorted(r["rule_key"] for r in _rules54
+                            if r.get("disposition") in J.PASS_DISPOSITIONS
+                            and not (r.get("external_ref") or []))
+        # ★ 反向对照：喂一条**故意不声明**的同形规则，上面那个谓词必须指得出来 ——
+        #   否则「声明齐全」会因为谓词恒假而恒真（§2.4 点名的病）。
+        _bogus54 = {"rule_key": "TX.synthetic-undeclared", "disposition": "auto_pass",
+                    "external_ref": [], "no_external_basis": ""}
+        check("V54a", "★ PASS 档里「不引外部条款」的规则必须**显式声明**"
+                      "（逐条点名：`T9.objective-parameter`），否则「没有依据」会被读成「依据很弱」",
+              not _undeclared54(_rules54)
+              and _undeclared54([_bogus54]) == ["TX.synthetic-undeclared"]
+              and "T9.objective-parameter" in _nobasis54,
+              f"今天这一类共 {len(_nobasis54)} 条：{_nobasis54} · 未声明的："
+              f"{_undeclared54(_rules54) or '无'} · 反向对照（喂一条不声明的）→ "
+              f"{_undeclared54([_bogus54])}")
+
+        # ★★ 行为级：「不产生命中」这句话**跑语料量出来**，不从规则形态推。
+        #    （形态（`is_modifier` / `topic_only`）是间接判据 —— Q44 的 impact 里点名过这一点。）
+        _recs54 = json.loads((SKEL / "_data" / "records.json").read_text(encoding="utf-8"))
+        _hit54 = set()
+        for _r54 in _recs54:
+            _t54 = ((_r54.get("Primary Text") or "") + "\n" + (_r54.get("Headline") or "")).strip()
+            if not _t54:
+                continue
+            for _h54 in J.engine().assess(_t54)[0]:
+                if _h54.rule_key in set(_nobasis54):
+                    _hit54.add(_h54.rule_key)
+        check("V54b", "★ 行为级：「PASS 档 + 不引外部条款」的规则**真的一条命中都没有**"
+                      "（跑语料量出来的，不是从规则形态推出来的）",
+              not _hit54,
+              f"语料 {len(_recs54)} 条逐条过匹配器 · 命中这一类规则的：{sorted(_hit54) or '无'} —— "
+              f"★ 一旦它真的产生了命中，是**断言先红**，不是判定先放松")
+
+        _nb54 = _nobasis54[0]
+        _k54 = {_nb54: _bykey54[_nb54]}
+        _st_hit = EO.cited_gate_status(cited=[], evidence_status="ok",
+                                       hit_rule_keys=[_nb54], rules_by_key=_k54)
+        _st_cited = EO.cited_gate_status(cited=[{"origin": "stated"}], evidence_status="ok",
+                                         hit_rule_keys=[_nb54], rules_by_key=_k54)
+        _st_other = EO.cited_gate_status(cited=[], evidence_status="ok",
+                                         hit_rule_keys=["T8.2.urgency-scarcity"],
+                                         rules_by_key=_k54)
+        check("V54c", "★ 门二三态可判：命中「声明不引外部条款」的规则 → 落 `untested` 并点名；"
+                      "**引用集非空**、或命中的是别的规则 → 不作声（两条反向对照）",
+              (_st_hit or {}).get("status") == "untested"
+              and (_st_hit or {}).get("rules") == [_nb54]
+              and _st_cited is None and _st_other is None,
+              f"命中它 → {(_st_hit or {}).get('status')} {(_st_hit or {}).get('rules')} · "
+              f"引用集非空 → {_st_cited}（应为 None） · 命中别的规则 → {_st_other}（应为 None）")
+
+        # ★★ 端到端：证明它**真的接在判定路径上** —— 用一份**内存里**合成的规则表
+        #    （一个带关键词、`auto_pass`、声明了 `no_external_basis` 的规则），
+        #    把进程内单例临时换掉跑一次 `judge()`，再**无条件换回来**。
+        #    不碰盘上任何制品（§2.4.4）；这也是 §2.4.7 那条方法上的教训：
+        #    判据要真的走进那一跳，而不是断言「源码里出现过这个名字」。
+        _synth54 = copy.deepcopy(json.loads(
+            (SKEL / "rules-v1.json").read_text(encoding="utf-8")))
+        _synth54["rules"].append({
+            "rule_key": "T9.synthetic-q44-no-basis",
+            "parent_rule": "自证合成（Q44）", "topic": "T9", "topic_label": "产品参数（客观可测）",
+            "modality": "permit", "severity": "L0", "disposition": "auto_pass",
+            "evaluability": "manual_only",
+            "match": {"keywords": ["ZZ_SYNTHETIC_Q44"], "patterns": [], "languages": ["en"]},
+            "downgrade_band": {"keywords": [], "effect": "none"},
+            "evidence_required": "product_spec",
+            "no_external_basis": "自证合成：故意声明不引外部条款",
+            "source_legacy": "自证", "detection_layer": "native",
+        })
+        _eng_orig = J._ENGINE
+        try:
+            J._ENGINE = S.Engine(_synth54, J.load_vocab())
+            _r54 = J.judge("ZZ_SYNTHETIC_Q44", origin="test")
+            _r54_clean = J.judge("a plain sentence with no rule in it", origin="test")
+        finally:
+            J._ENGINE = _eng_orig
+        _cg54 = (_r54.get("verdict") or {}).get("clause_gate")
+        check("V54d", "★ 接线（端到端）：命中这类规则时 `verdict.clause_gate` 真的出现且是 `untested`；"
+                      "普通判定里**不许**凭空多出这个字段",
+              isinstance(_cg54, dict) and _cg54.get("status") == "untested"
+              and _cg54.get("rules") == ["T9.synthetic-q44-no-basis"]
+              and "clause_gate" not in ((_r54_clean.get("verdict") or {}))
+              and (_r54["verdict"]["disposition"] == "auto_pass"),
+              f"合成规则命中 → clause_gate={_cg54} · disposition="
+              f"{_r54['verdict']['disposition']}（门二未判，所以**不**收窄）· "
+              f"普通判定里有这个字段吗={'clause_gate' in (_r54_clean.get('verdict') or {})}（应为否）")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

@@ -2524,7 +2524,7 @@
       "id": "Q44",
       "kind": "design",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "Owner",
       "raised_at": "2026-09-23",
       "title": "T4 接线的第二扇门在「引用了 0 条条款」时**是开着的** —— 而 PASS 档里正好有一条规则声明了自己没有外部依据（今天不产生命中）",
@@ -2549,7 +2549,11 @@
         }
       ],
       "default_if_unanswered": "沉默 = 选项 C（保持「引用集为空 → 门二不问」）。★ 但要说清：选 C 不等于「已经判过它安全」—— 它等于**这一条既没有门也没有断言**，而 `T9.objective-parameter` 不产生命中这句话今天没有任何东西在守着。",
-      "where": "`research/governance/skeleton/judge.py`（门二 `_cited` 那一段）· `research/governance/skeleton/rules-v1.json`（PASS 档两条规则：`T8.2.urgency-scarcity` / `T9.objective-parameter`）· `tools/verify_engine_contract.py`（V47f 是这扇门的执行点）· `PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md` §五 T4。"
+      "where": "`research/governance/skeleton/judge.py`（门二 `_cited` 那一段）· `research/governance/skeleton/rules-v1.json`（PASS 档两条规则：`T8.2.urgency-scarcity` / `T9.objective-parameter`）· `tools/verify_engine_contract.py`（V47f 是这扇门的执行点）· `PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md` §五 T4。",
+      "answered_at": "2026-09-23",
+      "answered_by": "Owner",
+      "answer": "选项 A —— 先把它变成可判据的：加断言 + 门二对这种情形落一条**如实的未测说明**",
+      "record": "① 判据：新建纯函数 `evidence_origin.cited_gate_status()`（三态），`judge.py` 把它接到 `verdict.clause_gate` —— 命中「声明不引外部条款」的规则且引用集为空时落 `{\"status\": \"untested\", \"rules\": [...]}`，**不收窄**（没有依据 ≠ 依据很弱）。② 断言 `verify_engine_contract.py` 的 V54a–V54d：V54a PASS 档 + 引用集为空必须显式声明 `no_external_basis`（逐条点名 `T9.objective-parameter`）+ 反向对照（喂一条不声明的必须被指出来）；V54b **行为级**：291 条语料逐条过匹配器，这类规则**零命中**（不从规则形态推）；V54c 三态纯函数 + 两条反向对照（引用集非空 / 命中别的规则都不作声）；V54d **端到端**：内存里合成一条同形规则换上进程内单例跑 `judge()`，`clause_gate` 真的出现，且普通判定里不许凭空多出这个字段。③ 打断验红：让 `cited_gate_status` 恒返回 None → **V54c/V54d 红、rc=1**（实测）。④ `engine-manifest.json` 重新固化（`judge.py` / `evidence_origin.py` 都在 code 清单里）。⑤ 全量 198/198。★ 仍未消除的边界（写下来而不是留着）：V54b 只量**本语料**；这条规则若将来真的产生命中，是断言先红，但「红之后该给它一扇门还是维持不可达」是新的决定。"
     },
     {
       "id": "Q45",

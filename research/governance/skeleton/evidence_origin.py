@@ -107,6 +107,44 @@ def may_finalize_pass(refs):
                    f"OCR/转写/画面转述可以补充，但不能单独把结论推到 PASS")
 
 
+def cited_gate_status(*, cited, evidence_status, hit_rule_keys, rules_by_key):
+    """门二（**所引条款**的来源）对这次判定**做了什么** —— 三态，其中两态必须长得不一样。
+
+    ★ Q44（2026-09-23）。门二的开口条件写的是「**确实引用了条款**（`cited` 非空）才判」，
+      而那个理由是对的：**没有依据 ≠ 依据很弱**。但这样一来有一类判定**不受门二约束** ——
+      命中的规则自己声明了 `no_external_basis`（本规则不引外部条款）。
+      它此前与「门二问过、没意见」在产出里**长得一模一样**：两边都没有 `origin_narrowed`。
+
+    返回 `None`，或：
+
+        {"gate": "cited_clauses", "status": "untested", "why": "...", "rules": [...]}
+
+    ★ 为什么措辞必须是「未测」而不是沉默：沉默不等于「已经判过它安全」，
+      它等于这一路**没有被判过** —— 而 `AGENTS.md` §2.4.2 的规矩是
+      **未测不许与通过长得一样**。
+
+    ★ 判据（`verify_engine_contract.py` 的 V54a–V54d）：这条函数**本身**可被直接调用
+      （V54c 喂合成命中走进去），而 V54d 用一份**内存里**合成的规则表端到端跑一次
+      `judge()`，证明它真的接在判定路径上 —— 不是「源码里出现过这个名字」（§2.4）。
+    """
+    if cited:
+        # 门二开口了：结论要么在 `origin_narrowed`（收窄），要么在 `evidence_status`
+        # （条款库读不出）—— 两条各说各的事，这里不重复报。
+        return None
+    rules = sorted({k for k in hit_rule_keys
+                    if (rules_by_key.get(k) or {}).get("no_external_basis")})
+    if not rules:
+        return None
+    return {
+        "gate": "cited_clauses",
+        "status": "untested",
+        "why": ("命中的规则自己声明了 `no_external_basis`（本规则不引外部条款）—— "
+                "门二对这一条**不作判断**：没有依据 ≠ 依据很弱。"
+                "★ 这不等于「已经判过它安全」，它等于这一路**没有被判过**。"),
+        "rules": rules,
+    }
+
+
 def receipt_origin_problems(rc):
     """回执里两个 `origin` 不许混。这是本模块抬头那张表的执行点。"""
     bad = []

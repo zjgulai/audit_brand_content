@@ -766,6 +766,10 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
     #      ★ 门二只在**确实引用了条款**时开口：命中的规则若声明了 `no_external_basis`，
     #        「没有依据」不是「依据很弱」—— 那一条由规则自己的声明管，不由这扇门管。
     narrowed = None
+    # ★ Q44 = 选项 A（2026-09-23）：门二**没问过**与门二**判过它安全**，必须长得不一样。
+    #   见 `evidence_origin.cited_gate_status()`。没有这一项时，两者在产出里都是
+    #   「没有 `origin_narrowed`」—— 一模一样，而其中一个意味着**没有人看着它**。
+    clause_gate = None
     _mat_ok, _mat_why = (True, "")
     _ref_ok, _ref_why = (True, "")
     if disposition in PASS_DISPOSITIONS:
@@ -791,6 +795,12 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
                           "**所引条款**怎么读到的 —— 各有各的方向，不许合并成一个集合。"),
             }
             disposition = "manual_review"
+        else:
+            # ★ Q44：门二**没开口**时，要如实说清是哪一种没开口 ——
+            #   「问过、没意见」还是「这一路根本没问过」。
+            clause_gate = EO.cited_gate_status(
+                cited=_cited, evidence_status=_evidence.get("evidence_status"),
+                hit_rule_keys=[x["rule_key"] for x in out_hits], rules_by_key=rules_by_key)
 
     layer = resolve_layer(disposition, hits, layers, has_text=has_text, ctx={
         "rule_keys": sorted({x["rule_key"] for x in out_hits}),
@@ -840,6 +850,10 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
     }
     if narrowed:
         verdict["origin_narrowed"] = narrowed
+    if clause_gate:
+        # ★ Q44：门二**未判**也要留下来 —— 不留的话，「没问过」与「问过没意见」
+        #   在读产出的人眼里是同一件事（都没有 `origin_narrowed`）。
+        verdict["clause_gate"] = clause_gate
 
     boundary = _boundary(eng, eng.vocab, hits, product_line, locale)
     if narrowed:

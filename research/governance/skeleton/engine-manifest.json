@@ -1,8 +1,8 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-24T07:33:14+00:00",
+  "generated_at": "2026-09-24T07:43:48+00:00",
   "engine_version": "b990f681f49c9c20",
-  "code_version": "34bda087d4718349",
+  "code_version": "99ef3b0bc3248302",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
@@ -85,8 +85,8 @@
       "bytes": 34263
     },
     "judge.py": {
-      "sha256": "4fb1d8fc06feb25417604a88b85b15e8dec7a4b84e09ec0818b9226ee6975c8a",
-      "bytes": 63289
+      "sha256": "b4c5c71880b7b00fce9ec9c21041ae600fef9a3feac63448d1e0df53ee6287b8",
+      "bytes": 64312
     },
     "vocab.py": {
       "sha256": "b0b938687bb53721d87e249b630b9ed1c6f937adde0a002feae38c52b4533954",
@@ -101,8 +101,8 @@
       "bytes": 26306
     },
     "evidence_origin.py": {
-      "sha256": "80788584ab6455a712d986c97a2961148af27edcf99f034046bdaab7b0f8b1e5",
-      "bytes": 6759
+      "sha256": "91d64461d1873c48a301b1fbaceb89652c829f758ee877d4512df1374630945b",
+      "bytes": 8937
     },
     "clause_ref.py": {
       "sha256": "8c72e29e51ae6d7cec1fe59f7ada3f874757f189f930bf46688e6228b67e550d",
