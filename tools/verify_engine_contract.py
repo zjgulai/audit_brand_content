@@ -2203,7 +2203,7 @@ def main() -> int:
     _mut_claimed = {y for q in _mut for y in (q.get("covers_unwired_guards") or [])}
     _ctrl_u = bool(_unwired_problems(_unwired, _mut)) or any(
         w for w in _unwired if w not in _mut_claimed)
-    _N_UNWIRED = 39
+    _N_UNWIRED = 38
     _relax_u = (f"未接线 {len(_unwired)} < {_N_UNWIRED}" if len(_unwired) < _N_UNWIRED else "")
     check("V45d", f"每个未接线的守卫词都指向一条**可决策的**未决项（被 ≥1 条 open 认领，"
                   f"或词条点名一条已答的 Q/D）；认领并集恰好等于未接线集合；未接线 ≤ {_N_UNWIRED}",
@@ -2901,6 +2901,79 @@ def main() -> int:
               f"扫 {len(_JUDGE_MODULES)} 个判定模块 → 命中 {_hits56 or '无'}（应为空）· "
               f"反向对照（喂一个「注释里写 import openai + 真 import openai」的合成模块）→ "
               f"{_ctrl56}（必须只报第 2 行 —— 注释不算代码）")
+
+        # ── V57（Q24）「不是守卫的词」必须被剔除、并单独登记 ────────────────────
+        #   Q24 = 选项 A。判据不是「它长得像不像守卫」，而是**它就是所在规则要抓的那个主张**：
+        #   旧系统 `exceptions` 的语义是**放行** —— 所以写着它的文案在旧系统里是**放行**的，
+        #   那是**旧规则的一条假阴孔**。今天没出事只因为它 `wired=false`（拿不到带 → 按满档判险）：
+        #   这个洞是**被意外关上的，不是被决定关上的**。
+        #
+        #   ★ 本块**自己加载**它要的两份数据：`_gdoc` / `_qitems` 属于 V43 那个 gate 的局部量，
+        #     `--only V57` 时它们不存在 —— 这是写的时候按作用域推出来的，不是跑出来的。
+        _g57 = json.loads((SKEL / "context-guards-v1.json").read_text(encoding="utf-8"))
+        _w57 = {w["word"]: w for w in _g57["words"]}
+        _fn57 = ((_g57.get("$false_negative_words") or {}).get("items") or [])
+        _q57 = json.loads((SKEL / "legal-decisions-v1.json").read_text(
+            encoding="utf-8")).get("$decision_queue") or []
+
+        check("V57a", "★ Q24=A：`乳腺炎治疗设备` 已从守卫表**剔除**，并登记为「旧规则假阴孔」"
+                      "（带 why + 决定指针）—— 它**就是 H02 要抓的那个主张**，不是免责声明",
+              "乳腺炎治疗设备" not in _w57
+              and len(_fn57) == 1 and _fn57[0].get("word") == "乳腺炎治疗设备"
+              and _fn57[0].get("kind") == "旧规则假阴孔"
+              and bool(_fn57[0].get("why")) and _fn57[0].get("decision") == "Q24",
+              f"守卫表 {len(_w57)} 词（不含它）· 假阴孔清单 "
+              f"{[(i.get('word'), i.get('decision')) for i in _fn57]}")
+
+        def _homeless57(words, false_neg, items):
+            """★ Q24 的 impact 点名的代价（「回头查旧表还有没有同类」）落成判据 —— 但**只管未接线的那半**。
+
+            ★ 第一版把「已接线」的未归类词也算进来，于是报了 `treat yourself` / `gently` 两个
+              「无归宿」—— 而它们其实是 `wired=true` / `active`。也就是说：**判据比它声称的宽**，
+              它会误报（§2.1.1：会误报的检查器比没有检查器更糟）。现在分两半，各用各的口径：
+
+                · **未接线**的未归类词 → 必须有归宿（与 V45d 同一条口径：被一条未决项认领，
+                  或词条自己点名一条已答的 Q/D）；
+                · **已接线**的未归类词 → 由 V57c 管（它已经在生效，问题是「谁对它负责」）。
+            """
+            fn = {i.get("word") for i in false_neg}
+            claimed = {w for q in items for w in (q.get("covers_unwired_guards") or [])}
+            bad = []
+            for w in words:
+                if w.get("guard_type") != "未归类" or w["word"] in fn or w.get("wired"):
+                    continue
+                if w["word"] in claimed:
+                    continue
+                blob = f"{w.get('wire_gap') or ''} {w.get('status_note') or ''}"
+                if re.search(r"\b[QD]\d+\b", blob):
+                    continue
+                bad.append(w["word"])
+            return sorted(bad)
+
+        _unclass = [w for w in _w57.values() if w.get("guard_type") == "未归类"]
+        _unwired_uc = [w for w in _unclass if not w.get("wired")]
+        _homeless = _homeless57(list(_w57.values()), _fn57, _q57)
+        _ctrl57 = _homeless57(
+            [{"word": "ZZ 合成主张词", "guard_type": "未归类", "wired": False}],
+            _fn57, _q57) == ["ZZ 合成主张词"]
+        check("V57b", "★ 同类互查（Q24 的 impact 点名的代价）：每个**未接线**的 `未归类` 词都有归宿 —— "
+                      "被一条未决项认领、或词条自己点名一条已答的 Q/D；**无归宿 = 遗忘**",
+              not _homeless and _ctrl57 and len(_unwired_uc) > 0,
+              f"未归类 {len(_unclass)} 个（未接线 {len(_unwired_uc)}：{[w['word'] for w in _unwired_uc]}）· "
+              f"无归宿 {_homeless or '无'} · 反向对照（喂一个合成词）→ {_ctrl57}")
+
+        # ★ V57c：未归类**且已接线**的词 —— 它已经在生效，所以问题不是「忘了认领」，
+        #   而是「**谁对它负责**」。判据：至少有一条未决项在它的文本里点过这个名字。
+        #   （今天 `treat yourself` 被 Q25 点名；`gently` 原先**谁都没提过** —— 这一条就是为它加的。）
+        _blob57 = json.dumps(_q57, ensure_ascii=False)
+        _wired_uc = [w["word"] for w in _unclass if w.get("wired")]
+        _orphan57 = [w for w in _wired_uc if w not in _blob57]
+        _ctrl57c = ("ZZ 合成主张词" not in _blob57) and ("gently" in _blob57)
+        check("V57c", "★ 未归类**且已接线**（在生效）的词，必须至少有一条未决项点过它的名字 —— "
+                      "「一个语义档没定的词正在生效，而没人对它负责」是这条要拦的",
+              not _orphan57 and _ctrl57c,
+              f"已接线且未归类 {len(_wired_uc)} 个：{_wired_uc} · 没有任何未决项提到的："
+              f"{_orphan57 or '无'} · 反向对照（一个不存在的名字必须不在文本里）→ {_ctrl57c}")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

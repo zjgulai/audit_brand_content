@@ -85,9 +85,36 @@ def guard_type(word):
     return "未归类"
 
 
+# ★ Q24 = 选项 A（2026-09-23 裁定）：**不是守卫的词** —— 从守卫表剔除，单独立项为「旧规则假阴孔」。
+#
+#   判据不是「它长得像不像守卫」，而是：**它就是它所在规则要抓的那个主张本身**。
+#   `乳腺炎治疗设备` 里的 `乳腺炎` 是 H02 的匹配词 —— 而旧系统 `exceptions` 的语义是**放行**
+#   （同批次天然对照：`Savannah-20260825` 的 i=265 含豁免词 → 源表 0 命中·绿）。
+#   也就是说：**旧系统对写着「乳腺炎治疗设备」的文案是放行的。**
+#
+#   这个洞今天是被**意外**关上的，不是被决定关上的（它 `wired=false` → 拿不到带 → 按满档判险）。
+#   三个方向都试过，只有「剔除 + 立为假阴孔」是对的：
+#     · 忠实迁移 → 把这个洞搬进新系统，重现旧行为；
+#     · 当成普通降级词 → 与它的**否定**（`不是乳腺炎治疗设备`）同处一档，这一档就失去区分力；
+#     · 静默留在表里 → 下一个人按 Q23 批量接通时**会顺手把它接上，而没人知道它曾经开着**。
+#
+#   ★ 改这里而不是改生成物：本表是 `build_context_guards.py` 生成的，手改会被下次重生成抹掉。
+NOT_GUARDS = {
+    "乳腺炎治疗设备": {
+        "kind": "旧规则假阴孔",
+        "why": ("它**就是 H02 要抓的那个主张本身**（`乳腺炎` 是 H02 的匹配词），不是免责声明 —— "
+                "旧系统把它写在 `豁免词` 里，等于对这条主张放行。"),
+        "decision": "Q24",
+        "action": "交法务确认是否补召回；**不要**迁移成放行项，也不要当成普通降级词",
+    },
+}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true",
+                    help="★ 明知重算结果与已入库的表不一致、仍要覆盖（会抹掉 46 条接线决定）")
     a = ap.parse_args()
 
     live = json.loads(LIVE.read_text())
@@ -113,6 +140,7 @@ def main():
 
     records = [x for x in live if x["规则编号"] != "安全词"]
     words, dup = [], []
+    false_neg = []          # ★ Q24：被剔除的「不是守卫」的词（假阴孔），单独成区
     for x in records:
         legacy = x["规则编号"]
         terms = split_terms(x["豁免词"])
@@ -126,6 +154,11 @@ def main():
                 dup.append({"word": term, "legacy_rule": legacy,
                             "belongs_to": "whitelist-v1.json",
                             "whitelist_status": wset[low]["status"]})
+                continue
+            # ★ Q24 = 选项 A：**不是守卫的词**在查通道**之前**就剔除 ——
+            #   它的问题不是「落在哪个带」，而是「它根本不该在这张表里」。
+            if low in NOT_GUARDS:
+                false_neg.append({"word": term, "legacy_rule": legacy, **NOT_GUARDS[low]})
                 continue
             # ② 该词实际占据了哪些带？—— 先按事实查，再谈归属
             occ = occupies.get(low, [])
@@ -287,6 +320,21 @@ def main():
         },
         "stats": stats,
         "duplicated_from_whitelist": dup,
+        # ★ Q24（选项 A）：「**不是守卫**的词」独立成区 —— 既不迁移，也不静默留在表里。
+        #   与 `duplicated_from_whitelist` 同一个形状：**剔除的东西要留下名字与理由**，
+        #   否则下一个人只会看到「表里 85 个词」，看不出这里少了一个。
+        "$false_negative_words": {
+            "$note": [
+                "★ Q24 = 选项 A（2026-09-23）：这些词**不是语境守卫** —— 它们（或其中的关键词）",
+                "**就是所在规则要抓的那个主张本身**。旧系统 `exceptions` 的语义是放行，",
+                "所以旧系统对写着这些词的文案是**放行**的：**旧规则的一条假阴孔**。",
+                "★ 它们今天还没造成后果，只是因为 `wired=false`（拿不到带 → 按满档判险）——",
+                "这个洞是**被意外关上的，不是被决定关上的**。忠实迁移会把它搬进新系统。",
+                "★ 处置：不进守卫表；单独立项，交法务确认是否补召回。",
+                "判据见 `tools/verify_engine_contract.py` 的 V57a–V57c。",
+            ],
+            "items": false_neg,
+        },
         "words": sorted(words, key=lambda w: (w.get("source_legacy") or "ZZ", w["word"])),
     }
 
@@ -303,6 +351,36 @@ def main():
     if a.dry_run:
         print("\n（--dry-run，未写文件）")
         return 0
+
+    # ★★ 2026-09-23 实测撞上的**破坏性路径**：本脚本今天**重算不出**已入库的那张表。
+    #
+    #   根因：`wired` 是按 `rules-v1.json` 的 `downgrade_band.keywords` 重算的，而那批词在
+    #   ADR-0008 分表时**已经搬进本表**，`downgrade_band.keywords` 早已清空 ——
+    #   于是重算出的「已接线」是 **0**，而入库值是 **46**。实测跑一次：353 插入 / 457 删除，
+    #   46 条接线决定被抹成 0 条，而输出照样打印「✅ 已写入」。
+    #
+    #   这与 `AGENTS.md` §2.1 的 `readdoc > 文件`、§2.4.4 的 `--selftest` 是**同一个形状**：
+    #   **照文档里的命令做，就会破坏它要保护的东西。**
+    #
+    #   所以这里加一道锁，而不是把数字改对 —— 数字改不对（输入 `_evidence/rulelib-live.json`
+    #   还不在版本库内、`.gitignore:45`），但**「不一致就不许静默覆盖」是能做到的**。
+    #   要做的是「重建生成器」这件事本身 —— 那是 Q46。
+    if OUT.exists():
+        try:
+            old = json.loads(OUT.read_text(encoding="utf-8")).get("stats") or {}
+        except (OSError, ValueError):
+            old = {}
+        drift = [(k, old.get(k), stats.get(k)) for k in ("guards", "wired", "not_wired")
+                 if k in old and old.get(k) != stats.get(k)]
+        if drift and not a.force:
+            print("\n❌ 拒绝写盘：重算结果与**已入库的那张表**不一致 ——")
+            for k, o, n in drift:
+                print(f"     {k}: 入库 {o} → 重算 {n}")
+            print("   ★ 这不是「表旧了」，是**生成器旧了**：`wired` 按 `downgrade_band.keywords` 重算，")
+            print("     而那批词在 ADR-0008 分表时已搬进本表 —— 覆盖一次会抹掉那 46 条接线决定。")
+            print("   ★ 要重建生成器，这是一个决定（Q46），不是一个命令。")
+            print("   ★ 确实知道后果仍要覆盖：加 `--force`（它只关掉这道锁，不改变结果）。")
+            return 2
     OUT.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
     print(f"\n✅ 已写入 {OUT.relative_to(ROOT)}")
     return 0

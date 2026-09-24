@@ -1762,7 +1762,7 @@
       "id": "Q24",
       "kind": "legal_question",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "法务（经 Owner 转达）",
       "raised_at": "2026-09-17",
       "title": "`乳腺炎治疗设备` —— 旧规则的一条假阴孔，迁移还是剔除",
@@ -1790,9 +1790,11 @@
       ],
       "default_if_unanswered": "沉默 = 选项 C（当作普通降级词）：现状是 `wired=false`，暂时等价于「不生效 + 满档判险」；一旦有人按 Q23 批量接通，它会连同 `不是乳腺炎治疗设备` 一起被接成降级 —— **洞被顺手关上，而没有人知道它曾经开着**。",
       "where": "`research/governance/skeleton/_data/rules_raw.json` 的 H02 `exceptions` 与 `keywords`。",
-      "covers_unwired_guards": [
-        "乳腺炎治疗设备"
-      ]
+      "covers_unwired_guards": [],
+      "answered_at": "2026-09-23",
+      "answered_by": "法务（经 Owner 转达）",
+      "answer": "选项 A —— 不迁移：从守卫表剔除，单独立项为「旧规则假阴孔」交法务确认是否补召回",
+      "record": "① **剔除**：`乳腺炎治疗设备` 从 `context-guards-v1.json` 的 `words` 里移除（85 → **84** 词；`wired` **46** 一条未动）。② **立为假阴孔**：新增顶层区 `$false_negative_words`（与 `duplicated_from_whitelist` 同形）—— **剔除的东西要留下名字与理由**，否则下一个人只看到「表里 84 个词」，看不出这里少了一个。条目带 `kind=旧规则假阴孔` / `why` / `decision=Q24` / `action`（交法务确认是否补召回）。③ ★ **为什么是外科编辑而不是重跑生成器**：实测跑一次 `build_context_guards.py` —— 它重算出的「已接线」是 **0** 而入库值是 **46**（`wired` 按 `downgrade_band.keywords` 重算，而那批词在 ADR-0008 分表时已搬进本表），353 插入 / 457 删除，而输出照样打印「✅ 已写入」。根因与重建方案登记为 **Q46**；同时给生成器加了「不一致就拒写（退 2，`--force` 才覆盖）」。④ 棘轮收紧（V45d 会红着要求）：未接线 39 → **38**，`_N_UNWIRED` 跟着改；`covers_unwired_guards` 里摘掉这个词（否则「认领并集恰好等于未接线集合」会报多余 1）。⑤ 判据：新增 **V57a**（它不在守卫表、且在假阴孔清单里带 why+指针）与 **V57b**（**同类互查**：每个未归类的词都要有归宿 —— 进假阴孔清单，或被一条未决/已答项认领；反向对照喂一个无归宿的合成词）。"
     },
     {
       "id": "Q25",
@@ -1803,7 +1805,7 @@
       "raised_at": "2026-09-17",
       "title": "「非主张」词无家可归：`treat yourself` / `or cure` / `or treat` 该走哪条通道",
       "question": "两个通道的准入判据合起来没有「非主张」的位置：白名单准入是「能否被第三方独立复核为真/假」（`whitelist-v1.json` 的 `admission_criterion`）—— 非主张无所谓真假；守卫的机制语义是「表明该规则所指的主张**并未被作出**（否定 / 免责 / 溯源 / 弱化替代）」（`context-guards-v1.json` 的 `mechanism.semantics`）—— 非主张不是「取消主张」，它是**另一个主张**（如自我照护建议）。实测后果：`treat yourself` 落在 `guard_type=未归类`，被接成降级（旧系统是**放行**），已造成 3 条记录被误拦；`or cure` / `or treat` 同为未归类、未接线、拿不到带。注意 `treat yourself` 之所以会命中 H01，是因为 H01 的匹配词里有裸 `treat` —— 命中的不是「疗效主张」，是**词形**。所以这可能不是通道问题，而是 ADR-0007 的**准入**问题。",
-      "evidence": "live 实测 `judge(\"treat yourself\")` → `manual_review`（旧系统放行，已造成迁移回归假阳性 3/291）· `judge(\"or cure\")` / `judge(\"or treat\")` → `auto_reject`；`context-guards-v1.json` 中 `guard_type=未归类` 全表 7 个（`or cure` `or treat` `soulage les engorgements` `soulager les engorgements` `treat yourself` `乳腺炎治疗设备` `gently`）；H01 `keywords` 含裸 `treat`；两通道判据见 `whitelist-v1.json` 的 `admission_criterion` 与 `context-guards-v1.json` 的 `mechanism.semantics`。",
+      "evidence": "live 实测 `judge(\"treat yourself\")` → `manual_review`（旧系统放行，已造成迁移回归假阳性 3/291）· `judge(\"or cure\")` / `judge(\"or treat\")` → `auto_reject`；`context-guards-v1.json` 中 `guard_type=未归类` 全表 7 个（`or cure` `or treat` `soulage les engorgements` `soulager les engorgements` `treat yourself` `乳腺炎治疗设备` `gently`）；H01 `keywords` 含裸 `treat`；两通道判据见 `whitelist-v1.json` 的 `admission_criterion` 与 `context-guards-v1.json` 的 `mechanism.semantics`。 ★ 2026-09-23 实测补（这是 V57c 的执行点，不是叙述）：`guard_type=未归类` 的词今天共 6 个，按接线状态分成两端 —— ① **未接线** 4 个（`or cure`/`or treat` 本项认领、`soulage les engorgements`/`soulager les engorgements` 由 Q26 认领）；② ★ **已接线（active）2 个**：`treat yourself`（本项之前已点名）与 **`gently`** —— 后者此前**没有任何未决项提到过它**，而它已经在生效（`wired=true`）。也就是说：一个语义档没定的词，一边在生效，一边没人对它负责。本项的范围因此要把它一起算进去：「非主张」这一档不存在，代价不只是 `treat yourself` 的 3 条/批误拦，还包括**任何一个尚未定档的词都能被塞进降级通道并且生效**。",
       "options": [
         {
           "key": "A",
@@ -2597,6 +2599,40 @@
       "answered_by": "Owner",
       "answer": "选项 A —— 写进 `boundary_statement.unknowns`，只在确实引用了未确认条款时加",
       "record": "`judge.py` 在产出边界声明时，若回执的 `unconfirmed_notice` 非空，就往 `boundary_statement.unknowns` 追加一条 —— **前缀 + 回执原文逐字**（同源，§2.4.5：两处各写一句迟早会有一句先改）。触发条件严格照选项 A：`unconfirmed_notice` 非空 ⟺ 引用集里至少有一条 status=research；**零命中不加**。自证：`verify_engine_contract.py` 的 V55a（引用未确认条款 → 必须有且点名 EXT- 编号）、V55b（零命中 → 不许有）、V55c（与回执同源）、V55d（**规模上的反向对照**：语料里既不是全部也不是零）。打断（把 `_unconf` 直接置 None → 退回「只活在回执与工具说明里」）→ **V55a/V55c/V55d 三红、rc=1**；恢复后 202/202。★ **A 的代价已量出来**：语料有文本的 **232** 条里 **132** 条（**56.9%**）会带上这条 —— 这是「天天响的信号会被无视」（§2.1.1）的**具体量**，不是担心。★ 复核过账本提醒的那件事：全量跑完**没有一条既有断言被这条改动带红** （V21c/V47d 等逐字比 boundary 的断言都还在守）。★ 仍未做的（写下来）：`judge_copy` 工具说明那一侧**仍然没有执行点** （`grep judge_copy tools/*.py tools/agent/*.mjs` 只命中它自己）—— 选 A 之后回答侧已有机器产出，但「说明里写没写」依旧无人守；那正是选项 C 要补的，属新的决定。"
+    },
+    {
+      "$origin": "执行 Q24 时撞出来的（不是计划里的）",
+      "id": "Q46",
+      "kind": "engineering_question",
+      "line": "engine",
+      "status": "open",
+      "owner": "Owner",
+      "raised_at": "2026-09-23",
+      "title": "`build_context_guards.py` 重算不出已入库的守卫表 —— 照它跑一次会抹掉 46 条接线决定",
+      "question": "守卫表的抬头写着它由 `build_context_guards.py` 生成（含 `derivation_note` / `source.split_rule`），**但那个脚本今天重算不出这张表**。实测（2026-09-23，执行 Q24 时撞上）：跑一次得到 `guards 79 / wired 0 / not_wired 79`，而入库值是 `84 / 46 / 38`；diff 是 **353 插入 / 457 删除**，而输出照样打印「✅ 已写入」。根因两条：① `wired` 是按 `rules-v1.json` 的 `downgrade_band.keywords` 重算的，而那批词在 ADR-0008 分表时**已经搬进本表**、原字段早已清空；② 生成器的输入 `research/governance/_evidence/rulelib-live.json` **不在版本库内**（`.gitignore:45`）。也就是说：**「按表头那句话重跑一次」= 静默丢掉 46 条接线决定**，与 `AGENTS.md` §2.1 的 `readdoc > 文件`、§2.4.4 的 `--selftest` 是同一个形状。★ 已经做了的（不改变本项的性质）：给生成器加了一道锁 —— 重算结果与入库值不一致就**拒写**（退 2，`--force` 才覆盖），并留了 `--dry-run`。**锁只防误伤，不回答「谁是真源」**。",
+      "evidence": "① 实测：`python3 research/governance/skeleton/build_context_guards.py` → 打印 `语境守卫表：79 / 已接线 0 / 未接线 79`，随后被新加的锁拒绝写盘（退 2）；`git diff --stat` 在加锁前那次是 `353 insertions(+), 457 deletions(-)`。② 入库表 `context-guards-v1.json` 的 `stats`：`guards 84 / wired 46 / not_wired 38`（Q24 剔除 1 词后）。③ 生成器读 `HERE/../_data`？不 —— 它读 `research/governance/_evidence/rulelib-live.json`，而 `**/_evidence/` 被 `.gitignore:45` 挡着（`git check-ignore -v` 实测命中）。④ 引擎侧的事实：判定读的是**本表**（`score.Engine` 的 `V.guards`），不是 `downgrade_band.keywords` —— 所以「谁是真源」这个问题今天只有一个答案：**这张表自己**。⑤ 同类前科：ADR-0013 §15.3「手册里的可复现命令复现不出手册里的数」。",
+      "options": [
+        {
+          "key": "A",
+          "recommended": true,
+          "label": "把守卫表定为**手工维护的契约**：把生成器降级为「一次性迁移脚本」并在抬头写明，让它永久拒绝写盘（锁保持），同时把表头那段 `derivation_note` / `source` 改成如实描述",
+          "impact": "成本是一处文档更正 + 把脚本改名/加抬头（一次性迁移脚本，不是生成器），换来的是**表头不再承诺一件它做不到的事** —— 今天任何人照着它跑一次都会毁掉 46 条决定。代价说清：从此「重算一遍」这条路没有了，表的正确性靠判据守（V45a–V45d、V57a–V57c）与法务的逐词定性，而不是靠重新生成。"
+        },
+        {
+          "key": "B",
+          "recommended": false,
+          "label": "重建生成器：把 `wired` 改成从**本表/规则表的新位置**读，并补一条「重算 == 入库」的断言",
+          "impact": "如果能做到，它是最好的形态（表可复算、漂移会红）。但它要求先回答「46 个词的接线事实现在到底记在哪」—— 而今天那个字段已经空了；在回答之前动手，等于用一个新的猜测去覆盖一个已知的现状。"
+        },
+        {
+          "key": "C",
+          "recommended": false,
+          "label": "维持现状：锁已经加上了，不再重跑就是答案",
+          "impact": "零动作。代价是**表头继续在骗人**：`derivation_note` 与 `source.split_rule` 仍然读起来像「这张表可以重新生成」，而锁只拦得住真正去跑它的人 —— 拦不住照着它写新脚本的人。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = **选项 C**（维持现状，锁就是答案）。★ 沉默的代价是**不对称的**：机器侧全绿（没有任何断言在看表头那句话），而人一旦照着表头去重跑或去写新脚本，丢掉的是 46 条接线决定 —— 与 Q38/Q39 同一个形状：机器看不见，丢的是人的东西。",
+      "where": "`research/governance/skeleton/build_context_guards.py`（抬头与写盘前那道锁） · `research/governance/skeleton/context-guards-v1.json`（`derivation_note` / `source` / `stats`）"
     }
   ],
   "$id_aliases": {

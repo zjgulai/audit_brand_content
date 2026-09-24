@@ -1,7 +1,7 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-24T08:00:22+00:00",
-  "engine_version": "b990f681f49c9c20",
+  "generated_at": "2026-09-24T08:22:12+00:00",
+  "engine_version": "d7cfc24cf9b1f5ac",
   "code_version": "e6e33ea20ee09592",
   "artifacts": {
     "rules": {
@@ -30,14 +30,14 @@
     },
     "context_guards": {
       "file": "context-guards-v1.json",
-      "bytes": 57801,
-      "sha256": "f52595f8d1211d0a98980d32b3ab7e0c7677ec6240e1e749038c2db09595cf88",
+      "bytes": 64642,
+      "sha256": "db416a59e64ae92c05a07a87c43ab89e661c8bd9efa5ceeb6cf8ee302a28bdbe",
       "why": "语境守卫词（取消/弱化主张，绝不放行）",
       "counts": {
-        "words": 85,
+        "words": 84,
         "active": 46,
         "wired": 46,
-        "pending": 39
+        "pending": 38
       }
     },
     "topic_tree": {
