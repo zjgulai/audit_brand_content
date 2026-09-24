@@ -777,8 +777,12 @@ export async function checkPending(opts = {}) {
 }
 
 async function runCheckPending({ reason = 'daily', force = false, day = null, today = null, run = runPendingChecker,
-                                chatId = null } = {}) {
-  const prev = loadPendingState();
+                                chatId = null, dryRun = false, stateFile = null } = {}) {
+  // ★ `stateFile` 可注入：存在的理由与 `runCheckNow` 里那条**完全一样** —— 自证要能证明
+  //   「`dryRun` 下真的一字节都没落盘」，而这句话只有在能指定文件时才证得了。
+  //   默认仍是那份真状态文件，生产路径不受影响。
+  const file = stateFile ?? PENDING_STATE_FILE();
+  const prev = loadState(file);
   const D = day ?? today ?? bjDate();
   if (!force && prev.p_lastDay === D) {
     return { skipped: `今天（${D}）已经跑过` };
@@ -804,8 +808,25 @@ async function runCheckPending({ reason = 'daily', force = false, day = null, to
   // ★ `today` 被注入时**不落状态** —— 那是一次「看一遍」，不是一次真跑。
   //   落了会很阴：state 里记下「10-03 已经说过」之后，**真正的 10-03 到了反而会闭嘴**，
   //   而群里什么都没收到。一次查看不该改掉将来要发生的事。
-  if (today) return { code, note, say, why, sayTo: sayTo ?? null, reason, overdue: now.overdue, dryRun: `注入日 ${today} —— 未落状态` };
-  saveState(state, PENDING_STATE_FILE());
+  //
+  // ★ 2026-09-23（Q40 = 选项 A）补上**同形的另一半**：裸 `--pending`（不带 `--today=`）
+  //   此前**照样落盘**。而 CLI 走的是 `force: true` —— 于是在终端里看一眼就把当天的
+  //   额度用掉了：`enterPending` 写下 `p_saidDueKey`，daemon 的 `pendingWatch` 再问就是
+  //   「今天已经说过」→ `say: null` → **那条到期提醒永远到不了群里**，而机器侧全绿
+  //   （状态文件里那个键与「真的说过了」长得一模一样）。修法与 `--check` 完全同形。
+  //
+  //   ★ 代价**已逐条核过**（账本里 A 的 impact 点名要先确认这一件）：
+  //     换日兜底读的是 `p_lastDay`（`ws_daemon.mjs` 心跳里那行），而 daemon 调
+  //     `checkPending` **不带 `force`** → 一天最多一次。CLI 不再写 `p_lastDay`，
+  //     只会让「`p_lastDay !== 今天`」**更容易**成立 —— 也就是 daemon 会补跑并发出去，
+  //     方向正是我们要的；**也不会变成轮询**，因为 daemon 那一支每次真跑都会落 `p_lastDay`。
+  if (dryRun || today) {
+    return { code, note, say, why, sayTo: sayTo ?? null, reason, overdue: now.overdue,
+             dryRun: today
+               ? `注入日 ${today} —— 未落状态`
+               : 'CLI 看一眼 —— 未落状态（否则会吞掉当天的到期提醒）' };
+  }
+  saveState(state, file);
   return { code, note, say, why, sayTo: sayTo ?? null, reason, overdue: now.overdue };
 }
 
@@ -1272,6 +1293,70 @@ export async function selftest() {
          return fs.readFileSync(file, 'utf8') !== seeded;
        } finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
      }],
+
+    /* ── ★ Q40：裸 `--pending` 也必须 `dryRun`（2026-09-23 加）────────────────────
+     *
+     * 与上面 `--check` 那一对**完全同形**，因为它们是同一个病的两半：上一轮只修了
+     * `--check`，这一族于是看起来已经收口了 —— 而漏掉的那一半同样只在**文档**里出现
+     * （`--pending` 被写进「复现与自证」的常规命令），不在自证脚本里。
+     *
+     * 后果比 `--check` 那条更具体、也更有日期：`--pending` 写下的 `p_saidDueKey` 等键
+     * 恰好是 daemon 判「今天已经说过一次」的依据，所以 **2026-10-02 那天谁在终端里跑一次
+     * `--pending`，那天的到期提醒就永远不会到群里**，而状态里多出的那个键与「真的说过了」
+     * 长得一模一样 —— 没有任何东西会红。
+     *
+     * 这一对同样**不比对文本、真起一次子进程**：
+     *   ① 行为级：`--pending` 指着注入的状态目录跑完，那个文件必须**一个字节都没变**；
+     *   ② 反向对照：同一份状态文件，走一次**不带 `dryRun`**（也不注入 `today`）的
+     *      `checkPending`，它**必须变** —— 否则 ① 会因为「这个文件从来没人写」而恒真。
+     *      ★ 反向对照显式传 `stateFile:`：**自证绝不碰真状态**（§2.4.4）。
+     */
+    ['★ 行为级：CLI 的 `--pending` 一个字节都不许落盘（看一眼不该吞掉当天的到期提醒）',
+     async () => {
+       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prdpending-'));
+       try {
+         const file = path.join(dir, 'prd-pending-watch.json');
+         const seeded = JSON.stringify({ p_lastDay: '2026-09-20', p_lastState: 'ok',
+                                         p_saidDueKey: null,
+                                         p_lastRunAt: '2026-09-20T10:00:00.000Z' }, null, 2);
+         fs.writeFileSync(file, seeded);
+         const code = await new Promise((resolve) => {
+           const child = spawn(process.execPath, [process.argv[1], '--pending'],
+                               { cwd: REPO_ROOT, env: { ...process.env, SHOUHENG_STATE_DIR: dir } });
+           child.on('error', () => resolve(null));
+           child.on('close', (c) => resolve(c));
+         });
+         return code !== null && fs.readFileSync(file, 'utf8') === seeded;
+       } finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* 清不掉就算了 */ } }
+     }],
+
+    ['反向对照：**不带** `dryRun` 的待收检查必须落盘，且真的把状态改掉（上面那条不是恒真）',
+     async () => {
+       const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'prdpending-')), 'p.json');
+       try {
+         const seeded = JSON.stringify({ p_lastDay: '2026-09-20', p_lastState: 'ok' }, null, 2);
+         fs.writeFileSync(f, seeded);
+         await checkPending({ force: true, day: D, stateFile: f,
+                              run: async () => ({ code: 0, note: '', data: {} }) });
+         return fs.readFileSync(f, 'utf8') !== seeded;
+       } finally { try { fs.unlinkSync(f); } catch { /* 已经没了就算了 */ } }
+     }],
+
+    ['★ 自证里的每一个 `checkPending` 也不许落到**真状态文件**上'
+     + '（`dryRun` / `today:` 注入 / `stateFile` 三选一 —— 后两个本身就意味着不落盘）',
+     /**
+      * 与上面那条 `checkNow` 版同一条读法：**注释不算代码**、判「到达」不判「出现过」。
+      * 为什么允许 `today:`：注入日那一支在实现里**就是**不落盘（09-22 定下的），
+      * 所以它和 `dryRun` 是同一件事的两种写法，不是逃生门。
+      * 反向保证：`calls.length >= 1` —— 改名之后它会因为「一次都没匹配到」而红。
+      */
+     () => {
+       const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+       const src = strip(selftest.toString());
+       const calls = [...src.matchAll(/checkPending\(\{([^}]*)\}/g)].map((m) => m[1]);
+       const ok = (a) => /dryRun:\s*true/.test(a) || /stateFile:/.test(a) || /today:/.test(a);
+       return calls.length >= 1 && calls.every(ok);
+     }],
   ];
 
   let bad = 0;
@@ -1331,8 +1416,27 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(r.code ?? 0);
   }
   if (process.argv.includes('--pending')) {
+    /**
+     * ★ **`--pending` 也必须 `dryRun`（2026-09-23 加，Q40 = 选项 A）。**
+     *
+     * 它与上面 `--check` 那一条是**同一个病的另一半**，而且同样隐蔽：漏掉它的那次
+     * 只修了 `--check`，于是这一族看起来已经收口了。实测差别只有一个字：
+     * `runCheckPending` 原先只在**注入了 `--today=`** 时不落盘（那是 09-22 为「提前看一眼」
+     * 加的），**不带 `--today=` 的裸 `--pending` 照样写状态**。
+     *
+     * 而它写下的正是 `p_saidDueKey` / `p_saidBrokenDay` / `p_saidUntestedDay` 那几个键，
+     * daemon 的 `pendingWatch` 又正是用它们判「今天已经说过一次」→ `say: null` → **不发**。
+     * 也就是说：**10-02 那天谁在终端里跑一次 `--pending`，那天的到期提醒就永远不会到群里**，
+     * 而没有任何东西会红 —— 状态里只多一个键，读起来完全像「今天已经说过了」。
+     *
+     * 为什么 `dryRun` 就是对的修法：与 `--check` 同一条（§2.5）—— 检查的职责是回答
+     * 「有没有到期的」；「要不要说、说给谁」是 daemon 的职责。手动看一眼不该把当天的
+     * 额度用掉：**「看见的」不许改掉「将来要发生的」。**
+     *
+     * 判据与反向对照见 `--selftest` 里那一对（行为级起真子进程 + 反向对照）。
+     */
     const t = process.argv.find((a) => a.startsWith('--today='))?.slice(8) ?? null;
-    const r = await checkPending({ reason: 'manual', force: true, today: t });
+    const r = await checkPending({ reason: 'manual', force: true, today: t, dryRun: true });
     console.log(JSON.stringify({ code: r.code, why: r.why, say: r.say, skipped: r.skipped,
                                  dryRun: r.dryRun, overdue: r.overdue ?? [] }, null, 2));
     process.exit(r.code ?? 0);

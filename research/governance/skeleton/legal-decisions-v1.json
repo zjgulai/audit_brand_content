@@ -2386,7 +2386,7 @@
       "id": "Q40",
       "kind": "engineering_defect",
       "line": "repo",
-      "status": "open",
+      "status": "answered",
       "owner": "Owner",
       "raised_at": "2026-09-23",
       "title": "裸 `--pending` 会像 `--check` 一样吞掉一次告警 —— 两者是同一个病的两半，只修了一半",
@@ -2408,7 +2408,11 @@
       ],
       "default_if_unanswered": "沉默 = 选项 B（维持现状）：裸 `--pending` 继续落盘，2026-10-02 的到期提醒仍有被一次手动检查静音的风险，而机器侧全绿。★ 沉默的代价是不对称的：状态文件里多出的那个 `p_saidDueKey` 与「真的说过了」长得一模一样 —— 这正是本条要防的形状。",
       "where": "`tools/agent/prd_baseline.mjs`（`runCheckPending` / `enterPending`） · `PMO/shouheng-state/prd-pending-watch.json` · 检查 `python3 tools/verify_pending.py`。",
-      "$origin": "2026-09-23 修 `--check` 时顺手比对同族命令查出（详见 `PMO/守衡-Utopia结合方案-20260923.md` §六 第 2 条）。它**不是新发现的功能缺口**，而是一个**已经修过一次的病长在同族的另一条路径上** —— 按 `AGENTS.md` §2.4「名字出现过不是拦得住」，修一条要有断言，修一族要证明覆盖了整族。"
+      "$origin": "2026-09-23 修 `--check` 时顺手比对同族命令查出（详见 `PMO/守衡-Utopia结合方案-20260923.md` §六 第 2 条）。它**不是新发现的功能缺口**，而是一个**已经修过一次的病长在同族的另一条路径上** —— 按 `AGENTS.md` §2.4「名字出现过不是拦得住」，修一条要有断言，修一族要证明覆盖了整族。",
+      "answered_at": "2026-09-23",
+      "answered_by": "Owner",
+      "answer": "选项 A —— 与 `--check` 同形处理：给裸 `--pending` 加 `dryRun`",
+      "record": "`prd_baseline.mjs` 的 `runCheckPending` 加 `dryRun`（与既有 `today` 注入共用同一条「不落状态」分支），CLI 的 `--pending` 传 `dryRun: true`；并加 `stateFile` 注入点（否则自证证不了「一字节未落盘」，反向对照还会写真状态 —— §2.4.4）。★ A 的 impact 点名要先核的那件事**已核**：换日兜底读 `p_lastDay`（ws_daemon 心跳那行），daemon 调 `checkPending` 不带 force → 一天最多一次；CLI 不再写 `p_lastDay` 只会让该条件更容易成立（daemon 会补跑并发出去），不会变成轮询 —— daemon 那一支每次真跑都落它。★ 本改动**不需要重启守衡**：daemon 那一支的入参一个字没变（dryRun 默认 false），变的只有 CLI（每次都是新进程）。自证：`node tools/agent/prd_baseline.mjs --selftest` 80 → **83 项**，新增行为级（真起子进程指向注入状态目录，文件一字节未变）+ 反向对照（不带 dryRun 必须落盘）+ `checkPending` 版扫描器；打断 CLI 那处 `dryRun: true` → 第 81 项红、rc=1（实测）。"
     },
     {
       "id": "Q41",
