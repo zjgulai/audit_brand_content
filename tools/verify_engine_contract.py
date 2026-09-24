@@ -298,18 +298,41 @@ def main() -> int:
 
     # ── V8 未接线守卫必须具名可见 ───────────────────────────────────
     # 会红的情况：「红线」与「本可降级但因词形未补全而成了红线」被渲染成同一行。
+    #
+    # ★★ 2026-09-23（Q26 = 选项 A）：这一组**两次**失去真实样本，处置都是「换样本 / 改构造式」，
+    #   而不是放宽断言 —— 记下来，因为它是「断言转红 ≠ 引擎坏了」的稳定来源：
+    #     · Q23 接通 18 个词 → 原样本 `does not cure` 被接通；
+    #     · Q26 接通 16 个词 → 换上的样本 `relieves engorgement` **也被接通**；
+    #     · 剩下 2 个法语词（`soulage/soulager les engorgements`）**构造不出 near-miss**
+    #       （目标规则 T1.1 的匹配词是 en/zh，法语词与它不共现）。
+    #   于是改成**构造式**：临时替换 `judge.unwired_guards()` 注入一个未接线守卫，
+    #   断言机制仍会具名报出、且带成因。断言测的是**机制**，不是某个具体的词。
     if not a.only or a.only.startswith("V8"):
-        nm = R["near_miss"]["hits"][0].get("unwired_guard_near_miss", [])
+        _nm_word = {"word": "ZZ 未接线守卫样本", "status": "pending",
+                    "downgrades": ["T1.1.medical-cure"],
+                    "effect": "auto_reject → manual_review",
+                    "wire_gap": "自证构造的成因（非 None —— 这条断言要的不是「未接线」四个字）",
+                    "status_note": "自证构造"}
+        _txt_nm = "Our pump treats engorgement and ZZ 未接线守卫样本"
+        _orig_unwired = J.unwired_guards
+        try:
+            J.unwired_guards = lambda: [_nm_word]
+            _r_nm = J.judge(_txt_nm, product_line="吸奶器", locale="en")
+        finally:
+            J.unwired_guards = _orig_unwired
+        _h_nm = _r_nm["hits"][0] if _r_nm["hits"] else {}
+        nm = _h_nm.get("unwired_guard_near_miss", [])
         names = {x["word"] for x in nm}
-        check("V8a", "『本可降级但守卫未接线』被具名报出",
-              "relieves engorgement" in names, f"报出 {sorted(names)}")
-        check("V8b", "对照：接线后同一句式确实会降级",
-              R["downgrade"]["hits"][0]["disposition"] == "manual_review"
-              and R["near_miss"]["hits"][0]["disposition"] == "auto_reject",
-              f"does not treat（已接线）→ {R['downgrade']['hits'][0]['disposition']}；"
-              f"relieves engorgement（未接线）→ {R['near_miss']['hits'][0]['disposition']}")
-        gap = next((x.get("wire_gap") for x in nm if x["word"] == "relieves engorgement"), None)
+        _real_unwired = J.unwired_guards()
+        check("V8a", "『本可降级但守卫未接线』被具名报出（★ 构造式 —— 今天无真实实例）",
+              "ZZ 未接线守卫样本" in names and _h_nm.get("disposition") == "auto_reject",
+              f"报出 {sorted(names)} · 该命中仍是 {_h_nm.get('disposition')}（未接线 → 不改写处置）· "
+              f"今天真实未接线守卫 {len(_real_unwired)} 个、其中能共现的 0 个")
+        gap = next((x.get("wire_gap") for x in nm if x["word"] == "ZZ 未接线守卫样本"), None)
         check("V8c", "给出缺口成因（不是只说『未接线』）", bool(gap), str(gap))
+        check("V8b", "对照：**已接线**的同一族词确实会降级（真实数据，`does not treat` 由 Q23 接通）",
+              R["downgrade"]["hits"][0]["disposition"] == "manual_review",
+              f"does not treat（已接线）→ {R['downgrade']['hits'][0]['disposition']}")
 
     # ── V9 放行带会响（正对照）────────────────────────────────────
     # 会红的情况：pass_of 又变成零调用者 —— 缺陷 1 回归。存量语料**测不出**它，
@@ -2224,7 +2247,7 @@ def main() -> int:
     _mut_claimed = {y for q in _mut for y in (q.get("covers_unwired_guards") or [])}
     _ctrl_u = bool(_unwired_problems(_unwired, _mut)) or any(
         w for w in _unwired if w not in _mut_claimed)
-    _N_UNWIRED = 18
+    _N_UNWIRED = 2
     _relax_u = (f"未接线 {len(_unwired)} < {_N_UNWIRED}" if len(_unwired) < _N_UNWIRED else "")
     check("V45d", f"每个未接线的守卫词都指向一条**可决策的**未决项（被 ≥1 条 open 认领，"
                   f"或词条点名一条已答的 Q/D）；认领并集恰好等于未接线集合；未接线 ≤ {_N_UNWIRED}",

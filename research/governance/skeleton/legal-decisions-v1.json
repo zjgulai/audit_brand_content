@@ -1823,7 +1823,7 @@
       "id": "Q26",
       "kind": "legal_question",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "法务（经 Owner 转达）",
       "raised_at": "2026-09-17",
       "title": "剩下 18 个未接线守卫词（弱化 10 / 风险降低 5 / 溯源 1 / 未归类 2）是否接线",
@@ -1852,26 +1852,11 @@
       ],
       "default_if_unanswered": "沉默 = 选项 C（维持不接线）：这 18 个词的降级效果继续不生效，规则在它们出现的文案上按满档判险。本语料 291 条实测分歧 0 条（17 个零实例、1 个与源表一致），所以沉默的代价目前只在前瞻面上。",
       "where": "`research/governance/skeleton/context-guards-v1.json` 的 `words[].wired` 与 `wire_gap`。",
-      "covers_unwired_guards": [
-        "eases engorgement",
-        "easing engorgement",
-        "engorgement relief",
-        "may help your flow",
-        "reduce the risk of plugged",
-        "reduces the risk of clogged",
-        "reducing the risk of clogged",
-        "relaxation supports",
-        "relieves engorgement",
-        "relieving engorgement",
-        "risk of clogged ducts",
-        "risk of plugged ducts",
-        "soothe engorgement",
-        "soothes engorgement",
-        "soulage les engorgements",
-        "soulager les engorgements",
-        "放松",
-        "自然奶阵"
-      ]
+      "covers_unwired_guards": [],
+      "answered_at": "2026-09-23",
+      "answered_by": "法务（经 Owner 转达）",
+      "answer": "选项 A —— 16 个语义档明确的接线为降级，2 个法语未归类词另立一项",
+      "record": "① 16 个词接通（`wired=true`/`status=active`/`effect_target=manual_review`），逐条加 `$wired_by`。守卫表 wired 63 → **79**、not_wired 18 → **2**。★ 判据依据是 Q26 自己写下的那句方法论点：**「不会自我命中」不等于「没用」** —— 守卫词的作用是在**别的词**让规则命中时把它降级，所以这批不能靠 Q23 的自我触发实测来判。② 2 个法语词（`soulage/soulager les engorgements`，`guard_type=未归类`）另立 **Q47** —— 它们今天既不是「语义档明确」，也未接线；且实测**构造不出 near-miss**（目标规则 T1.1 的关键词是 en/zh，与之不共现）。③ ★ 连带：Q26=A 让 **V8a–V8c 失去最后一个真实实例** —— 那三条断言的样本 `relieves engorgement` 正是这 16 个之一；剩 2 个法语词又构造不出 near-miss。改成**构造式**（照 V54d 的合成注入）：注入一个未接线守卫断言机制会具名报出 + 反向对照（把它接上后同一句式改为降级），并把「今天实例数」作为读数打出来。④ 棘轮：未接线 18 → **2**（`_N_UNWIRED`）。"
     },
     {
       "id": "Q27",
@@ -2619,6 +2604,44 @@
       ],
       "default_if_unanswered": "沉默 = **选项 C**（维持现状，锁就是答案）。★ 沉默的代价是**不对称的**：机器侧全绿（没有任何断言在看表头那句话），而人一旦照着表头去重跑或去写新脚本，丢掉的是 46 条接线决定 —— 与 Q38/Q39 同一个形状：机器看不见，丢的是人的东西。",
       "where": "`research/governance/skeleton/build_context_guards.py`（抬头与写盘前那道锁） · `research/governance/skeleton/context-guards-v1.json`（`derivation_note` / `source` / `stats`）"
+    },
+    {
+      "$origin": "Q26 = 选项 A 的另一半（2026-09-23 裁定）",
+      "id": "Q47",
+      "kind": "legal_question",
+      "line": "engine",
+      "status": "open",
+      "owner": "法务（经 Owner 转达）",
+      "raised_at": "2026-09-23",
+      "title": "两个法语守卫词（`soulage/soulager les engorgements`）的语义档没人定过",
+      "question": "Q26 的 16 个词都有明确语义档（弱化/替代、风险降低、溯源/同源），而这两个是 `guard_type=未归类` —— 机器按表面词素推不出档，人也没定过。它们从 H01 的 `豁免词` 迁移而来，`downgrades: [T1.1.medical-cure]`，今天 `wired=false`（对引擎零影响）。与 Q25 那两个词不同的是：**它们连 near-miss 都构造不出来** —— 实测目标规则 T1.1 的匹配词是 en/zh（`treat`/`cure`/`治疗`…），法语词与它**不共现**，所以这条守卫今天在任何一个语句里都不会生效。要定的因此不是「接不接线」，而是：**它们是守卫（该接线）、还是该从表里剔除、还是该为法语补一条规则？**",
+      "evidence": "① 守卫表实测：`guard_type=未归类` 且未接线，`wired=false`；`lang` 机器判成 `en`（实际是法语）—— 同一个字段上还有第二处机器推导不准。② 实测 `judge(\"Notre tire-lait soulage les engorgements et traite la mastite\")` → `catch_all`、零命中（`traite` 不在 T1.1 的关键词里）。③ 语料 291 条实测 0 实例。④ 与 Q25 的关系：Q25 处置的是**非主张**那一档（`treat yourself`），而这两个词的档位至今是空的 —— 所以它们**不能**随 Q25 一起解决。",
+      "options": [
+        {
+          "key": "A",
+          "recommended": true,
+          "label": "先补 `guard_type`（法务定性）再谈接线；在定性之前维持 `wired=false` 并在表里写明原因",
+          "impact": "与本项目一贯口径一致（ADR-0008 §三：一条语境规则该不该存在是法务的决定）。代价是这两个词继续零影响 —— 但因它们今天在任何语句里都不会生效（构造不出 near-miss），这个代价**目前是隐性的**，不是「先放着」而是「确实无影响」。"
+        },
+        {
+          "key": "B",
+          "recommended": false,
+          "label": "从守卫表剔除，登记为「法语覆盖缺口」—— 与 T1.1 只认 en/zh 这件事一起交给多语种需求",
+          "impact": "把问题从「词表」抬到「规则的语言覆盖」，方向更对；代价是它变成一个**更大的**缺口（要为法语补规则），而 W4 只剩一个月。"
+        },
+        {
+          "key": "C",
+          "recommended": false,
+          "label": "当作普通守卫词接通（`manual_review`）",
+          "impact": "与 16 个同族词同处置，零争议成本；但它**永远不会生效**（T1.1 不认法语），于是表里会多两个「接了线却打不着火」的词 —— 死重的另一种形态。"
+        }
+      ],
+      "default_if_unanswered": "沉默 = **选项 A**（维持 `wired=false` 并写明原因）。★ 代价目前是隐性的：这两个词在任何语句里都不会生效，所以沉默不会立刻产生误拦 —— 但它把「一个没人做过的决定」继续当作「已决定」执行，与 Q23/Q25/Q26 的选项 C 同病。",
+      "where": "`research/governance/skeleton/context-guards-v1.json`（两个词条）· `research/governance/skeleton/rules-v1.json`（T1.1 的 `match.languages`）",
+      "covers_unwired_guards": [
+        "soulage les engorgements",
+        "soulager les engorgements"
+      ]
     }
   ],
   "$id_aliases": {

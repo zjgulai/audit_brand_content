@@ -44,12 +44,12 @@
   "guards": 81,
   "from_live": 76,
   "from_skeleton_only": 5,
-  "wired": 63,
-  "not_wired": 18,
+  "wired": 79,
+  "not_wired": 2,
   "g3_violations": 0,
   "by_status": {
-   "active": 63,
-   "pending": 18,
+   "active": 79,
+   "pending": 2,
    "misrouted": 0
   },
   "by_type": {
@@ -413,16 +413,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "easing engorgement",
@@ -435,16 +436,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（easing discomfort）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "engorgement relief",
@@ -457,16 +459,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "not a medical device",
@@ -611,16 +614,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（reduce the risk of clogged）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "reduces the risk of clogged",
@@ -633,16 +637,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（reduces discomfort）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "reducing the risk of clogged",
@@ -655,16 +660,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "relieve engorgement",
@@ -699,16 +705,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（relieves discomfort）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "relieving engorgement",
@@ -721,16 +728,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "risk of clogged ducts",
@@ -743,16 +751,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（risk of clogged）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "risk of plugged ducts",
@@ -765,16 +774,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（risk of clogged）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "soothe engorgement",
@@ -787,16 +797,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "同族已接线（soothe tension）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "soothes engorgement",
@@ -809,16 +820,17 @@
    "downgrades_legacy": [
     "H01"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "soulage les engorgements",
@@ -1082,16 +1094,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "同族已接线（may help）—— 词形未补全",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "natural let-down",
@@ -1148,16 +1161,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "your natural let-down",
@@ -1350,16 +1364,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "无法治疗乳腺炎",
@@ -1395,16 +1410,17 @@
    "downgrades_legacy": [
     "H02"
    ],
-   "effect_target": "none",
-   "effect": "",
-   "wired": false,
-   "channel_verdict": "none",
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
    "g3_violation": null,
-   "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status": "active",
+   "status_note": null,
    "source_legacy": "H02",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-   "source": "现网 `豁免词`"
+   "wire_gap": null,
+   "source": "现网 `豁免词`",
+   "$wired_by": "Q26 = 选项 A（2026-09-23 裁定）：语义档明确（弱化/替代、风险降低、溯源/同源）→ 与已接线同族词同处置。★「不会自我命中 ≠ 没用」：守卫词的作用是在**别的词**让规则命中时把它降级。"
   },
   {
    "word": "comfortable",
