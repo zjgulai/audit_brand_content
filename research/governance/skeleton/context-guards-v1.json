@@ -1,2022 +1,2022 @@
 {
-  "$schema_version": "context-guards-v1",
-  "$note": [
-    "★ ADR-0009（决策 4）：本表是独立的「语境守卫」表，**不得与白名单或判定规则同表混放**。",
-    "现网把本表内容塞在规则库的 `豁免词` 字段里，与 10 个白名单词共用字段，",
-    "与 `安全词` 是同一种病 —— 通道由字段里的字符串决定，而不是由结构决定。",
-    "本表唯一用途：把 `downgrades` 列出的规则从 auto_reject 降到 manual_review。",
-    "**不放行任何东西**。放行是白名单表的唯一职责（whitelist-v1.json）。"
-  ],
-  "mechanism": {
-    "name": "语境守卫",
-    "semantics": "出现在文案中时，表明该规则所指的主张**并未被作出**（否定 / 免责 / 溯源 / 弱化替代），从而把该规则降级，而不是放行。",
-    "channel": "downgrade only",
-    "structural_difference": "白名单证成主张 → 落 auto_pass 带；语境守卫取消或弱化主张 → 落 manual_review 带。判别式是 band 的 effect 落点，不是词表归属。",
-    "why_not_a_flag": "现网靠 `边界类型 == \"安全词白名单\"` 这种字符串开关区分机制。开关会因写错条件、字段改名、换读取路径而失效；分表不会。"
+ "$schema_version": "context-guards-v1",
+ "$note": [
+  "★ ADR-0009（决策 4）：本表是独立的「语境守卫」表，**不得与白名单或判定规则同表混放**。",
+  "现网把本表内容塞在规则库的 `豁免词` 字段里，与 10 个白名单词共用字段，",
+  "与 `安全词` 是同一种病 —— 通道由字段里的字符串决定，而不是由结构决定。",
+  "本表唯一用途：把 `downgrades` 列出的规则从 auto_reject 降到 manual_review。",
+  "**不放行任何东西**。放行是白名单表的唯一职责（whitelist-v1.json）。"
+ ],
+ "mechanism": {
+  "name": "语境守卫",
+  "semantics": "出现在文案中时，表明该规则所指的主张**并未被作出**（否定 / 免责 / 溯源 / 弱化替代），从而把该规则降级，而不是放行。",
+  "channel": "downgrade only",
+  "structural_difference": "白名单证成主张 → 落 auto_pass 带；语境守卫取消或弱化主张 → 落 manual_review 带。判别式是 band 的 effect 落点，不是词表归属。",
+  "why_not_a_flag": "现网靠 `边界类型 == \"安全词白名单\"` 这种字符串开关区分机制。开关会因写错条件、字段改名、换读取路径而失效；分表不会。"
+ },
+ "admission_criterion": {
+  "rule": "该词出现时，能否合理地把「主张未被作出」与「主张被作出」区分开",
+  "note": "判不出者不得进本表 —— 否则降级通道会变成误报的垃圾桶。"
+ },
+ "invariants": [
+  "G1 disjointness ｜ active 守卫词不得出现在任何规则的 match.keywords 中",
+  "   ← 违反即「否定表述本身被判险」：`does not cure` 触发 `cure` 规则且无降级信号 → 误报。",
+  "G2 attribution ｜ 每个守卫词必须声明至少一条 downgrades（否则是死重：加了不生效）",
+  "G3 direction   ｜ 守卫词只允许落 manual_review 带；**落 auto_pass 带即违反**",
+  "   ★ G3 是白名单与本表的结构分界：守卫绝不放行。",
+  "G4 cross-table ｜ 守卫词不得与**未隔离**的白名单词重名（隔离的白名单词可走降级通道）",
+  "G5 wiring      ｜ wired=false 的守卫不计入失败，但必须逐条给出 wire_gap 成因（退出码 2）"
+ ],
+ "derivation_note": [
+  "`guard_type` 是按**表面词素**的机器推导，不是语义裁定。",
+  "按 ADR-0008 §三分工表，「一条语境规则该不该存在」是法务的决定，",
+  "开发者不得自行增删。本表因此只记录与呈现，不做语义裁决。"
+ ],
+ "source": {
+  "snapshot": "snapshot-20260916T050845Z.json",
+  "legacy_field": "品线内容边界规则库.豁免词",
+  "legacy_field_total": 94,
+  "split_rule": "现网豁免词 − 白名单表已有词 = 语境守卫表"
+ },
+ "stats": {
+  "live_field_total": 94,
+  "duplicated_from_whitelist": 14,
+  "guards": 84,
+  "from_live": 79,
+  "from_skeleton_only": 5,
+  "wired": 46,
+  "not_wired": 38,
+  "g3_violations": 0,
+  "by_status": {
+   "active": 46,
+   "pending": 38,
+   "misrouted": 0
   },
-  "admission_criterion": {
-    "rule": "该词出现时，能否合理地把「主张未被作出」与「主张被作出」区分开",
-    "note": "判不出者不得进本表 —— 否则降级通道会变成误报的垃圾桶。"
+  "by_type": {
+   "否定": 26,
+   "弱化/替代表述": 25,
+   "溯源/同源表述": 14,
+   "风险降低表述": 7,
+   "免责声明": 6,
+   "未归类": 6
   },
-  "invariants": [
-    "G1 disjointness ｜ active 守卫词不得出现在任何规则的 match.keywords 中",
-    "   ← 违反即「否定表述本身被判险」：`does not cure` 触发 `cure` 规则且无降级信号 → 误报。",
-    "G2 attribution ｜ 每个守卫词必须声明至少一条 downgrades（否则是死重：加了不生效）",
-    "G3 direction   ｜ 守卫词只允许落 manual_review 带；**落 auto_pass 带即违反**",
-    "   ★ G3 是白名单与本表的结构分界：守卫绝不放行。",
-    "G4 cross-table ｜ 守卫词不得与**未隔离**的白名单词重名（隔离的白名单词可走降级通道）",
-    "G5 wiring      ｜ wired=false 的守卫不计入失败，但必须逐条给出 wire_gap 成因（退出码 2）"
-  ],
-  "derivation_note": [
-    "`guard_type` 是按**表面词素**的机器推导，不是语义裁定。",
-    "按 ADR-0008 §三分工表，「一条语境规则该不该存在」是法务的决定，",
-    "开发者不得自行增删。本表因此只记录与呈现，不做语义裁决。"
-  ],
-  "source": {
-    "snapshot": "snapshot-20260916T050845Z.json",
-    "legacy_field": "品线内容边界规则库.豁免词",
-    "legacy_field_total": 94,
-    "split_rule": "现网豁免词 − 白名单表已有词 = 语境守卫表"
-  },
-  "stats": {
-    "live_field_total": 94,
-    "duplicated_from_whitelist": 14,
-    "guards": 84,
-    "from_live": 79,
-    "from_skeleton_only": 5,
-    "wired": 46,
-    "not_wired": 38,
-    "g3_violations": 0,
-    "by_status": {
-      "active": 46,
-      "pending": 38,
-      "misrouted": 0
-    },
-    "by_type": {
-      "否定": 26,
-      "弱化/替代表述": 25,
-      "溯源/同源表述": 14,
-      "风险降低表述": 7,
-      "免责声明": 6,
-      "未归类": 6
-    },
-    "by_lang": {
-      "en": 60,
-      "zh": 24
-    }
-  },
-  "duplicated_from_whitelist": [
-    {
-      "word": "FDA cleared",
-      "legacy_rule": "H06",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "FDA-cleared",
-      "legacy_rule": "H06",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "FDA registered",
-      "legacy_rule": "H06",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "comfort",
-      "legacy_rule": "H07",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "quarantined"
-    },
-    {
-      "word": "gentle",
-      "legacy_rule": "H07",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "quarantined"
-    },
-    {
-      "word": "low noise",
-      "legacy_rule": "M01",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "quiet mode",
-      "legacy_rule": "M01",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "low-decibel",
-      "legacy_rule": "M01",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "suction level",
-      "legacy_rule": "M02",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "adjustable suction",
-      "legacy_rule": "M02",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active"
-    },
-    {
-      "word": "FDA 注册",
-      "legacy_rule": "H06",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active",
-      "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
-    },
-    {
-      "word": "silent mode",
-      "legacy_rule": "M01",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active",
-      "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
-    },
-    {
-      "word": "静音模式",
-      "legacy_rule": "M01",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active",
-      "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
-    },
-    {
-      "word": "suction settings",
-      "legacy_rule": "M02",
-      "belongs_to": "whitelist-v1.json",
-      "whitelist_status": "active",
-      "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
-    }
-  ],
-  "words": [
-    {
-      "word": "can't cure",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "can't treat",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（can't cure）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "cannot cure",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "cannot treat",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（cannot cure）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "do not cure",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（do not treat）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "do not treat",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "does not cure",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（does not treat）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "does not treat",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "doesn't cure",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "doesn't treat",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "ease engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.5.duct-unclog"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "eases engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "easing engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（easing discomfort）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "engorgement relief",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "not a medical device",
-      "lang": "en",
-      "guard_type": "免责声明",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "not a treatment",
-      "lang": "en",
-      "guard_type": "免责声明",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "not intended to cure",
-      "lang": "en",
-      "guard_type": "免责声明",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "not intended to treat",
-      "lang": "en",
-      "guard_type": "免责声明",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "not to treat",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "or cure",
-      "lang": "en",
-      "guard_type": "未归类",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "or treat",
-      "lang": "en",
-      "guard_type": "未归类",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reduce the risk of clogged",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reduce the risk of plugged",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（reduce the risk of clogged）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reduces the risk of clogged",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（reduces discomfort）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reducing the risk of clogged",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "relieve engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.5.duct-unclog"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "relieves engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（relieves discomfort）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "relieving engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "risk of clogged ducts",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（risk of clogged）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "risk of plugged ducts",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（risk of clogged）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "soothe engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "同族已接线（soothe tension）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "soothes engorgement",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "soulage les engorgements",
-      "lang": "en",
-      "guard_type": "未归类",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "soulager les engorgements",
-      "lang": "en",
-      "guard_type": "未归类",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "treat yourself",
-      "lang": "en",
-      "guard_type": "未归类",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H01",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "won't cure",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不可以治疗",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不可治疗",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不是治疗",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不用于治疗",
-      "lang": "zh",
-      "guard_type": "免责声明",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不能治愈",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不能治疗",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "并非治疗",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "无法治疗",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.1.medical-cure"
-      ],
-      "downgrades_legacy": [
-        "H01"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H01",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "may help your flow",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "同族已接线（may help）—— 词形未补全",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "natural let-down",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.1.milk-supply"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H02",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "natural letdown",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.1.milk-supply"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H02",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "relaxation supports",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "your natural let-down",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.1.milk-supply"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H02",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "your natural letdown",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.1.milk-supply"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H02",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不可以治疗乳腺炎",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不可以预防乳腺炎",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H02",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不是乳腺炎治疗设备",
-      "lang": "zh",
-      "guard_type": "免责声明",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不能治愈乳腺炎",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不能治疗乳腺炎",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "不能预防乳腺炎",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H02",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "放松",
-      "lang": "zh",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "无法治疗乳腺炎",
-      "lang": "zh",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "自然奶阵",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [
-        "H02"
-      ],
-      "effect_target": "none",
-      "effect": "",
-      "wired": false,
-      "channel_verdict": "none",
-      "g3_violation": null,
-      "status": "pending",
-      "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
-      "source_legacy": "H02",
-      "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "comfortable",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "ease discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "easing discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "gentler",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "gently",
-      "lang": "en",
-      "guard_type": "未归类",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reduce discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reduced discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "reduces discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "relieve discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "relieves discomfort",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "soothe tension",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.2.pain-relief"
-      ],
-      "downgrades_legacy": [
-        "H07"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H07",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "inspired by",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "inspired by natural nursing",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "借鉴",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "参考宝宝",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "参考思路",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "参考自然哺乳",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "灵感",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "设计思路",
-      "lang": "zh",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.2.mimic-claim"
-      ],
-      "downgrades_legacy": [
-        "H09"
-      ],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": "H09",
-      "wire_gap": null,
-      "source": "现网 `豁免词`"
-    },
-    {
-      "word": "cannot prevent",
-      "lang": "en",
-      "guard_type": "否定",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": null,
-      "source": "骨架独有（现网 `豁免词` 未登记）",
-      "wire_gap": null
-    },
-    {
-      "word": "may help",
-      "lang": "en",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.1.milk-supply"
-      ],
-      "downgrades_legacy": [],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": null,
-      "source": "骨架独有（现网 `豁免词` 未登记）",
-      "wire_gap": null
-    },
-    {
-      "word": "risk of clogged",
-      "lang": "en",
-      "guard_type": "风险降低表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.2.medical-prevent"
-      ],
-      "downgrades_legacy": [],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": null,
-      "source": "骨架独有（现网 `豁免词` 未登记）",
-      "wire_gap": null
-    },
-    {
-      "word": "supports your natural",
-      "lang": "en",
-      "guard_type": "溯源/同源表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T2.1.1.milk-supply"
-      ],
-      "downgrades_legacy": [],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": null,
-      "source": "骨架独有（现网 `豁免词` 未登记）",
-      "wire_gap": null
-    },
-    {
-      "word": "缓解涨奶",
-      "lang": "zh",
-      "guard_type": "弱化/替代表述",
-      "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
-      "downgrades": [
-        "T1.5.duct-unclog"
-      ],
-      "downgrades_legacy": [],
-      "effect_target": "manual_review",
-      "effect": "auto_reject → manual_review",
-      "wired": true,
-      "channel_verdict": "downgrade",
-      "g3_violation": null,
-      "status": "active",
-      "status_note": null,
-      "source_legacy": null,
-      "source": "骨架独有（现网 `豁免词` 未登记）",
-      "wire_gap": null
-    }
-  ],
-  "$false_negative_words": {
-    "$note": [
-      "★ Q24 = 选项 A（2026-09-23 裁定）：这些词**不是语境守卫** —— 它们（或其中的关键词）",
-      "**就是所在规则要抓的那个主张本身**。旧系统 `exceptions` 的语义是**放行**，",
-      "所以旧系统对写着这些词的文案是**放行**的：**旧规则的一条假阴孔**。",
-      "★ 它今天还没造成后果，只是因为 `wired=false`（拿不到带 → 按满档判险）——",
-      "这个洞是**被意外关上的，不是被决定关上的**。忠实迁移会把这个洞搬进新系统。",
-      "★ 处置：不进守卫表；单独立项，交法务确认是否补召回。",
-      "★ 判据：`tools/verify_engine_contract.py` 的 V57a–V57c。",
-      "★ 为什么是**外科编辑**而不是重跑生成器：本表当前的 `build_context_guards.py`",
-      "  重算出的「已接线」是 0 而入库值是 46（分表之后 `downgrade_band.keywords` 已搬空）——",
-      "  照它跑一次会抹掉 46 条接线决定。生成器已加「不一致就拒写」，见 Q46。"
-    ],
-    "items": [
-      {
-        "word": "乳腺炎治疗设备",
-        "legacy_rule": "H02",
-        "kind": "旧规则假阴孔",
-        "why": "它**就是 H02 要抓的那个主张本身**（`乳腺炎` 是 H02 的匹配词），不是免责声明 —— 旧系统把它写在 `豁免词` 里，等于对这条主张放行。",
-        "decision": "Q24",
-        "action": "交法务确认是否补召回；**不要**迁移成放行项，也不要当成普通降级词"
-      }
-    ]
+  "by_lang": {
+   "en": 60,
+   "zh": 24
   }
+ },
+ "duplicated_from_whitelist": [
+  {
+   "word": "FDA cleared",
+   "legacy_rule": "H06",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "FDA-cleared",
+   "legacy_rule": "H06",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "FDA registered",
+   "legacy_rule": "H06",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "comfort",
+   "legacy_rule": "H07",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "quarantined"
+  },
+  {
+   "word": "gentle",
+   "legacy_rule": "H07",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "quarantined"
+  },
+  {
+   "word": "low noise",
+   "legacy_rule": "M01",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "quiet mode",
+   "legacy_rule": "M01",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "low-decibel",
+   "legacy_rule": "M01",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "suction level",
+   "legacy_rule": "M02",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "adjustable suction",
+   "legacy_rule": "M02",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active"
+  },
+  {
+   "word": "FDA 注册",
+   "legacy_rule": "H06",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active",
+   "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
+  },
+  {
+   "word": "silent mode",
+   "legacy_rule": "M01",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active",
+   "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
+  },
+  {
+   "word": "静音模式",
+   "legacy_rule": "M01",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active",
+   "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
+  },
+  {
+   "word": "suction settings",
+   "legacy_rule": "M02",
+   "belongs_to": "whitelist-v1.json",
+   "whitelist_status": "active",
+   "$note": "迁入（2026-09-16）；此前登记在守卫表里，状态 misrouted。"
+  }
+ ],
+ "words": [
+  {
+   "word": "can't cure",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "can't treat",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（can't cure）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "cannot cure",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "cannot treat",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（cannot cure）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "do not cure",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（do not treat）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "do not treat",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "does not cure",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（does not treat）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "does not treat",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "doesn't cure",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "doesn't treat",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "ease engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.5.duct-unclog"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "eases engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "easing engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（easing discomfort）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "engorgement relief",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "not a medical device",
+   "lang": "en",
+   "guard_type": "免责声明",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "not a treatment",
+   "lang": "en",
+   "guard_type": "免责声明",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "not intended to cure",
+   "lang": "en",
+   "guard_type": "免责声明",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "not intended to treat",
+   "lang": "en",
+   "guard_type": "免责声明",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "not to treat",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "or cure",
+   "lang": "en",
+   "guard_type": "未归类",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "or treat",
+   "lang": "en",
+   "guard_type": "未归类",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reduce the risk of clogged",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reduce the risk of plugged",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（reduce the risk of clogged）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reduces the risk of clogged",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（reduces discomfort）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reducing the risk of clogged",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "relieve engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.5.duct-unclog"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "relieves engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（relieves discomfort）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "relieving engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "risk of clogged ducts",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（risk of clogged）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "risk of plugged ducts",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（risk of clogged）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "soothe engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "同族已接线（soothe tension）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "soothes engorgement",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "soulage les engorgements",
+   "lang": "en",
+   "guard_type": "未归类",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "soulager les engorgements",
+   "lang": "en",
+   "guard_type": "未归类",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "treat yourself",
+   "lang": "en",
+   "guard_type": "未归类",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H01",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "won't cure",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不可以治疗",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不可治疗",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不是治疗",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不用于治疗",
+   "lang": "zh",
+   "guard_type": "免责声明",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不能治愈",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不能治疗",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "并非治疗",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "无法治疗",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.1.medical-cure"
+   ],
+   "downgrades_legacy": [
+    "H01"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H01",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "may help your flow",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "同族已接线（may help）—— 词形未补全",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "natural let-down",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.1.milk-supply"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H02",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "natural letdown",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.1.milk-supply"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H02",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "relaxation supports",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "your natural let-down",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.1.milk-supply"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H02",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "your natural letdown",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.1.milk-supply"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H02",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不可以治疗乳腺炎",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不可以预防乳腺炎",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H02",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不是乳腺炎治疗设备",
+   "lang": "zh",
+   "guard_type": "免责声明",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不能治愈乳腺炎",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不能治疗乳腺炎",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "不能预防乳腺炎",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H02",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "放松",
+   "lang": "zh",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "无法治疗乳腺炎",
+   "lang": "zh",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "自然奶阵",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [
+    "H02"
+   ],
+   "effect_target": "none",
+   "effect": "",
+   "wired": false,
+   "channel_verdict": "none",
+   "g3_violation": null,
+   "status": "pending",
+   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "source_legacy": "H02",
+   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "comfortable",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "ease discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "easing discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "gentler",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "gently",
+   "lang": "en",
+   "guard_type": "未归类",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reduce discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reduced discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "reduces discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "relieve discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "relieves discomfort",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "soothe tension",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.2.pain-relief"
+   ],
+   "downgrades_legacy": [
+    "H07"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H07",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "inspired by",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "inspired by natural nursing",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "借鉴",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "参考宝宝",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "参考思路",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "参考自然哺乳",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "灵感",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "设计思路",
+   "lang": "zh",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.2.mimic-claim"
+   ],
+   "downgrades_legacy": [
+    "H09"
+   ],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": "H09",
+   "wire_gap": null,
+   "source": "现网 `豁免词`"
+  },
+  {
+   "word": "cannot prevent",
+   "lang": "en",
+   "guard_type": "否定",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": null,
+   "source": "骨架独有（现网 `豁免词` 未登记）",
+   "wire_gap": null
+  },
+  {
+   "word": "may help",
+   "lang": "en",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.1.milk-supply"
+   ],
+   "downgrades_legacy": [],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": null,
+   "source": "骨架独有（现网 `豁免词` 未登记）",
+   "wire_gap": null
+  },
+  {
+   "word": "risk of clogged",
+   "lang": "en",
+   "guard_type": "风险降低表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.2.medical-prevent"
+   ],
+   "downgrades_legacy": [],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": null,
+   "source": "骨架独有（现网 `豁免词` 未登记）",
+   "wire_gap": null
+  },
+  {
+   "word": "supports your natural",
+   "lang": "en",
+   "guard_type": "溯源/同源表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T2.1.1.milk-supply"
+   ],
+   "downgrades_legacy": [],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": null,
+   "source": "骨架独有（现网 `豁免词` 未登记）",
+   "wire_gap": null
+  },
+  {
+   "word": "缓解涨奶",
+   "lang": "zh",
+   "guard_type": "弱化/替代表述",
+   "guard_type_derivation": "机器推导（表面词素）· 语义归属待法务确认",
+   "downgrades": [
+    "T1.5.duct-unclog"
+   ],
+   "downgrades_legacy": [],
+   "effect_target": "manual_review",
+   "effect": "auto_reject → manual_review",
+   "wired": true,
+   "channel_verdict": "downgrade",
+   "g3_violation": null,
+   "status": "active",
+   "status_note": null,
+   "source_legacy": null,
+   "source": "骨架独有（现网 `豁免词` 未登记）",
+   "wire_gap": null
+  }
+ ],
+ "$false_negative_words": {
+  "$note": [
+   "★ Q24 = 选项 A（2026-09-23 裁定）：这些词**不是语境守卫** —— 它们（或其中的关键词）",
+   "**就是所在规则要抓的那个主张本身**。旧系统 `exceptions` 的语义是**放行**，",
+   "所以旧系统对写着这些词的文案是**放行**的：**旧规则的一条假阴孔**。",
+   "★ 它今天还没造成后果，只是因为 `wired=false`（拿不到带 → 按满档判险）——",
+   "这个洞是**被意外关上的，不是被决定关上的**。忠实迁移会把这个洞搬进新系统。",
+   "★ 处置：不进守卫表；单独立项，交法务确认是否补召回。",
+   "★ 判据：`tools/verify_engine_contract.py` 的 V57a–V57c。",
+   "★ 为什么是**外科编辑**而不是重跑生成器：本表当前的 `build_context_guards.py`",
+   "  重算出的「已接线」是 0 而入库值是 46（分表之后 `downgrade_band.keywords` 已搬空）——",
+   "  照它跑一次会抹掉 46 条接线决定。生成器已加「不一致就拒写」，见 Q46。"
+  ],
+  "items": [
+   {
+    "word": "乳腺炎治疗设备",
+    "legacy_rule": "H02",
+    "kind": "旧规则假阴孔",
+    "why": "它**就是 H02 要抓的那个主张本身**（`乳腺炎` 是 H02 的匹配词），不是免责声明 —— 旧系统把它写在 `豁免词` 里，等于对这条主张放行。",
+    "decision": "Q24",
+    "action": "交法务确认是否补召回；**不要**迁移成放行项，也不要当成普通降级词"
+   }
+  ]
+ }
 }
