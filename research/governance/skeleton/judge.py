@@ -53,7 +53,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+import clause_ref as CR  # noqa: E402  T4：回执 → 条款 → 原文（证据引用）
 import engine_manifest as manifest  # noqa: E402
+import evidence_origin as EO  # noqa: E402  T19：证据来源四档 + PASS 收窄
 import score as S  # noqa: E402
 import severity as sev  # noqa: E402
 from vocab import load_vocab, assert_channels, band_target  # noqa: E402
@@ -66,6 +68,9 @@ RECEIPTS_PATH = HERE / "_data" / "receipts.jsonl"
 #   依据：这四档是规则文件里的既有取值（11 auto_reject / 12 manual_review /
 #   1 auto_pass_with_note / 1 auto_pass），次序与 ADR-0005「默认不通过」一致。
 DISPOSITION_PRECEDENCE = ["auto_reject", "manual_review", "auto_pass_with_note", "auto_pass"]
+# T19：这两个是「直接发布」档 —— 证据来源收窄**只**作用在它们身上。
+#   单独定义在这里是为了让「收窄作用域」只有一处定义，而不是散在条件里。
+PASS_DISPOSITIONS = ("auto_pass", "auto_pass_with_note")
 
 # ADR-0005 约束 1 的三值建议（**建议**，不是决定）
 SUGGESTION_BY_DISPOSITION = {
@@ -482,8 +487,26 @@ def _layer_note(status, decided_at, decided_by) -> str:
 
 
 # ---------------------------------------------------------------- 回执
+def _rule_keys(verdict: dict) -> list:
+    """从回执的入参里取「命中了哪几条规则」。
+
+    ★ 这个入参叫 `verdict` 但它**装的是整份判定结果**（`verdict` 只是它下面的一个键）
+      —— 落 T4 时我就是照着名字读、于是拿到一个空数组，而**没有任何东西会红**：
+      `rule_keys_hit: []` 与「这条判定零命中」长得一模一样。
+      所以这里两个位置都读，谁在都行（`receipt_evidence_problems()` 同理）。
+    """
+    if not isinstance(verdict, dict):
+        return []
+    inner = verdict.get("verdict")
+    if isinstance(inner, dict) and inner.get("rule_keys_hit") is not None:
+        return list(inner.get("rule_keys_hit") or [])
+    return list(verdict.get("rule_keys_hit") or [])
+
+
 def build_receipt(text: str, verdict: dict, vers: dict, *, issued_at: str,
                   run_id: str | None = None, origin: str = "cli",
+                  evidence_origin: str = "stated",
+                  evidence: dict | None = None,
                   obligations: dict | None = None) -> dict:
     """ADR-0005 约束 5：「**没有 receipt 的判定不算发生过。**」
 
@@ -503,6 +526,9 @@ def build_receipt(text: str, verdict: dict, vers: dict, *, issued_at: str,
     core = {
         "contract_version": vers["contract_version"],
         "origin": origin,
+        # ★ 与上面那个 `origin` **不是一回事**（见 evidence_origin.py 抬头）。
+        #   放在它正下方是刻意的：两个 origin 挨着，混淆的时候一眼能看见。
+        "evidence_origin": evidence_origin,
         "input_sha256": _sha256(text),
         "input_chars": len(text),
         "engine_version": vers["engine_version"],
@@ -521,7 +547,25 @@ def build_receipt(text: str, verdict: dict, vers: dict, *, issued_at: str,
     core["$note"] = ("不含原文与片段（ADR-0008 决策 2）。"
                      "verdict_digest 把回执钉在**结论**上，不只是钉在输入上 —— "
                      "只记输入的回执无法证明当时判了什么。"
-                     "origin 区分测试与真判定（cli / batch / shouheng）。")
+                     "origin 区分测试与真判定（cli / batch / shouheng）。"
+                     "★ `evidence_ref[]` 是 T4 的那一跳：**回执 → 条款 → 原文**"
+                     "（PRD §5.3）。它只存地址（库名/条目ID/条文号/链接/指纹）与"
+                     "「怎么读到的」，仍不含任何原文片段。")
+
+    # ── T4：回执 → 条款 → 原文（PRD §5.3 的「依据《文档名》第 X 条」）────
+    # ★ 平铺在回执顶层，不是塞进一个子对象：`evidence_ref` / `ratified` /
+    #   `unconfirmed_notice` 就是 T4 定的字段名，多包一层会让「回执里有没有这一项」
+    #   变成一个需要知道嵌套路径才能回答的问题。
+    core["rule_keys_hit"] = sorted(set(_rule_keys(verdict)))
+    # ★ 为什么要记规则编号：`verdict_digest` 是个**哈希** —— 拿着回执的人
+    #   无法据此判断「引用带全了没有」。规则编号不是广告原文（ADR-0008 决策 2
+    #   约束的是原文），却是「这条回执该引哪几条条款」的唯一依据。
+    if evidence:
+        for _k in CR.BLOCK_FIELDS:
+            core[_k] = evidence.get(_k)
+        for _k in CR.BLOCK_AUX_FIELDS:
+            if evidence.get(_k) is not None:
+                core[_k] = evidence[_k]
 
     # ── 出口义务（D6 / D10）────────────────────────────────────────
     # ★ 为什么出口要进**回执**而不是只在判定结果里：判定结果是一次性的返回体，
@@ -581,7 +625,8 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
           ad_account: str | None = None,
           receipt: bool = False,
           receipt_path: Path | None = None, issued_at: str | None = None,
-          origin: str = "cli") -> dict:
+          origin: str = "cli",
+          evidence_origin: str = "stated") -> dict:
     """★ 稳定契约。文案（+ 品线）→ 判定 / 命中规则编号 / 位置 / 降级证据 /
     规则与词表版本 / 边界声明 / 处置层 / 出口通知。
 
@@ -590,6 +635,16 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
 
     ★ `ad_type` 不是判定输入，是**路由输入**（D5）：文本为空的记录要走 DP0，
       而那条通知要说清「是哪种格式没有文本」。只说「没有文本」，收件人无法行动。
+
+    ★★ 本函数有**两个 `origin`，它们不是一回事** —— 见 `evidence_origin.py` 抬头：
+
+      * `origin=` 是**回执来源**（cli / batch / shouheng / test），回答「这次判定谁发起的」，
+        它是 `push_receipts.py` 那道「测试不许进生产账本」闸门的依据；
+      * `evidence_origin=` 是**证据来源**（stated / ocr / transcribed / described），
+        回答「被审的材料是怎么读到的」，它决定结论能不能到 PASS。
+
+      写成同一个名字就会撞车（`AGENTS.md` §2.4.5）：`origin="stated"` 会让那道闸门
+      照常放行，而没有任何东西会红。两个取值域的交集由 `receipt_origin_problems()` 断言为空。
     """
     if text is None:
         text = ""
@@ -673,6 +728,70 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
     else:
         disposition, severity, topic = "catch_all", "L0", eng.catch_all.get("topic", "L0")
 
+    # ── T4 · 命中的规则 → 证据引用（**在 `judge()` 内部产出，不可注入**）──────
+    #   ★ 为什么不做成 `judge(evidence_refs=...)` 那样的入参：`judge()` 的调用方
+    #     不止一个（CLI / 批量 / `push_receipts` / 守衡的 `judge_copy`），
+    #     只要有一个不传，那条回执就永远点不开依据，**而且没有任何东西会红**。
+    #     「任一判定回执能反查到条款」这句话只有在产出点唯一时才成立。
+    #   ★ 算在这里（而不是回执那一段里）是因为下面那道**门二**要用它：
+    #     条款的 `origin` 要真的参与收窄，不能只躺在回执里（§2.4「定义了没人用」）。
+    _lib_doc, _lib_index, _lib_problem = CR.load_library()
+    _evidence = CR.evidence_block(sorted({x["rule_key"] for x in out_hits}),
+                                  eng.all_rules, _lib_index,
+                                  library_problem=_lib_problem)
+
+    # ── T19 · 证据来源收窄：非「原文照读」的证据不许单独把结论推到 PASS ──────
+    #
+    #   PRD §5.2 缺的那一档。图片走 OCR、视频走转写/画面转述 —— 它们**不比原文照读**，
+    #   所以不能让它们单独把一条内容判成「可以发布」。有 stated 在场时它们可以当补充。
+    #
+    #   ★ 为什么收窄发生在**这里**（disposition 已算出、layer 还没解析）：
+    #     落在这一步，`resolve_layer` / `suggestion` / `blank_register` 全都跟着走对了；
+    #     写在出口那一跳，结论会与处置层对不上（`AGENTS.md` §2.5 的形态错位，同一个形状）。
+    #
+    #   ★ 今天不会触发：文字输入的判定一律 `evidence_origin=stated`。
+    #     它触发的那一天，是图片/视频第一次进审查的那一天 —— 而那正是它该在的一天。
+    #
+    #   ★★ T4 接线（2026-09-23）：收窄现在是**两扇并列的门**，不是一扇。
+    #
+    #      | 门 | 看的是 | 为什么不能合成一扇 |
+    #      |---|---|---|
+    #      | 一 | **被审材料**怎么读到的（`input.evidence_origin`） | 判「这份材料我们读全了吗」 |
+    #      | 二 | **所引条款**怎么读到的（`evidence_ref[].origin`） | 判「我们据以放行的那条标准，我们读准了吗」 |
+    #
+    #      ★ 合成的写法（把两者倒进同一个 `may_finalize_pass` 集合）**会放松今天的口径**：
+    #        `may_finalize_pass` 的规矩是「有 stated 在场就放行，弱的只作补充」，
+    #        于是「材料是 OCR、条款是 stated」这一组会被判成放行 ——
+    #        而它正是门一要挡的那一组。**两件事各有各的方向，合并就是 §2.4.5。**
+    #      ★ 门二只在**确实引用了条款**时开口：命中的规则若声明了 `no_external_basis`，
+    #        「没有依据」不是「依据很弱」—— 那一条由规则自己的声明管，不由这扇门管。
+    narrowed = None
+    _mat_ok, _mat_why = (True, "")
+    _ref_ok, _ref_why = (True, "")
+    if disposition in PASS_DISPOSITIONS:
+        if evidence_origin not in EO.PASS_ORIGINS:
+            _mat_ok, _mat_why = EO.may_finalize_pass([{"origin": evidence_origin}
+                                                      for _ in out_hits])
+        _cited = _evidence.get("evidence_ref") or []
+        if _cited and _evidence.get("evidence_status") == "ok":
+            _ref_ok, _ref_why = EO.may_finalize_pass(_cited)
+        if (not _mat_ok) or (not _ref_ok):
+            _gates = ([f"材料来源（{evidence_origin}）：{_mat_why}"] if not _mat_ok else []) + \
+                     ([f"所引条款来源：{_ref_why}"] if not _ref_ok else [])
+            narrowed = {
+                "from": disposition,
+                "why": "；".join(_gates),
+                "gate": ("both" if not _mat_ok and not _ref_ok
+                         else ("material" if not _mat_ok else "cited_clauses")),
+                "evidence_origin": evidence_origin,
+                "cited_origins": sorted({r.get("origin") for r in (_cited or [])}),
+                "$note": ("PRD §5.2 未写的那条规矩：OCR / 转写 / 画面转述可以**补充**证据，"
+                          "但不能单独把结论推到 PASS。要放行必须先有一条原文照读的证据。"
+                          "★ T4 之后这扇门有两道并列的闸：**材料**怎么读到的、"
+                          "**所引条款**怎么读到的 —— 各有各的方向，不许合并成一个集合。"),
+            }
+            disposition = "manual_review"
+
     layer = resolve_layer(disposition, hits, layers, has_text=has_text, ctx={
         "rule_keys": sorted({x["rule_key"] for x in out_hits}),
         "run_id": ad_id or "",
@@ -719,14 +838,27 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
             "复算：`python3 research/governance/audit_risk_label.py`。"
             if not has_text else None),
     }
+    if narrowed:
+        verdict["origin_narrowed"] = narrowed
 
     boundary = _boundary(eng, eng.vocab, hits, product_line, locale)
+    if narrowed:
+        #   边界声明也要说这一句 —— 它是「这次判定有什么不适用」的正式出口，
+        #   只写在 verdict 里，读 boundary 的人（法务）就看不到结论为什么被压过。
+        boundary.setdefault("unknowns", [])
+        boundary["unknowns"].append(
+            f"**证据来源收窄（T19）**：{narrowed['why']}。"
+            f"结论因此从 `{narrowed['from']}` 落到 `manual_review`。")
 
     result = {
         "contract_version": CONTRACT_VERSION,
         "input": {
             "text_sha256": _sha256(text),
             "chars": len(text),
+            # ★ 证据来源（T19）。与回执顶层的 `origin` **不是一回事** ——
+            #   那个是「谁发起的这次判定」，这个是「材料是怎么读到的」。
+            "evidence_origin": evidence_origin,
+            "$evidence_origin_note": EO.ORIGIN_MEANING.get(evidence_origin, "未知来源"),
             "has_text": has_text,
             "product_line": product_line,
             "locale": locale,
@@ -784,7 +916,9 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
                       "不能证明有人负责。"),
         }
         rc = build_receipt(text, {k: v for k, v in result.items() if k != "receipt"},
-                           vers, issued_at=ts, origin=origin, obligations=obl)
+                           vers, issued_at=ts, origin=origin,
+                           evidence_origin=evidence_origin,
+                           evidence=_evidence, obligations=obl)
         result["receipt"] = rc
         append_receipt(rc, receipt_path)
 
@@ -851,6 +985,18 @@ def render(r: dict) -> str:
                  f"{r['versions']['rule_version']} / {r['versions']['vocab_version']}")
     if r.get("receipt"):
         lines.append(f"  回执   {r['receipt']['run_id']} @ {r['receipt']['issued_at']}")
+        # ★ T4：回执的证据链要在**人读视图**里看得见。
+        #   只写进 JSONL 的话，「这条判定依据哪几条、那几条确认过没有」
+        #   只有会读账本的人知道 —— 而 Q22 要防的正是「一次研究被读成一次法务裁定」。
+        _ev = r["receipt"].get("evidence_ref") or []
+        if _ev:
+            lines.append(f"  依据   {len(_ev)} 条外部标准："
+                         + "、".join(f"{x.get('条文号')}（{x.get('条目ID')}）" for x in _ev))
+            if r["receipt"].get("unconfirmed_notice"):
+                lines.append(f"  ⚠ {r['receipt']['unconfirmed_notice']}")
+        elif r["receipt"].get("$ratified_note"):
+            lines.append("  依据   本次判定没有引用任何外部条款"
+                         "（零命中 / 命中的规则声明了 no_external_basis）")
     return "\n".join(lines)
 
 

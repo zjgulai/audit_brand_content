@@ -1,13 +1,13 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-17T12:03:46+00:00",
-  "engine_version": "a3218e7f3245f745",
-  "code_version": "a45ef12ba540c87d",
+  "generated_at": "2026-09-23T11:11:03+00:00",
+  "engine_version": "b990f681f49c9c20",
+  "code_version": "ad478a100dd8d24b",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
-      "bytes": 47606,
-      "sha256": "18c25d4be2ffaf0f4781971985b1fe8db66c953d2fdd2f2ad54aff162e6c9da9",
+      "bytes": 72087,
+      "sha256": "43e531bd184fa74d84c8433b37fdbd94d55470ed5fa53b4ba7795fb7a42a0796",
       "why": "判险词 + 规则 + 兜底通道（唯一产生命中的来源）",
       "counts": {
         "rules": 26,
@@ -85,8 +85,8 @@
       "bytes": 34263
     },
     "judge.py": {
-      "sha256": "0b8a2430d8cd7bad20f7119ed2de20ba579bdd547a82898935982c2fe4e3b9ae",
-      "bytes": 53136
+      "sha256": "4fb1d8fc06feb25417604a88b85b15e8dec7a4b84e09ec0818b9226ee6975c8a",
+      "bytes": 63289
     },
     "vocab.py": {
       "sha256": "b0b938687bb53721d87e249b630b9ed1c6f937adde0a002feae38c52b4533954",
@@ -97,8 +97,16 @@
       "bytes": 8024
     },
     "engine_manifest.py": {
-      "sha256": "ed55d29a771916f95b1d6f95295461ba30dde57c0bfb2dee497d2d36aba30b71",
-      "bytes": 20016
+      "sha256": "4947e6eb3dcb22bf99a515c9f3580ddccff5549d01547811f85fe61eb1d92bdf",
+      "bytes": 20979
+    },
+    "evidence_origin.py": {
+      "sha256": "80788584ab6455a712d986c97a2961148af27edcf99f034046bdaab7b0f8b1e5",
+      "bytes": 6759
+    },
+    "clause_ref.py": {
+      "sha256": "8c72e29e51ae6d7cec1fe59f7ada3f874757f189f930bf46688e6228b67e550d",
+      "bytes": 26719
     }
   },
   "upstream": {

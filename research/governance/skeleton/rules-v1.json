@@ -75,6 +75,50 @@
         ]
       },
       "evidence_required": "regulatory_clearance_or_clinical",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-021",
+          "条文号": "S7-03",
+          "链接": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+          "指纹": "sha256:95b0952d876dcd11"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-025",
+          "条文号": "S9-01",
+          "链接": "https://support.google.com/adspolicy/answer/176031",
+          "指纹": "sha256:19f68f62126a8905"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-038",
+          "条文号": "S13-01",
+          "链接": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+          "指纹": "sha256:eef6374350ef37c5"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-046",
+          "条文号": "S14-08",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:8605899f684bd932"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-051",
+          "条文号": "S15-05",
+          "链接": "https://www.gov.uk/guidance/advertise-your-medicines",
+          "指纹": "sha256:0b757c78abc192f9"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-053",
+          "条文号": "S16-02",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:fc8c251f23862a1f"
+        }
+      ],
       "source_legacy": "W1卖点表达边界 + 吸奶器广告文案审计_红绿灯.xlsx",
       "detection_layer": "native"
     },
@@ -116,6 +160,29 @@
         ]
       },
       "evidence_required": "regulatory_clearance_or_clinical",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-025",
+          "条文号": "S9-01",
+          "链接": "https://support.google.com/adspolicy/answer/176031",
+          "指纹": "sha256:19f68f62126a8905"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-038",
+          "条文号": "S13-01",
+          "链接": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+          "指纹": "sha256:eef6374350ef37c5"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-053",
+          "条文号": "S16-02",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:fc8c251f23862a1f"
+        }
+      ],
       "source_legacy": "H02 边界内容第一段",
       "detection_layer": "native"
     },
@@ -172,6 +239,15 @@
         ]
       },
       "evidence_required": "regulatory_clearance_or_clinical",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-035",
+          "条文号": "S12-02",
+          "链接": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+          "指纹": "sha256:5ea8f51b7eba3316"
+        }
+      ],
       "source_legacy": "H01 边界内容",
       "detection_layer": "native"
     },
@@ -247,6 +323,15 @@
         ]
       },
       "evidence_required": "rct_or_clinical",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-035",
+          "条文号": "S12-02",
+          "链接": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+          "指纹": "sha256:5ea8f51b7eba3316"
+        }
+      ],
       "source_legacy": "H02 边界内容第二段",
       "detection_layer": "native"
     },
@@ -324,6 +409,15 @@
         ]
       },
       "evidence_required": "clinical",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-035",
+          "条文号": "S12-02",
+          "链接": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+          "指纹": "sha256:5ea8f51b7eba3316"
+        }
+      ],
       "source_legacy": "H07 关键词/正则（英文部分）",
       "detection_layer": "native",
       "$codified_note": [
@@ -395,6 +489,15 @@
         "effect": "none"
       },
       "evidence_required": "w1_self_controlled_data",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-039",
+          "条文号": "S14-01",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:dd7f8f48d1beb66c"
+        }
+      ],
       "source_legacy": "M07（原关键词横跨 T2.1.3 与 T2.2.1）",
       "detection_layer": "native",
       "$added_note": "原 M02 有 8 关键词 0 正则，本骨架补 2 条正则。",
@@ -435,6 +538,78 @@
         "effect": "none"
       },
       "evidence_required": "registered_clinical_study",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-003",
+          "条文号": "S1-03",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:951da5db85ac22c6"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-005",
+          "条文号": "S1-05",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:82b89427e61439d2"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-006",
+          "条文号": "S2-01",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:4b0340816636822e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-008",
+          "条文号": "S2-03",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:0e09267f3a198c3a"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-009",
+          "条文号": "S2-04",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:6ac6f0844d6c1067"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-040",
+          "条文号": "S14-02",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:cea4fcd7cf55666e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-041",
+          "条文号": "S14-03",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:3decd00fe18dff1f"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-044",
+          "条文号": "S14-06",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:1cc5dbcfe3cf238d"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-047",
+          "条文号": "S15-01",
+          "链接": "https://www.gov.uk/guidance/advertise-your-medicines",
+          "指纹": "sha256:93d3c9f9e9387aa5"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-052",
+          "条文号": "S16-01",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:d980c1672772bf83"
+        }
+      ],
       "source_legacy": "H03",
       "detection_layer": "added",
       "$added_note": "正则为本骨架新增（原表 H03 有 9 个关键词但 0 条正则）。同族 H04 亦然。"
@@ -477,6 +652,64 @@
         "effect": "none"
       },
       "evidence_required": "named_endorser_consent",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-005",
+          "条文号": "S1-05",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:82b89427e61439d2"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-009",
+          "条文号": "S2-04",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:6ac6f0844d6c1067"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-021",
+          "条文号": "S7-03",
+          "链接": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+          "指纹": "sha256:95b0952d876dcd11"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-031",
+          "条文号": "S10-04",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:6ed9289d5148d203"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-042",
+          "条文号": "S14-04",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:0855f4ddd818a5ea"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-044",
+          "条文号": "S14-06",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:1cc5dbcfe3cf238d"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-047",
+          "条文号": "S15-01",
+          "链接": "https://www.gov.uk/guidance/advertise-your-medicines",
+          "指纹": "sha256:93d3c9f9e9387aa5"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-055",
+          "条文号": "S16-04",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:02cd20389595b84d"
+        }
+      ],
       "source_legacy": "H04",
       "detection_layer": "added"
     },
@@ -514,6 +747,43 @@
         "effect": "none"
       },
       "evidence_required": "certification_document",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-004",
+          "条文号": "S1-04",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:7c095f1dbd7775dd"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-014",
+          "条文号": "S4-01",
+          "链接": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+          "指纹": "sha256:88ac8c9dfd4711f6"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-030",
+          "条文号": "S10-03",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:28bffe4ed2efc35d"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-031",
+          "条文号": "S10-04",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:6ed9289d5148d203"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-061",
+          "条文号": "S17-03",
+          "链接": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+          "指纹": "sha256:bc7dad3e2a318bf6"
+        }
+      ],
       "source_legacy": "M05",
       "detection_layer": "native",
       "$codified_note": "`hospital-grade` 与 `qualité hospitalière` 为 codified：M05 的 15 次命中里有 10 次是这两个片段，但原表关键词/正则都复现不了（原正则要求 `hospital grade` 带空格，实际文案是连字符；法语完全无覆盖）。"
@@ -550,6 +820,36 @@
         "effect": "none"
       },
       "evidence_required": "clinical_applicability",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-030",
+          "条文号": "S10-03",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:28bffe4ed2efc35d"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-037",
+          "条文号": "S12-04",
+          "链接": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+          "指纹": "sha256:4b8c8a4ca4bae77e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-058",
+          "条文号": "S16-07",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:85e916485b696a14"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-061",
+          "条文号": "S17-03",
+          "链接": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+          "指纹": "sha256:bc7dad3e2a318bf6"
+        }
+      ],
       "source_legacy": "U03（原挂 T3.3 + T7.1，本骨架拆为 T7.1）",
       "detection_layer": "codified",
       "$codified_note": "U03 的 `krankenhaus`(de)。原表 U03 关键词已含 `hospital`，正则 \\b(NICU|hospital)\\b 本应命中 —— 其中 1 次实为字段范围问题，此处一并收口。",
@@ -625,6 +925,64 @@
         "$conflict_resolution_note": "若只看 D3 的 diff，会以为这个词「被放行了」；只看 D9 的 diff，会以为 D3 被撤销了。**两个 diff 都对，合起来才是完整语义** —— 所以这一条必须同时留在词表和规则两处，不能只留一处。"
       },
       "evidence_required": "510k_number",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-001",
+          "条文号": "S1-01",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:f81f5107959b5081"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-006",
+          "条文号": "S2-01",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:4b0340816636822e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-025",
+          "条文号": "S9-01",
+          "链接": "https://support.google.com/adspolicy/answer/176031",
+          "指纹": "sha256:19f68f62126a8905"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-032",
+          "条文号": "S11-01",
+          "链接": "https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved",
+          "指纹": "sha256:834bc69211537818"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-033",
+          "条文号": "S11-02",
+          "链接": "https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved",
+          "指纹": "sha256:be4ae92bf3e541b1"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-034",
+          "条文号": "S12-01",
+          "链接": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+          "指纹": "sha256:c8d62d5ee3d6972e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-038",
+          "条文号": "S13-01",
+          "链接": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+          "指纹": "sha256:eef6374350ef37c5"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-045",
+          "条文号": "S14-07",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:9b8eb8de17a58b27"
+        }
+      ],
       "source_legacy": "H06",
       "detection_layer": "native",
       "$renamed_from": "T3.5.regulatory-status"
@@ -665,6 +1023,29 @@
         "effect": "none"
       },
       "evidence_required": "head_to_head_test",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-010",
+          "条文号": "S2-05",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:a13ddd8ac79e8d1f"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-048",
+          "条文号": "S15-02",
+          "链接": "https://www.gov.uk/guidance/advertise-your-medicines",
+          "指纹": "sha256:fd6c180d9fec6d1e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-056",
+          "条文号": "S16-05",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:88ddc03fa25f17b4"
+        }
+      ],
       "source_legacy": "H08",
       "detection_layer": "native",
       "$removed_note": "★ 原 H08 的 `比.*好` 被移除：它是**一条含 `.*` 的伪关键词**，实际是正则却写在关键词列，且会匹配任意长度文本（含 HTML）。依据：设计文档 §2.5 记录的「75 个关键词只有单通道」问题。`秒杀` 保留但见下。"
@@ -701,6 +1082,15 @@
         "effect": "none"
       },
       "evidence_required": "comparative_test",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-010",
+          "条文号": "S2-05",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:a13ddd8ac79e8d1f"
+        }
+      ],
       "source_legacy": "M06",
       "detection_layer": "native"
     },
@@ -750,6 +1140,43 @@
         "effect": "none"
       },
       "evidence_required": "none_possible",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-027",
+          "条文号": "S9-03",
+          "链接": "https://support.google.com/adspolicy/answer/176031",
+          "指纹": "sha256:6c446cd32ce66e39"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-043",
+          "条文号": "S14-05",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:b8f54d592c521bcf"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-049",
+          "条文号": "S15-03",
+          "链接": "https://www.gov.uk/guidance/advertise-your-medicines",
+          "指纹": "sha256:f1384b33049caf04"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-054",
+          "条文号": "S16-03",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:5b652f4d87018471"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-056",
+          "条文号": "S16-05",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:88ddc03fa25f17b4"
+        }
+      ],
       "source_legacy": "H05 第一段",
       "detection_layer": "codified",
       "$scope_note": "★ 原 H05 的「适合所有胸型」族（fits all breast shapes / one size fits all / 适合所有妈妈）**已从本规则移出**，因为它是 T2.2（机器性能/适体性）而非 T5（安全性）。按 2026-09-09 口径排名最高级已放开，但放开的是表达、不是主题 —— 见 topic-tree-v1.md §0.3。",
@@ -793,6 +1220,15 @@
         "effect": "none"
       },
       "evidence_required": "fit_test_data",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-029",
+          "条文号": "S10-02",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:a163be077ab78643"
+        }
+      ],
       "source_legacy": "H05 第二段（本骨架从 H05 拆出）",
       "detection_layer": "native",
       "$renamed_from": "T5.3.fit-all-claim"
@@ -863,6 +1299,15 @@
         ]
       },
       "evidence_required": "algorithm_documentation",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-036",
+          "条文号": "S12-03",
+          "链接": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+          "指纹": "sha256:f53ca653ad4be25b"
+        }
+      ],
       "source_legacy": "H09",
       "detection_layer": "native",
       "$severity_note": "★ 原 H09 在现行表里是「高危·红」（L4），设计文档 §2.2.1 的映射表却把它写成 L3。本骨架取 **L4**（以现行表的实际等级为准）。这是一处设计文档与源数据的数字不一致，已记录。"
@@ -916,6 +1361,15 @@
         "effect": "manual_review → auto_pass"
       },
       "evidence_required": "decibel_test",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-039",
+          "条文号": "S14-01",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:dd7f8f48d1beb66c"
+        }
+      ],
       "source_legacy": "M01",
       "detection_layer": "codified",
       "$codified_note": "M01 的 `Whisper-Quiet`：原表正则要求 whisper 后接 quiet，但连字符形式 `Whisper-Quiet` 不匹配已列为关键词的 `whisper quiet`（空格版）。**连字符/空格不归一化**是原表的一处系统性缺陷。"
@@ -962,6 +1416,15 @@
         "effect": "manual_review → auto_pass"
       },
       "evidence_required": "suction_test",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-039",
+          "条文号": "S14-01",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:dd7f8f48d1beb66c"
+        }
+      ],
       "source_legacy": "M02",
       "detection_layer": "added",
       "$added_note": "原 M02 有 8 关键词 0 正则，本骨架补 2 条正则。",
@@ -1001,6 +1464,43 @@
         "effect": "none"
       },
       "evidence_required": "source_citation",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-003",
+          "条文号": "S1-03",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:951da5db85ac22c6"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-008",
+          "条文号": "S2-03",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:0e09267f3a198c3a"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-039",
+          "条文号": "S14-01",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:dd7f8f48d1beb66c"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-040",
+          "条文号": "S14-02",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:cea4fcd7cf55666e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-052",
+          "条文号": "S16-01",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:d980c1672772bf83"
+        }
+      ],
       "source_legacy": "M03 第一段",
       "detection_layer": "native",
       "$split_note": "★ 原 M03 同时管「有来源」与「无来源」两种数据声明，但**判定所需的证据不同**（前者要求出示来源，后者是兜底规则直接判红）。本骨架拆为 T2.3.1 / T2.3.2 两条。",
@@ -1037,6 +1537,85 @@
         "effect": "none"
       },
       "evidence_required": "claim_evidence_on_file",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-003",
+          "条文号": "S1-03",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:951da5db85ac22c6"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-008",
+          "条文号": "S2-03",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:0e09267f3a198c3a"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-010",
+          "条文号": "S2-05",
+          "链接": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+          "指纹": "sha256:a13ddd8ac79e8d1f"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-022",
+          "条文号": "S7-04",
+          "链接": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+          "指纹": "sha256:976027fa7f42de85"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-029",
+          "条文号": "S10-02",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:a163be077ab78643"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-039",
+          "条文号": "S14-01",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:dd7f8f48d1beb66c"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-042",
+          "条文号": "S14-04",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:0855f4ddd818a5ea"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-043",
+          "条文号": "S14-05",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:b8f54d592c521bcf"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-046",
+          "条文号": "S14-08",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:8605899f684bd932"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-052",
+          "条文号": "S16-01",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:d980c1672772bf83"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-059",
+          "条文号": "S17-01",
+          "链接": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+          "指纹": "sha256:7fcd5e5614bb2ea0"
+        }
+      ],
       "source_legacy": "M03 第二段",
       "detection_layer": "native"
     },
@@ -1071,6 +1650,43 @@
         "effect": "none"
       },
       "evidence_required": "none",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-011",
+          "条文号": "S3-01",
+          "链接": "https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ",
+          "指纹": "sha256:ae4640b2d42cad83"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-020",
+          "条文号": "S7-02",
+          "链接": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+          "指纹": "sha256:62d14ddcb9c2137e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-023",
+          "条文号": "S8-01",
+          "链接": "https://transparency.meta.com/policies/ad-standards/",
+          "指纹": "sha256:e4965e0e64283c9f"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-028",
+          "条文号": "S10-01",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:b26634f1b8611d7e"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-060",
+          "条文号": "S17-02",
+          "链接": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+          "指纹": "sha256:c7262b21ad19c40a"
+        }
+      ],
       "source_legacy": "M04 第一段",
       "detection_layer": "added",
       "$added_note": "原 M04 的 `don't miss` 只有一词，本骨架补 3 个词 + 1 条正则以覆盖「恐吓式」子类（原表的 11 个词全部是「限时/稀缺」类，**焦虑类实际无覆盖**）。"
@@ -1108,6 +1724,22 @@
         "effect": "none"
       },
       "evidence_required": "none",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-022",
+          "条文号": "S7-04",
+          "链接": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+          "指纹": "sha256:976027fa7f42de85"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-028",
+          "条文号": "S10-01",
+          "链接": "https://support.google.com/adspolicy/answer/6020955",
+          "指纹": "sha256:b26634f1b8611d7e"
+        }
+      ],
       "source_legacy": "M04 第二段",
       "detection_layer": "native",
       "$split_note": "★ 原 M04 把「焦虑」与「限时」压成一条，但**两者严重度不同** —— 促销紧迫性是行业常规（IAB/GARM 均不视为风险），制造焦虑才是。本骨架拆为 T8.1(L2) / T8.2(L1)。"
@@ -1152,6 +1784,36 @@
         "effect": "none"
       },
       "evidence_required": "consultant_engagement_contract",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-005",
+          "条文号": "S1-05",
+          "链接": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+          "指纹": "sha256:82b89427e61439d2"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-044",
+          "条文号": "S14-06",
+          "链接": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+          "指纹": "sha256:1cc5dbcfe3cf238d"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-047",
+          "条文号": "S15-01",
+          "链接": "https://www.gov.uk/guidance/advertise-your-medicines",
+          "指纹": "sha256:93d3c9f9e9387aa5"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-055",
+          "条文号": "S16-04",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:02cd20389595b84d"
+        }
+      ],
       "source_legacy": "U01",
       "detection_layer": "native",
       "$note": "U01 是唯一 15/15 全部可机械复现的规则 —— 因为它的关键词全部是**英文头衔**，没有小语种暴露。这个反例恰好印证了语种缺口的解释。"
@@ -1189,6 +1851,22 @@
         "effect": "none"
       },
       "evidence_required": "none",
+      "external_ref": [
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-011",
+          "条文号": "S3-01",
+          "链接": "https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ",
+          "指纹": "sha256:ae4640b2d42cad83"
+        },
+        {
+          "库名": "外部标准库",
+          "条目ID": "EXT-058",
+          "条文号": "S16-07",
+          "链接": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+          "指纹": "sha256:85e916485b696a14"
+        }
+      ],
       "source_legacy": "U04",
       "detection_layer": "native",
       "$escalation_note": "★ 原 U04 写着「与 goodbye/no more/not anymore/relieve 等消除性表述连用应升级 H01/H07」。**这条升级逻辑在原表里只是一句文字，无法执行。** 本骨架把它变成 escalation 块（见下）。这是设计文档 §2.2.1 「规则要从文档变成可执行」最具体的一处。",
@@ -1224,6 +1902,7 @@
         "effect": "none"
       },
       "evidence_required": "product_spec",
+      "no_external_basis": "本规则不引外部条款：它是 permit/topic_only 节点，不是禁止性规则，不产生命中",
       "source_legacy": "安全词白名单（26 词中的 22 个）",
       "detection_layer": "native",
       "$quarantined": {
@@ -1281,6 +1960,7 @@
         "effect": "none"
       },
       "evidence_required": "site_reimbursement_qualification",
+      "no_external_basis": "本规则不引外部条款：规则已停用（enabled=false），不产生命中",
       "source_legacy": "U02（现行表已停用）",
       "detection_layer": "native"
     }

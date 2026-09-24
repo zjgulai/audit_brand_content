@@ -75,8 +75,14 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > `PMO/` 下还有若干**本轮新写、尚未入库**的登记件
 > （`PMO/守衡-上游第三版基线与影响登记-20260922.md`、`PMO/守衡-假否定登记-20260922.md`、
 > `PMO/守衡-内容推送与被at登记-20260915至0922.md`、`PMO/守衡-回话草稿-M12材料逐条状态-20260922.md`、
-> `PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md`、`PMO/守衡-知识库构建完整方案-20260922.md`）。
+> `PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md`、`PMO/守衡-知识库构建完整方案-20260922.md`、
+> **`PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md`**、**`PMO/守衡-Utopia结合方案-20260923.md`**）。
 > 它们不在本 README 的**可达性口径**内 —— 那个口径只算已入库文件。列出来用 `git status --porcelain PMO/`。
+>
+> ★ **后两份是一对**，读的时候别只读一半：
+> 《知识库建设整体方案》是**骨架层**（以 PRD v1.2 的 S1–S5 五层为轴，把 D1–D6 与 T1–T16 挂进去），
+> 《Utopia 结合方案》是**它的技术判断来源**（为什么只借设计不部署、移植哪三条、不移植哪四条）。
+> 两份关系与「判据只有一处」的纪律写在骨架那份的 §〇。
 
 ### 调研与证据 · `research/`
 
@@ -90,6 +96,7 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 | [`research/distill/00-写作规范.md`](./research/distill/00-写作规范.md) → [`01-大纲.md`](./research/distill/01-大纲.md) → [`cross-cutting-findings.md`](./research/distill/cross-cutting-findings.md) | 竞品仓库拆解：写作规范 → 大纲 → 跨分片发现；分片在 `research/distill/shards/` |
 | [`research/replay/离线复现报告-20260916.md`](./research/replay/离线复现报告-20260916.md) | 离线复现报告 |
 | [`research/star-lists-audit-report.md`](./research/star-lists-audit-report.md) | star 清单审计 |
+| [`research/utopia/数据模型与规则机制.md`](./research/utopia/数据模型与规则机制.md) → [`运营面与接入成本.md`](./research/utopia/运营面与接入成本.md) | **`deeplethe/utopia` 的只读剖析**（v0.1.0，`dev@ef6495c`）：前者是数据模型 / 双时态 / 溯源链 / 推理与治理，后者是数据源 / 检索 / API / MCP / 部署 / 接入成本。**每条断言带 `文件:行`**；凡文档写着而代码里没有的单独标出。结论落在 `PMO/守衡-Utopia结合方案-20260923.md` |
 
 **不要求逐份挂入口的四类**（判据、份数、以及「这一类里到底有几份其实是有入边的」，
 都由 `python3 tools/verify_doc_reachability.py` 的分项表实时算出来，别从这份 README 抄数）：

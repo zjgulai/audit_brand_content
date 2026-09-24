@@ -619,6 +619,143 @@ head('L 发送链 · 降级链完整且不重复投递');
   } else ok('L5 形态决策只在发送层一处');
 }
 
+/* ─────────────── L6/L7 内核自己的文案也要过同一把尺 ─────────────── */
+head('L6/L7 内核文案 · 兜底话术不许被自己的检测器拦下 + 拒答的留证承诺要有执行点');
+{
+  // ★ 这两条守的是 2026-09-22 那次**真实事故**（上游在私聊里连问两次都没得到回答）。
+  //
+  //   链条：模型跑满 6 轮工具 → `agent.mjs` 的兜底话术把 `toolTrace` 里**所有**工具名
+  //   拼进正文（`run_readonly_command、run_readonly_command、…` ×19）
+  //   → `internalLeak` 判「连续三次同名工具」为故障 → `envelope.mjs` 降级成拒答
+  //   → 她收到「我这次没能把回答组织好」，问第二次，一模一样。
+  //
+  //   两处各自都是对的：话术想说「我查过但没查到」，检测器想拦「内部记录漏进正文」。
+  //   **合起来 100% 撞车** —— 这正是 §2.5「同一件事只能有一处判据」的反面：
+  //   内核产出文案、信封判定文案，两边各自为政，谁都不知道对方的约束。
+  //
+  //   所以这条断言的形状是：**把内核的产出真的喂给信封的那把尺**。
+  //   不是「源码里出现过 lintCopy」（那是 §2.4 里那个恒真的名字测试），
+  //   而是**真的调用一次**。
+  let fallbackReply = null;
+  try {
+    ({ fallbackReply } = await import(path.join(HERE, 'agent', 'agent.mjs')));
+  } catch (e) {
+    no('L6 能加载内核的兜底话术', `import agent/agent.mjs 失败：${e.message}`);
+  }
+
+  if (fallbackReply) {
+    // 真实形状：一次工具循环里同名工具会连出十几次（实测 19 次 run_readonly_command）。
+    const trace = [
+      ...Array.from({ length: 19 }, () => ({ tool: 'run_readonly_command', ok: true, ms: 40 })),
+      { tool: 'read_text_file', ok: true, ms: 1 },
+      { tool: 'run_readonly_command', ok: false, ms: 12 },
+    ];
+    const t = String(fallbackReply(trace) ?? '');
+
+    if (!t.trim()) no('L6 兜底话术非空', '拿到了空串 —— 对方会收到一条空回复');
+    else ok('L6 兜底话术非空');
+
+    const hits = lintCopy(t).filter((h) => h.level === 'error');
+    if (hits.length) {
+      no('L6 兜底话术过得了他自己的检测器',
+         `喂 20 次真实形状的工具调用后，被拦下：${hits.map((h) => `${h.id}×${h.count}`).join('、')}`
+         + `\n       —— 这句话术会被信封降级成拒答，对方等于没收到回答。原文：${JSON.stringify(t.slice(0, 120))}`);
+    } else ok('L6 兜底话术过得了他自己的检测器（喂 20 次真实形状的工具调用）');
+
+    // 三种形状都要过：一次没调、全成功、全失败。
+    for (const [name, sample] of [
+      ['空 trace（一次都没调）', []],
+      ['全成功', [{ tool: 'run_readonly_command', ok: true }, { tool: 'grep_workspace', ok: true }]],
+      ['全失败', [{ tool: 'run_readonly_command', ok: false }, { tool: 'run_readonly_command', ok: false }]],
+    ]) {
+      const s = String(fallbackReply(sample) ?? '');
+      const h = lintCopy(s).filter((x) => x.level === 'error');
+      if (!s.trim()) no(`L6 ${name} 非空`, '空串');
+      else if (h.length) no(`L6 ${name} 不被拦`, `命中 ${h.map((x) => x.id).join('、')}`);
+      else ok(`L6 ${name} 不被拦`);
+    }
+
+    // 反向对照：**旧话术必须被判红**。
+    // 没有这一条，上面那些绿都证明不了什么 —— 万一 lintCopy 今天对什么都闭嘴，
+    // 它们照样全绿（§2.4.1：一个从没红过的断言不算验证过它）。
+    const OLD = '我查了几轮还是没能得出可靠结论，先把已知的告诉你：'
+              + `我试过 ${trace.map((x) => x.tool).join('、')}，但信息不足。你能否补充一下具体要查什么？`;
+    const oldHits = lintCopy(OLD).filter((h) => h.id === 'internalLeak');
+    if (!oldHits.length) {
+      no('L6 反向对照：旧话术必须被拦',
+         '旧版那句（把工具名拼进正文）**没有**被 internalLeak 判红 —— '
+         + '那么这条断言证明不了它修的是真问题，检测器可能已经失效');
+    } else ok(`L6 反向对照成立：旧话术被 internalLeak 判红（×${oldHits[0].count}）`);
+  }
+
+  // L7 拒答话术说「原文留在 PMO/logs/dropped/」—— 那一行得真的存在。
+  // 2026-09-22 之前它是**假的**：话说出去了，盘上什么都没有。
+  //
+  // ★ 这一条的**第一版是错的，而且错成本节要防的那个形状**：它用
+  //   `envSrc.match(/PMO\/logs\/[\w\/.-]*/)` 从**源码文本**里抓路径 ——
+  //   抓到的是注释里那半句（`PMO/logs`），而且 daemon 那边匹配到了**第一条**
+  //   `path.join(LOG_DIR, …)`（那是早就存在的 `EVENT_DUMP`）。两侧都比错了地方，
+  //   而比较还因为「解析出来是空串」被静默跳过 → **印出一个绿**。
+  //   一个证明不了任何东西的绿，比红更糟（§2.4.1）。
+  //
+  //   现在两边都改成**能指出对象的读数**：
+  //     说的 —— 真的调一次 `toCardOrText()`，从**产出的话术**里取路径；
+  //     写的 —— 从 `dumpDropped` 的**函数体**里取，不看文件里别处。
+  const { toCardOrText } = await import(path.join(CARDS_DIR, 'envelope.mjs'));
+  const daemonSrc = fs.readFileSync(path.join(HERE, 'ws_daemon.mjs'), 'utf8');
+
+  // 造一段**一定会被判 internalLeak** 的纯文本，逼出那条拒答话术。
+  const LEAKY = '我试过 run_readonly_command、run_readonly_command、run_readonly_command，但信息不足。';
+  const refusal = toCardOrText(LEAKY);
+  if (!refusal.dropped || refusal.mode !== 'text') {
+    no('L7 能逼出拒答话术', `喂一段必被拦的文本，拿到的是 mode=${refusal.mode} dropped=${refusal.dropped} —— 后面的断言都无从谈起`);
+  } else ok('L7 能逼出拒答话术（喂 run_readonly_command ×3）');
+
+  const claimed = (refusal.text.match(/PMO\/logs\/[\w.-]+(?:\/[\w.-]+)*\/?/) ?? [])[0] ?? null;
+  if (!claimed) {
+    no('L7 拒答话术说得出留证位置',
+       `话术里没有落点路径，那「原文我留在…」就是一句没法核对的话。实际话术：${JSON.stringify(refusal.text)}`);
+  } else ok(`L7 拒答话术承诺的落点：${claimed}`);
+
+  // ① 执行点必须**接在 dropped 分支上**（不是别处随便调一次）
+  if (!/if \(shaped\.dropped\)\s*dumpDropped\(/.test(daemonSrc)) {
+    no('L7 留证有执行点', 'daemon 里没有 `if (shaped.dropped) dumpDropped(...)` —— '
+       + '那句「原文留在 PMO/logs」就是一句没有执行点的承诺（§2.4.2）');
+  } else ok('L7 留证接在 dropped 分支上');
+
+  // ② 从 `dumpDropped` **函数体**里取落点，不看文件里别处
+  const fnStart = daemonSrc.indexOf('function dumpDropped(');
+  if (fnStart < 0) no('L7 落盘函数存在', '找不到 dumpDropped');
+  else {
+    // 函数体到下一个顶层 `function`/`async function` 之前
+    const rest = daemonSrc.slice(fnStart);
+    const nextTop = rest.slice(1).search(/\n(?:async )?function\s/);
+    const body = nextTop > 0 ? rest.slice(0, nextTop + 1) : rest;
+
+    if (!/writeFileSync/.test(body)) no('L7 落盘函数真的写盘', 'dumpDropped 里没有 writeFileSync');
+    else ok('L7 dumpDropped 真的写盘');
+
+    const wroteDir = (body.match(/path\.join\(LOG_DIR,\s*'([\w.-]+)'\)/) ?? [])[1] ?? null;
+    if (!wroteDir) {
+      no('L7 取得到落盘目录', 'dumpDropped 函数体里找不到 `path.join(LOG_DIR, …)` —— 取不到就说不了「说的与写的同一处」');
+    } else {
+      const claimedDir = (claimed ?? '').replace(/^PMO\/logs\/?/, '').replace(/\/$/, '');
+      if (claimed && claimedDir !== wroteDir) {
+        no('L7 说的与写的同一处',
+           `话术说 PMO/logs/${claimedDir}，daemon 的 dumpDropped 写在 PMO/logs/${wroteDir} —— 两处会各自漂移`);
+      } else if (!claimed) {
+        no('L7 说的与写的同一处', '话术里没写落点，无从核对');
+      } else ok(`L7 说的与写的同一处（PMO/logs/${wroteDir}/）`);
+    }
+
+    // ③ 落盘目录必须真的能被日志引用出来 —— 对方按话术去找，找得到才算数
+    if (!/PMO\/logs\/dropped\//.test(body)) {
+      no('L7 日志里印出的是同一个落点', 'dumpDropped 打的日志行里没有 `PMO/logs/dropped/`，'
+         + '排查的人会去错的地方找');
+    } else ok('L7 日志里印出的是同一个落点');
+  }
+}
+
 /* ─────────────── N 附件 · 「按规矩不取」不许被说成「我读不到」 ─────────────── */
 head('N 附件 · 策略边界不许被说成能力边界');
 {

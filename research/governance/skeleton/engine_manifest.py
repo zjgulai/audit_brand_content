@@ -83,7 +83,18 @@ TREE_NODE_RE = re.compile(r"\*\*(T\d(?:\.\d){0,2})\*\*")
 #     code_version    = 代码（下面这 6 个文件）      → 对应 agent_version
 #   一个回执带两个，才答得了「谁、用哪版规则、跑哪版代码，判了什么」。
 CODE_FILES = ["matcher.py", "score.py", "judge.py", "vocab.py", "severity.py",
-              "engine_manifest.py"]
+              "engine_manifest.py",
+              # ★ T19（2026-09-23）：`evidence_origin.py` 决定**一条判定能不能到 PASS**
+              #   （`may_finalize_pass`）。它改一个字节，判定结果就可能不同 ——
+              #   所以它必须进代码指纹，否则「改了放行规矩但 code_version 没变」
+              #   会让 `--check` 说出「一切正常」。
+              "evidence_origin.py",
+              # ★ T4（2026-09-23）：`clause_ref.py` 决定回执里**引用了哪几条条款**
+              #   （`evidence_block()`）。它不改判定档位 —— 但它改**回执的证据链**，
+              #   而「谁、用哪版规则、跑哪版代码，判了什么」里的最后一问，
+              #   现在包含「依据《外部标准库》第 X 条」。它不进指纹的话，
+              #   同一个 code_version 会对应两种不同的引用集，而 `--check` 照样说正常。
+              "clause_ref.py"]
 
 # 上游快照台账：本地制品与飞书快照之间的声明式引用，不是证明。见模块 docstring。
 UPSTREAM_LATEST = HERE.parents[2] / "research" / "live" / "LATEST.json"

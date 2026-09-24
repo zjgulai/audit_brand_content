@@ -63,6 +63,7 @@
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 import { REPO_ROOT, stateDir, ensureDir } from './config.mjs';
@@ -174,10 +175,156 @@ export const loadPendingState = () => loadState(PENDING_STATE_FILE());
  * 而是「状态文件的键集合**恰好**在这张表里」—— 残留**由构造不可能**，不靠清理。
  * 两边各一张表，`--selftest` 里有一条断言它们互不越界。
  */
-const KEEP_BASELINE = ['lastState', 'saidDriftFp', 'saidUntestedDay'];
-const KEEP_PENDING = ['p_lastState', 'p_saidDueKey', 'p_saidDueDay', 'p_saidUntestedDay', 'p_saidBrokenDay'];
+const KEEP_BASELINE = ['lastState', 'saidDriftFp', 'saidUntestedDay', 'staleSince',
+                       // ★ 2026-09-22 加：**异常通报发到过哪个群** —— 见下面 `alertChat` 那段。
+                       'alertChat'];
+const KEEP_PENDING = ['p_lastState', 'p_saidDueKey', 'p_saidDueDay', 'p_saidUntestedDay', 'p_saidBrokenDay',
+                      'p_alertChat',
+                      // ★ 2026-09-22 加：**已经补问过的条目 id**。它挡的是「补问已经发进群、
+                      //   但清单里那条 `outbound` 指针还没补上」那个窗口 —— 没有它，
+                      //   同一个问题会在指针补上之前**每天**重发一次。
+                      //   真正的「每条只补一次」由清单自己保证（`ask_nags` 数指针条数），
+                      //   这个键只是第二把锁。**两把锁各挡一段，缺一段就会重复打扰一个真人。**
+                      'p_nagged'];
 const pick = (prev, keys) =>
   Object.fromEntries(keys.filter((k) => prev?.[k] !== undefined).map((k) => [k, prev[k]]));
+
+/**
+ * 基线状态文件的**完整**键集合（`KEEP_*` 是「跨次携带」的那几个，这里是全部）。
+ *
+ * 存在的理由有两个，都与「跳过」那条路径有关：
+ *   ① 跳过时只更新 `staleSince`，**其余键一个都不能丢** —— 需要一个明确的完整表，
+ *      而不是再写一次 `{ ...prev }`（那正是本文件开头点名要废掉的形状）；
+ *   ② `--selftest` 要能断言「键**恰好**在这张表里」。原先基线这一侧没有这条断言
+ *      （只有待收那一侧有），也就是**白名单纪律在基线文件上是没有执行点的** ——
+ *      §2.4 点名的那个病，这次是它自己。
+ */
+export const BASELINE_KEYS = [...KEEP_BASELINE, 'lastRunAt', 'lastDay', 'lastCode', 'rawCode'];
+
+/**
+ * ★★ `alertChat` / `p_alertChat` —— **通报带地址，收尾必须带同一个地址。**
+ *    （2026-09-22 加，代价是一次**生产运行**里露出来的真事故，不是构造的用例。）
+ *
+ * **事故原样**（`PMO/logs/ws_daemon.log` 2837 / 3013 行 + 外发台账）：
+ *
+ * ```
+ * 16:59:32  基线检查[link] 退 1  →  ⚠️ 上游 PRD 改版了…请给我一分钟重拉一次基线
+ *                                  发到 oc_49a7…（链接所在的那个群）
+ * 17:01:11  重拉索引、记新指纹（漂移已解决）
+ * 17:55:32  基线检查[startup] 退 0 → ✅ 上游基线检查恢复了
+ *                                  发到 oc_7775…（**另一个群**）
+ * ```
+ *
+ * 两个后果都对外，而且方向相反：
+ *   ① `oc_49a7…` 收到过「请给我一分钟重拉一次基线」，**永远收不到收尾** ——
+ *      那边至今挂着一条已经解决、且**请求过动作**的告警；
+ *   ② `oc_7775…` 从没收到过告警，却收到「恢复了」 —— 那条消息在那边的语境里是
+ *      **凭空出现的**（不知道恢复的是什么）。同一句话，在一个群是收尾，在另一个群是噪音。
+ *
+ * **根因一句话**：状态机记住了**说过什么**（`saidDriftFp`），没记住**对谁说的**。
+ * 告警的目标群不是告警状态的一部分 —— 于是「说一次」和「收尾」落在了两个群上。
+ *
+ * 为什么两个群会不一样：`baselineWatch` 的目标是 `chatId ?? resolveChat()`，
+ * 而 `chatId` **只有 `[link]` 触发才有**（= 链接所在的那个群）；
+ * `resolveChat()` 读的是 `saveChatId` 存下的「**最近来过消息的群**」
+ * —— 16:59 与 17:55 之间群里正常问答过，那个值已经翻页了。
+ * 也就是说：**触发源不同 → 目标群不同**，而收尾走的是与告警无关的另一条解析路径。
+ *
+ * **规矩**（与 §2.4.3「说出去的话要有落点」同一条，落在「地址」这一维上）：
+ *   **凡是分支里产出了对外通报，就把通报去的那个群记进状态；
+ *     凡是产出了收尾，就回到那个群，并把它清空。**
+ * 判据落成两个字段，而不是两处 `??` 兜底：
+ *   · 说 `say` 的分支 → `alertChat: now.chatId ?? null`；
+ *   · 收尾分支（从异常回到绿）→ `sayTo: prev.alertChat ?? null` + `alertChat: null`。
+ *
+ * ⚠️ **`sayTo` 为 null 表示「当初没通报过」，不是「发到默认群」** —— 调用方仍然退回
+ *    `resolveChat()`。这条区分是故意的：**不许凭空给一个群发一句它没见过的收尾**
+ *    （正是 17:55 那次干的事）。反向对照里有一条专门守着它。
+ *
+ * 这条与 §2.4.6 是**一对**：那条修的是「跳过之后没人补跑」（**时间**维），
+ * 这条修的是「补跑出来之后，话说给了另一个群」（**地址**维）。
+ * 同一个「触发路径不同 → 结果不同」的形状，长在两个不同的维度上。
+ */
+
+/**
+ * 通报：记下「这次话说给了哪个群」。**所有产出 `say` 的分支都要把它展开进 `state`** ——
+ * 少一处，那一支的收尾就会发错群，而且**没有任何东西会红**（与事故本身同一个形状）。
+ *
+ * 键名参数化（基线用 `alertChat`、待收用 `p_alertChat`），但**实现只有这一处** ——
+ * §2.5：两处各写一遍同一个判断，就是「内核按 A 想、发送层按 B 发」那个病的温床。
+ */
+const saidTo = (now, key = 'alertChat') => ({ [key]: now.chatId ?? null });
+
+/** 收尾的目标群：**当初通报去的那个**；从没通报过就是 null（不许凭空指一个群）。 */
+const closeTo = (prev, key = 'alertChat') => prev?.[key] ?? null;
+
+/**
+ * ★ **这条告警到底发到哪个群** —— 三个来源的优先级，只在这里判一次。
+ *
+ * 为什么单独拆出来：这条优先级原先**只活在 `ws_daemon.mjs` 的一行表达式里**
+ * （`chatId ?? await resolveChat()`），所以状态机那一侧 75 条断言全绿，
+ * 也照样能把收尾发到另一个群 —— 事故就发生在这一跳上。
+ * 拆成纯函数之后，「`sayTo` 优先于触发群」这件事才有了一条**能红的判据**
+ * （§2.4：写进文档的每条规矩，都要指得出是哪一行在拦它）。
+ *
+ * `null` 的语义是**「没有依据」**，不是「发到默认群」—— 三个都是 null 时返回 null，
+ * 由调用方决定「只进日志」（那句日志是「有话要说但没群可发」，退 2 不许沉默）。
+ *
+ * ⚠️ 第一版我把这条写成了「`sayTo` 必须在 `ws_daemon` 里被用到」的**源码文本断言** ——
+ *    那是 §2.4 点名的假执行点（`MAX_SECTIONS` 那个病：名字出现过 ≠ 拦得住）。
+ *    能红的判据必须**调用它**，所以它在这儿，不在扫描器里。
+ */
+export function pickAlertTarget({ sayTo = null, triggerChat = null, fallback = null } = {}) {
+  return sayTo ?? triggerChat ?? fallback ?? null;
+}
+
+/**
+ * ★ `recheckDue()` —— 「这次读数被跳过了，什么时候把它补回来」。
+ *
+ * ── 为什么需要它（2026-09-22 实测，`PMO/守衡-误答登记-20260922.md` §十三）
+ *
+ * `runCheckNow` 在冷却期内的行为是 `return { skipped }`，调用方 `log` 完就 `return`。
+ * **冷却是「跳过」，不是「重排」** —— 没有任何一行在冷却过期后把那次检查补回来。
+ * 于是实测出来的时间线是：
+ *
+ * ```
+ * 16:59:32  基线检查跑了 → 退 1，发现上游改版，群里已告警
+ * 17:17:10  重启 → 启动即核被冷却跳过（18 分钟 < 30）
+ * 17:22:33  又重启 → 同样被跳过（23 分钟 < 30）
+ * 17:29:32  冷却**到期** —— 而这一时刻**没有任何一行代码在看它**
+ * 次日 00:00   换日兜底才会跑
+ * ```
+ *
+ * 两个后果，第二个更坏：
+ *   ① 漂移的发现窗口被一次重启撑到约 **24 小时**；
+ *   ② 这期间状态文件一直写着 `lastState: "drift"`，**而基线其实早已重记、全绿** ——
+ *      它停在 `drift` 不是因为它还是 drift，**是没有东西去更新它**。
+ *
+ * ── 判据（三条，每条都对应一条自证）
+ *
+ * 补跑的**唯一**依据是「这个进程里确实跳过了一次，而冷却现在允许了」：
+ *
+ *   · `staleSince` 为空 → **不补**。否则这就退化成「每 30 分钟轮询一次」——
+ *     那是把一个发现窗口问题换成一个抓取风暴问题，且与本检查的设计意图相反
+ *     （它只在 启动 / 收到链接 / 换日 三处触发）；
+ *   · 冷却未过 → **不补**（补了也会被自己再跳过，白跑）；
+ *   · 两者都满足 → **补**，补完 `enter()` 会把 `staleSince` 清空。
+ *
+ * ★ 它是**纯函数**：`t` 可注入，所以「冷却前 / 冷却后」两侧都能在自证里造出来，
+ *   而不必等 30 分钟。判据在 `prd_baseline.mjs`（这一层），
+ *   **谁在跑它在 `ws_daemon.mjs` 的心跳里** —— `AGENTS.md` §2.4.2 那两层，缺一层都不算兑现。
+ *
+ * @param {object} prev 状态文件
+ * @param {number} t    当前时刻（注入用）
+ * @returns {string|null} null = 不必补跑；字符串 = 补跑的理由（进日志）
+ */
+export function recheckDue(prev, t = Date.now()) {
+  if (!prev?.staleSince) return null;                       // 没跳过 → 不补（否则成了轮询）
+  const last = prev.lastRunAt ? Date.parse(prev.lastRunAt) : 0;
+  const left = COOLDOWN_MS - (t - last);
+  if (left > 0) return null;                                // 冷却未过 → 补了也是白跑
+  return `上次读数停在 ${prev.lastRunAt}，自 ${prev.staleSince} 起被跳过、冷却已过`;
+}
 
 /**
  * 状态迁移：给定「上次说过什么」和「这次读到什么」，返回「该不该说、说什么」。
@@ -195,7 +342,14 @@ export function enter(prev, now) {
   //   第一版没有这一行，137 会一路落到末尾的绿分支 —— 那正是这个检查器要防的病。
   const code = [0, 1, 2].includes(now.code) ? now.code : 2;
   const day = now.day;
-  const st = { ...pick(prev, KEEP_BASELINE), lastRunAt: new Date().toISOString(), lastDay: day, lastCode: code, rawCode: now.code };
+  const st = {
+    ...pick(prev, KEEP_BASELINE),
+    lastRunAt: new Date().toISOString(), lastDay: day, lastCode: code, rawCode: now.code,
+    // ★ **真的跑过一次，就把「这份读数已经过期」的标记清掉**（2026-09-22 加）。
+    //   必须写在展开**之后** —— 展开会把 `prev.staleSince` 带进来，写在前面等于没清。
+    //   清不掉的话 `recheckDue()` 会永远为真，心跳就会变成每拍补跑一次。
+    staleSince: null,
+  };
 
   if (code === 1 && now.drifted.length) {
     // 同一个漂移指纹只说一次；指纹变了（又改了一版）就再说。
@@ -206,7 +360,7 @@ export function enter(prev, now) {
     const lines = now.drifted.map((d) =>
       `· **${d.file}**\n  旧指纹 \`${String(d.old).slice(0, 16)}…\` → 新指纹 \`${String(d.now).slice(0, 16)}…\``);
     return {
-      state: { ...st, lastState: 'drift', saidDriftFp: fp },
+      state: { ...st, lastState: 'drift', saidDriftFp: fp, ...saidTo(now) },
       why: '上游改版了（这是本检查存在的理由）',
       say: [
         `⚠️ **上游 PRD 改版了** —— 我手上那份基线已经过期。`,
@@ -222,7 +376,7 @@ export function enter(prev, now) {
       return { state: { ...st, lastState: 'untested' }, say: null, why: '今天的「未测」已经说过一次' };
     }
     return {
-      state: { ...st, lastState: 'untested', saidUntestedDay: day },
+      state: { ...st, lastState: 'untested', saidUntestedDay: day, ...saidTo(now) },
       why: '没测成 —— 报「未测」，不报「没问题」',
       say: [
         `⚠️ **上游基线检查这次没跑成**（拿不到正文或凭据）。`,
@@ -235,12 +389,16 @@ export function enter(prev, now) {
   // 退 0：只在上一次是红/未测时说一句"恢复了"，否则闭嘴。
   if (prev.lastState === 'drift' || prev.lastState === 'untested') {
     return {
-      state: { ...st, lastState: 'ok', saidDriftFp: null },
+      state: { ...st, lastState: 'ok', saidDriftFp: null, alertChat: null },
+      // ★ **收尾回到当初通报去的那个群**（`alertChat`）—— 不是 `resolveChat()`。
+      //   null = 当初没通报过，调用方仍退回默认群；那时说「恢复」本来就是错的，
+      //   所以这一支也**不会**被走到（`lastState` 不是红/未测）。
+      sayTo: closeTo(prev),
       why: '从红/未测恢复 —— 群里之前看到过异常，得看到它结束',
       say: `✅ 上游基线检查恢复了：手上那份 PRD 与指纹一致。`,
     };
   }
-  return { state: { ...st, lastState: 'ok', saidDriftFp: null }, say: null, why: '一直是绿的，不刷屏' };
+  return { state: { ...st, lastState: 'ok', saidDriftFp: null, alertChat: null }, say: null, why: '一直是绿的，不刷屏' };
 }
 
 /* ─────────────────────── 执行 ─────────────────────── */
@@ -350,7 +508,7 @@ export async function checkNow(opts = {}) {
 }
 
 async function runCheckNow({ reason = 'daily', force = false, day = bjDate(), run = runChecker,
-                            dryRun = false, stateFile = null } = {}) {
+                            dryRun = false, stateFile = null, chatId = null } = {}) {
   // ★ `stateFile` 可注入：存在的理由是**自证** —— `--selftest` 要能证明
   //   「`dryRun` 下真的一个字节都没落盘」，而这句话只有在能指定文件时才证得了。
   //   默认仍是那份真状态文件，生产路径不受影响。
@@ -358,13 +516,39 @@ async function runCheckNow({ reason = 'daily', force = false, day = bjDate(), ru
   const prev = loadState(file);
   const last = prev.lastRunAt ? Date.parse(prev.lastRunAt) : 0;
   if (!force && Date.now() - last < COOLDOWN_MS) {
-    return { skipped: `冷却中（上次 ${prev.lastRunAt}，不足 ${COOLDOWN_MS / 60000} 分钟）` };
+    /**
+     * ★ **跳过要留痕**（2026-09-22 加，`PMO/守衡-误答登记-20260922.md` §十三）。
+     *
+     * 原先这一支只有 `return` —— 于是「这次没查」在盘上**一个字都没有**，
+     * 而状态文件里的 `lastState` 继续以「最新读数」的身份示人。
+     * 实测后果：一次落在冷却窗口里的重启，让 `lastState: "drift"` 在基线早已转绿之后
+     * **又挂了 6.5 小时**，而任何读这个文件的人都会得到「它还是漂移的」这个错误结论。
+     *
+     * 现在记两件事，缺一件都不算修好：
+     *   ① `staleSince` —— **第一次**跳过发生的时刻（重复跳过不刷新它，
+     *      否则「过期了多久」会被自己的心跳一直顶到现在，读数又变成假的）；
+     *   ② 它同时是 `recheckDue()` 的**唯一**依据 —— 判据（B）与触发（A）共用一处，
+     *      `AGENTS.md` §2.5「同一个形状只能有一处实现」。
+     *
+     * ⚠️ `dryRun` 下**一个字节都不许落盘**（§2.4.4）—— 这条路径同样是自证会走到的。
+     */
+    const staleSince = prev.staleSince ?? new Date().toISOString();
+    if (!dryRun && staleSince !== prev.staleSince) {
+      saveState({ ...pick(prev, BASELINE_KEYS), staleSince }, file);
+    }
+    return {
+      skipped: `冷却中（上次 ${prev.lastRunAt}，不足 ${COOLDOWN_MS / 60000} 分钟）`,
+      staleSince,
+    };
   }
 
   const { code, out, note } = await run({});
   const now = {
     code,
     day,
+    // ★ `chatId` ＝ **这次通报会发到哪个群**（调用方在跑之前就定下来，见 `baselineWatch`）。
+    //   它是 `alertChat` 的来源，也是「收尾必须回到同一个群」的唯一依据。
+    chatId,
     drifted: code === 1 ? parseDrift(out) : [],
     untested: code === 2 ? parseUntested(out) : [],
   };
@@ -372,7 +556,7 @@ async function runCheckNow({ reason = 'daily', force = false, day = bjDate(), ru
   if (code === 1 && !now.drifted.length) {
     now.drifted = [{ file: '（输出里没抠到具体文件，见 PMO/logs）', old: '', now: '' }];
   }
-  const { state, say, why } = enter(prev, now);
+  const { state, say, why, sayTo } = enter(prev, now);
   /**
    * ★ `dryRun` 时必须**一个字节都不落盘**。（2026-09-22 加的，代价是一次实测）
    *
@@ -397,7 +581,7 @@ async function runCheckNow({ reason = 'daily', force = false, day = bjDate(), ru
    * 判据（§2.4）：写进文档的每条命令，都要能指出它会不会改状态；指不出来就别写。
    */
   if (!dryRun) saveState(state, file);
-  return { code, note, say, why, reason, out, ...(dryRun ? { dryRun: '注入/自证 —— 未落状态' } : {}) };
+  return { code, note, say, why, sayTo: sayTo ?? null, reason, out, ...(dryRun ? { dryRun: '注入/自证 —— 未落状态' } : {}) };
 }
 
 /* ─────────────────── 待收清单：到期提醒（`PMO/待收清单-v1.json`） ─────────────────── */
@@ -450,6 +634,46 @@ export function enterPending(prev, now) {
   const struct = now.structErrors ?? [];
   const st = { ...pick(prev, KEEP_PENDING), p_lastRunAt: new Date().toISOString(), p_lastDay: day, p_lastCode: code, p_rawCode: now.code };
 
+  /* ── ★ F 段：问出去两个工作日了还没回 → 补问一次（2026-09-22 加） ────────────
+   *
+   * 为什么单独一支、而且**不挂在 `code` 上**：`verify_pending.py` 的 F 段刻意不折进退出码
+   * —— 「问了还没回」既不是「清单坏了」（1）也不是「没读成」（2）。把它塞进任何一支，
+   * 那一支的话术就会去冒充它（§2.4.3：说出去的话比依据大）。
+   *
+   * ★ **每条只补一次**，而且是**结构上**只补一次：判据是清单里那条 `outbound` 指针
+   *   **恰好一条**（见 `ask_nags` 的 ②）。补问发出去、指针补进清单之后，这条就再也不进表。
+   *   状态里的 `p_nagged` 只挡「已经发进群、指针还没补上」那个窗口。
+   *   **两把锁各挡一段 —— 缺一把，同一个问题就会每天重发一次，而对方是个真人。**
+   *
+   * 一条已知的取舍：补问和「到期提醒」撞在同一天时，只有补问这一条会发出去，
+   * 到期那批会顺延到下一次检查（并在这里报个数，不至于被吞掉）。
+   * 两边都是每天最多说一次，所以顺延的代价是一天，不是丢失。
+   */
+  const nag = now.nag ?? [];
+  if (nag.length) {
+    const seen = new Set(prev.p_nagged ?? []);
+    const fresh = nag.filter((n) => n?.id && !seen.has(n.id));
+    if (!fresh.length) {
+      return { state: { ...st, p_lastState: 'nag' }, say: null, why: '这几条都已经补问过了' };
+    }
+    return {
+      state: { ...st, p_lastState: 'nag', p_nagged: [...seen, ...fresh.map((n) => n.id)], ...saidTo(now, 'p_alertChat') },
+      why: `${fresh.length} 件问出去两个工作日了还没回`,
+      say: [
+        `⏳ **有 ${fresh.length} 件先前问过、还没收到答复的，我补问一次** —— 各只补这一次，之后不再提。`,
+        ...fresh.slice(0, 5).map((n) => [
+          `· **${n.事项}** —— ${n.问于} 问的，已过 ${n.工作日} 个工作日`,
+          // 去掉 markdown 记号：quote 是**逐字**存的，带 `**` 原样发出去会缺配对
+          n.问题 ? `  我问的是：「${String(n.问题).replace(/[*`]/g, '')}」` : null,
+        ].filter(Boolean).join('\n')),
+        fresh.length > 5 ? `· …另有 ${fresh.length - 5} 条，见 \`python3 tools/verify_pending.py\`` : null,
+        (now.overdue ?? []).length
+          ? `⚠️ 同时还有 ${now.overdue.length} 件到期未收 —— 下一次待收检查会单独提。` : null,
+        `**不用现在回。** 你要是有别的优先级，直接说一句，我把这条关掉。`,
+      ].filter(Boolean).join('\n'),
+    };
+  }
+
   if (code === 1 && (now.overdue ?? []).length) {
     const key = now.overdue.map((o) => `${o.id}@${o.到期日}`).sort().join('|');
     if (prev.p_saidDueKey === key && prev.p_saidDueDay === day) {
@@ -466,7 +690,7 @@ export function enterPending(prev, now) {
       ].filter(Boolean).join('\n');
     });
     return {
-      state: { ...st, p_lastState: 'due', p_saidDueKey: key, p_saidDueDay: day },
+      state: { ...st, p_lastState: 'due', p_saidDueKey: key, p_saidDueDay: day, ...saidTo(now, 'p_alertChat') },
       why: `待收清单有 ${now.overdue.length} 件到期未收`,
       say: [
         `⏳ **上游有承诺到期了，还没收到**（${now.overdue.length} 件）`,
@@ -481,7 +705,9 @@ export function enterPending(prev, now) {
   /**
    * ★ **退 1 但明细为空 = 清单自己坏了，不是「没有到期」。**（2026-09-22 修）
    *
-   * `tools/verify_pending.py:275` 是 `code = 1 if (struct or od) else 0` ——
+   * `tools/verify_pending.py` 的 `judge()` 里是 `code = 1 if (struct or od) else 0` ——
+   * （原先这里写的是行号 `:275`。2026-09-22 同一个文件加了 D/E 两段判据、插进一百多行，
+   *   那个行号当场指到了别处。§2.2 第 1 条：**指不准就别写数字**，改成函数名。）
    * **退 1 有两个来源**，到期明细（`od`）只是其中一个。另一个是结构错误
    * （id 重复 / 缺原话 / 指针指不到上游原话…）。
    *
@@ -498,7 +724,7 @@ export function enterPending(prev, now) {
       return { state: { ...st, p_lastState: 'broken' }, say: null, why: '今天的「清单坏了」已经说过一次' };
     }
     return {
-      state: { ...st, p_lastState: 'broken', p_saidBrokenDay: day },
+      state: { ...st, p_lastState: 'broken', p_saidBrokenDay: day, ...saidTo(now, 'p_alertChat') },
       why: `退 1 但到期明细为空 —— 清单结构有 ${struct.length} 处错误`,
       say: [
         `⏳ **待收清单这次读出来是坏的** —— 退 1，但**一条到期明细都没给出**。`,
@@ -515,7 +741,7 @@ export function enterPending(prev, now) {
       return { state: { ...st, p_lastState: 'untested' }, say: null, why: '今天的「未测」已经说过一次' };
     }
     return {
-      state: { ...st, p_lastState: 'untested', p_saidUntestedDay: day },
+      state: { ...st, p_lastState: 'untested', p_saidUntestedDay: day, ...saidTo(now, 'p_alertChat') },
       why: '没读成 —— 报「未测」，不报「没有待收」',
       say: [
         `⚠️ **待收清单这次没读成**${now.reason ? `（${now.reason}）` : ''}。`,
@@ -532,12 +758,15 @@ export function enterPending(prev, now) {
       // ★ 两个去重键都要清：`p_saidDueKey` 清了，`p_saidBrokenDay` 也必须清 ——
       //   否则「坏了 → 修好 → 当天又坏了」会因为是同一天而被吞掉，
       //   而这次坏是**修好之后新发生的**，不是「今天已经说过的那一次」。
-      state: { ...st, p_lastState: 'ok', p_saidDueKey: null, p_saidBrokenDay: null },
+      state: { ...st, p_lastState: 'ok', p_saidDueKey: null, p_saidBrokenDay: null, p_alertChat: null },
+      // ★ 收尾回到当初通报去的那个群（同基线上方那段）—— 2026-10-02 那条到期提醒就是这个形状，
+      //   而它的收尾如果发到另一个群，那边的人会看到一句「现在没有到期未收」而不知道在说什么。
+      sayTo: closeTo(prev, 'p_alertChat'),
       why: '从到期/未测/清单坏了 恢复 —— 群里之前看到过异常，得看到它结束',
       say: `✅ 待收清单：现在没有到期未收。`,
     };
   }
-  return { state: { ...st, p_lastState: 'ok' }, say: null, why: '没有到期未收，不刷屏' };
+  return { state: { ...st, p_lastState: 'ok', p_alertChat: null }, say: null, why: '没有到期未收，不刷屏' };
 }
 
 /** 触发一次待收检查（含换日去重）。与 `checkNow` 同一条单飞纪律，理由见那里。 */
@@ -547,7 +776,8 @@ export async function checkPending(opts = {}) {
   try { return await pendingInFlight; } finally { pendingInFlight = null; }
 }
 
-async function runCheckPending({ reason = 'daily', force = false, day = null, today = null, run = runPendingChecker } = {}) {
+async function runCheckPending({ reason = 'daily', force = false, day = null, today = null, run = runPendingChecker,
+                                chatId = null } = {}) {
   const prev = loadPendingState();
   const D = day ?? today ?? bjDate();
   if (!force && prev.p_lastDay === D) {
@@ -557,19 +787,26 @@ async function runCheckPending({ reason = 'daily', force = false, day = null, to
   const now = {
     code,
     day: D,
+    // ★ 同 `runCheckNow`：这次通报会发到哪个群（`p_alertChat` 的来源）。
+    chatId,
     overdue: data?.overdue ?? [],
     // ★ 结构错误要一起带下去：`verify_pending.py` 的退 1 **有两个来源**（`struct or od`），
     //   只带 `overdue` 的话，「清单坏了但一条到期都没有」在状态机眼里和「没有问题」一样。
     structErrors: data?.struct_errors ?? [],
+    // ★ F 段（2026-09-22 加）：`verify_pending.py` 算好的「问出去两个工作日了还没回」那批。
+    //   它**不在退出码里**（那是刻意的，见 verify_pending.py 的 F 段注释）：读不出清单时
+    //   `data` 是 null → 这里是空数组 → 落到下面 code===2 那一支说「没读成」。
+    //   **没测到不许被说成「没有要补问的」。**
+    nag: data?.nag ?? [],
     reason: data?.reason ?? note ?? '',
   };
-  const { state, say, why } = enterPending(prev, now);
+  const { state, say, why, sayTo } = enterPending(prev, now);
   // ★ `today` 被注入时**不落状态** —— 那是一次「看一遍」，不是一次真跑。
   //   落了会很阴：state 里记下「10-03 已经说过」之后，**真正的 10-03 到了反而会闭嘴**，
   //   而群里什么都没收到。一次查看不该改掉将来要发生的事。
-  if (today) return { code, note, say, why, reason, overdue: now.overdue, dryRun: `注入日 ${today} —— 未落状态` };
+  if (today) return { code, note, say, why, sayTo: sayTo ?? null, reason, overdue: now.overdue, dryRun: `注入日 ${today} —— 未落状态` };
   saveState(state, PENDING_STATE_FILE());
-  return { code, note, say, why, reason, overdue: now.overdue };
+  return { code, note, say, why, sayTo: sayTo ?? null, reason, overdue: now.overdue };
 }
 
 /* ─────────────────────── 反向对照（离线，不动盘不联网） ─────────────────────── */
@@ -580,6 +817,8 @@ async function runCheckPending({ reason = 'daily', force = false, day = null, to
  */
 export async function selftest() {
   const D = '2026-09-21';
+  /** 注入用的「现在」。`recheckDue()` 是纯函数且 `t` 可注入 —— 所以「冷却前/后」两侧都造得出来，不必真等 30 分钟。 */
+  const T0 = Date.parse('2026-09-22T09:30:00.000Z');
   const drift = (fp) => ({ code: 1, day: D, untested: [], drifted: [{ file: 'A.md', old: 'a'.repeat(64), now: fp }] });
   /** 待收清单的假样本：n 件到期未收（用的是 P-03 的真实字段形状） */
   const pdue = (n) => ({
@@ -590,6 +829,17 @@ export async function selftest() {
     })),
   });
   const dueKey = (n) => Array.from({ length: n }, (_, i) => `P-0${i + 1}@2026-10-02`).sort().join('|');
+  /** F 段的假样本：n 件「问出去两个工作日了还没回」。
+   *  字段形状照抄 `tools/verify_pending.py` 的 `ask_nags()` —— **两处形状必须一致**，
+   *  这里抄错一个键名，测出来的就是另一个东西而它照样全绿。 */
+  const pnag = (n) => ({
+    code: 0, day: D, overdue: [], structErrors: [],
+    nag: Array.from({ length: n }, (_, i) => ({
+      id: `P-0${i + 1}`, 事项: '法务侧「谁来确认 62 条外部标准、大概多久」这个口径',
+      问于: '2026-09-17', 工作日: 2,
+      问题: '顺带把 15:42 问的那句定掉：**确认人是谁、大概多久**。',
+    })),
+  });
   const cases = [
     ['绿 → 绿：不许刷屏', () => enter({ lastState: 'ok' }, { code: 0, day: D, drifted: [], untested: [] }).say === null],
     ['第一次漂移 → **必须说**', () => typeof enter({ lastState: 'ok' }, drift('b'.repeat(64))).say === 'string'],
@@ -616,6 +866,57 @@ export async function selftest() {
     ['从漂移回到绿 → **必须说**（群里看到过异常，得看到它结束）',
       () => typeof enter({ lastState: 'drift' }, { code: 0, day: D, drifted: [], untested: [] }).say === 'string'],
     ['从未测回到绿 → **必须说**', () => typeof enter({ lastState: 'untested' }, { code: 0, day: D, drifted: [], untested: [] }).say === 'string'],
+
+    /* ── ★★ 通报带地址，收尾必须带同一个地址（2026-09-22；事故见上面 `alertChat` 那段）────
+     *
+     * 这四条是**一对正反面 × 两个维度**，与前面「跳过/补跑」那组同一写法：
+     *   · 通报时不许不记地址（否则收尾无处可回 —— 就是本次事故）；
+     *   · 从没通报过时不许凭空指一个群（否则再造一次「往没收到过告警的群发收尾」）；
+     *   · 重复触发（闭嘴那支）不许把已记的地址抹掉；
+     *   · 收尾之后必须清空（否则下一次恢复又发回一个早已无关的群）。
+     */
+    ['★★ 漂移通报在 A 群 → 恢复通知的 `sayTo` **必须还是 A 群**（本次事故的直接判据）',
+      () => { const A = 'oc_49a7cfb2861cffa4365ca8491f398d32';
+              const d = enter({ lastState: 'ok' }, { ...drift('e'.repeat(64)), chatId: A });
+              if (d.state.alertChat !== A) return false;                       // 通报必须记下地址
+              const back = enter(d.state, { code: 0, day: D, drifted: [], untested: [], chatId: null });
+              return back.say !== null && back.sayTo === A; }],                 // 收尾必须回到 A
+    ['★ 反向对照：从没通报过（没有 `alertChat`）→ 收尾的 `sayTo` 必须是 null，**不许凭空指一个群**',
+      // 这一条正是 17:55 那次干的事：`oc_7775…` 从没收到过告警，却收到一句「✅ 恢复了」。
+      // `sayTo === null` 让调用方退回 `resolveChat()`；而 `lastState` 不是红/未测时
+      // 这一支根本不会被走到 —— 两道门都不许把它放过去。
+      () => { const back = enter({ lastState: 'drift' }, { code: 0, day: D, drifted: [], untested: [], chatId: 'oc_x' });
+              return back.sayTo === null; }],
+    ['★ 反向对照：同一个漂移指纹再说一次（闭嘴那支）→ **不许把已记的地址抹掉**',
+      // 真实形状：18:23 与 18:24 那两次 link 触发都落在冷却里，复跑一次就会走这一支。
+      // 抹掉它，收尾就又没了地址 —— 与本次事故同一个后果，只是换了条路径进来。
+      () => { const A = 'oc_A', fp = 'f'.repeat(64);
+              const first = enter({ lastState: 'ok' }, { ...drift(fp), chatId: A });
+              const again = enter(first.state, { ...drift(fp), chatId: 'oc_别的群' });
+              return again.say === null && again.state.alertChat === A; }],
+    ['★ 收尾之后 `alertChat` 必须清空（否则下一次恢复又发回一个早已无关的群）',
+      () => { const back = enter({ lastState: 'drift', alertChat: 'oc_A' },
+                                 { code: 0, day: D, drifted: [], untested: [], chatId: null });
+              return back.state.alertChat === null; }],
+    ['★ 未测通报也带地址（与漂移同一条规矩，少一处就等于那一支的收尾丢了地址）',
+      () => { const r = enter({ lastState: 'ok' }, { code: 2, day: D, drifted: [], untested: ['A.md'], chatId: 'oc_B' });
+              return r.say !== null && r.state.alertChat === 'oc_B'; }],
+    ['★ 待收：同一个形状 —— 到期提醒在 B 群 → 收尾的 `sayTo` 必须是 B 群',
+      () => { const B = 'oc_49a7cfb2861cffa4365ca8491f398d32';
+              const due = enterPending({ p_lastState: 'ok' }, { ...pdue(1), chatId: B });
+              if (due.state.p_alertChat !== B) return false;
+              const back = enterPending(due.state, { code: 0, day: D, overdue: [], chatId: null });
+              return back.say !== null && back.sayTo === B; }],
+    ['★ 待收反向对照：从没通报过 → 收尾的 `sayTo` 必须是 null（上面那条不是恒真）',
+      () => enterPending({ p_lastState: 'due' }, { code: 0, day: D, overdue: [], chatId: 'oc_x' }).sayTo === null],
+
+    /* ── ★ 地址优先级（`pickAlertTarget`）：事故就发生在这一跳上，而它原先没有判据 ── */
+    ['★★ 收尾地址**优先于**触发群与默认群（`sayTo` 是谁就用谁 —— 本次事故那一跳）',
+      () => pickAlertTarget({ sayTo: 'oc_A', triggerChat: 'oc_别的群', fallback: 'oc_默认群' }) === 'oc_A'],
+    ['没有收尾地址时，退回**触发群**（`[link]` 那次告警就该发在链接所在的群）',
+      () => pickAlertTarget({ sayTo: null, triggerChat: 'oc_链接那个群', fallback: 'oc_默认群' }) === 'oc_链接那个群'],
+    ['★ 反向对照：三个都没有 → 必须是 null（**不许**悄悄挑一个群 —— 那正是「往没收到过告警的群发收尾」）',
+      () => pickAlertTarget({}) === null && pickAlertTarget({ sayTo: null, triggerChat: null, fallback: null }) === null],
     ['漂移也算一种「说过」：进入 drift 后 lastState 必须是 drift',
       () => enter({}, drift('d'.repeat(64))).state.lastState === 'drift'],
     ['★ 不认识的退出码（137 被杀）→ 必须落进 untested，**不许当绿**',
@@ -676,6 +977,42 @@ export async function selftest() {
       () => { const s = enterPending({ p_lastState: 'ok', 陈年残留: 1, lastCode: 7 }, { code: 0, day: D, overdue: [] }).state;
               return !('陈年残留' in s) && !('lastCode' in s) && s.p_lastState === 'ok'; }],
 
+    /* ── ★ 跳过留痕 + 补跑判据（2026-09-22；§十三 那 6.5 小时的直接修法）────────
+     *
+     * 这四条是**一对正反面 × 两个维度**，缺任何一条都会有一个方向是恒真的：
+     *   · 该补跑时必须补（否则洞还在）；
+     *   · 不该补跑时必须闭嘴（否则退化成每 30 分钟轮询一次，那是另一个 bug）。
+     */
+    ['★ 基线状态**恰好**只有 `BASELINE_KEYS` 里的键（原先基线这侧没有这条断言）',
+      // ⚠️ 判据是**包含于**（`⊆`），不是相等 —— 第一版我写的是相等，当场红了：
+      //    `saidDriftFp` 在「从没漂移过」时**本来就不该在**（`pick` 只带 prev 里有的键），
+      //    要求它出现等于要求状态文件凭空多一个空值。**这是我把不变式写强了，不是代码错了。**
+      //    真正要守的是**上界**：不许出现表外的键（那才是 `{ ...prev }` 留下的残留）。
+      //    下界只对每次都会写的四个键成立。
+      () => { const s = enter({ lastState: 'ok', 陈年残留: 1, p_lastDay: '2026-09-21' },
+                              { code: 0, day: D, drifted: [], untested: [] }).state;
+              return Object.keys(s).every((k) => BASELINE_KEYS.includes(k))
+                  && ['lastState', 'lastRunAt', 'lastDay', 'lastCode', 'staleSince'].every((k) => k in s); }],
+
+    ['★ 有跳过记录 + 冷却已过 → **必须补跑**',
+      () => typeof recheckDue({ lastRunAt: new Date(T0 - COOLDOWN_MS - 60_000).toISOString(),
+                                staleSince: new Date(T0 - COOLDOWN_MS).toISOString() }, T0) === 'string'],
+
+    ['反向对照：有跳过记录但**冷却没过** → 不许补跑（上面那条不是恒真）',
+      () => recheckDue({ lastRunAt: new Date(T0 - 60_000).toISOString(),
+                         staleSince: new Date(T0 - 60_000).toISOString() }, T0) === null],
+
+    ['★ 反向对照：**没有**跳过记录 → 永远不许补跑（否则心跳变成 30 分钟轮询一次）',
+      // 这一条是 A 方案最容易做错的方向：把「冷却过期」当成触发条件，
+      // 于是这份检查从「三处触发」悄悄变成「每天 48 次」——
+      // 发现窗口的问题解决了，换来一个抓取风暴，而没人会看出来。
+      () => recheckDue({ lastRunAt: new Date(T0 - COOLDOWN_MS * 10).toISOString(), staleSince: null }, T0) === null
+         && recheckDue({ lastRunAt: new Date(T0 - COOLDOWN_MS * 10).toISOString() }, T0) === null],
+
+    ['★ 真跑一次之后 `staleSince` 必须被清掉（`enter()` 写在展开之后）',
+      () => enter({ lastState: 'ok', staleSince: '2026-09-22T09:22:33.000Z' },
+                  { code: 0, day: D, drifted: [], untested: [] }).state.staleSince === null],
+
     /* ── ★ 退 1 但明细为空 = 清单坏了（2026-09-22 修；此前它会掉进绿分支）── */
     ['★ 待收：退 1 但**明细为空**（清单自己结构坏了）→ 必须说，不许沉默',
       () => { const r = enterPending({ p_lastState: 'ok' }, { code: 1, day: D, overdue: [], structErrors: ['id 重复：P-03'] });
@@ -709,6 +1046,35 @@ export async function selftest() {
     ['待收：过期天数要出现在文案里（「今天到期」/「已过 N 天」）',
       () => { const r = enterPending({}, { code: 1, day: D, overdue: [{ ...pdue(1).overdue[0], 过期天数: 3 }] });
               return /已过 3 天/.test(r.say); }],
+
+    /* ── ★ F 段：问出去两个工作日了还没回 → 补问一次（2026-09-22 加）───────────
+     *
+     * 「每条只补一次」有**两把锁**，各守一段，所以两边都要有正反两面：
+     *   · 清单侧（`outbound` 指针恰好一条 —— 补过之后指针变两条，就再也不进表）
+     *     由 `tools/verify_pending.py --controls` 的 F 段守；
+     *   · 状态侧（`p_nagged` —— 挡「已经发进群、指针还没补上」那个窗口）由这七条守。
+     *   缺任何一把，同一个问题就会每天重发一次，而对面是个真人。
+     */
+    ['★ 补问：第一次读到 → **必须说**', () => typeof enterPending({ p_lastState: 'ok' }, pnag(1)).say === 'string'],
+    ['★ 补问：同一条**已经补过**（`p_nagged` 里有它）→ 闭嘴',
+      () => enterPending({ p_lastState: 'nag', p_nagged: ['P-01'] }, pnag(1)).say === null],
+    ['★ 补问：一条补过、一条没补过 → **只说没补过那条**，且两条都记进 `p_nagged`',
+      () => { const r = enterPending({ p_lastState: 'nag', p_nagged: ['P-01'] }, pnag(2));
+              return typeof r.say === 'string' && !/P-01/.test(r.say)
+                  && JSON.stringify([...r.state.p_nagged].sort()) === '["P-01","P-02"]'; }],
+    ['★ 补问反向对照：**没有要补的**（`nag` 为空）→ 不许说（上面第一条不是恒说）',
+      () => enterPending({ p_lastState: 'ok' }, { code: 0, day: D, overdue: [], nag: [] }).say === null],
+    ['★ 补问：文案里不许出现**没配对的 markdown 记号** —— `quote` 是逐字存的，'
+      + '带 `**` 原样发出去会缺一半（而这句话是对外发的）',
+      () => !/「[^」]*\*\*/.test(enterPending({}, pnag(1)).say)],
+    ['★ 补问：未测（清单读不出 → `nag` 为空）时**不许**被说成「没有要补问的」',
+      () => { const r = enterPending({ p_lastState: 'ok' }, { code: 2, day: D, overdue: [], reason: '清单读不出' });
+              return /没读成/.test(r.say) && !/没有要补问|一切正常/.test(stripNegated(r.say)); }],
+    ['★ 补问：和「到期未收」撞车时，补问发出去、**到期那批要报个数不许被吞掉**',
+      () => { const r = enterPending({}, { code: 1, day: D, overdue: pdue(2).overdue, nag: pnag(1).nag });
+              return typeof r.say === 'string' && /还有 2 件到期未收/.test(r.say); }],
+    ['★ 补问：`p_nagged` 必须在状态白名单里 —— 不在的话下一次读状态就被 `pick` 丢掉，补问会重复',
+      () => 'p_nagged' in enterPending({ p_nagged: ['P-01'] }, pnag(0)).state],
 
     /* ── ★ 单飞：两个检查不许同时写状态（2026-09-21 真跑时丢过一次数据）── */
     ['★ 单飞：上一次还在跑时，第二次必须立刻跳过（否则后写的旧快照会抹掉先写的）',
@@ -770,6 +1136,59 @@ export async function selftest() {
           return after !== before && JSON.parse(after).lastState === 'ok';
         } finally { try { fs.unlinkSync(f); } catch { /* 已经没了就算了 */ } }
       }],
+    /* ── ★ 跳过那条路径的**行为级**断言（2026-09-22）────────────────────────
+     * 上面那四条 `recheckDue` 是**纯函数**断言 —— 它们全绿，只证明「判据写对了」，
+     * 不证明「跳过时真的落了 `staleSince`」。§2.4.2 那两层的老问题：
+     * 判据存在 ≠ 有人执行。所以这里必须**真调一次 `checkNow`**，再回读文件。
+     */
+    ['★ 行为级：冷却期里跳过时，状态文件必须**真的写下** `staleSince`',
+      async () => {
+        const f = path.join(stateDir(), '_selftest-tmp-state.json');
+        try {
+          // `lastRunAt` 就设在「刚刚」→ 必然落进冷却，走 skipped 那一支
+          fs.writeFileSync(f, JSON.stringify({ lastRunAt: new Date().toISOString(), lastDay: D,
+                                               lastState: 'drift', saidDriftFp: 'x', lastCode: 1, rawCode: 1 }));
+          const r = await checkNow({ stateFile: f, run: async () => { throw new Error('冷却期不该真的去跑检查'); } });
+          const s = JSON.parse(fs.readFileSync(f, 'utf8'));
+          return typeof r.skipped === 'string'
+              && typeof s.staleSince === 'string' && !Number.isNaN(Date.parse(s.staleSince))
+              && s.lastState === 'drift';        // ← 读数本身**不许被跳过擦掉**
+        } finally { try { fs.unlinkSync(f); } catch { /* 已经没了就算了 */ } }
+      }],
+    ['★ 行为级反向对照：第二次跳过**不许刷新** `staleSince`（否则「过期了多久」会被心跳顶到现在）',
+      async () => {
+        const f = path.join(stateDir(), '_selftest-tmp-state.json');
+        try {
+          const first = new Date(Date.now() - 5 * 60_000).toISOString();
+          fs.writeFileSync(f, JSON.stringify({ lastRunAt: new Date().toISOString(), lastDay: D,
+                                               lastState: 'drift', staleSince: first }));
+          await checkNow({ stateFile: f, run: async () => { throw new Error('不该跑'); } });
+          return JSON.parse(fs.readFileSync(f, 'utf8')).staleSince === first;
+        } finally { try { fs.unlinkSync(f); } catch { /* 已经没了就算了 */ } }
+      }],
+    ['★ 行为级：`dryRun` 下跳过也**一个字节都不许落盘**（与上面那条成对）',
+      async () => {
+        const f = path.join(stateDir(), '_selftest-tmp-state.json');
+        try {
+          fs.writeFileSync(f, JSON.stringify({ lastRunAt: new Date().toISOString(), lastDay: D, lastState: 'drift' }));
+          const before = fs.readFileSync(f, 'utf8');
+          await checkNow({ dryRun: true, stateFile: f, run: async () => { throw new Error('不该跑'); } });
+          return fs.readFileSync(f, 'utf8') === before;
+        } finally { try { fs.unlinkSync(f); } catch { /* 已经没了就算了 */ } }
+      }],
+    ['★ 行为级：补跑之后 `staleSince` 归零 —— 判据（B）与触发（A）在**同一次真实调用**里接上',
+      async () => {
+        const f = path.join(stateDir(), '_selftest-tmp-state.json');
+        try {
+          fs.writeFileSync(f, JSON.stringify({ lastRunAt: new Date(Date.now() - COOLDOWN_MS - 60_000).toISOString(),
+                                               lastDay: D, lastState: 'drift', staleSince: '2026-09-22T09:22:33.000Z' }));
+          const due = recheckDue(JSON.parse(fs.readFileSync(f, 'utf8')));
+          await checkNow({ stateFile: f, run: async () => ({ code: 0, out: '', note: '' }) });
+          const s = JSON.parse(fs.readFileSync(f, 'utf8'));
+          return typeof due === 'string' && s.staleSince === null && s.lastState === 'ok';
+        } finally { try { fs.unlinkSync(f); } catch { /* 已经没了就算了 */ } }
+      }],
+
     ['★ 自证里的每一个 `checkNow` 都不许落到**真状态文件**上（`dryRun` 或 `stateFile` 二选一）',
       /**
        * 这条断言**写了三版，前两版都是错的**，两版错在同一个病上：**判据比它声称的弱。**
@@ -803,6 +1222,56 @@ export async function selftest() {
             && calls.every((a) => dry(a) || inj(a))
             && calls.some(dry) && calls.some(inj);
       }],
+
+    /* ── ★ `--check` 不许静音告警（2026-09-23 加，代价是一次真事故） ──────────────
+     *
+     * 上面那条只扫 `selftest.toString()` —— 也就是它**只守得住自证自己**。
+     * 而本轮踩到的那条路径根本不在自证里：它是 **CLI**。
+     * 这正是 §2.4 点名的病：**在执行点的断言里活了下来** ——
+     * 判据覆盖不到的那一跳，就是事故所在的那一跳。
+     *
+     * 所以这一对**不比对文本，真起一次子进程**：
+     *   ① 行为级：`--check --offline` 指着注入的状态目录跑完，那个文件必须**一个字节都没变**；
+     *   ② 反向对照：同一份状态文件，走一次**不带 `dryRun`** 的 `checkNow`，它**必须变**。
+     *      没有 ②，① 会因为「反正这个文件从来没人写」而恒真 —— 一个恒真的检查器比没有更糟。
+     *
+     * 为什么用真子进程而不是直接调 `checkNow`：**要证的是「CLI 那一支」**。
+     * 直接调函数只能证明「函数在 dryRun 下不落盘」，而那件事上面已经证过了；
+     * 这里要证的是「CLI 传了 dryRun」。断言的靶子是那一行代码，不是那个函数。
+     * 子进程的 `SHOUHENG_STATE_DIR` 指向临时目录 —— **自证绝不碰真的状态文件**（§2.4.4）。
+     */
+    ['★ 行为级：CLI 的 `--check` 一个字节都不许落盘（它只回答「红不红」，不说话）',
+     async () => {
+       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prdcheck-'));
+       try {
+         const file = path.join(dir, 'prd-baseline-watch.json');
+         const seeded = JSON.stringify({ lastState: 'drift', saidDriftFp: 'A.md:' + 'b'.repeat(64),
+                                         lastRunAt: '2026-09-23T10:05:46.001Z', lastDay: '2026-09-23',
+                                         lastCode: 1, rawCode: 1 }, null, 2);
+         fs.writeFileSync(file, seeded);
+         const code = await new Promise((resolve) => {
+           const child = spawn(process.execPath, [process.argv[1], '--check', '--offline'],
+                               { cwd: REPO_ROOT, env: { ...process.env, SHOUHENG_STATE_DIR: dir } });
+           child.on('error', () => resolve(null));
+           child.on('close', (c) => resolve(c));
+         });
+         // 粗判：跑起来就算过了这一关（`--offline` 应退 2 = 未测）。不判具体码，
+         // 否则这条会随 `verify_prd_baseline.py` 的退出码语义漂移 —— 它验的不是那个。
+         return code !== null && fs.readFileSync(file, 'utf8') === seeded;
+       } finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+     }],
+
+    ['反向对照：**不带** `dryRun` 时必须落盘（证明上面那个「没变」不是恒真）',
+     async () => {
+       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prdcheck-'));
+       try {
+         const file = path.join(dir, 'prd-baseline-watch.json');
+         const seeded = JSON.stringify({ lastState: 'ok', saidDriftFp: null }, null, 2);
+         fs.writeFileSync(file, seeded);
+         await checkNow({ force: true, stateFile: file, run: async () => ({ code: 0, out: '', note: '' }) });
+         return fs.readFileSync(file, 'utf8') !== seeded;
+       } finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} }
+     }],
   ];
 
   let bad = 0;
@@ -827,8 +1296,38 @@ export async function selftest() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   if (process.argv.includes('--selftest')) process.exit(await selftest());
   if (process.argv.includes('--check')) {
-    const r = await checkNow({ reason: 'manual', force: true, run: (o) => runChecker({ ...o, offline: process.argv.includes('--offline') }) });
-    console.log(JSON.stringify({ code: r.code, note: r.note, why: r.why, say: r.say, skipped: r.skipped }, null, 2));
+    /**
+     * ★ **`--check` 必须 `dryRun`（2026-09-23 加）。这是本文件第三条「跑一次就静音告警」的路径。**
+     *
+     * 前两条都修过了：`--selftest`（§2.4.4，代价是一次实测）、以及 `checkNow` 内部那两处
+     * 自证调用点。这一条当时**漏了**，而且漏得最隐蔽 —— 它不在自证脚本里，它**在文档里**：
+     * `PMO/守衡-知识库构建完整方案-20260922.md` §八 把
+     * `node tools/agent/prd_baseline.mjs --check` 列进了「复现与自证」的常规命令。
+     *
+     * 实测（2026-09-23 18:05:46，本轮踩的）：上游当天 14:16:42 改了 PRD → 按文档跑 `--check`
+     * → 它不带 `dryRun`，于是 `enter()` 算出的那句话被 `saveState` **记成「已说过」**
+     * （`saidDriftFp` = 新指纹），而 CLI 只 `console.log`，**一个字都没发出去**。
+     * 而 daemon 的发送条件是 `if (!r.say) return` —— 下次它自己跑到同一漂移时，
+     * `enter()` 回「同一个漂移指纹已经说过」，`say` 是 null，于是**永久沉默**。
+     *
+     * 两个对外后果方向相反、同时发生：
+     *   ① 群里**永远收不到**那条告警；
+     *   ② 状态里 `lastState` 停在 `drift`，等基线复绿后 daemon 会走「从红/未测恢复」那一支，
+     *      发一句「✅ 上游基线检查恢复了」—— **一个从没收到过告警的群，凭空收到收尾**。
+     *      这正是 §2.4.7 在 09-22 刚修过的形状（通报带地址、收尾不带地址）从另一条路回来：
+     *      CLI 不传 `chatId`，`alertChat` 记成 null，收尾只能退回 `resolveChat()` 去猜一个群。
+     *
+     * **为什么 `dryRun` 就是对的修法**：检查的职责是回答「现在红不红」；
+     * 「要不要说、说给谁」是 daemon 的职责（§2.5：同一个形状只能有一处实现）。
+     * 手动看一眼就把告警额度用掉，等于**「看见的」改掉了「将来要发生的」**。
+     *
+     * 判据与反向对照见 `--selftest` 里那一对：行为级那条会真起一次子进程、指着注入的
+     * 状态目录，证明这个文件**一个字节都没动**；反向对照证明那个检测器不是恒真。
+     */
+    const r = await checkNow({ reason: 'manual', force: true, dryRun: true,
+                               run: (o) => runChecker({ ...o, offline: process.argv.includes('--offline') }) });
+    console.log(JSON.stringify({ code: r.code, note: r.note, why: r.why, say: r.say, skipped: r.skipped,
+                                 dryRun: r.dryRun }, null, 2));
     process.exit(r.code ?? 0);
   }
   if (process.argv.includes('--pending')) {

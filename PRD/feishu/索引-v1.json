@@ -1,6 +1,6 @@
 {
-  "generated_by": "本轮增量探查（一次性抓取，非生成器）",
-  "fetched_at": "2026-09-21 11:30:35 +0800",
+  "generated_by": "本轮增量探查（一次性抓取，非生成器）；2026-09-23 18:06 因 L3 变红重拉《内容审查 Agent PRD》正文并重记读数。《一页纸》该次未被上游改动，读数不重拉、沿用 09-22 那一版（它的 obj_edit_time 仍是 09-22 11:12:14，这是判据）",
+  "fetched_at": "2026-09-23 18:06:03 +0800",
   "api": "docx/v1/documents/{obj_token}/raw_content（只读；未调用任何 download/medias）",
   "docs": [
     {
@@ -14,11 +14,18 @@
       "parent_node_token": "PpZuwfHZ3i3iMJkHccWcHTC2ndh",
       "owner_open_id": "ou_3eef3cc3fbecfdafa98cd74e608522c3",
       "node_create_time_bj": "2026-09-21 10:37:00",
-      "obj_edit_time_bj": "2026-09-21 10:41:33",
-      "chars": 7144,
-      "sha256": "9254f5c76f7abe4e4d206fddf5dc4d2b7d7b6f00660369896963d50a30d7ca44",
-      "size_bytes": 14614,
-      "stored_as": "逐字原文（raw_content 原样，未做任何改写）"
+      "obj_edit_time_bj": "2026-09-23 14:16:42",
+      "chars": 10865,
+      "sha256": "8df44f86e0e2f9e2540fbe1c2472eb3850474da23177eae48592658b33888217",
+      "size_bytes": 23453,
+      "stored_as": "逐字原文（raw_content 原样，未做任何改写）",
+      "prev_fingerprints": [
+        "a3365008628ab3692b49b14a53c8ccefd5dbea625bc50a6888c90d1b1560c037 @ 2026-09-22 16:32:37 / 10864 字 / 23452 B —— 09-22 17:01 那一版索引里记的读数，09-23 18:06 被本行取代；全份归档在 _history/内容审查Agent-PRD-v1.0@20260923T1806.md",
+        "9254f5c76f7abe4e4d206fddf5dc4d2b7d7b6f00660369896963d50a30d7ca44 @ 2026-09-21 10:41:33 / 7144 字 / 14614 B —— 09-22 12:25 那一版索引里记的读数，09-22 17:0x 被本行取代"
+      ],
+      "diff_vs_prev": "本次改动的**全部内容**是第 497 行之后多一个空行（`diff` 输出只有 `496a497 > `，差 1 字节 / 1 字）。正文一字未变。",
+      "modified_by_open_id": "ou_af95e2a43871579692afbb25a529e77e",
+      "upstream_version": "v1.2（文件名里的 v1.0 是**定位符**，不是版本声明；上游 09-22 16:32:37 从 v1.0 改到 v1.2）"
     },
     {
       "file": "美国市场内容治理项目-一页纸计划书.md",
@@ -31,11 +38,14 @@
       "parent_node_token": "Ix5qwfQA1ivTuykOhtHcPHBKnGh",
       "owner_open_id": "ou_3eef3cc3fbecfdafa98cd74e608522c3",
       "node_create_time_bj": "2026-09-14 11:41:17",
-      "obj_edit_time_bj": "2026-09-20 12:06:40",
-      "chars": 2831,
-      "sha256": "d78fdef6d7f2b61ec5d9bfd0c40758915841cd5ae91b63c8329ffcd3714b9460",
-      "size_bytes": 6367,
-      "stored_as": "逐字原文（raw_content 原样，未做任何改写）"
+      "obj_edit_time_bj": "2026-09-22 11:12:14",
+      "chars": 2932,
+      "sha256": "8211abc09a731dc151e40ce6686142f9be8c377b202b753f1c03fd423aafabd2",
+      "size_bytes": 6540,
+      "stored_as": "逐字原文（raw_content 原样，未做任何改写）",
+      "prev_fingerprints": [
+        "d78fdef6d7f2b61ec5d9bfd0c40758915841cd5ae91b63c8329ffcd3714b9460 @ 2026-09-20 12:06:40 / 2831 字 / 6367 B —— 09-21 11:30 那一版索引里记的读数，09-22 12:25 被本行取代"
+      ]
     }
   ]
 }

@@ -123,7 +123,25 @@ export async function compact(sess, summarize, keepTurns = config.llm.maxTurns, 
              old.map((m) => `${m.role}: ${String(m.content).slice(0, 200)}`).join('\n');
   }
 
-  sess.summary = String(digest ?? '').trim();
+  // ★ 最后一道闸（2026-09-22 加）：**纪要空 → 不压缩，消息一条都不删。**
+  //
+  //   这道闸是**独立**于 `summarize()` 的，故意的。「宁可长着，也不要丢」这条判据
+  //   不该依赖上游某个函数守规矩 —— 上面那条 `cut <= 0` 的早退就是同一个理由
+  //   （「强行压缩会破坏 tool_calls 配对，宁可长着也不要发坏请求」）。
+  //
+  //   真事故：`summarize()` 在推理预算被吃光时返回空串，这里当成纪要写下去，
+  //   然后把整天旧对话删掉。三个会话的 `summary` 全是 0 长度，日志里印了 8 次
+  //   「保留 N 轮 + 纪要」——**删了，且什么都没留下，而日志说留下了。**
+  //   代价不是「这次没压缩」，是「守衡确信地不记得」：它下一轮看到的是断头的历史。
+  //
+  //   返回 false 的后果是这轮上下文偏长，下一轮还会再试（那次可能是好的 ——
+  //   实测同一个输入连跑两次，一次 0 字一次 245 字）。
+  if (!String(digest ?? '').trim()) {
+    console.warn('[memory] ⚠️ 压缩放弃：纪要为空白 —— 旧对话**一条都没删**（宁可长着，也不要丢）');
+    return false;
+  }
+
+  sess.summary = String(digest).trim();
   sess.messages = keep;
   return true;
 }

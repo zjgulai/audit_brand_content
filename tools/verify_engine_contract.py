@@ -79,6 +79,24 @@ def main() -> int:
     _sink = contextlib.redirect_stdout(_human) if a.json else contextlib.nullcontext()
     _sink.__enter__()
 
+    # ★★ 2026-09-23（T4/T15）：**自证不许有副作用** —— `AGENTS.md` §2.4.4 的执行点。
+    #
+    #   这一整套检查会真的调 `judge(receipt=True)`（V7、V47、V48…），
+    #   而回执是往 `_data/receipts.jsonl` **追加**的。生产账本只增不删、还带前缀哈希链 ——
+    #   一次「跑个自证」，本来就可能永久地往审计账本里塞进几条测试记录。
+    #   （这正是 `receipts.LOSS.md` 记的那次事故的形状：一条测试回执进了真账本，
+    #     而账本当时没有任何字段能把它认出来。）
+    #
+    #   所以这里在**跑任何检查之前**把账本原样拍下来，在**全部跑完之后**逐字节比回去。
+    #   ★ 为什么不是「断言源码里每个 judge 调用都传了 receipt_path」：那是文本断言，
+    #     一个换行或一个别名就能骗过它（§2.4：名字出现过 ≠ 拦得住）。
+    #     比字节是**行为级**的 —— 少了它，这一整套检查就从「量具」变成了「参与者」。
+    _LEDGER_SNAP = None
+    try:
+        _LEDGER_SNAP = (SKEL / "_data" / "receipts.jsonl").read_bytes()
+    except OSError as _e:                                     # noqa: BLE001
+        _LEDGER_SNAP = f"<读不出：{_e}>".encode()
+
     print("=" * 74)
     print("判定引擎 · 稳定契约验收（批次 A）")
     print("=" * 74)
@@ -234,9 +252,30 @@ def main() -> int:
         check("V7c", "verdict_digest 把回执钉在**结论**上（不只是输入）",
               rc["verdict_digest"] == digest, digest[:16] + "…")
         blob = rp.read_text(encoding="utf-8")
-        leaked = [w for w in ("FDA", "approved", "breast", "pump") if w in blob]
-        check("V7d", "回执不落原文与片段（ADR-0008 决策 2）", not leaked,
-              f"泄漏 {leaked}" if leaked else "只存 sha256；能验证原文的人才能还原")
+        # ★★ 2026-09-23（T4）：这一条原先是对**整行**做固定词表扫描，而 T4 之后
+        #    回执里多了一类**设计上就该在**的文本：条款地址（库名/条目ID/条文号/链接）。
+        #    平台政策页的 slug 天然带 `breast-pumps`、`it-really-fda-approved` 这种词，
+        #    于是「只存 sha256」这句**正确的结论**会被**公开链接**报成泄漏。
+        #
+        #    ★ 处置不是把词表放宽（那会让判据在真正要紧的词上失明 —— §2.4.1），
+        #      而是把扫描区域收窄到一个**说得清的对象**：排除的只有 `evidence_ref[]`
+        #      里那四个**派生字段** —— 而 `clause_ref.ref_problems()` 现在断言它们
+        #      逐条等于按条目重算的值（含 `链接`），所以那几个字段里藏不了东西。
+        #      排除发生在哪几个键上，下面逐条说清楚。
+        _scan = json.loads(blob.strip().split("\n")[-1])
+        _n_ref = len(_scan.get("evidence_ref") or [])
+        _addr = []
+        for _r in (_scan.get("evidence_ref") or []):
+            _addr += [str(_r.pop(_k, "")) for _k in ("库名", "条目ID", "条文号", "链接")]
+        if _n_ref:
+            _scan["evidence_ref"] = f"<{_n_ref} 条条款地址：四个派生字段已单独逐条校验>"
+        scan_text = json.dumps(_scan, ensure_ascii=False)
+        leaked = [w for w in ("FDA", "approved", "breast", "pump") if w in scan_text]
+        check("V7d", "回执不落原文与片段（ADR-0008 决策 2）—— 扫描区域**只**排除条款地址那四个派生字段",
+              (not leaked) and bool(_addr) and all(_addr),
+              (f"其余字段零泄漏；排除的 {_n_ref} 条地址（{len(_addr)} 个字段全部非空）"
+               f"逐条等于按条目重算的值 —— 由 `ref_problems()` 的「链接也必须是派生值」守着"
+               if not leaked else f"❌ 排除的地址字段之外仍有泄漏 {leaked}"))
         lines = [json.loads(x) for x in blob.strip().split("\n") if x.strip()]
         check("V7e", "回执为追加式（append-only）且逐行可解析",
               len(lines) == 1 and lines[0]["run_id"] == rc["run_id"])
@@ -2371,6 +2410,218 @@ def main() -> int:
                    and d["id"] not in _plan_of_mut]
         check("V46d", "反向对照：从表里删掉一个批次行，V46c 的判据必须报出「无人认领」",
               "D35" in _caught, f"删掉 B6 行后无人认领：{_caught or '❌没抓住'}")
+
+    # ── V47（T19 · C2 移植）证据来源分级：非「原文照读」不许单独把结论推到 PASS ──
+    #
+    #   这一步是 T19 从「写在文档里的规矩」变成「会红的断言」的那一跳。
+    #   ★ 为什么它必须长在**引擎契约**里、而不是只长在 `verify_kb.py`：
+    #     收窄发生在 `judge()` 内部（`disposition` 已算出、`layer` 还没解析的那一步），
+    #     所以它的对象是**一次真实判定**。在 KB 侧只能验「形状对不对」，
+    #     验不了「结论真的被压下来了没有」。
+    #
+    #   ★ 今天这条检查的**正例方向不会触发**（文字输入一律 stated），
+    #     但它不是恒真：`described` 那一路是端到端跑出来的真判定，会真的变红。
+    if not a.only or a.only.startswith("V47"):
+        import evidence_origin as _EO
+
+        _pass_text = CASES["pass_band"]        # V22c 已证：这条裸判是 auto_pass
+        _r_stated = J.judge(_pass_text, product_line="吸奶器", locale="en")
+        _r_desc = J.judge(_pass_text, product_line="吸奶器", locale="en",
+                          evidence_origin="described")
+        _r_ocr = J.judge(_pass_text, product_line="吸奶器", locale="en",
+                         evidence_origin="ocr")
+
+        check("V47a", "判定输入自带证据来源，且只在那四档内（与回执来源 `origin` 不是一回事）",
+              (_r_stated["input"].get("evidence_origin") in _EO.ORIGINS
+               and _r_stated["input"].get("evidence_origin") != _r_stated["input"].get("origin")),
+              f"input.evidence_origin={_r_stated['input'].get('evidence_origin')!r} · "
+              f"四档 {list(_EO.ORIGINS)} · 与回执来源取值域交集 "
+              f"{sorted(set(_EO.ORIGINS) & set(_EO.RECEIPT_ORIGINS)) or '空'}")
+
+        # 正例：原文照读时必须照旧放行 —— 少了它，这条判据写成 `return manual_review` 也会绿。
+        check("V47b", "正例：原文照读的正常路径**照旧放行**（收窄不许误伤既有判定）",
+              _r_stated["verdict"]["disposition"] == "auto_pass",
+              f"{_pass_text[:28]!r} → {_r_stated['verdict']['disposition']}")
+
+        # ★ 判据 ② 的端到端形态：同一句话，只是读到它的方式不同。
+        check("V47c", f"★ 同一条文案，证据来源换成非 stated → 结论从 auto_pass 落到 manual_review"
+                      f"（{len(_EO.ORIGINS) - len(_EO.PASS_ORIGINS)} 档各自点名）",
+              _r_desc["verdict"]["disposition"] == "manual_review"
+              and _r_ocr["verdict"]["disposition"] == "manual_review",
+              f"stated → {_r_stated['verdict']['disposition']} · "
+              f"ocr → {_r_ocr['verdict']['disposition']} · "
+              f"described → {_r_desc['verdict']['disposition']} · "
+              f"收窄记录 {(_r_desc['verdict'].get('origin_narrowed') or {}).get('from')}"
+              f"→{( _r_desc['verdict'].get('origin_narrowed') or {}).get('why', '')[:44]}…")
+
+        # 收窄之后，下游全都要跟着走对：处置层、建议、边界声明三处都得是「人看」那一档。
+        _lay = _r_desc["verdict"]["layer"]
+        check("V47d", "收窄之后处置层/建议/边界声明三处同步落到「需要人看」"
+                      "（只改一个 disposition 字段会留下自相矛盾的回执）",
+              _lay.get("machine_may_finalize") is False
+              and all("证据来源收窄" in str(u) for u in
+                      _r_desc["boundary_statement"].get("unknowns") or []
+                      if "证据来源收窄" in str(u))
+              and any("证据来源收窄" in str(u)
+                      for u in _r_desc["boundary_statement"].get("unknowns") or []),
+              f"layer={_lay.get('id')} machine_may_finalize={_lay.get('machine_may_finalize')} · "
+              f"unknowns 含收窄说明 "
+              f"{any('证据来源收窄' in str(u) for u in _r_desc['boundary_statement'].get('unknowns') or [])}")
+
+        # ★★ 两个 origin 不许混 —— 落这一步时**当场撞到**的名字冲突。
+        #     `judge()` 里原本已有一个 `origin`，含义是**回执来源**（cli/batch/shouheng/test），
+        #     它是 `push_receipts.py` 那道「测试不许进生产账本」闸门的依据。
+        #     证据来源若也叫 `origin`，把 `origin="stated"` 写进回执顶层，
+        #     那道闸门会照常放行，而**没有任何东西会红**。
+        with tempfile.TemporaryDirectory() as _t47:
+            _rc47 = J.judge(_pass_text, product_line="吸奶器", locale="en",
+                            receipt=True, receipt_path=Path(_t47) / "r.jsonl",
+                            issued_at="2026-09-23T00:00:00+00:00",
+                            origin="test")["receipt"]
+        _mix_now = _EO.receipt_origin_problems(_rc47)
+        _mix_a = _EO.receipt_origin_problems({"origin": "stated", "evidence_origin": "described"})
+        _mix_b = _EO.receipt_origin_problems({"origin": "cli", "evidence_origin": "test"})
+        check("V47e", "★★ 两个 origin 不许混：回执来源与证据来源取值域互斥，两个方向都拦",
+              not _mix_now and _mix_a and _mix_b
+              and _rc47.get("origin") in _EO.RECEIPT_ORIGINS
+              and _rc47.get("evidence_origin") in _EO.ORIGINS,
+              f"真回执 origin={_rc47.get('origin')!r} · evidence_origin="
+              f"{_rc47.get('evidence_origin')!r} · 取值域交集 "
+              f"{sorted(set(_EO.ORIGINS) & set(_EO.RECEIPT_ORIGINS)) or '空'}；"
+              f"反向对照：把 stated 写进回执 origin → {'报红' if _mix_a else '❌没报红'}；"
+              f"把 test 写进证据来源 → {'报红' if _mix_b else '❌没报红'}")
+
+    # ── V48（T4）回执 → 条款 → 原文：这一跳的**产出点唯一在 judge() 内部** ──
+    #
+    #   ★ 为什么长在引擎契约里：T4 的判据是「任一判定回执能反查到条款」——
+    #     它的对象是**一份真回执**，而在 KB 侧（`verify_kb.py` 的 T4a–T4d）
+    #     验的是「块的结构与解引用对不对」。两侧各验一半，与 T19 的 V47/T19 同一种切法。
+    #
+    #   ★ 判据原文点名的那条反向对照（**塞一条不存在的条目 ID 必须红**）在
+    #     `T4a` 里，这里放的是它验不到的那一半：这个块**只能由 judge() 产出**
+    #     （做成入参的话，四个调用方里只要有一个不传，那条回执就永远点不开依据）。
+    #   ★ 这一段同时装着 V47f 与 V48a–d（两者共用同一份条款库与同一个 `_CR`）——
+    #     所以 `--only` 必须两条前缀都认，否则 `--only V47` 会**安静地跳过 V47f**，
+    #     而输出照样写「全绿」（一个把检查关掉却看不出来的开关，比没有开关更糟）。
+    if not a.only or a.only.startswith(("V47", "V48")):
+        import clause_ref as _CR
+
+        _lib_doc, _lib_idx, _lib_prob = _CR.load_library()
+        _rules48 = json.loads((SKEL / "rules-v1.json").read_text(encoding="utf-8"))["rules"]
+        with tempfile.TemporaryDirectory() as _t48:
+            _r48 = J.judge(CASES["reject"], product_line="吸奶器", receipt=True,
+                           receipt_path=Path(_t48) / "r.jsonl", origin="test",
+                           issued_at="2026-09-23T00:00:00+00:00")
+        _rc48 = _r48["receipt"]
+        _p48 = _CR.receipt_evidence_problems(_rc48, _lib_idx, rules=_rules48)
+        check("V48a", "★ 回执 → 条款：真回执逐条解引用得上，且引用带全（与命中规则一致）",
+              (not _p48) and _rc48.get("evidence_status") == "ok"
+              and len(_rc48.get("evidence_ref") or []) > 0
+              and _rc48.get("rule_keys_hit") == sorted({h["rule_key"] for h in _r48["hits"]}),
+              f"{_rc48['run_id']}：命中 {_rc48.get('rule_keys_hit')} → "
+              f"{len(_rc48.get('evidence_ref') or [])} 条引用、问题 {len(_p48)} 条 · "
+              f"evidence_status={_rc48.get('evidence_status')!r}"
+              + ("" if not _p48 else f" ❌ {_p48[:2]}"))
+
+        # ★ 反向对照（判据原文点名的那一条）：条目 ID 改成不存在的 → 必须红。
+        _fake48 = json.loads(json.dumps(_rc48, ensure_ascii=False))
+        _fake48["evidence_ref"][0]["条目ID"] = "EXT-999"
+        _c48 = _CR.receipt_evidence_problems(_fake48, _lib_idx, rules=_rules48)
+        check("V48b", "反向对照：回执里塞一条不存在的条目 ID 必须红（凭空关联）",
+              len(_c48) > 0 and any("不存在" in m for _, m in _c48),
+              f"EXT-999 → {_c48[:1]}")
+
+        # ★ 读不到条款库 ≠ 没有依据：那种情况必须落「未测」，不许留一个空数组。
+        #   （`AGENTS.md` §2.2 第 7 条：靠外部文件取的读数，取不到时不许空着，也不许当 0。）
+        _blk_na = _CR.evidence_block(["T1.1.medical-cure"], _rules48, None,
+                                     library_problem="（自证注入）条款库读不出来")
+        _ok_na = _CR.evidence_block_problems(_blk_na, _lib_idx, rule_keys=["T1.1.medical-cure"],
+                                             rules=_rules48)
+        _bad_na = _CR.evidence_block_problems(
+            {**_blk_na, "evidence_unavailable_reason": None}, _lib_idx,
+            rule_keys=["T1.1.medical-cure"], rules=_rules48)
+        check("V48c", "条款库读不到 → `evidence_status=unavailable` + 理由（不是空数组），"
+                      "且不许与引用并存",
+              _blk_na["evidence_status"] == "unavailable"
+              and _blk_na["evidence_ref"] == [] and (not _ok_na) and len(_bad_na) > 0
+              and _CR.evidence_block_problems(
+                  {**_blk_na, "evidence_ref": _rc48["evidence_ref"]}, _lib_idx) != [],
+              f"注入后 status={_blk_na['evidence_status']!r} · 引用 "
+              f"{len(_blk_na['evidence_ref'])} 条 · 判据 {len(_ok_na)} 问题；"
+              f"反向对照：抹掉理由 → {'✅报红' if _bad_na else '❌没报红'}")
+
+        # ★ 这个制品只在写回执时产生 —— 不写回执的判定（291 条语料那条路径）一字不动。
+        _no48 = J.judge(CASES["reject"], product_line="吸奶器")
+        check("V48d", "证据块只在 `receipt=True` 时产出（不写回执的判定路径一字不动）",
+              "evidence_ref" not in _no48 and "ratified" not in _no48
+              and _no48["verdict"]["disposition"] == _r48["verdict"]["disposition"],
+              f"无回执时顶层键含 evidence_ref？{'evidence_ref' in _no48} · "
+              f"两次 disposition 均 {_no48['verdict']['disposition']}")
+
+        # ★★ V47f（T4 接线）：收窄的**第二扇门** —— 所引条款的来源。
+        #    端到端做法：把条款库**临时换成一份只改了 `origin` 的副本**
+        #    （`origin` 不进变更指纹，所以别的字段一个字都不用动），
+        #    再跑一次同一条判定。今天 62 条全是 `stated`，所以这一路**平时不会触发**
+        #    —— 但它不是恒真：下面这条就是真的走通了「条款来源 → 收窄」那一跳。
+        _orig_ext = _CR.EXT_PATH
+        try:
+            import tempfile as _tf47
+            _lib47 = json.loads(json.dumps(_lib_doc, ensure_ascii=False))
+            for _e in _lib47.get("entries") or []:
+                _e["origin"] = "ocr"
+            _p47 = Path(_tf47.mkdtemp()) / "lib-ocr.json"
+            _p47.write_text(json.dumps(_lib47, ensure_ascii=False, indent=1), encoding="utf-8")
+            _CR.EXT_PATH = _p47
+            _r_ocr_clause = J.judge(_pass_text, product_line="吸奶器", locale="en")
+            _r_both = J.judge(_pass_text, product_line="吸奶器", locale="en",
+                              evidence_origin="ocr")
+        finally:
+            _CR.EXT_PATH = _orig_ext
+        _r_restored = J.judge(_pass_text, product_line="吸奶器", locale="en")
+        _nar = _r_ocr_clause["verdict"].get("origin_narrowed") or {}
+        # 反向对照：两扇门各自点名 —— 材料 ocr 那一次必须记 gate=material，
+        # 条款 ocr 这一次必须记 gate=cited_clauses，两样都 ocr 记 both。
+        # 合成一扇门的话这三者会长得一样（而且第一组会被判成放行）。
+        check("V47f", "★ T4 接线：所引条款的来源也参与收窄（**并列的第二扇门**，不与材料来源合并）",
+              _r_ocr_clause["verdict"]["disposition"] == "manual_review"
+              and _nar.get("gate") == "cited_clauses"
+              and _nar.get("cited_origins") == ["ocr"]
+              and (_r_desc["verdict"].get("origin_narrowed") or {}).get("gate") == "material"
+              and ((_r_both["verdict"].get("origin_narrowed") or {}).get("gate")) == "both"
+              and _r_restored["verdict"]["disposition"] == _r_stated["verdict"]["disposition"],
+              f"条款库临时改成 origin=ocr → {_r_ocr_clause['verdict']['disposition']}"
+              f"（gate={_nar.get('gate')!r}、条款来源 {_nar.get('cited_origins')}）· "
+              f"材料 ocr 那次 gate={(_r_desc['verdict'].get('origin_narrowed') or {}).get('gate')!r} · "
+              f"两样都 ocr → {_r_both['verdict']['disposition']}"
+              f"（gate={(_r_both['verdict'].get('origin_narrowed') or {}).get('gate')!r}）· "
+              f"库换回原文 → {_r_restored['verdict']['disposition']}"
+              + "　★ 合并成一扇门会**放松**今天的口径："
+                "「材料 OCR + 条款 stated」会被判成放行，而那正是门一要挡的那一组")
+
+    # ── V49 自证不许有副作用（§2.4.4 的执行点）──────────────────────────
+    #   快照在 main() 一开始就拍了（跑任何检查之前）。这里逐字节比回去。
+    if not a.only:
+        _now = None
+        try:
+            _now = (SKEL / "_data" / "receipts.jsonl").read_bytes()
+        except OSError as _e:                                 # noqa: BLE001
+            _now = f"<读不出：{_e}>".encode()
+        _rolled = _now != _LEDGER_SNAP
+        check("V49", "★ 跑完这一整套自证，生产回执账本**一字节未变**（自证不许有副作用）",
+              not _rolled,
+              ("生产账本逐字节一致 —— 每一处 `judge(receipt=True)` 都写在自己的临时路径上"
+               if not _rolled else
+               f"❌ 账本被自证改动了：{len(_LEDGER_SNAP)}B → {len(_now)}B —— "
+               f"有检查把回执写进了生产账本（`receipts.LOSS.md` 记的就是这个形状）"))
+        # ★ 反向对照：**只差一个空行**时，V49 必须红 —— 而「去掉首尾空白再比」的写法
+        #   会把它放过。这一条同时证明 V49 比的是**字节**，不是规范化之后的文本
+        #   （`AGENTS.md` §2.1.1：判据要比内容，不能比一个看着像读过的近似量）。
+        _onebyte = _LEDGER_SNAP + b"\n"
+        _ctrl49 = (_onebyte != _now) and (_onebyte.strip() == _now.strip())
+        check("V49c", "反向对照：账本只多一个空行，V49 就会红（它比的是字节，不是 strip 过的文本）",
+              _ctrl49,
+              f"多一个空行：字节不等 {'✅' if _onebyte != _now else '❌'} · "
+              f"而 strip 之后相等 {'✅（所以 strip 式写法会漏掉它）' if _onebyte.strip() == _now.strip() else '❌'}")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

@@ -68,6 +68,27 @@
       ]
     },
     {
+      "verifier": "tools/verify_reply_context.py",
+      "asserts": "回复上文：话题回复的 parent_id 有没有被真的读进来（A 纯函数 / B 接线含 feishu 取形状 / C 反向对照 / D 拿 2026-09-22 那次误答的真实事件做回归）",
+      "subjects": [
+        "tools/agent/thread.mjs",
+        "tools/agent/agent.mjs",
+        "tools/agent/feishu.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_outbound.py",
+      "asserts": "出站留痕与入记忆：主动推送有没有落台账、回话前有没有把「我说过但记忆里没有的」折进会话（A 纯函数/临时台账 · B 接线含全仓发送者总表 · C 反向对照 · D 拿 2026-09-22 那次误答的真实台账+真实会话做回归 · G post/interactive 读得对不对）",
+      "subjects": [
+        "tools/agent/outbound.mjs",
+        "tools/agent/agent.mjs",
+        "tools/agent/feishu.mjs",
+        "tools/ws_daemon.mjs",
+        "tools/send_once.mjs",
+        "tools/outbound_ledger.mjs"
+      ]
+    },
+    {
       "verifier": "tools/verify_shouheng_ops.py",
       "asserts": "守衡运维：重启闸门默认拒绝 / 不许绕过 / KeepAlive 自愈 / 它现在还活着",
       "subjects": [

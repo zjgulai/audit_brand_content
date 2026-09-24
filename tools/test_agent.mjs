@@ -112,6 +112,94 @@ await t('非 git 仓库时 git 命令的报错被结构化吞住', async () => {
   assert.ok(r.result.error || r.result.stdout !== undefined);
 });
 
+console.log('\n═══ 1b. 空输出不许被读成「0 命中」（2026-09-22 事故，反向对照）═══');
+
+/*
+ * 事故原样：守衡执行 `grep -rl <PRD 的 wiki token> .` —— 全仓递归，含 node_modules/、
+ * .git/、skills/ 下 777 个压缩包。实测**超过 60 秒都跑不完**（我用 harness 的 60 秒上限
+ * 复现过，是被 SIGTERM 杀掉的），而工具只有 15 秒 → 被 timezone 杀掉 →
+ * 返回体 { error: "Command failed: …", stdout: "" } → **它只读了 stdout 是空的**，
+ * 于是对群里说「我用这个 token 搜了一遍，0 命中」。
+ * 真值：那个 token 就在工作区两个文件里。
+ *
+ * 下面每一条都对着那次误判的一个环节。
+ */
+
+await t('超时被杀的返回体里**没有 stdout 这个键** —— 空字符串无从被读成「0 命中」', async () => {
+  process.env.SHOUHENG_RO_TIMEOUT_MS = '1';   // 1ms：bash 启动本身都超过它，必定超时
+  let r;
+  try {
+    r = await executeTool('run_readonly_command', JSON.stringify({ command: 'grep -rn 守衡 PMO' }));
+  } finally {
+    delete process.env.SHOUHENG_RO_TIMEOUT_MS;
+  }
+  assert.ok(r.ok, '工具本身不应抛出');
+  assert.strictEqual(r.result.status, 'timeout', `本应判为超时，实际：${JSON.stringify(r.result).slice(0, 200)}`);
+  assert.ok(!('stdout' in r.result),
+    `超时时返回体里不许有 stdout —— 空 stdout 会被读成「扫完了、没命中」。实际：${JSON.stringify(r.result).slice(0, 200)}`);
+  assert.ok(/未测/.test(r.result.note), `note 里必须写出「未测」：${r.result.note}`);
+  assert.ok(/不是「0 命中」/.test(r.result.note), 'note 必须明着堵住「0 命中」这个读法');
+});
+
+await t('引发事故的那条命令，在跑之前就被护栏拒绝', async () => {
+  const r = await executeTool('run_readonly_command',
+    JSON.stringify({ command: 'grep -rl NB55wAq8liEOdKkquL2cgtPEnmg .' }));
+  assert.ok(r.ok && r.result.status === 'rejected',
+    `本应被护栏拒绝，实际：${JSON.stringify(r.result).slice(0, 200)}`);
+  // 它必须给出**下一步**，不能只说「不行」
+  assert.ok(/search_workspace/.test(r.result.note), '拒绝时必须给替代路径');
+});
+
+await t('护栏不许把正常用法也拦掉（点名子目录的 grep 要放行）', async () => {
+  const r = await executeTool('run_readonly_command',
+    JSON.stringify({ command: 'grep -rn 守衡 PMO/守衡-链路打通确认.md' }));
+  assert.ok(r.ok, '工具本身不应抛出');
+  assert.notStrictEqual(r.result.status, 'rejected',
+    `点名到具体文件不该被拦，实际：${JSON.stringify(r.result).slice(0, 200)}`);
+});
+
+await t('白名单只放行 lark_find.py 的**读**子命令，下载类一律拒绝（§2.6 红线）', async () => {
+  // 2026-09-22 起守衡能用 `python3 tools/lark_find.py readdoc <token>` 读飞书文档正文 ——
+  // 这符合 §2.6 红线（「读」允许，「取走附件」禁止）。这条断言就是那条红线的执行点：
+  // 任何人往白名单里塞 download / medias，这里立刻红。
+  for (const c of ['python3 tools/lark_find.py download abc',
+                   'python3 tools/lark_find.py medias abc',
+                   'python3 tools/lark_find.py export abc']) {
+    const r = await executeTool('run_readonly_command', JSON.stringify({ command: c }));
+    assert.strictEqual(r.result.status, 'rejected',
+      `"${c}" 必须被拒（红线：飞书内容禁止下载），实际：${JSON.stringify(r.result).slice(0, 200)}`);
+  }
+});
+
+await t('search_workspace 找得到那个 token（对事故的**真阳性**对照）', async () => {
+  const r = await executeTool('search_workspace', JSON.stringify({ keyword: 'NB55wAq8liEOdKkquL2cgtPEnmg' }));
+  assert.ok(r.ok && r.result.status === 'ok', JSON.stringify(r.result).slice(0, 200));
+  assert.ok(r.result.matches >= 1,
+    `那次说「0 命中」，真值是至少 1 —— 实际 ${r.result.matches}（扫了 ${r.result.searched_files} 个文件）`);
+  assert.strictEqual(r.result.stopped_early, false, '整仓检索不该被截断，否则「0 命中」不成立');
+});
+
+await t('search_workspace：0 命中必须带分母，且分母为 0 时不算数', async () => {
+  // 关键词必须**当场生成**：写死的字符串会出现在本测试文件自己里，
+  // 于是「一定不存在」变成「一定存在」—— 这正是那类「假阴性/假阳性都在骗人」的坑。
+  const ghost = `zz${Date.now()}x${Math.random().toString(36).slice(2)}q`;
+  const r = await executeTool('search_workspace', JSON.stringify({ keyword: ghost }));
+  assert.ok(r.result.searched_files > 0, '分母必须大于 0，否则「没找到」是未测不是 0');
+  assert.strictEqual(r.result.matches, 0, `不该命中，实际 ${r.result.matches}`);
+  assert.ok(/分母/.test(r.result.note), `0 命中时要说清分母撑着：${r.result.note}`);
+});
+
+await t('search_workspace：扫不完时必须说「未测」，不许下「没找到」的结论', async () => {
+  const ghost = `zz${Date.now()}x${Math.random().toString(36).slice(2)}q`;
+  const r = await executeTool('search_workspace', JSON.stringify({ keyword: ghost, max_files: 3 }));
+  assert.strictEqual(r.result.stopped_early, true, '上限这么小必须被截断');
+  assert.ok(/未测/.test(r.result.note), `截断时 note 必须说未测：${r.result.note}`);
+  // 判据用的是**扫完时才出现的那句话**，而不是「0 命中」三个字 ——
+  // 后者会出现在「不许说成 0 命中」这句提示语里，拿它当判据等于自己判自己。
+  assert.ok(!/有分母撑着/.test(r.result.note),
+    `截断时不许给出「0 命中」的结论句：${r.result.note}`);
+});
+
 await t('未知工具给出结构化错误而非崩溃', async () => {
   const r = await executeTool('no_such_tool', '{}');
   assert.strictEqual(r.ok, false);
@@ -182,6 +270,38 @@ await t('无法回退到边界时放弃压缩而非产生坏序列', async () =>
   const compacted = await mem.compact(sess, async () => '摘要', 5, 5);  // 保留 5 轮 / 超过 5 条触发
   assert.strictEqual(compacted, false, '找不到安全切点时应放弃压缩');
   assert.strictEqual(sess.messages.length, 40, '放弃压缩时不应丢消息');
+});
+
+await t('纪要为空时必须放弃压缩（不许「删了历史、什么都没留」）', async () => {
+  // ★ 2026-09-22 真事故：`summarize()` 在推理预算被吃光时返回空串，
+  //   `compact()` 把它当成纪要写下去，**然后把旧对话全删了**。
+  //   盘上的读数：三个会话的 `summary` 全是 0 长度，而日志印了 8 次「保留 N 轮 + 纪要」。
+  //   代价不是「这次没压缩」，是「守衡确信地不记得」—— 下一轮它看到的是断头的历史。
+  //
+  //   这一条守的是**最后一道闸**：它与 summarize 的行为无关，故意的。
+  //   喂三个空法（空串 / 纯空白 / undefined），一个都不许通过。
+  const mem = await import('./agent/memory.mjs');
+  for (const [name, empty] of [['空串', ''], ['纯空白', '\n\n   \t\n'], ['undefined', undefined]]) {
+    const sess = { key: `test_emptysummary_${name}`, messages: [], summary: '', messageCount: 0 };
+    for (let i = 0; i < 12; i++) {
+      sess.messages.push({ role: 'user', content: `问题 ${i}` });
+      sess.messages.push({ role: 'assistant', content: `回答 ${i}` });
+    }
+    const before = sess.messages.length;
+    const compacted = await mem.compact(sess, async () => empty, 5, 5);
+    assert.strictEqual(compacted, false, `返回${name}时应放弃压缩，实际 compacted=${compacted}`);
+    assert.strictEqual(sess.messages.length, before, `返回${name}时不许丢消息（原 ${before} 条）`);
+    assert.strictEqual(sess.summary, '', `返回${name}时不许把空白写进纪要`);
+  }
+  // 反面：非空纪要**必须**照常压缩 —— 否则上面那条可能是「压缩整个坏了」而全绿。
+  const sess2 = { key: 'test_emptysummary_ok', messages: [], summary: '', messageCount: 0 };
+  for (let i = 0; i < 12; i++) {
+    sess2.messages.push({ role: 'user', content: `问题 ${i}` });
+    sess2.messages.push({ role: 'assistant', content: `回答 ${i}` });
+  }
+  const okCompacted = await mem.compact(sess2, async () => '真的纪要', 5, 5);
+  assert.strictEqual(okCompacted, true, '有纪要时必须照常压缩（反向对照）');
+  assert.strictEqual(sess2.summary, '真的纪要', '纪要应写进去');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -614,19 +734,31 @@ await t('配置的 maxTokens 必须留得下思维链（实测 1600 会被吃光
 
 console.log('\n═══ 10. 群历史的「看不见」必须由工具给，不由模型推 ═══');
 
-await t('提示词能构建，且不夹带裸反引号（模板字符串里会直接炸）', async () => {
-  const { buildSystemPrompt } = await import('./agent/persona.mjs');
+await t('提示词能构建，且人设正文里没有裸反引号', async () => {
+  const { buildSystemPrompt, SYSTEM_PROMPT } = await import('./agent/persona.mjs');
   let sp;
   assert.doesNotThrow(() => { sp = buildSystemPrompt(); }, 'SYSTEM_PROMPT 是模板字符串，正文里出现裸反引号会让整个模块语法错误');
 
   // 事故：往提示词里写 `recent_messages` 做反引号强调，模板字符串提前闭合，
   // 整个 persona.mjs 变成语法错误 —— 而这在跑测试之前完全看不出来。
-  const body = sp.split('# 当前时间')[0];
-  assert.ok(!body.includes('`'), '提示词正文里不能有反引号：它是模板字符串的一部分');
+  //
+  // ★ 2026-09-22 修正：原先断言的是「`# 当前时间` 之前的全部正文里不许有反引号」。
+  //   **那是误报，而且已经挂了很久** —— `cardContract()` 那段本来就要示范卡片块围栏
+  //   （源码里写的是转义反引号 \`\`\`，构建后就是真反引号），它就落在那个区间里。
+  //   实测：改之前跑本套件是「41 通过 / 1 失败」，失败的就是这一条。
+  //   一个长期误报的检查器会让人开始不看报告（AGENTS.md §2.1.1），所以改成断真正的不变量：
+  //   **人设正文（SYSTEM_PROMPT）里一个反引号都不许有**；卡片规程那段单独放行，
+  //   但要断言它示范的围栏**真的出现在了成品提示词里**（反过来被「修」没了也要红）。
+  assert.strictEqual((SYSTEM_PROMPT.match(/`/g) || []).length, 0,
+    `人设正文里出现了反引号：${SYSTEM_PROMPT.slice(Math.max(0, SYSTEM_PROMPT.indexOf('`') - 60), SYSTEM_PROMPT.indexOf('`') + 60)}`);
+  assert.ok(sp.includes('[[card:类型]]'), '卡片块的围栏必须真的出现在成品提示词里');
+  assert.ok(sp.includes('```'), '围栏的三个反引号必须真的渲染出来（转义写错会静默少掉）');
 
   assert.ok(sp.includes('只能看到最近 50 条'), '必须写明群历史只看得到最近 50 条');
   assert.ok(sp.includes('撤回的消息，原文取不回'), '必须写明撤回的消息取不回原文');
   assert.ok(sp.includes('非文字消息你读不到内容'), '必须写明图片/文件/卡片读不到内容');
+  assert.ok(sp.includes('「我打不开飞书文档」通常是一句假话'),
+    '必须写明：收到飞书链接时先说工作区里有没有那一份，再说读不读得了');
   assert.ok(!/我记不清/.test(sp.replace(/不要用「我记不清」/g, '')),
     '不许把「看不到」说成「记不清」——那是两种不同的东西');
 });

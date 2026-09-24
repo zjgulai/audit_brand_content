@@ -88,7 +88,15 @@ def main():
         r = _req(f"{BASE}/docx/v1/documents/{sys.argv[2]}/raw_content", t)
         if r.get("code") != 0:
             print("❌", json.dumps(r, ensure_ascii=False)[:500]); return 1
-        print(r["data"].get("content", ""))
+        # ★ 原样写出，**不补换行**（2026-09-22 改，改前是 print()）。
+        #   理由：`PRD/feishu/索引-v1.json` 里的 sha256 / chars / size_bytes 记的是
+        #   raw_content **本身**的读数，而 verify_prd_baseline.py 的 B1–B3 拿落盘副本去比那三个数。
+        #   用 print() 会多一个 "\n" —— 于是「照文档跑那条重拉命令」得到的文件永远对不上索引，
+        #   B1/B2/B3 全红；下一个人会以为是自己弄坏的，而不是**这条命令复现不出文档里的数**
+        #   （AGENTS.md §2.2 第 1 条：文档里的数字要能复现出来）。
+        #   实测依据：2026-09-22 重拉《一页纸计划书》，print() 版落盘 2933 字 / 6541 字节，
+        #   而索引口径是 2932 字 —— 差的正是这一个换行。
+        sys.stdout.write(r["data"].get("content", ""))
         return 0
 
     if cmd == "tables":

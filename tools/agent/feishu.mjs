@@ -139,6 +139,138 @@ export const __test_chunkText = chunkText;
 
 const MAX_TEXT_LEN = 8000;   // 飞书文本消息安全上限
 
+/* ─────────────── 读回正文：post / interactive 也要读得出来 ─────────────── */
+
+/**
+ * ★ 2026-09-22 新增。**在它之前，守衡读自己的历史是瞎的。**
+ *
+ * 实测（当天 15:35 拿真实群历史跑了一遍 `listRecentMessages`）：
+ *
+ * ```
+ * 2026-09-18 12:40:20 interactive 守衡(你自己)  （interactive 类型，正文为空 —— 我没法看到里面的内容。）
+ * 2026-09-22 14:39:52 interactive 守衡(你自己)  （interactive 类型，正文为空 —— 我没法看到里面的内容。）
+ * 2026-09-22 15:32:16 post        守衡(你自己)  （post 类型，正文为空 —— 我没法看到里面的内容。）
+ * ```
+ *
+ * 而**内容就在 payload 里** —— 那条 post 的 `body.content` 逐字是
+ * `{"title":"","content":[[{"tag":"text","text":"我这边调用模型失败了，没法回答这个问题。"}],…]}`。
+ * 我们只是按 `JSON.parse(content).text` 去读了，而 post / interactive **没有 `text` 这个字段**。
+ *
+ * 这是 §2.4.1 的**第 4 行**（否定结论比输入大）：工具说的是「**我读不了**」，
+ * 真相是「**我没去读对地方**」。后果与 14:39 那次误答同源 ——
+ * `sendMarkdown` 发的都是 **post**、卡片回复都是 **interactive**，
+ * 于是**守衡读群历史时看不见自己说过的绝大多数话**，只看得见 `send_once.mjs`
+ * 手发的那几条 `text`。它问「我先前说过什么」时，答案是结构性地缺的。
+ *
+ * 判据在 `tools/verify_outbound.py` 的 **G 段**：拿这几条**真实 payload** 做回归。
+ */
+
+/** post（富文本）的 content JSON → 纯文本。读不出来回 `null`（**不是空串**）。 */
+export function postToPlain(contentJson) {
+  let d;
+  try { d = JSON.parse(contentJson ?? '{}'); } catch { return null; }
+  // 飞书同时给 content 与 content_v2（实测同值）；取不到第一个才用第二个。
+  const blocks = Array.isArray(d?.content) ? d.content : (Array.isArray(d?.content_v2) ? d.content_v2 : null);
+  if (!blocks) return null;
+  const lines = [];
+  for (const para of blocks) {
+    if (!Array.isArray(para)) continue;
+    lines.push(para.map((n) => {
+      const tag = n?.tag;
+      if (tag === 'a') return n.text ?? n.href ?? '';
+      if (tag === 'at') return `@${n.user_name ?? n.user_id ?? ''}`;
+      if (tag === 'img') return '[图片]';
+      if (tag === 'media') return '[媒体]';
+      return typeof n?.text === 'string' ? n.text : '';
+    }).join(''));
+  }
+  return lines.join('\n');
+}
+
+/**
+ * 卡片（interactive）的 JSON → 文字**重建**。回 `{title, lines, stub}`。
+ *
+ * ⚠️ **实测（2026-09-22，拿 14:39:52 那张真卡跑了一遍）**：`im/v1/messages` 对 interactive
+ * 消息**不返回卡片正文**，只回一句占位：
+ *
+ * ```json
+ * {"title":"已收到","elements":[[{"tag":"img",…},{"tag":"text","text":"请升级至最新版本客户端，以查看内容"}]]}
+ * ```
+ *
+ * 所以「卡片读得回来」是**假的**。能读到的只有**标题**（上面这个是「已收到」）。
+ * 这一条必须写进返回值，否则 `bodyToText` 会把那句占位文案当成卡片内容交出去 ——
+ * 那比原先的「我看不到」更坏：**它看起来像内容**。
+ */
+function cardToPlain(contentJson) {
+  let d;
+  try { d = JSON.parse(contentJson ?? '{}'); } catch { return { title: null, lines: [], stub: false, bad: true }; }
+  if (!d || typeof d !== 'object') return { title: null, lines: [], stub: false, bad: true };
+
+  const lines = [];
+  const seen = new Set();
+  const walk = (node) => {
+    if (node == null) return;
+    if (Array.isArray(node)) { for (const x of node) walk(x); return; }
+    if (typeof node !== 'object') return;
+    for (const [k, v] of Object.entries(node)) {
+      if (typeof v === 'string' && (k === 'text' || k === 'content')) {
+        if (v.trim() && !seen.has(v)) { seen.add(v); lines.push(v); }
+        continue;
+      }
+      if (v && typeof v === 'object') walk(v);
+    }
+  };
+  walk(d);
+
+  const title = typeof d.title === 'string' ? d.title
+              : (typeof d?.header?.title?.content === 'string' ? d.header.title.content : null);
+  const stub = lines.some((s) => /请升级至最新版本客户端/.test(s));
+  return { title, lines: lines.filter((s) => !/请升级至最新版本客户端/.test(s)), stub, bad: false };
+}
+
+/**
+ * 把一条消息的 `body.content` 读成**人话**。两个读取入口（`getMessage` / `listRecentMessages`）
+ * 都走这里 —— 两处各写一份解析，就是「同一个形状有两个实现」，
+ * 而这两份一定会漂移（一份修了另一份没修，表现是「有时候读得到有时候读不到」）。
+ *
+ * @returns {{text:string|null, parsed:boolean, note?:string}}
+ *   `text` 为 `null` 表示**没解析出内容**（`note` 说明是哪种没解析出来）——
+ *   与「解析出来是空的」必须分得开（§2.4.1 第 1 行那个「0 张表」）。
+ */
+export function bodyToText(msgType, contentJson) {
+  if (msgType === 'text') {
+    let t = null;
+    try { t = JSON.parse(contentJson ?? '{}').text ?? null; } catch { t = null; }
+    if (typeof t === 'string') return { text: t, parsed: true };
+    return { text: null, parsed: false, note: 'text 类型但解析不出 `.text` 字段' };
+  }
+  if (msgType === 'post') {
+    const t = postToPlain(contentJson);
+    if (t !== null) return { text: t, parsed: true };
+    return { text: null, parsed: false, note: 'post 类型但 `content` / `content_v2` 都不是段落数组' };
+  }
+  if (msgType === 'interactive') {
+    const c = cardToPlain(contentJson);
+    const title = c.title ? `「${c.title}」` : '（连标题都没有）';
+    if (c.bad) return { text: null, parsed: false, note: 'interactive 类型但卡片 JSON 解析失败' };
+    if (c.stub) {
+      // ★ 接口只回占位文案 —— 这是**通道的盲区**，不是「我懒得读」。
+      //   照实说：读不到正文；能读到的只有标题。别把占位文案当内容交出去。
+      return { text: null, parsed: false,
+               note: `卡片正文这个接口不返回（只回一句「请升级至最新版本客户端」占位），`
+                   + `能读到的只有标题${title}。卡片说了什么，只有发它的那一方（会话记忆 / 外发台账）知道` };
+    }
+    if (c.lines.length) {
+      // ⚠️ 必须说清这是**重建**：卡片存的是结构，不是一段正文。
+      //    把重建结果当成逐字原文去引用，就是另一种「比依据大」。
+      return { text: `（卡片文字按结构还原，非逐字原文${c.title ? `；标题${title}` : ''}）\n${c.lines.join('\n')}`,
+               parsed: true };
+    }
+    return { text: null, parsed: false, note: `interactive 类型但卡片 JSON 里没抽到文字（标题${title}）` };
+  }
+  return { text: null, parsed: false, note: `${msgType ?? '未知'} 类型没有正文读取通道` };
+}
+
 /** 超长文本切块（优先在换行处切，避免把句子劈开） */
 function chunkText(text, size = MAX_TEXT_LEN) {
   const out = [];
@@ -313,7 +445,12 @@ export async function listRecentMessages(chatId, pageSize = 20, memberMap = null
     }
     const items = r?.data?.items ?? [];
     const out = items.map((it) => {
-      let raw = ''; try { raw = JSON.parse(it.body?.content ?? '{}').text ?? ''; } catch { raw = it.body?.content ?? ''; }
+      // ★ 2026-09-22：改走 `bodyToText`。原先这里只认 `JSON.parse(content).text`，
+      //   而 **post（`sendMarkdown` 发的）与 interactive（卡片）没有 `text` 字段** ——
+      //   于是守衡读群历史时，**自己发出去的话全部显示成「我没法看到里面的内容」**。
+      //   实测那三行读数与根因写在 `bodyToText` 上面。
+      const parsed = bodyToText(it.msg_type, it.body?.content);
+      const raw = parsed.text ?? '';
       // 撤回的消息，飞书把正文换成一句英文占位符，原文在任何接口都取不回。
       // 必须把它和「正常但很短的消息」区分开：前者是**内容没了**，后者是**本来就这么短**。
       // 混在一起时，守衡会把「撤回」读成「有一条我看不懂的消息」，进而低估自己漏了多少东西。
@@ -324,9 +461,13 @@ export async function listRecentMessages(chatId, pageSize = 20, memberMap = null
       const ATTACHMENT_TYPES = new Set(['file', 'image', 'media', 'audio']);
       const text = recalled
         ? '（原文已在飞书端撤回，撤回后任何接口都不返回内容）'
-        : (raw || `（${it.msg_type ?? '未知'} 类型，正文为空 —— ${ATTACHMENT_TYPES.has(it.msg_type)
-            ? '这是附件：飞书内容禁止下载，附件只有下载这一条通道，所以我不取它的内容。'
-            : '我没法看到里面的内容。'}）`);
+        : (raw || (ATTACHMENT_TYPES.has(it.msg_type)
+            ? '（这是附件：飞书内容禁止下载，附件只有下载这一条通道，所以我不取它的内容。）'
+            // ★ 这一句原先对 post / interactive 也这么说过（「正文为空 —— 我没法看到里面的内容」），
+            //   而那是**假否定**：内容就在 payload 里，是我们没去读对地方。
+            //   现在只有**真的没解析出来**才落到这里，并把「是哪种没解析出来」写出来 ——
+            //   **「没解析出来」和「内容为空」是两件事**，读的人要能分开。
+            : `（${it.msg_type ?? '未知'} 类型：我没能解析出正文 —— ${parsed.note ?? '未知原因'}）`));
       const sender = {
         messageId: it.message_id,
         // 北京时间，不是 UTC。原来这里是 toISOString()，而 `now` 工具给的是北京时间，
@@ -358,6 +499,85 @@ export async function listRecentMessages(chatId, pageSize = 20, memberMap = null
     return out;
   } catch (e) {
     return { error: `拉取消息失败 code=${e?.response?.data?.code} msg=${e?.response?.data?.msg ?? e.message}` };
+  }
+}
+
+/**
+ * 按 `message_id` 回读**单条**消息。回 `{ error }` 而**不抛** —— 与 `listRecentMessages` 同风格。
+ *
+ * ★ 存在的理由（2026-09-22）：她被 @ 时用**话题回复**答话，
+ *   而 `im.message.receive_v1` 事件里 `parent_id` / `root_id` 指着我方那条消息。
+ *   两个字段原先没人读 → 守衡看到一句悬空的回答，接到了别的话题上，误答并外发。
+ *   判据（什么时候该读、读哪一条）在 `agent/thread.mjs`，**这里只管把那一读做出来**。
+ *
+ * ★ 实测（2026-09-22，只读探针，见 PMO/守衡-误答登记-20260922.md §3.2.1）：
+ *   机器人**读得回自己发出去的消息** —— 包括 `tools/send_once.mjs` 发的主动推送
+ *   （`om_x100b64166aff2ca8b487459d2f76acb` 实测读得到，`sender_type=app`）。
+ *   所以「守衡看不见自己问过什么」这一半，靠这一次回读就能补上，
+ *   **不需要动 import 图、不需要给 memory.append 加调用点**。
+ *
+ * @returns {Promise<{text:string, from:string, senderType:string, senderOpenId:string|null,
+ *                    at:string|null, msgType:string, recalled:boolean, parentId:string|null,
+ *                    rootId:string|null}|{error:string}>}
+ */
+export async function getMessage(messageId) {
+  try {
+    const r = await client.im.message.get({ path: { message_id: messageId } });
+    const items = r?.data?.items ?? [];
+    if (!items.length) {
+      // ⚠️ `code=0` 但 items 为空 —— 必须与「读到了空消息」长得不一样（§2.4.1 第 1 行那个坑）。
+      return { error: `消息 ${messageId} 回读成功但 items 为空（code=0）—— 这是「读不到」，不是「内容是空的」` };
+    }
+    const it = items[0];
+
+    // ★ 2026-09-22：改走 `bodyToText`（与 `listRecentMessages` 同一份解析）。
+    //   原先这里也只认 `.text` —— 后果具体到本轮：`outbound_ledger.mjs --backfill`
+    //   会给一条 **post** 消息写进**空正文**的台账记录，而空正文在折记忆时会被跳过，
+    //   于是「补记了」和「没补记」在表面上完全一样。补记的正是守衡自己发的话，
+    //   而它自己发的**绝大多数是 post**（`sendMarkdown` 走富文本）。
+    const parsed = bodyToText(it.msg_type, it.body?.content);
+    const raw = parsed.text ?? '';
+
+    // 撤回：飞书把正文换成一句英文占位符，原文任何接口都取不回。
+    // 必须与「正常但很短的消息」分开 —— 前者是**内容没了**，后者是**本来就这么短**。
+    const recalled = /^This message was recalled$/i.test(raw.trim());
+
+    const senderType = it.sender?.sender_type;       // user | app
+    const senderOpenId = senderType === 'user' ? (it.sender?.id ?? null) : null;
+
+    // 发信人的显示名：机器人直接说「你自己」，用户才去查名。
+    // 查不到就如实写 open_id，**不编一个称呼**（把 id 写出来至少能比对）。
+    let from = senderType === 'app' ? `${BOT_NAME}(你自己)` : null;
+    if (!from && senderOpenId) {
+      const looked = await getUserName(senderOpenId, it.chat_id ?? null);
+      from = looked?.name ?? `用户(${senderOpenId})`;
+    }
+
+    return {
+      text: recalled ? '（原文已在飞书端撤回，撤回后任何接口都不返回内容）' : raw,
+      from: from ?? String(senderType ?? '(未知发送者)'),
+      senderType: senderType ?? null,
+      senderOpenId,
+      // ★ 2026-09-22 补：`chat_id` 原先没有带出去。补记外发（`tools/outbound_ledger.mjs
+      //   --backfill`）要把一条历史消息写进台账，而台账是按 `chat_id` 折进会话记忆的 ——
+      //   取不到它，「这条是发到哪个群的」就只能靠调用方猜，而猜错的表现是
+      //   **折进了另一个群（或谁都折不进）**，两边都不报错。
+      chatId: it.chat_id ?? null,
+      at: it.create_time ? beijingString(Number(it.create_time)) : null,
+      createTime: it.create_time ? Number(it.create_time) : null,
+      msgType: it.msg_type ?? null,
+      recalled,
+      // ★ 解析出来了没有 —— 与 `text` 是空串分得开。调用方（补记台账）据此决定
+      //   「这条读回来了」还是「这条我读不出来」，不许把后者当成前者。
+      parsed: parsed.parsed,
+      parseNote: parsed.note ?? null,
+      parentId: it.parent_id ?? null,
+      rootId: it.root_id ?? null,
+    };
+  } catch (e) {
+    // 已知会走到这里的一种情形：消息被删除 / 不在本应用可见范围。
+    // 这不是「没有上文」，是「读不到上文」—— 调用方必须能分辨（见 thread.mjs 头注）。
+    return { error: `回读消息失败 code=${e?.response?.data?.code} msg=${e?.response?.data?.msg ?? e.message}` };
   }
 }
 

@@ -39,12 +39,37 @@ DAEMON_LOG="$ROOT/PMO/logs/ws_daemon.log"
 
 EXIT_REFUSED=3
 
-YES=0; CHECK=0; WHY=""; SINCE=""
+# ── 「同意」是有保质期的：读数与执行必须落在**同一次**对话里 ──────────
+#
+# ★ 2026-09-22 实测的事故，这道闸门就是为它加的：
+#
+#   17:54  我跑不带 --yes 的那条，读到「重启会生效：3 个模块 + 1 个脚本」，念给委托方
+#   17:55  另**一个会话**自己重启了一次（台账 30696→38441），把那些改动全加载了
+#   18:03  我拿 17:54 的读数去执行 --yes —— 而闸门当场打印的是「重启会生效 **无**」，
+#          底下还写着「那这次重启不带来任何运行时变化，先想清楚为什么还要重启」。
+#          **我没有重读，于是执行了一次零收益的重启。**
+#
+#   那一次代价是运气好（17:50 之后入站事件为 0，一条消息没丢）。
+#   但这个形状与 §2.4.6 / §2.7 点名的病**是同一个**：
+#   **一份有保质期的读数，没有任何东西在它过期时把我拦住。**
+#   只不过前面几次长在状态文件上，这一次长在**闸门自己的输出**上。
+#
+# 所以：读数写成一份**一次性凭证**，`--yes` 必须带着它，且它必须仍然对得上。
+# 三条都要过 —— 任一条不过就拒，并且**把是哪一条说清楚**（拒绝不许含糊）。
+CONSENT="${SHOUHENG_RESTART_CONSENT:-$ROOT/PMO/shouheng-state/restart-consent}"
+CONSENT_MAX_AGE=300          # 5 分钟。够人念完再决定，不够跨过一次别人的重启。
+
+YES=0; CHECK=0; WHY=""; SINCE=""; NO_KICK=0
 for a in "$@"; do
   case "$a" in
     --yes)   YES=1 ;;
     --check) CHECK=1 ;;
     --why=*) WHY="${a#--why=}" ;;
+    # --no-kick：把 --yes 那条路上**全部**校验跑完，但**不真重启**，退 0。
+    # 它存在的唯一理由是让自证能断言「凭证有效这条路上不会误报」（§2.1.1：
+    # 一个会误报的检查器比没有检查器更糟）。它**不会**消耗凭证，也**不动进程** ——
+    # 所以它不构成绕过：它一次 kickstart 都不发。
+    --no-kick) NO_KICK=1 ;;
     # --since 只改「重启会生效」那块读数的参照时间，不参与要不要重启的决定。
     # 存在的理由：不加它，那块读数在最常见的时刻恒为「无」—— 恒真的读数等于没读。
     # 自证拿它做反向对照：--since=0 必须列出整个 import 图，--since=<未来> 必须为空。
@@ -62,14 +87,20 @@ pid_of() {
   pgrep -f 'ws_daemon\.mjs' 2>/dev/null | head -1
 }
 
-# 读数：群里最后一条消息距今多久（判断重启时机的唯一硬依据）
-last_msg_age() {
+# 读数：**某一类会话**里最后一条消息距今多久（判断重启时机的唯一硬依据）
+#
+# ★ 2026-09-22 改：原先不分群和私聊，取的是事件日志里最新那一条 —— 实测当天
+#   最新一条是**私聊**（`chat_type=p2p`），却被印成「群里最后一条」。那是 §2.4.1
+#   那句自检：**这句话比我的输入大**。现在按 `chat_type` 分开报，两条都给人看 ——
+#   **重启窗口对群和私聊都生效**，所以不能只报一条。
+chat_age() {   # $1 = group | p2p
   # ⚠ ${EVENTS} 的花括号不是风格 —— macOS 自带 bash 3.2 会把紧跟变量的多字节
   #   字符首字节吃进变量名（`$EVENTS）` 被当成变量 EVENTS\xef），报一句
   #   莫名其妙的 unbound variable。凡是变量后面直接跟中文，必须加花括号。
-  [ -f "$EVENTS" ] || { echo "未知（没有事件落盘 ${EVENTS}）"; return; }
-  python3 - "$EVENTS" <<'PY' 2>/dev/null || echo "未知（落盘读不出来）"
+  [ -f "$EVENTS" ] || { echo "未知"; return; }
+  python3 - "$EVENTS" "$1" <<'PY' 2>/dev/null || echo "未知"
 import json, sys, time
+kind = sys.argv[2]
 best = None
 with open(sys.argv[1], encoding='utf-8', errors='replace') as f:
     for line in f:
@@ -80,7 +111,10 @@ with open(sys.argv[1], encoding='utf-8', errors='replace') as f:
             d = json.loads(line)
         except Exception:
             continue
-        ts = ((d.get('data') or {}).get('message') or {}).get('create_time')
+        m = ((d.get('data') or {}).get('message') or {})
+        if (m.get('chat_type') or '') != kind:
+            continue
+        ts = m.get('create_time')          # 毫秒；取的是**原消息时刻**，不是重投时刻
         try:
             ts = int(ts)
         except (TypeError, ValueError):
@@ -88,10 +122,9 @@ with open(sys.argv[1], encoding='utf-8', errors='replace') as f:
         if best is None or ts > best:
             best = ts
 if best is None:
-    print('未知（落盘里没有带时间的消息）')
+    print('未知（这类会话没有带时间的消息）')
 else:
-    age = (time.time() - best / 1000) / 60
-    print('%.0f 分钟前' % age)
+    print('%.0f 分钟前' % ((time.time() - best / 1000) / 60))
 PY
 }
 
@@ -148,18 +181,93 @@ PY
 PID="$(pid_of)"
 echo "── 守衡重启闸门 ──────────────────────────────────────"
 if [ -n "${PID:-}" ]; then
-  START_EPOCH="$(ps -o lstart= -p "$PID" 2>/dev/null | xargs -I{} date -j -f '%a %b %d %T %Y' '{}' '+%s' 2>/dev/null)"
-  echo "  现在在跑      PID ${PID}，已运行 $(ps -o etime= -p "$PID" 2>/dev/null | tr -d ' ')"
-  echo "  启动于        $(ps -o lstart= -p "$PID" 2>/dev/null | sed 's/^ *//')"
+  # ★ 2026-09-22 重写：这一块原先读 `ps -o lstart=`，而 ps 在受限环境里被拒
+  #   （DSH 沙箱下 `/bin/ps: Operation not permitted`）→ 启动时刻**永远**读不到，
+  #   于是下面「重启会生效」整块算不出来。而 §2.7 把那一块称作**判断时机的唯一硬依据**。
+  #   **这是选型错误，不是环境限制**：pid 的权威在 launchd（`pid_of` 本来就先问它），
+  #   而「什么时候启动的」有两个不需要 ps 的来源，按可信度排序：
+  #     ① daemon 自写的 PMO/shouheng-state/daemon-run.json（随 step 1 落地）
+  #     ② 重启台账里 `pid_after == 当前 pid` 的那一条
+  #   ② 必须核一条**恒等式**：`pid_after` 要等于现在这个 pid。不核它，就会把
+  #   「上一次重启的时刻」当成「这个进程的启动时刻」—— launchd 的 KeepAlive
+  #   自愈重启**不进台账**，那时这两件事不是一回事。
+  #   ps 留作第三顺位：能用就用（它给的 lstart 是原始读数），不能用就不提它。
+  START_INFO="$(python3 - "$ROOT" "$PID" <<'PY' 2>/dev/null
+import datetime, json, os, sys, time
+root, pid = sys.argv[1], sys.argv[2]
+def ep(s):
+    return int(datetime.datetime.fromisoformat(str(s).replace('Z', '+00:00')).timestamp())
+def emit(e, src):
+    print('%d|%s|%s' % (e, time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(e)), src))
+    raise SystemExit
+try:
+    d = json.load(open(os.path.join(root, 'PMO/shouheng-state/daemon-run.json'), encoding='utf-8'))
+    if str(d.get('pid')) == pid and d.get('startedAt'):
+        emit(ep(d['startedAt']), 'run-state.startedAt')
+except SystemExit:
+    raise
+except Exception:
+    pass
+try:
+    ledger = os.path.join(root, 'PMO/logs/restart-ledger.jsonl')
+    recs = [json.loads(x) for x in open(ledger, encoding='utf-8') if x.strip()]
+    for r in reversed(recs):
+        if r.get('ok') and str(r.get('pid_after')) == pid and r.get('at'):
+            emit(ep(r['at']), '重启台账最后一条（pid_after 对得上）')
+except SystemExit:
+    raise
+except Exception:
+    pass
+PY
+)"
+  START_EPOCH="${START_INFO%%|*}"
+  START_HUMAN="$(printf '%s' "${START_INFO}" | cut -d'|' -f2)"
+  START_SRC="$(printf '%s' "${START_INFO}" | cut -d'|' -f3)"
+  if [ -n "${START_EPOCH:-}" ]; then
+    UPTIME_MIN="$(python3 -c 'import sys,time;print(int((time.time()-float(sys.argv[1]))//60))' "${START_EPOCH}" 2>/dev/null)"
+    echo "  现在在跑      PID ${PID}，已运行 ${UPTIME_MIN} 分钟"
+    echo "  启动于        ${START_HUMAN}（来源：${START_SRC}）"
+  else
+    START_RAW="$(ps -o lstart= -p "${PID}" 2>/dev/null | xargs)"
+    if [ -n "${START_RAW}" ]; then
+      START_EPOCH="$(printf '%s' "${START_RAW}" | xargs -I{} date -j -f '%a %b %d %T %Y' '{}' '+%s' 2>/dev/null)"
+      echo "  现在在跑      PID ${PID}，已运行 $(ps -o etime= -p "${PID}" 2>/dev/null | tr -d ' ')"
+      echo "  启动于        ${START_RAW}（来源：ps lstart）"
+    else
+      START_EPOCH=""
+      echo "  现在在跑      PID ${PID}（进程在，但启动时刻三个来源都读不到 → 运行时长【未测】）"
+      echo "  启动于        ⚠ 未测：run-state 未部署、台账里没有 pid_after=${PID} 的记录、ps 也被拒"
+    fi
+  fi
 else
   START_EPOCH=""
   echo "  现在在跑      ✗ 没有在跑"
 fi
-echo "  群里最后一条  $(last_msg_age)"
+echo "  最后一条消息  群 $(chat_age group) ｜ 私聊 $(chat_age p2p)"
+echo "                （**重启窗口对两者都生效** —— 分不清群和私聊时，这个读数会说一句"
+echo "                  比输入大的话：2026-09-22 实测，最新一条是私聊，而当时它被算成了「群里」）"
 echo "  重启方式      launchctl kickstart -k $DOMAIN/$LABEL"
 echo "                ⚠ 不要用 kill -TERM —— 退出码 0 会让 launchd 认为这是正常停机，不再拉起（见本文件头部实测）"
-if [ -n "${START_EPOCH:-}" ]; then
-  RAW="$(runtime_changed_since "${SINCE:-$START_EPOCH}")"
+# 基准时刻：**显式 --since 优先**，否则用进程启动时刻。
+# ★ 只要 --since 给了，就**不许**再被「取不到启动时刻」挡住 —— 这个开关存在的全部意义
+#   就是让这块读数**可证伪**（§2.7 造它时的原话：`--since=0` 出全图、`--since=未来` 出空）。
+#   把它挂在 ps 后面，等于把可证伪性又收了回去：2026-09-22 实测，ps 被拒时
+#   B1/B2 两条断言同时变红 —— 而那两条正是设计来证明「这块读数会动」的。
+if [ -n "${SINCE:-}" ]; then
+  SINCE_USE="${SINCE}"
+elif [ -n "${START_EPOCH:-}" ]; then
+  SINCE_USE="${START_EPOCH}"
+else
+  SINCE_USE=""
+fi
+
+if [ -z "${SINCE_USE:-}" ]; then
+  # 读不到基准 ≠ 没有东西会生效。这两件事在输出里必须长得不一样。
+  echo "  重启会生效    ⚠ **未测** —— 读不到进程启动时刻，这块算不出来"
+  echo "                （这不等于「没有东西会生效」。要算就显式给基准："
+  echo "                  --since=0 出全图；--since=<epoch 秒> 出那之后改过的）"
+else
+  RAW="$(runtime_changed_since "${SINCE_USE}")"
   CHANGED="$(printf '%s\n' "$RAW" | sed -n '/^===IMPORT===/,/^===SPAWN===/p' | sed '1d;$d')"
   SPAWNED="$(printf '%s\n' "$RAW" | sed -n '/^===SPAWN===/,$p' | sed '1d')"
   if [ -n "$CHANGED" ] || [ -n "$SPAWNED" ]; then
@@ -180,6 +288,33 @@ if [ -n "${START_EPOCH:-}" ]; then
     echo "  重启会生效    无 —— 启动之后没有任何被 import 的模块或被调起的脚本被改过"
     echo "                （那这次重启不带来任何运行时变化，先想清楚为什么还要重启）"
   fi
+fi
+
+# ── 把这次读数压成一份**一次性凭证** ────────────────────────
+# 摘要覆盖「谁在跑 + 拿什么基准算的 + 算出来什么」三样 —— 也就是说：
+# **凭证对不上，等价于「世界变了」**，而不是「你抄错了一个数」。
+READING="pid=${PID:-none}
+since=${SINCE_USE:-none}
+changed=${CHANGED:-}
+spawned=${SPAWNED:-}"
+DIGEST="$(printf '%s' "$READING" | shasum -a 256 | awk '{print $1}')"
+
+# 只有「报告但不执行」那一次才写凭证。`--check` 是纯查看，不许留下任何东西
+# （§2.4.4：写进自证表的命令，都要能回答「它跑完之后盘上有什么变了？」）。
+# 已带 --yes 的那次也**不重写** —— 否则它就把自己要校验的那份凭证换掉了。
+if [ "$YES" = "0" ] && [ "$CHECK" = "0" ]; then
+  mkdir -p "$(dirname "$CONSENT")"
+  {
+    echo "at=$(date +%s)"
+    echo "pid=${PID:-none}"
+    echo "digest=$DIGEST"
+  } > "$CONSENT"
+  echo "──────────────────────────────────────────────────────"
+  echo "  ⏳ 本次读数已写成凭证（$((CONSENT_MAX_AGE / 60)) 分钟内有效）："
+  echo "     $CONSENT"
+  echo "     要执行就现在执行：bash tools/restart_shouheng.sh --yes --why=\"<理由>\""
+  echo "     ★ 过了这个时间、或这中间别人重启过，它会拒 —— 那就**重新读一遍**再决定，"
+  echo "       不要绕过它。读数会过期这件事，本文件头上记着一次真事故。"
 fi
 
 # ── 没在跑：这不是重启，是救活 ──────────────────────────────
@@ -203,12 +338,54 @@ else
     echo "  ✗ 拒绝重启：--yes 必须配 --why=\"<理由>\" —— 重启要留痕，理由就是痕迹。"
     exit "$EXIT_REFUSED"
   fi
+  # ★ 凭证校验：**同意必须在同一次读数里给出**。三条各拦一种「世界变了」：
+  #   缺凭证（没先读就执行）／凭证过期（读了很久才动手）／PID 对不上（中间别人重启过）。
+  #   第三条是 2026-09-22 那次事故的**直接判据** —— 它不需要任何时间假设，
+  #   只问一句「我同意的那个进程，还是现在这个吗？」
+  if [ ! -f "$CONSENT" ]; then
+    echo "  ✗ 拒绝重启：**没有凭证** —— 这一轮没有先跑过不带 --yes 的那条。"
+    echo "    先读一遍：bash tools/restart_shouheng.sh"
+    echo "    然后再执行（读完到执行之间别隔太久）。"
+    exit "$EXIT_REFUSED"
+  fi
+  C_AT="$(sed -n 's/^at=//p' "$CONSENT")"
+  C_PID="$(sed -n 's/^pid=//p' "$CONSENT")"
+  C_DIGEST="$(sed -n 's/^digest=//p' "$CONSENT")"
+  NOW_EPOCH="$(date +%s)"
+  if [ -z "${C_AT:-}" ] || [ $((NOW_EPOCH - C_AT)) -gt "$CONSENT_MAX_AGE" ]; then
+    echo "  ✗ 拒绝重启：**凭证已过期**（取于 ${C_AT:-未知}，上限 ${CONSENT_MAX_AGE} 秒）。"
+    echo "    读数是有保质期的 —— 过期了就得**重新读一遍**，不是把旧读数再念一遍。"
+    rm -f "$CONSENT" || true
+    exit "$EXIT_REFUSED"
+  fi
+  if [ "${C_PID:-none}" != "${PID:-none}" ]; then
+    echo "  ✗ 拒绝重启：**PID 对不上** —— 你同意的是 PID ${C_PID}，现在在跑的是 PID ${PID:-none}。"
+    echo "    这中间有一次**别人的重启**：那些改动已经生效了，你手上这份读数已经过期。"
+    echo "    重新读一遍再决定：bash tools/restart_shouheng.sh"
+    rm -f "$CONSENT" || true
+    exit "$EXIT_REFUSED"
+  fi
+  if [ "${C_DIGEST:-}" != "$DIGEST" ]; then
+    echo "  ✗ 拒绝重启：**读数对不上** —— 凭证里的摘要与你这次算出来的不一致。"
+    echo "    （同一台机器、同一个 PID，但「重启会生效」那份清单变了：文件在两次之间被改过。）"
+    echo "    重新读一遍再决定：bash tools/restart_shouheng.sh"
+    rm -f "$CONSENT" || true
+    exit "$EXIT_REFUSED"
+  fi
+  echo "  ✓ 凭证有效  （取于 $((NOW_EPOCH - C_AT)) 秒前，PID ${C_PID} 未变，摘要一致）"
+  if [ "$NO_KICK" = "1" ]; then
+    echo "  （--no-kick：以上校验全过，但**没有执行 kickstart** —— 进程一个字节没动，凭证也没消耗）"
+    exit 0
+  fi
   MODE="restart"
 fi
 
 # ── 执行 ───────────────────────────────────────────────────
 PID_BEFORE="${PID:-none}"
 echo "  执行          launchctl kickstart -k $DOMAIN/$LABEL  [$MODE]"
+# 凭证**一次性**：执行前就作废。放在 kickstart 之后作废的话，kickstart 失败时
+# 凭证还留着，下一次 --yes 会拿一份「已经用过的同意」再试一遍 —— 那不叫同意。
+rm -f "$CONSENT" || true
 launchctl kickstart -k "$DOMAIN/$LABEL" || { echo "  ✗ kickstart 失败（退出码 ${?}）—— 它可能现在没在跑，或 label 不对"; exit 1; }
 
 # 等它起来（最多 20 秒），并**证明它真的回来了** —— 只 kickstart 不验证，

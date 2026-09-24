@@ -58,7 +58,7 @@
 | 文件 | 是什么 |
 |---|---|
 | `索引-v1.json` | **机器可读的基线台账**：每份文档的 token / 时间 / 字数 / sha256 / 字节数 |
-| `内容审查Agent-PRD-v1.0.md` | 《内容审查 Agent PRD》v1.0 逐字原文（7,144 字，09-21 10:41 版） |
+| `内容审查Agent-PRD-v1.0.md` | 《内容审查 Agent PRD》逐字原文。**当前是上游 v1.2**（10,864 字 / 23,452 B / sha `a336500862…`，上游 09-22 16:32:37 改）；09-21 那一版是 v1.0（7,144 字），全文归档在 `_history/`。⚠️ **文件名里的 `v1.0` 是定位符，不是版本声明** —— 它被 `.ua/` 关系图与 `persona.mjs`/`tools.mjs` 的提示词引用，改名会波及那些地方，所以保持稳定 |
 | `美国市场内容治理项目-一页纸计划书.md` | 《美国市场内容治理项目（第一阶段）一页纸计划书》逐字原文（2,831 字，09-20 12:06 版） |
 | `../PRD差异对照-20260921.md` | 三份载体（本地旧提取件 / 线上旧页 / 线上新 PRD）的逐章差异与分析 |
 
@@ -86,12 +86,26 @@ python3 -c "import json;d=json.load(open('PRD/feishu/索引-v1.json'));print(d['
 索引里的两个 sha256 全仓零消费者。`AGENTS.md` §2.4.2 记的就是这件事。
 **落在 `tools/verify_prd_baseline.py`，它是那句对外承诺的执行点。**
 
-**重新拉取（L3 红了才做）**：脚本会把该跑的命令直接打出来。要点两条：
+**重新拉取（L3 红了才做）**：脚本会把该跑的命令直接打出来。要点三条：
 
-1. **用 shell 重定向落盘**（`... readdoc <token> > 'PRD/feishu/<文件>'`）——
-   Python 写盘会进填充态，`read` 工具读不出来（§七）。
+1. **落盘的三步配方**（2026-09-22 更正 —— 原来说「用 shell 重定向落盘就不会被填充」
+   **是错的**：`readdoc` 的产出方是 `python3`，重定向只是 shell 转手，文件照样进填充态，
+   实测 `verify_depad.py` 报「真实 6540B · stat 10636B」）：
+
+   ```bash
+   python3 tools/lark_find.py readdoc <token> > 'PRD/feishu/<文件>'   # ① 落盘
+   python3 tools/verify_depad.py --fix                                # ② 去填充（必做）
+   python3 tools/verify_depad.py                                      # ③ 复验须「被填充 0 个」
+   ```
+
+   `readdoc` 自 2026-09-22 起**原样输出、不补换行**，所以 ① 出来的文件 sha256 与
+   `raw_content` 逐字一致；在这个改动之前用 `print()` 会多一个 `\n`，
+   于是**照文档跑出来的文件永远对不上索引**，B1/B2/B3 全红。
 2. **别只改 sha256**，`chars` / `size_bytes` / `obj_edit_time_bj` 一起重记 ——
    只改一个数，等于把「变过」这件事压成一行，后人看不出变了什么。
+   旧的读数写进该条的 `prev_fingerprints`，别丢。
+3. **只写复现得出来的数**（AGENTS.md §2.2 第 1 条）：本轮我一度想记一个
+   09-22 上午的「中间态指纹」，但它在仓里**找不到任何出处**，于是没写进去。
 
 ---
 
@@ -122,7 +136,8 @@ python3 -c "import json;d=json.load(open('PRD/feishu/索引-v1.json'));print(d['
 
 ```
 ls -l / wc -c / stat -f %z  →  18710
-python open().read()        →  14614     ← 索引 size_bytes 也是 14614
+python open().read()        →  14614     ← 索引 size_bytes 也是 14614（**那是当时那一版**；
+                                            09-22 16:32:37 上游改版后已是 23452）
 ```
 
 抓到它的是 `python3 tools/verify_depad.py`（`--fix` 修好，`cp` 往返带 sha256 断言）。

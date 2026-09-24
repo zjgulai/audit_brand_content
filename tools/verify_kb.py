@@ -592,6 +592,661 @@ def main():
               f"族成员不存在且并集不等 → 抓住 {len(_fam_probe)}/2；"
               f"材料「待分类」→ 抓住 {len(_axis_probe)}/1")
 
+        # ── T 组 · 移植项（T17 逐条缺口账 / T18 引用失效 / T19 origin 分级）──
+        #   三条都来自 `PMO/守衡-Utopia结合方案-20260923.md` §四，本条文件是它们的执行层。
+        #   共同形态：**把一条原来靠人记住的纪律，变成一条会红的断言。**
+        import kb_gap_ledger as GL
+
+        _led = GL.load_ledger()
+        _led_rows = (_led[0] or {}).get("rows") or [] if _led[0] else []
+        _ext_entries = _ext.get("entries", []) if _ext else []
+        _cited, _cite_note = GL.cited_index()
+        _live = GL.channel_liveness()
+
+        def _ledger_problems(rows, entries, cited, live):
+            """★ 判据抽成纯函数，反向对照才能对**同一个判据**做变异。
+
+            这是本仓反复吃过亏的地方（`V30` 的 `_queue_problems`、`F3` 的
+            `_ext_problems` 同理）：写成一段内联 `if`，反向对照就只能另写一份
+            相似的判断 —— 而验的已经不是同一条判据了。
+
+            返回 `[(类, 说明)]`。**分类不是为了好看**：每一类各有一条反向对照守着
+            （见下面 `_ctl`），而每条检查的结论行只在自己那一类的对照也响了之后才准变绿
+            —— 否则删掉一条判据，结论行会照旧写着「正反两面一致」（结论行撒谎）。
+            """
+            bad = []
+            # ① 键唯一 + 三个取值域是枚举（自由字符串 = 没有原因码）
+            _k = __import__("collections").Counter(
+                (r.get("库"), r.get("条目ID"), r.get("通道")) for r in rows)
+            for k, n in _k.items():
+                if n > 1:
+                    bad.append(("枚举", f"键重复 {k} ×{n}"))
+            for r in rows:
+                if r.get("库") not in GL.LIBS:
+                    bad.append(("枚举", f"{r.get('条目ID')}: 库={r.get('库')!r} 不在取值域"))
+                if r.get("通道") not in GL.CHANNELS:
+                    bad.append(("枚举", f"{r.get('条目ID')}: 通道={r.get('通道')!r} 不在取值域"))
+                if r.get("原因码") not in GL.REASONS:
+                    bad.append(("枚举", f"{r.get('条目ID')}: 原因码={r.get('原因码')!r} 是自由字符串"))
+            # ② 恒等式：分项之和 == 总数（改写 `AGENTS.md` §2.4.1 可操作结论 2）
+            _cnt = __import__("collections").Counter(
+                r["原因码"] for r in rows if r.get("原因码") in GL.REASONS)
+            if sum(_cnt.values()) != len(rows):
+                bad.append(("枚举", f"Σ(各原因码计数)={sum(_cnt.values())} ≠ 总行数={len(rows)}"
+                                    f"　（有 {len(rows) - sum(_cnt.values())} 行落不进任何一组）"))
+            # ③ 逐条覆盖 + 正反一致
+            _ids = {e.get("id") for e in entries}
+            _idx = {}
+            for r in rows:
+                _idx.setdefault((r.get("库"), r.get("条目ID"), r.get("通道")), []).append(r)
+            for eid in sorted(x for x in _ids if x):
+                hit = _idx.get(("外部标准库", eid, "rules")) or []
+                if len(hit) != 1:
+                    bad.append(("覆盖", f"{eid}: 恰需一行（库=外部标准库·通道=rules），实得 {len(hit)} 行"))
+                    continue
+                # ★ 只认 **rules 通道**的反向指针来定这一行的原因码。
+                #   `cited` 现在同时装着 engine 通道（回执）的引用 ——
+                #   不按通道过滤的话，一条**回执**引过它就会让**规则那一行**翻成
+                #   `cited_by`。那正是「一条通道活着给另一条通道作证」（§2.4.1 第 4 行），
+                #   而且是**静默**的：账看起来更绿了。
+                _rules_hit = [w for w in (cited.get(eid) or []) if w[1] == "rules"]
+                want = "cited_by" if _rules_hit else "unused"
+                if hit[0].get("原因码") != want:
+                    bad.append(("覆盖", f"{eid}: 账上说 {hit[0].get('原因码')!r}，反向指针实际是 {want!r}"))
+            for r in rows:
+                if r.get("库") == "外部标准库" and r.get("条目ID") not in _ids:
+                    bad.append(("覆盖", f"{r.get('条目ID')}: 不在外部标准库里 —— 凭空一行"))
+            # ④ ★ 通道必须活着才准出否定结论（§2.4.1 第 4 行）
+            for ch in sorted({r.get("通道") for r in rows}):
+                if not (live.get(ch) or {}).get("alive"):
+                    bad.append(("活性", f"通道 {ch} 此刻没活着，账上却有它的行 —— "
+                                        f"否定结论比输入大（{(live.get(ch) or {}).get('proof', '无自证')}）"))
+            return bad
+
+        # ── 反向对照 + 正例对照 ──────────────────────────────────────
+        #   ★ 只验反例是不够的（§2.4.1 的 X7 教训）：反例各有别的理由也会被抓住，
+        #     而判据写成恒真时反例照样红。所以下面必须有一条**正例**。
+        def _ctl(rows, cited=None, entries=None):
+            return {k for k, _ in _ledger_problems(
+                rows, entries if entries is not None else _ext_entries,
+                cited if cited is not None else _cited, _live)}
+
+        _lp = _ledger_problems(_led_rows, _ext_entries, _cited, _live)
+        _cnt_all = __import__("collections").Counter(r.get("原因码") for r in _led_rows)
+
+        _c_enum = _ctl([dict(_led_rows[0], 原因码="不知道")] + _led_rows[1:]) \
+            if _led_rows else set()
+        #   ★ 每个反例**各自点名**。第一版只断言「触发过的类别集合 == {覆盖}」——
+        #     实测无效：删掉「恰一行」那条判据后，「凭空一行」还在触发「覆盖」，
+        #     集合照旧相等，两个变异体全绿。**集合相等不等于每条对照都响了。**
+        _c_named = {}
+        if _led_rows:
+            _c_named["自由原因码"] = _c_enum
+            _c_named["未测通道出结论"] = _ctl(_led_rows + [dict(_led_rows[0], 通道="shouheng")])
+        if _ext_entries and _led_rows:
+            _c_named["凭空一行"] = _ctl(_led_rows + [dict(_led_rows[0], 条目ID="EXT-999")])
+            #   ★ 「删一行」必须删**点名的那一行**，不许写 `_led_rows[1:]`。
+            #     2026-09-23（T4/T15 · engine 通道接了进来）当场踩到：行是按
+            #     `(库, 条目ID, 通道)` 排的，`engine` 排在 `rules` 前面，于是
+            #     「删第 0 行」删掉的是 `EXT-001 · engine` —— 而覆盖判据看的是
+            #     `通道=rules` 那一行，**它一条问题也不报**，这条对照安静地变成了恒真。
+            #     （这正是本节开头那段话的第二次发生：**一条随世界变好而失效的对照**。）
+            _i_rules = next((i for i, r in enumerate(_led_rows)
+                             if r.get("通道") == "rules"
+                             and r.get("条目ID") == _ext_entries[0].get("id")), None)
+            _c_named["删一行"] = _ctl(_led_rows[:_i_rules] + _led_rows[_i_rules + 1:]
+                                      if _i_rules is not None else _led_rows)
+            #   ★ 这两个对照**必须按当前事实构造**，不能写死「把第一行改成 cited_by」。
+            #     第一版就是写死的：T3 落地后 EXT-001 真的成了 `cited_by`，
+            #     于是那个「变异体」与真身一模一样，判据自然不报错 ——
+            #     **一条随世界变好而失效的反向对照，会安静地变成恒真。**
+            #     现在两边各取一行真实的、方向相反的行来造反，两个方向都验。
+            _truth = {("外部标准库", e.get("id"), "rules"):
+                      ("cited_by" if _cited.get(e.get("id")) else "unused")
+                      for e in _ext_entries}
+            def _flip(idx, to):
+                rows = [dict(r) for r in _led_rows]
+                rows[idx] = dict(rows[idx], 原因码=to)
+                return rows
+            _i_un = next((i for i, r in enumerate(_led_rows)
+                          if _truth.get((r.get("库"), r.get("条目ID"), r.get("通道")))
+                          == "unused"), None)
+            _i_ci = next((i for i, r in enumerate(_led_rows)
+                          if _truth.get((r.get("库"), r.get("条目ID"), r.get("通道")))
+                          == "cited_by"), None)
+            if _i_un is not None:
+                _c_named["谎称被引用"] = _ctl(_flip(_i_un, "cited_by"))
+            if _i_ci is not None:
+                _c_named["谎报没被引用"] = _ctl(_flip(_i_ci, "unused"))
+        _ctl_cov = {k: v for k, v in _c_named.items()
+                    if k in ("凭空一行", "删一行", "谎称被引用", "谎报没被引用")}
+        # ★ 正例：某条目真的有了反向指针 → 它的行必须翻成 cited_by 且**不再红**
+        _pos_cited, _pos_rows = dict(_cited), [dict(r) for r in _led_rows]
+        if _ext_entries and _pos_rows:
+            _pos_cited[_ext_entries[0]["id"]] = [("外部标准库", "rules", "T0.probe")]
+            _pos_rows[0] = dict(_pos_rows[0], 原因码="cited_by")
+        _pos_bad = _ledger_problems(_pos_rows, _ext_entries, _pos_cited, _live) if _pos_rows else []
+
+        def _bad_of(cat):
+            return [m for k, m in _lp if k == cat]
+
+        c.add("T17a", "逐条缺口账：恒等式与取值域",
+              not _bad_of("枚举") and "枚举" in _c_named.get("自由原因码", set()),
+              (f"{len(_led_rows)} 行 · Σ(各原因码计数) == 总行数 · 三个取值域全部命中枚举（"
+               + "、".join(f"{k} {v}" for k, v in sorted(_cnt_all.items(), key=str)) + "）"
+               f" · 反向对照：自由原因码 → {'判据报红' if '枚举' in _c_enum else '❌没报红'}"
+               if not _bad_of("枚举") else f"❌ {_bad_of('枚举')[:3]}"))
+
+        #   「谎称被引用」与「谎报没被引用」各需一种事实才构造得出；**至少两条对照
+        #   都必须跑到**，否则这条检查会因为「构造不出反例」而静默变绿。
+        _b_ctl_ok = ({"凭空一行", "删一行"} <= set(_ctl_cov)
+                     and len(_ctl_cov) >= 3
+                     and all("覆盖" in v for v in _ctl_cov.values()))
+        c.add("T17b", "逐条缺口账：62 条逐条有落点，正反两面一致",
+              not _bad_of("覆盖") and _b_ctl_ok and not _pos_bad,
+              (f"{len(_ext_entries)} 条外部标准逐条恰一行（库=外部标准库·通道=rules）；"
+               f"cited_by ⇔ 反向指针（{_cite_note}）；"
+               f"反向对照：" + "、".join(
+                   f"{k}{'✅' if '覆盖' in v else '❌'}" for k, v in _ctl_cov.items())
+               + "（各自点名，不是「集合相等」）" + "；"
+               f"正例（真注入反向指针 → 该行翻 cited_by）→ "
+               f"{'不误伤 ✅' if not _pos_bad else f'❌ 误伤 {_pos_bad[:2]}'}"
+               if not _bad_of("覆盖") else f"❌ {_bad_of('覆盖')[:4]}"))
+
+        _c_live = _c_named.get("未测通道出结论", set())
+        c.add("T17c", "逐条缺口账：只对活着的通道下否定结论",
+              not _bad_of("活性") and "活性" in _c_live,
+              (f"通道活性：" + "、".join(f"{k}={'活' if v['alive'] else '未测'}"
+                                          for k, v in _live.items())
+               + f"；`unused` 只对活着的通道出 —— 反向对照：给未测通道塞一行 → "
+                 f"{'判据报红' if '活性' in _c_live else '❌没报红'}"
+               if not _bad_of("活性") else f"❌ {_bad_of('活性')[:3]}"))
+
+        # 可重算：同一日历日重建必须逐字相同（承接字段不许自己长出来）
+        _same_day = max((r.get("最近一次") or "") for r in _led_rows) if _led_rows else None
+        _re = GL.build(existing=_led[0], today=_same_day)[0] if _same_day else None
+        _re_txt = GL.dump(_re) if _re else None
+        _have_txt = GL.dump({"rows": _led_rows})
+        #   承接对照：把最近一次拨到昨天再重建 → 次数 +1、首次出现不变
+        _yest = (__import__("datetime").date.fromisoformat(_same_day)
+                 - __import__("datetime").timedelta(days=1)).isoformat() if _same_day else None
+        _carry = GL.build(existing={"rows": [dict(r, 最近一次=_yest) for r in _led_rows]},
+                          today=_same_day)[0]["rows"] if _yest else []
+        _carry_ok = bool(_carry) and all(
+            r["次数"] == o["次数"] + 1 and r["首次出现"] == o["首次出现"]
+            for r, o in zip(_carry, _led_rows))
+        c.add("T17d", "逐条缺口账：可重算（同一日重建逐字相同；跨日只许 次数+1、首次出现不动）",
+              _re_txt == _have_txt and _carry_ok,
+              (f"以账内最近一次 {_same_day} 重建 → 与盘上逐字相同（{len(_led_rows)} 行）；"
+               f"跨日重建 → 次数各 +1、首次出现不变 ✅"
+               if _re_txt == _have_txt and _carry_ok else
+               "❌ 账与重建不一致 —— 修复：python3 tools/kb_gap_ledger.py"))
+
+        # ── T18 · 条款变更 → 引用失效（C1 移植，蓝本 `0053`）──────────────
+        import kb_clause as CL
+
+        _rules_doc = None
+        if os.path.exists(_rp):
+            _rules_doc = json.load(open(_rp, encoding="utf-8"))
+        _cidx = CL.build_index(_ext) if _ext else None
+        _ip = CL.index_problems(_ext) if _ext else ["外部标准库不在盘上"]
+        _rrp = CL.rules_ref_problems(_rules_doc, _cidx) if (_ext and _rules_doc) else \
+            [("悬空", "rules-v1.json 或外部标准库不在盘上")]
+
+        def _mut_ext(fn):
+            """深拷贝外部标准库再变异 —— **绝不碰盘上的制品**（§2.4.4）。"""
+            import copy as _c
+            d = _c.deepcopy(_ext)
+            for e in d["entries"]:
+                fn(e)
+            return d
+
+        # T18a · 条款层自身：地址唯一、与位置一致、指纹可重算
+        _c18a = {
+            "clause_no 重号": _mut_ext(lambda e: e.update(clause_no="S1-01")),
+            "顺序被挪": _mut_ext(lambda e: e.update(clause_no="S9-99")),
+            "指纹被改": _mut_ext(lambda e: e.update(变更指纹="sha256:0000000000000000")),
+        }
+        _a18a = {}
+        for _k, _d in _c18a.items():
+            _msgs = CL.index_problems(_d)
+            _a18a[_k] = any(("不唯一" in _m) or ("≠ 按当前位置" in _m) or ("变更指纹" in _m)
+                            for _m in _msgs)
+        c.add("T18a", "条款层：条文号唯一且与位置一致，变更指纹可重算",
+              (not _ip) and all(_a18a.values()),
+              (f"{len(_cidx['entries'])} 条 · clause_no 唯一率 "
+               f"{len(_cidx['by_no'])}/{len(_cidx['entries'])} · 指纹逐条重算一致"
+               f"；反向对照：" + "、".join(f"{k}{'✅' if v else '❌'}" for k, v in _a18a.items())
+               if not _ip else f"❌ {_ip[:3]}"))
+
+        # T18b · 引用不悬空 + 双向一致
+        _c18b = {}
+        if _cidx and _rules_doc:
+            _c18b["凭空关联"] = CL.ref_problems(
+                {"库名": "外部标准库", "条目ID": "EXT-999", "条文号": "S9-99",
+                 "指纹": "sha256:x"}, _cidx, where="probe")
+            _c18b["条文号指错"] = CL.ref_problems(
+                {"库名": "外部标准库", "条目ID": "EXT-001", "条文号": "S1-99",
+                 "指纹": _cidx["by_id"]["EXT-001"]["变更指纹"]}, _cidx, where="probe")
+            import copy as _c2
+            _rd = _c2.deepcopy(_rules_doc)
+            _rd["rules"][0]["external_ref"] = []
+            _rd["rules"][0].pop("no_external_basis", None)
+            _c18b["凭空多一条边"] = CL.rules_ref_problems(_rd, _cidx)
+        _a18b = {k: len(v) > 0 for k, v in _c18b.items()}
+        c.add("T18b", "条款层↔规则层：每条引用指得到，且两边互为反面（单边声明即红）",
+              (not _rrp) and all(_a18b.values()) and len(_a18b) == 3,
+              (f"24 条规则带 external_ref、2 条声明 no_external_basis；"
+               f"62 条条目的「我关联到谁」与规则侧「谁认账」逐条相等"
+               f"；反向对照：" + "、".join(f"{k}{'✅' if v else '❌'}" for k, v in _a18b.items())
+               if not _rrp else f"❌ {_rrp[:3]}"))
+
+        # T18c · ★ C1 里真正的新东西：条款改了 → 引用失效
+        _c18c = {}
+        if _cidx:
+            _ref = CL.evidence_ref_of(_cidx["by_id"]["EXT-001"], _cidx)
+            _c18c["原样"] = CL.ref_problems(_ref, _cidx, where="probe")
+            _d3 = _mut_ext(lambda e: e.update(条款原文=(e.get("条款原文") or "") + ".")
+                           if e.get("id") == "EXT-001" else None)
+            _i3 = CL.build_index(_d3)
+            _c18c["改一个字节"] = CL.ref_problems(_ref, _i3, where="probe")
+        _a18c = ((not _c18c.get("原样"))
+                 and any(k == "失效" for k, _ in _c18c.get("改一个字节", [])))
+        c.add("T18c", "★ 条款被改动 → 引用它的规则标记 stale（改一个字节必须红）",
+              _a18c,
+              ("条款正文改一个字节 → 该引用报 `失效`（stale）；不改 → 一条问题也不报。"
+               "★ 这是 C1 移植里唯一真正的新东西：T2/T3 给的是「指针」与「条文号」，"
+               "它给的是「接了之后它会失效吗」"
+               if _a18c else f"❌ 改一个字节没报失效：{_c18c.get('改一个字节', [])[:2]}"))
+
+        # ── T19 · 证据 origin 分级与 PASS 收窄（C2 移植）────────────────
+        _erefs = CL.evidence_refs(_ext) if _ext else []
+        _ep = [m for r in _erefs for m in CL.evidence_ref_problems(r, _cidx)] if _cidx else []
+        _c19a = {}
+        if _cidx:
+            _probe = CL.evidence_ref_of(_cidx["by_id"]["EXT-001"], _cidx)
+            _c19a["自由来源"] = CL.evidence_ref_problems(
+                dict(_probe, origin="大概是正文吧"), _cidx, where="probe")
+            _c19a["没有来源"] = CL.evidence_ref_problems(
+                {k: v for k, v in _probe.items() if k != "origin"}, _cidx, where="probe")
+            _c19a["来源写成回执来源"] = CL.evidence_ref_problems(
+                dict(_probe, origin="cli"), _cidx, where="probe")
+        _a19a = {k: len(v) > 0 for k, v in _c19a.items()}
+        c.add("T19a", "证据来源：每条 evidence_ref 必带 origin，取值只在四档内（连回执来源也不许混）",
+              (not _ep) and all(_a19a.values()) and len(_a19a) == 3,
+              (f"{len(_erefs)} 条证据引用逐条带 origin，全部落在那四档内；"
+               f"反向对照：" + "、".join(f"{k}{'✅' if v else '❌'}" for k, v in _a19a.items())
+               + "；正例：62 条真证据全部通过"
+               if not _ep else f"❌ {_ep[:3]}"))
+
+        # T19b · ★ 判据 ②：origin != stated 不许单独把结论推到 PASS
+        def _pass_probe(origins):
+            return CL.may_finalize_pass([{"origin": o} for o in origins])
+        _c19b = {o: _pass_probe([o]) for o in ("ocr", "transcribed", "described")}
+        _pos19b = _pass_probe(["stated"])
+        _empty19b = _pass_probe([])
+        _mixed19b = _pass_probe(["ocr", "stated"])
+        c.add("T19b", "★ 非「原文照读」的证据不许单独把结论推到 PASS（三档各自点名）",
+              (not any(ok for ok, _ in _c19b.values())) and _pos19b[0]
+              and (not _empty19b[0]) and _mixed19b[0],
+              "三档各自单独支撑 PASS → " +
+              "、".join(f"{o}{'❌竟然可以' if ok else '✅被挡'}" for o, (ok, _) in _c19b.items())
+              + f"；正例 stated → {'✅可以' if _pos19b[0] else '❌被误伤'}"
+              + f"；空证据集 → {'✅挡住（没有证据≠无需证据）' if not _empty19b[0] else '❌竟然放行'}"
+              + f"；混有 stated → {'✅可以（弱证据只作补充）' if _mixed19b[0] else '❌被误伤'}")
+
+        # T19c · 两个 origin 不许混（落本模块时当场撞到的名字冲突）
+        _c19c = {
+            "回执来源写成证据来源": CL.EO.receipt_origin_problems(
+                {"origin": "stated", "evidence_origin": "described"}),
+            "证据来源写成回执来源": CL.EO.receipt_origin_problems(
+                {"origin": "cli", "evidence_origin": "test"}),
+        }
+        _a19c = {k: len(v) > 0 for k, v in _c19c.items()}
+        _pos19c = CL.EO.receipt_origin_problems({"origin": "batch", "evidence_origin": "ocr"})
+        c.add("T19c", "两个 origin 不许混：回执来源（cli/batch/shouheng/test）与证据来源四档互斥",
+              all(_a19c.values()) and (not _pos19c)
+              and not (set(CL.EO.ORIGINS) & set(CL.EO.RECEIPT_ORIGINS)),
+              "取值域交集为空；反向对照：" +
+              "、".join(f"{k}{'✅' if v else '❌'}" for k, v in _a19c.items())
+              + "；正例（batch + ocr 这一对合法组合）→ "
+              + ("不误伤 ✅" if not _pos19c else f"❌ 误伤 {_pos19c[:1]}")
+              + "　★ `judge()` 里原本已有一个 `origin`，含义是**回执来源** —— "
+                "证据来源因此叫 `evidence_origin`")
+
+        # ── T4 · 回执 → 条款 → 原文（PRD §5.3 的「依据《文档名》第 X 条」）──
+        #   判据原文：「任一判定回执能反查到条款；反向对照：塞一条不存在的条目 ID 必须红」。
+        #   ★ 这一段**真的起一次 judge()**，不是对函数做单元测试 —— 先前的教训是
+        #     「跑通了接口 ≠ 接线接上了」（§2.4.1）。
+        _rules_p = os.path.join(load.REPO, "research", "governance", "skeleton", "rules-v1.json")
+        _rules_doc = json.load(open(_rules_p, encoding="utf-8")) if os.path.exists(_rules_p) else {}
+        _rules_all = _rules_doc.get("rules") or []
+        _T4_REAL = None
+        _T4_CASES = {}
+        try:
+            import tempfile as _tf
+            from pathlib import Path as _P
+            sys.path.insert(0, os.path.join(load.REPO, "research", "governance", "skeleton"))
+            import judge as _J
+            _tmpd = _P(_tf.mkdtemp())
+            for _lbl, _txt in (("reject", "This device will cure your disease."),
+                               ("pass", "Our breast pump is FDA approved and FDA cleared for safety."),
+                               ("catchall", "今日天气不错，适合出门散步。")):
+                _T4_CASES[_lbl] = _J.judge(
+                    _txt, product_line="吸奶器", receipt=True,
+                    receipt_path=_tmpd / (_lbl + ".jsonl"),
+                    origin="test", issued_at="2026-09-23T00:00:00+00:00")["receipt"]
+            _T4_REAL = _J
+        except Exception as e:                                # noqa: BLE001
+            c.add("T4a", "回执 → 条款：任一判定回执能反查到条款（地址不悬空、指纹可重算）",
+                  False, f"❌ 起 judge() 失败：{type(e).__name__}: {e}")
+
+        if _T4_REAL is not None and _cidx:
+            _rc = _T4_CASES["reject"]
+            _p_real = CL.receipt_evidence_problems(_rc, _cidx, rules=_rules_all)
+
+            # 反向对照：**逐条点名**，不写「集合相等」（第一版就是这么写的，实测无效）。
+            _ctl4 = {}
+
+            def _mut4(fn):
+                # ★ **深拷贝**：`block_of()` 是浅拷贝，`b["evidence_ref"]` 与真回执指向
+                #   同一个 list —— 第一版没拷，于是「反向对照」把真回执改坏了，
+                #   紧接着的正例判据就红在了一个**自己造出来的**变异体上。
+                #   这正是 `AGENTS.md` §2.4.4：**自证有副作用，跑一次自证改掉了它要保护的东西。**
+                b = json.loads(json.dumps(CL.block_of(_rc), ensure_ascii=False))
+                fn(b)
+                return CL.evidence_block_problems(b, _cidx,
+                                                  rule_keys=_rc["rule_keys_hit"],
+                                                  rules=_rules_all)
+
+            _ctl4["凭空条目ID"] = _mut4(lambda b: b["evidence_ref"][0].__setitem__("条目ID", "EXT-999"))
+            _ctl4["条文号指错"] = _mut4(lambda b: b["evidence_ref"][0].__setitem__("条文号", "S1-99"))
+            _ctl4["指纹被改"] = _mut4(lambda b: b["evidence_ref"][0].__setitem__(
+                "指纹", "sha256:0000000000000000"))
+            _ctl4["引用整段抹掉"] = _mut4(lambda b: b.__setitem__("evidence_ref", []))
+            _ctl4["来源自由字符串"] = _mut4(lambda b: b["evidence_ref"][0].__setitem__(
+                "origin", "大概是正文吧"))
+            _a4 = {k: len(v) > 0 for k, v in _ctl4.items()}
+            # 正例：真回执不许被误伤（少了它，判据写成 `return [("悬空","永远")]` 也会绿）
+            _pos4 = CL.evidence_block_problems(
+                CL.block_of(_rc), _cidx, rule_keys=_rc["rule_keys_hit"], rules=_rules_all)
+            c.add("T4a", "回执 → 条款：任一判定回执能反查到条款（地址不悬空、指纹可重算、引用带全）",
+                  (not _p_real) and all(_a4.values()) and (not _pos4) and len(_a4) == 5,
+                  (f"真回执 {_rc['run_id']}（命中 {_rc['rule_keys_hit']}）→ 逐条解引用 "
+                   f"{len(_rc['evidence_ref'])} 条引用，问题 0 条；"
+                   f"反向对照：" + "、".join(f"{k}{'✅' if v else '❌没报红'}" for k, v in _a4.items())
+                   + f"；正例（同一条真回执）→ {'不误伤 ✅' if not _pos4 else f'❌ 误伤 {_pos4[:1]}'}"
+                   + "　★ 零命中那条（catch_all）引用为空，且 `$ratified_note` 说明它为什么是假")
+                  if not _p_real and not _pos4 else f"❌ 真回执自身没过：{(_p_real or _pos4)[:3]}")
+
+            # ── T4b · `ratified` 是**算出来的**，未确认声明必须**逐条点名** ──
+            _b4 = {}
+            _b4["手写 ratified=True"] = _mut4(lambda b: b.__setitem__("ratified", True))
+            _b4["抹掉未确认声明"] = _mut4(lambda b: b.__setitem__("unconfirmed_notice", None))
+            _b4["声明不点名"] = _mut4(lambda b: b.__setitem__(
+                "unconfirmed_notice", "★ 本判定引用的部分外部标准未经法务确认。"))
+            _b4["零引用不解释"] = CL.evidence_block_problems(
+                {**CL.block_of(_T4_CASES["catchall"]), "$ratified_note": None},
+                _cidx, rule_keys=[], rules=_rules_all)
+            _a4b = {k: len(v) > 0 for k, v in _b4.items()}
+            # 正例：把被引用的条目临时改成 ratified → 不许再要声明（否则判据成了「永远要声明」）
+            _flip = {i: dict(e) for i, e in _cidx["by_id"].items()}
+            for _r in _rc["evidence_ref"]:
+                _flip[_r["条目ID"]]["status"] = "ratified"
+            _idx_rat = {"by_id": _flip, "by_no": _cidx["by_no"],
+                        "sources": _cidx["sources"], "entries": _cidx["entries"]}
+            _blk_rat = CL.CR.evidence_block(_rc["rule_keys_hit"], _rules_all, _idx_rat)
+            _pos4b = CL.evidence_block_problems(_blk_rat, _idx_rat,
+                                                rule_keys=_rc["rule_keys_hit"], rules=_rules_all)
+            c.add("T4b", "★ `ratified` 必须是**派生**的、未确认声明必须**逐条点名**",
+                  all(_a4b.values()) and len(_a4b) == 4 and (not _pos4b)
+                  and _blk_rat["ratified"] is True and not _blk_rat["unconfirmed_notice"],
+                  "反向对照：" + "、".join(f"{k}{'✅' if v else '❌没报红'}" for k, v in _a4b.items())
+                  + f"；正例（被引用的条目临时改成 ratified）→ ratified="
+                    f"{_blk_rat['ratified']}、声明 {_blk_rat['unconfirmed_notice']!r}、判据"
+                  + ("不误伤 ✅" if not _pos4b else f"❌ 误伤 {_pos4b[:1]}")
+                  + "　★ 62 条今天**全部** research —— 所以 `ratified` 若写成手填的 false，"
+                    "法务确认第一条之后没有任何东西会红（§2.4.1 第 5 行）")
+
+        # ── T4c · 账本里那些**真**回执逐条反查 + 契约边界 ─────────────────
+        _led_p = os.path.join(load.REPO, "research", "governance", "skeleton",
+                              "_data", "receipts.jsonl")
+        _rows4 = []
+        if os.path.exists(_led_p):
+            for _ln in open(_led_p, encoding="utf-8").read().splitlines():
+                if _ln.strip():
+                    try:
+                        _rows4.append(json.loads(_ln))
+                    except Exception:                          # noqa: BLE001
+                        _rows4.append({"_坏行": _ln[:60]})
+        # 契约边界：`evidence_origin` 与 T4 的证据块是**同一批**加进回执的（2026-09-23），
+        # 所以「带 evidence_origin」= 在契约内。在此之前写的回执不许被要求带上它 ——
+        # 那是要求历史带上一个当时还不存在的字段。
+        _in4 = [r for r in _rows4 if "evidence_origin" in r]
+        _pre4 = [r for r in _rows4 if "evidence_origin" not in r]
+        _bad4 = [] if not _cidx else [m for r in _in4
+                                      for m in CL.receipt_evidence_problems(r, _cidx, rules=_rules_all)]
+        # 反向对照：往**临时回执**里塞一条契约内、条目 ID 是假的 —— 逐条反查必须红。
+        _fake4 = json.loads(json.dumps(_T4_CASES.get("reject") or {}, ensure_ascii=False))
+        if _fake4:
+            _fake4["evidence_ref"][0]["条目ID"] = "EXT-404"
+        _ctl4c = CL.receipt_evidence_problems(_fake4, _cidx, rules=_rules_all) \
+            if (_fake4 and _cidx) else []
+        c.add("T4c", "★ 真回执账本逐条反查（含**契约边界**：契约之前的回执不许被要求带上它）",
+              (not _bad4) and len(_ctl4c) > 0,
+              (f"账本 {len(_rows4)} 条：契约内 **{len(_in4)}** 条（问题 {len(_bad4)} 条）、"
+               f"契约之前 {len(_pre4)} 条"
+               + (f"（{str(_pre4[0].get('issued_at', '?'))[:10]}，那时还没有这个字段）"
+                  if _pre4 else "")
+               + f"；反向对照：塞一条条目ID不存在的契约内回执 → "
+                 f"{'✅报红' if _ctl4c else '❌没报红'}"
+               + ("　★ 契约内是 0 条 —— 「真回执能反查」这句今天由 T4a 的端到端那条**证着**；"
+                  "账本这一支是**空的**，不是绿的（§2.2 第 7 条）" if not _in4 else ""))
+              if not _bad4 else f"❌ 账本里契约内的回执有 {len(_bad4)} 个问题：{_bad4[:2]}")
+
+        # ── T4d · 依赖方向单向 + 「没有外部依据」要留痕 ────────────────────
+        #   ★ 条款地址的家在引擎侧 `clause_ref.py`，理由正是这条方向：
+        #     回执在 `judge()` 内部产出，而 skeleton 不许 import tools/。
+        _skel = os.path.join(load.REPO, "research", "governance", "skeleton")
+        _rev = []
+        for _f in sorted(os.listdir(_skel)):
+            if not _f.endswith(".py"):
+                continue
+            for _ln in open(os.path.join(_skel, _f), encoding="utf-8").read().splitlines():
+                _s = _ln.split("#")[0]
+                if re.search(r"^\s*(import|from)\s+.*\btools\b", _s) or \
+                   re.search(r"import\s+(kb_clause|kb_gap_ledger|verify_kb)\b", _s):
+                    _rev.append(f"{_f}: {_ln.strip()[:60]}")
+        _nobasis = [r["rule_key"] for r in _rules_all
+                    if not r.get("external_ref")
+                    and str(r.get("no_external_basis") or "").strip()]
+        _abs = CL.CR.evidence_refs_of_rules(_nobasis, _rules_all)
+        _blk_abs = CL.CR.evidence_block(_nobasis, _rules_all, _cidx) if _cidx else {}
+        _ctl4d = {}
+        if _cidx:
+            _b = CL.block_of(_T4_CASES["pass"])
+            _ctl4d["抹掉 absence 的理由"] = CL.evidence_block_problems(
+                {**_b, "evidence_absence": [{"规则": "T9.objective-parameter", "理由": "  "}]},
+                _cidx, rule_keys=_T4_CASES["pass"]["rule_keys_hit"], rules=_rules_all)
+            _ctl4d["命中的规则一条不带"] = CL.evidence_block_problems(
+                {**_b, "evidence_ref": [], "evidence_absence": []},
+                _cidx, rule_keys=_T4_CASES["pass"]["rule_keys_hit"], rules=_rules_all)
+        _a4d = {k: len(v) > 0 for k, v in _ctl4d.items()}
+        c.add("T4d", "依赖方向单向（skeleton 不 import tools/）+「本来就没有外部依据」要留痕",
+              (not _rev) and all(_a4d.values()) and len(_a4d) == 2
+              and len(_abs[1]) == len(_blk_abs.get("evidence_absence") or []),
+              (f"`research/governance/skeleton/` 下逐文件扫反向 import tools/ → **{len(_rev)} 处**"
+               f"（这就是地址词汇必须住在引擎侧的理由）；"
+               f"声明 `no_external_basis` 的规则 {len(_abs[1])} 条 → 逐条带理由进 "
+               f"`evidence_absence`；反向对照："
+               + "、".join(f"{k}{'✅' if v else '❌没报红'}" for k, v in _a4d.items()))
+              if not _rev else f"❌ skeleton 反向 import 了 tools/：{_rev[:3]}")
+
+        # ── T9 · 回填通道：复核结论 → 新条目/修正条目（PRD §9/§10）──────────
+        #   判据原文：「PRD §10「知识库回流数量」能算出一个**非零**的数」。
+        #   口径（2026-09-23 委托方裁定）：**只把源表那一侧的判定算「人的判定」**，
+        #   原因码只作附注 —— 把机器推断记成人的结论，正是 §2.4.3 那个病。
+        import kb_backfill as BF
+
+        _bf_rows = BF.load_ledger()
+        _bf_new = BF.derived_rows()
+        _bf_recs = BF._records()
+
+        # T9a · 每条都指得出**人的原话**（逐字来自源表，可自己去翻那一行）
+        def _src_problems(rows, recs):
+            bad = []
+            for r in rows:
+                i = r.get("记录")
+                if not isinstance(i, int) or not (0 <= i < len(recs)):
+                    bad.append(("悬空", f"回流 记录={i!r} 指不到 records.json 的任何一行"))
+                    continue
+                want = {c: recs[i].get(c) for c in BF.SRC_COLS}
+                got = {c: (r.get("源表判定") or {}).get(c) for c in BF.SRC_COLS}
+                if got != want:
+                    diff = [c for c in BF.SRC_COLS if got.get(c) != want.get(c)]
+                    bad.append(("原话", f"记录#{i} 的源表列 {diff} 与 records.json 不一致 —— "
+                                        f"「人的原话」必须是**照抄**，不是转述"))
+                src = str((r.get("源表判定") or {}).get("来源") or "")
+                if "源表" not in src:
+                    bad.append(("口径", f"记录#{i} 的判定来源写成 {src!r} —— "
+                                        f"它不是源表上写下的那一栏"))
+                if "不是" not in src or "法务" not in src:
+                    bad.append(("口径", f"记录#{i} 没有明写「这**不是**法务复核结论」—— "
+                                        f"差这一个字就是一次误读（PRD §9 要的是复核结论）"))
+                if "机器" not in str((r.get("附注") or {}).get("$note") or ""):
+                    bad.append(("口径", f"记录#{i} 的附注没有标明原因码是**机器推断**"))
+            return bad
+
+        _p9a = _src_problems(_bf_rows, _bf_recs) if _bf_rows else [("空", "账本为空")]
+        _c9a = {}
+        if _bf_rows:
+            def _mut9a(i, **kw):
+                rs = json.loads(json.dumps(_bf_rows, ensure_ascii=False))
+                for k, v in kw.items():
+                    if k == "来源":
+                        rs[i]["源表判定"]["来源"] = v
+                    elif k == "附注":
+                        rs[i]["附注"]["$note"] = v
+                    else:
+                        # ★ 全部落在 `源表判定` 里 —— 判据比的就是这一块。
+                        #   第一版写成了 `rs[i][k] = v`（顶层），于是那个「变异体」
+                        #   根本没碰被判据比对的数据，反向对照**根本没测到东西**，
+                        #   而它照样印出「❌没报红」—— 一条空转的对照。
+                        rs[i]["源表判定"][k] = v
+                return _src_problems(rs, _bf_recs)
+            _c9a["源表原文被转述"] = _mut9a(0, **{"命中片段": ["（转述过的片段）"]})
+            _c9a["判定来源不是源表"] = _mut9a(0, 来源="法务复核结论（口头）")
+            _c9a["没写明不是法务结论"] = _mut9a(0, 来源="源表")
+            _c9a["附注没标机器推断"] = _mut9a(0, 附注="原因是语料缺口")
+        _a9a = {k: len(v) > 0 for k, v in _c9a.items()}
+        c.add("T9a", "★ 每条回流都指得出**源表那一行**，且明写「这不是法务复核结论」",
+              (not _p9a) and all(_a9a.values()) and len(_a9a) == 4,
+              (f"{len(_bf_rows)} 条回流逐条指回 records.json；"
+               f"反向对照：" + "、".join(f"{k}{'✅' if v else '❌没报红'}" for k, v in _a9a.items())
+               + f"　★ 源表 `处理状态` 逐行照抄："
+                 + "、".join(f"{v} {n} 条" for v, n in
+                             sorted(__import__("collections").Counter(
+                                 (r.get("源表判定") or {}).get("处理状态")
+                                 for r in _bf_rows).items(), key=lambda x: -x[1]))
+                 + f"；`检查人` 非空 "
+                 f"{sum(1 for r in _bf_rows if str((r.get('源表判定') or {}).get('检查人') or '').strip())} 条")
+              if not _p9a else f"❌ {_p9a[:3]}")
+
+        # T9b · ★ 原因码只作**附注**，不参与「这条算不算回流」的判定
+        def _divergence_rows(fid, recs):
+            """只按**源表的列 vs 引擎的列**算分歧 —— **一个原因码都不看**。"""
+            out = []
+            for d in (fid.get("轴3_分歧逐行") or []):
+                src_hit = set(d.get("源表_命中") or [])
+                eng_hit = set(d.get("引擎_命中") or [])
+                if src_hit != eng_hit:
+                    out.append((d.get("i"), tuple(sorted(src_hit)), tuple(sorted(eng_hit))))
+            return out
+
+        _fid = json.load(open(BF.FIDELITY, encoding="utf-8"))
+        # ★ 归一化：`records.json` 的 `命中规则` 是**字符串**（`'U01'` / `'H02,M03,U03'`），
+        #   而 `_hit_rules` 与引擎那一侧是**列表**。第一版直接 `sorted(字符串)`，
+        #   于是它把 `'U01'` 拆成了 `('0','1','U')` —— 判据与账**永远不相等**，
+        #   而报错文字照样印着「13 行 ≡ 13 条」（两个 13 是分别数出来的，不是比出来的）。
+        def _hitlist(v):
+            if isinstance(v, (list, tuple)):
+                return tuple(sorted(str(x) for x in v))
+            return tuple(sorted(x for x in re.split(r"[,，/、\s]+", str(v or "")) if x))
+
+        _want9b = _divergence_rows(_fid, _bf_recs)
+        _got9b = [(r.get("记录"), _hitlist((r.get("源表判定") or {}).get("命中规则")),
+                   _hitlist((r.get("引擎判定") or {}).get("命中规则")))
+                  for r in _bf_rows]
+        # 反向对照：**只有机器原因码、源表那一行根本没记过命中** → 不许算一条回流
+        _fake_div = {"轴3_分歧逐行": [{"i": 0, "源表_命中": ["U01"], "引擎_命中": ["U01"],
+                                      "源表有引擎无": [{"原因": "★ 机器自己觉得该回流"}]}]}
+        _ctl9b = _divergence_rows(_fake_div, _bf_recs)
+        # 反向对照②：把原因码整块改成自由字符串 —— 「算不算回流」这个数**不许动**
+        _rs9b = json.loads(json.dumps(_bf_rows, ensure_ascii=False))
+        for r in _rs9b:
+            r["附注"]["机器推断的原因码"] = ["（随便写的）"]
+        _after9b = [(r.get("记录"), _hitlist((r.get("源表判定") or {}).get("命中规则")),
+                     _hitlist((r.get("引擎判定") or {}).get("命中规则"))) for r in _rs9b]
+        _fid_ids = {d.get("i") for d in (_fid.get("轴3_分歧逐行") or [])}
+        _led_ids = {r.get("记录") for r in _bf_rows}
+        c.add("T9b", "★ 原因码只作**附注**：回流条数 ≡ 源表列 vs 引擎列不一致的行数（一个原因码都不看）",
+              _want9b == _got9b and (not _ctl9b) and _after9b == _got9b
+              and _fid_ids == _led_ids and len(_want9b) > 0,
+              f"源表列 vs 引擎列不一致 {len(_want9b)} 行 ≡ 账上 {len(_got9b)} 条；"
+              f"反向对照①：源表两列相同、只有机器原因码说该回流 → "
+              f"{'✅不算一条' if not _ctl9b else '❌竟然算了'}；"
+              f"反向对照②：把全部原因码改成自由字符串 → 回流条数"
+              f"{'不动 ✅' if _after9b == _got9b else '❌变了'}")
+
+        # T9c · 可重算 + 只增不删（同一日重建逐字相同；跨日只许 次数+1）
+        _merged = BF.merge(_bf_rows, _bf_new, (os.environ.get("KB_T9_TODAY") or "2026-09-23"))
+        _same_today = [(r.get("记录"), r.get("次数"), r.get("首次出现")) for r in _merged]
+        _cross = BF.merge(_bf_rows, _bf_new, "2026-09-24")
+
+        def _content(r):
+            return {k: r.get(k) for k in ("记录", "分歧", "源表判定", "引擎判定")}
+
+        _content_ok = [_content(a) for a in _merged] == [_content(b) for b in _bf_new]
+        _once_ok = all(b["次数"] == a["次数"] + 1 and b["首次出现"] == a["首次出现"]
+                       for a, b in zip(_bf_rows, _cross))
+        # 反向对照：把一条的去向改成自由字符串 / 「人写进去的去向」必须扛得住重建
+        _c9c = {}
+        _rs9c = json.loads(json.dumps(_bf_rows, ensure_ascii=False))
+        _rs9c[0]["去向"] = "大概是新条目吧"
+        _c9c["去向自由字符串"] = [r for r in _rs9c if r.get("去向") not in BF.TARGETS]
+
+        def _lost_targets(old, merged):
+            """重建**丢掉**了哪些人写过的去向。抽成纯函数，反向对照才能对同一条判据做变异。"""
+            want = {r.get("记录"): r.get("去向") for r in old
+                    if r.get("去向") not in (None, "待定")}
+            got = {r.get("记录"): r.get("去向") for r in merged}
+            return [k for k, v in want.items() if got.get(k) != v]
+
+        _rs9d = json.loads(json.dumps(_bf_rows, ensure_ascii=False))
+        _rs9d[0]["去向"] = "新条目"
+        _keep_ok = not _lost_targets(_rs9d, BF.merge(_rs9d, _bf_new, "2026-09-24"))
+        # ★ 反向对照：把旧账里的去向**抽掉**（模拟「重建时被重算」那个 bug），
+        #   同一条判据必须报出来 —— 否则「保住了去向」这句话是恒真的。
+        _stripped9d = [({k: v for k, v in r.items() if k != "去向"}) for r in _rs9d]
+        _c9c["重建重算掉去向"] = _lost_targets(_rs9d, BF.merge(_stripped9d, _bf_new, "2026-09-24"))
+        c.add("T9c", "回填账本可重算（同一日逐行相同；跨日只许 次数+1、首次出现不动）"
+                     "且只增不删、**重建不许抹掉人写过的去向**",
+              _content_ok and _once_ok and all(_c9c.values()) and _keep_ok
+              and len(_same_today) == len(_bf_rows),
+              f"重算 {len(_bf_new)} 条 与账上 {len(_bf_rows)} 条逐行同内容；跨日 → 次数各 +1、"
+              f"首次出现不动；人写过的去向 → {'原样保住 ✅' if _keep_ok else '❌被重建抹掉'}；"
+              f"反向对照：" + "、".join(f"{k}{'✅报红' if v else '❌没报红'}" for k, v in _c9c.items()))
+
+        # T9d · ★ 两个数**分开**报：发生过的回流 ≠ 已经落到条目里的
+        _c9d = BF.counts(_bf_rows)
+        c.add("T9d", "★ 两个数分开：「回流事件」（PRD §10 的数）与「已落到条目」不许合并",
+              _c9d["回流事件"] == len(_bf_rows) > 0
+              and _c9d["回流事件"] == _c9d["去向待定"] + _c9d["已落到条目"]
+              and set(_c9d["去向往返"]) == set(BF.TARGETS),
+              f"**回流事件 {_c9d['回流事件']}**（非零 ✅）· 去向待定 {_c9d['去向待定']} · "
+              f"已落到条目 {_c9d['已落到条目']} · 涉及投放 USD {_c9d['涉及投放USD']:,.2f}；"
+              f"恒等式 事件 = 待定 + 已落 ✅　★ 去向由**人**定，机这一侧只把它列出来")
+
         manual = os.path.join(load.KB, "查询手册.md")
         n_sec = 0
         if os.path.exists(manual):
@@ -631,6 +1286,11 @@ def main():
                         key=lambda x: x["id"]):
             mark = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️ "}[i["status"]]
             print(f"  {mark} {i['id']:<4}{i['name']:<10} {i['detail']}")
+        print("　T 组 · 移植项（T17 逐条缺口账 / T18 引用失效 / T19 origin 分级）：")
+        for i in sorted((x for x in c.items if x["id"].startswith("T")),
+                        key=lambda x: x["id"]):
+            mark = {"PASS": "✅", "FAIL": "❌", "SKIP": "⏭️ "}[i["status"]]
+            print(f"  {mark} {i['id']:<5}{i['name']} {i['detail']}")
         print("　E 组 · 治理（缺口登记 / 文档可重算）：")
         for i in sorted((x for x in c.items if x["id"].startswith("E")),
                         key=lambda x: x["id"]):
