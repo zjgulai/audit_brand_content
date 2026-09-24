@@ -852,9 +852,9 @@
    "channel_verdict": "none",
    "g3_violation": null,
    "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status_note": "★ Q47 = 选项 A（2026-09-23 裁定）：**先补 `guard_type`（法务定性）再谈接线**；定性之前维持 `wired=false`。原因两条：① 它是 `未归类` —— 机器按表面词素推不出档，人也没定过；② ★ **实测它今天在任何语句里都不会生效**：目标规则 `T1.1.medical-cure` 的匹配词是 en/zh（`treat`/`cure`/`治疗`…），法语词与它**不共现** —— 连 near-miss 都构造不出来。所以这里不是「先放着」，是「确实无影响」。",
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "wire_gap": "Q47：定性待法务（未归类）；且构造不出 near-miss（见 status_note）",
    "source": "现网 `豁免词`"
   },
   {
@@ -874,9 +874,9 @@
    "channel_verdict": "none",
    "g3_violation": null,
    "status": "pending",
-   "status_note": "待法务定性：现网登记了，骨架未收录 —— 删除，或补一条规则",
+   "status_note": "★ Q47 = 选项 A（2026-09-23 裁定）：**先补 `guard_type`（法务定性）再谈接线**；定性之前维持 `wired=false`。原因两条：① 它是 `未归类` —— 机器按表面词素推不出档，人也没定过；② ★ **实测它今天在任何语句里都不会生效**：目标规则 `T1.1.medical-cure` 的匹配词是 en/zh（`treat`/`cure`/`治疗`…），法语词与它**不共现** —— 连 near-miss 都构造不出来。所以这里不是「先放着」，是「确实无影响」。",
    "source_legacy": "H01",
-   "wire_gap": "骨架未收录 —— 需确认是「有意剔除」还是「抄漏」",
+   "wire_gap": "Q47：定性待法务（未归类）；且构造不出 near-miss（见 status_note）",
    "source": "现网 `豁免词`"
   },
   {

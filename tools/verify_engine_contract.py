@@ -3078,6 +3078,21 @@ def main() -> int:
               f"退出码={_o59.returncode}（应 2）· 表字节未变={_gp59.read_bytes() == _before59} · "
               f"输出含「拒绝写盘」={'拒绝写盘' in (_o59.stdout + _o59.stderr)}")
 
+        # ── V60（Q47）「未接线」必须在**表里**写明原因，而不是只活在账本里 ──────────
+        #   Q47 = 选项 A：先补 `guard_type`（法务定性）再谈接线；定性之前维持 `wired=false`
+        #   **并在表里写明原因**。判据落在后半句上：读表的人不该需要先读账本才知道为什么。
+        _fr60 = [w for w in _w57.values()
+                 if w["word"] in ("soulage les engorgements", "soulager les engorgements")]
+        _bad60 = [w["word"] for w in _fr60
+                  if w.get("wired") or "Q47" not in ((w.get("status_note") or "")
+                                                     + (w.get("wire_gap") or ""))
+                  or "不会生效" not in (w.get("status_note") or "")]
+        check("V60", "★ Q47=A：两个法语守卫词**维持未接线**，且**表里**写明原因（点名 Q47 + 说清"
+                     "「它今天在任何语句里都不会生效」）—— 读表的人不该需要先读账本",
+              len(_fr60) == 2 and not _bad60,
+              f"命中 {len(_fr60)} 条 · 不合格 {_bad60 or '无'} · "
+              f"两条的 wire_gap 都点名 Q47={'Q47' in ((_fr60[0].get('wire_gap') or '') if _fr60 else '')}")
+
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
     if a.json:
