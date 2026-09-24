@@ -8,12 +8,6 @@
   "refs": [
     {
       "file": "PMO/守衡-Utopia结合方案-20260923.md",
-      "section": "10",
-      "kind": "current",
-      "heading": "记录与统计"
-    },
-    {
-      "file": "PMO/守衡-Utopia结合方案-20260923.md",
       "section": "5.2",
       "kind": "current",
       "heading": "审查能力"
@@ -35,6 +29,30 @@
       "section": "9",
       "kind": "current",
       "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "PMO/守衡-Utopia结合方案-20260923.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "5.4",
+      "kind": "current",
+      "heading": "结构化 JSON 规范"
+    },
+    {
+      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
+      "section": "7.1",
+      "kind": "current",
+      "heading": "四类知识库"
     },
     {
       "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
@@ -59,37 +77,6 @@
       "section": "15",
       "kind": "current",
       "heading": "验收标准"
-    },
-    {
-      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
-      "section": "5.3",
-      "kind": "current",
-      "heading": "三态结论输出规范"
-    },
-    {
-      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
-      "section": "5.4",
-      "kind": "current",
-      "heading": "结构化 JSON 规范"
-    },
-    {
-      "file": "PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md",
-      "section": "7.1",
-      "kind": "current",
-      "heading": "四类知识库"
-    },
-    {
-      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
-      "section": "10",
-      "kind": "current",
-      "heading": "记录与统计"
-    },
-    {
-      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
-      "section": "11",
-      "kind": "history",
-      "from_version": "v1.0",
-      "maps_to": "15"
     },
     {
       "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
@@ -147,6 +134,25 @@
       "heading": "人工复核与 sign-off"
     },
     {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "11",
+      "kind": "history",
+      "from_version": "v1.0",
+      "maps_to": "15"
+    },
+    {
+      "file": "PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md",
+      "section": "15",
+      "kind": "current",
+      "heading": "验收标准"
+    },
+    {
       "file": "PMO/守衡-知识库构建完整方案-20260922.md",
       "section": "10",
       "kind": "current",
@@ -197,18 +203,6 @@
     },
     {
       "file": "research/governance/skeleton/legal-decisions-v1.json",
-      "section": "11.2",
-      "kind": "current",
-      "heading": "保障机制"
-    },
-    {
-      "file": "research/governance/skeleton/legal-decisions-v1.json",
-      "section": "15",
-      "kind": "current",
-      "heading": "验收标准"
-    },
-    {
-      "file": "research/governance/skeleton/legal-decisions-v1.json",
       "section": "6.2",
       "kind": "current",
       "heading": "规则优先级分层设计"
@@ -227,13 +221,31 @@
       "maps_to": "11.2"
     },
     {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "11.2",
+      "kind": "current",
+      "heading": "保障机制"
+    },
+    {
+      "file": "research/governance/skeleton/legal-decisions-v1.json",
+      "section": "15",
+      "kind": "current",
+      "heading": "验收标准"
+    },
+    {
+      "file": "research/kb/README.md",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
       "file": "research/kb/README.md",
       "section": "10",
       "kind": "current",
       "heading": "记录与统计"
     },
     {
-      "file": "research/kb/README.md",
+      "file": "tools/kb_backfill.py",
       "section": "9",
       "kind": "current",
       "heading": "人工复核与 sign-off"
@@ -243,12 +255,6 @@
       "section": "10",
       "kind": "current",
       "heading": "记录与统计"
-    },
-    {
-      "file": "tools/kb_backfill.py",
-      "section": "9",
-      "kind": "current",
-      "heading": "人工复核与 sign-off"
     },
     {
       "file": "tools/kb_clause.py",
@@ -264,12 +270,6 @@
     },
     {
       "file": "tools/verify_kb.py",
-      "section": "10",
-      "kind": "current",
-      "heading": "记录与统计"
-    },
-    {
-      "file": "tools/verify_kb.py",
       "section": "5.3",
       "kind": "current",
       "heading": "三态结论输出规范"
@@ -279,6 +279,12 @@
       "section": "9",
       "kind": "current",
       "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "tools/verify_kb.py",
+      "section": "10",
+      "kind": "current",
+      "heading": "记录与统计"
     },
     {
       "file": "tools/verify_prd_baseline.py",

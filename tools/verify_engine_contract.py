@@ -2865,6 +2865,43 @@ def main() -> int:
               f"语料有文本的 {_t55} 条里 {_n55} 条带上它（{_n55 / max(_t55, 1) * 100:.1f}%）"
               f" —— ★ 这就是「天天响的信号」的量，Q45 选项 A 的代价是**量出来的**")
 
+        # ── V56（Q42）「P1/P2 零落点」必须**量得出来**，不能只是一句登记 ──────────
+        #   Q42 = 选项 A：本轮只登记不建。选项 A 的原文要的是「一条**带判据**的缺口」——
+        #   所以这里把「零落点」写成一条会红的断言：**判定路径上没有任何语义层调用**。
+        #   ★ 它红了的那一刻，正是**回去改验收表那一行**的时刻 —— 而不是悄悄多出一层，
+        #     让「P0–P3 四层配置完成」在没人注意的情况下自己变绿。
+        _JUDGE_MODULES = ("judge.py", "score.py", "matcher.py", "severity.py",
+                          "evidence_origin.py", "clause_ref.py", "engine_manifest.py")
+        _SEM_RE = re.compile(
+            r"^\s*(?:import|from)\s+(?:openai|anthropic|deepseek|dashscope|zhipuai)\b"
+            r"|api\.openai\.com|api\.anthropic\.com|dashscope\.aliyuncs\.com"
+            r"|/chat/completions|/v1/messages")
+
+        def _sem_hits(mods, base=None):
+            """判定路径上的语义层调用。`#` 之后不算代码（同 `verify_shouheng_ops.py` 的 C5、
+            `verify_cards.mjs` 的 J1a —— 同一条读法，而不是各自打补丁）。"""
+            out = []
+            for _m in mods:
+                _p = (base or SKEL) / _m
+                if not _p.exists():
+                    continue
+                for _i, _ln in enumerate(_p.read_text(encoding="utf-8").splitlines(), 1):
+                    if _SEM_RE.search(_ln.split("#", 1)[0]):
+                        out.append(f"{_m}:{_i}")
+            return out
+
+        _hits56 = _sem_hits(_JUDGE_MODULES)
+        _T56 = Path(tempfile.mkdtemp())
+        (_T56 / "judge.py").write_text(
+            "# 这是一条注释：import openai 写在注释里不算代码\nimport openai\n", encoding="utf-8")
+        _ctrl56 = _sem_hits(("judge.py",), base=_T56)
+        check("V56", "★ Q42=A 的判据：「P1/P2 零落点」是**量出来的** —— 判定路径上没有任何语义层调用"
+                     "（它红了就是有人建了语义层，那一刻回去改验收表那一行）",
+              not _hits56 and _ctrl56 == ["judge.py:2"],
+              f"扫 {len(_JUDGE_MODULES)} 个判定模块 → 命中 {_hits56 or '无'}（应为空）· "
+              f"反向对照（喂一个「注释里写 import openai + 真 import openai」的合成模块）→ "
+              f"{_ctrl56}（必须只报第 2 行 —— 注释不算代码）")
+
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
     if a.json:

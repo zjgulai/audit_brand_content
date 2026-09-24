@@ -2456,7 +2456,7 @@
       "id": "Q42",
       "kind": "product_task",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "Owner",
       "raised_at": "2026-09-23",
       "title": "PRD v1.2 新增的 §6 P1/P2 语义层今天完全没有落点 —— 知识库要按「谁读它」供数，这个「谁」还没定",
@@ -2484,7 +2484,11 @@
       ],
       "default_if_unanswered": "沉默 = 选项 A（本轮只登记不建）：P1/P2 保持零落点，W1–W4 按 P0 跑通四条通道，PRD §15「P0-P3 四层规则配置完成」在验收表里明写未通过。★ 沉默的代价是可接受的（它今天本来就不通过），但**必须被写出来** —— 把一个已知的未通过留成空白，下一个读验收表的人会把空白读成「还没测」。",
       "where": "`research/governance/skeleton/rules-v1.json`（26 条规则，P0 形态） · `research/governance/skeleton/context-guards-v1.json`（语境守卫 85 词） · PRD §6.2 分层表见 `PRD/feishu/内容审查Agent-PRD-v1.0.md` · 相关分析在 `PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md` §四 S3。",
-      "$origin": "2026-09-23 按委托方要求以最新版 PRD 为骨架重建知识库方案时发现：v1.2 新增的 §6 是整份 PRD 里**唯一一章我们完全没有对应实现**的，而它恰好规定了知识库的下游消费者是谁。登记为本项是为了让它有一个「等了多久、在等谁」的执行点，而不是留在结合方案的一段散文里。"
+      "$origin": "2026-09-23 按委托方要求以最新版 PRD 为骨架重建知识库方案时发现：v1.2 新增的 §6 是整份 PRD 里**唯一一章我们完全没有对应实现**的，而它恰好规定了知识库的下游消费者是谁。登记为本项是为了让它有一个「等了多久、在等谁」的执行点，而不是留在结合方案的一段散文里。",
+      "answered_at": "2026-09-23",
+      "answered_by": "Owner",
+      "answer": "选项 A —— 本轮只登记不建：把 P1/P2 写成一条带判据的缺口",
+      "record": "① **缺口带判据**：新增 `verify_engine_contract.py` 的 **V56** —— 扫描判定路径上 7 个模块\n（judge/score/matcher/severity/evidence_origin/clause_ref/engine_manifest），断言**没有任何语义层调用**\n（SDK import 或 LLM 端点 URL）；`#` 之后不算代码（同 verify_shouheng_ops 的 C5、verify_cards.mjs 的 J1a）。\n★ 它红了的那一刻就是**有人建了语义层** —— 那一刻回去改验收表那一行，而不是让「P0–P3 四层配置完成」\n在没人注意时自己变绿。反向对照：喂一个「注释里写 import openai + 真 import openai」的合成模块，\n必须只报第 2 行；打断（往 judge.py 真塞一行 import openai）→ V56 红、rc=1（实测）。\n② **验收表里明写未通过**：`PMO/守衡-知识库GAP分析与第一性原理决策-20260922.md` §三 补上\n「规则分层：P0-P3 四层规则配置完成」一行 = ❌ 失败（P0 26 条规则有落点、P3 有 `suggestion` 落点、\nP1/P2 零落点）。\n③ ★ 落地时撞出的偏差，一并写进那张表：**它与 PRD §15 不是一一对应** —— 本表 10 行 / PRD §15 **11 行**；\n`问题 ≥ 3 汇总` 与 `Sign-off` 两行**今天未登记**（不是「已通过」，是**还没人对过**）；\n而表里原有的 `知识库 v1（W1 输出）` **不是 §15 的行**，是 W1 交付物。\n④ ★ D36（Q34=A「只补 catch_all 一处语义判定」）到今天**也还没落地** —— 台账自己写着「决定不等于制品」。\nQ42=A 与它不冲突（一个补 catch_all 的建议级语义、一个是 PRD 意义上的 P1/P2 层），\n但读验收表的人容易把两者混起来，故记在此。"
     },
     {
       "id": "Q43",
