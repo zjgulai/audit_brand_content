@@ -1,8 +1,8 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-23T11:11:03+00:00",
+  "generated_at": "2026-09-24T07:33:14+00:00",
   "engine_version": "b990f681f49c9c20",
-  "code_version": "ad478a100dd8d24b",
+  "code_version": "34bda087d4718349",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
@@ -97,8 +97,8 @@
       "bytes": 8024
     },
     "engine_manifest.py": {
-      "sha256": "4947e6eb3dcb22bf99a515c9f3580ddccff5549d01547811f85fe61eb1d92bdf",
-      "bytes": 20979
+      "sha256": "b683b69d2d43934ceec570363c20718f9421399728fa84e5e10a7507411f24f5",
+      "bytes": 26306
     },
     "evidence_origin.py": {
       "sha256": "80788584ab6455a712d986c97a2961148af27edcf99f034046bdaab7b0f8b1e5",

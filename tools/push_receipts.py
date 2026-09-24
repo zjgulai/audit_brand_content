@@ -28,6 +28,16 @@
     连「该不该送」都没写，于是它既不在待送里、也不在缺路由里 —— 看起来一切正常。
     现在它被单独计数并打印。
 
+★ 2026-09-23（Q43 = 选项 A）补的**第四道硬门**，与上面三条同一个形状：
+
+  · **「路由得到人」不等于「答得出它是按哪一版规则判的」。** 每条待送回执在送出去之前，
+    按 `(engine_version, code_version)` **成对**反查一次历史 manifest，反查不回去就拒发。
+    在此之前 `resolve_version()` **全仓零调用点**（于是 `engine_manifest.py --check` 那段
+    「重新固化不会让旧回执失效」的提示**没有任何东西在跑它**），而且它只按
+    `engine_version` 单键回查、正序取第一条 —— 历史里并存两条同 ev 不同 cv 的记录时
+    （本机实测已有两次）会取到**旧的那条**，`code_version` 悄悄是错的。
+    现在账本读不出时落**未测**，与「已不在」分开报（`AGENTS.md` §2.4.2 的口径）。
+
 用法：
   python3 tools/push_receipts.py                     # 预演（默认）
   python3 tools/push_receipts.py --status            # 只看账
@@ -53,6 +63,13 @@ DEFAULT_OWNERS = SK / "_data" / "account-owners.csv"
 DEFAULT_PUSHED = SK / "_data" / "pushed.jsonl"
 CRED = os.path.expanduser("~/.dsh/credentials/shouheng-lark.json")
 API = "https://open.feishu.cn/open-apis"
+
+# ★ Q43 = 选项 A 的执行点：`resolve_version()` 必须**真的有人调**。
+#   在此之前它全仓零调用点，而 `engine_manifest.py --check` 失败时打印的那段处置说明
+#   **已经对使用者承诺过**「重新固化不会让旧回执失效」—— 一句对外说过的话，
+#   没有任何东西在跑它（`AGENTS.md` §2.4.2）。下面这一行就是那句话的落点。
+sys.path.insert(0, str(SK))
+from engine_manifest import resolve_version           # noqa: E402
 
 # 账号字段为空的那批记录按 `route.kind=ad_id` 落到这一行（见 account-owners.csv 的备注）。
 # 它是**兜底**：每次用到都会打印并计数，不静默。
@@ -122,6 +139,41 @@ def plan(receipts_path: Path, owners_path: Path, pushed_path: Path) -> dict:
             out["done"].append(rc)
             continue
         (out["fallback"] if via_fallback else out["todo"]).append((rc, key, row))
+    return out
+
+
+def traceability(receipts: list, *, manifest_path=None, history_path=None) -> dict:
+    """★ Q43 = 选项 A 的执行点：每条**待送**回执送出去之前，核一次
+    「当时那份规则集还查得到吗」。
+
+    在此之前，`engine_manifest.py --check` 失败时那段提示对使用者承诺过
+    「重新固化不会让旧回执失效」—— 而那只是一句话：`resolve_version()` 全仓零调用点，
+    且它当时只按 `engine_version` 单键回查、正序取第一条命中（于是并存两条同 ev 记录时
+    会取到旧的那条，`code_version` 悄悄是错的）。
+
+    四分类，因为它们**必须长得不一样**（`AGENTS.md` §2.4.2 的「未测 ≠ 通过 ≠ 红」）：
+
+      ok          成对命中 ≥1 条 → 当时那份规则集还在（同一对重归档过就会 >1，等价）
+      gone        一条都不命中，**且账本读得出** → 真的没了（这是红，必须响）
+      untested    一条都不命中，但**账本读不出** → 未测。★ 不许混进 gone，更不许混进 ok
+      no_version  回执里压根没有 engine_version/code_version → 无从核（也单独响）
+
+    判据（自证 V53）：喂一条 (ev, cv) 都不存在的回执 → 必须落 gone 并让命令退 2；
+    喂一个读不出的账本路径 → 必须落 untested，**不是** gone。
+    """
+    out = {"ok": [], "gone": [], "untested": [], "no_version": []}
+    for rc in receipts:
+        ev, cv = rc.get("engine_version"), rc.get("code_version")
+        if not ev or not cv:
+            out["no_version"].append(rc)
+            continue
+        r = resolve_version(ev, cv, manifest_path=manifest_path, history_path=history_path)
+        if r["n"] >= 1:
+            out["ok"].append((rc, r))
+        elif r["history_readable"]:
+            out["gone"].append((rc, r))
+        else:
+            out["untested"].append((rc, r))
     return out
 
 
@@ -208,6 +260,12 @@ def main() -> int:
             print(f"      run_id {rc.get('run_id')} · origin={rc.get('origin')}"
                   f" · issued_at={(rc.get('issued_at') or '')[:19]}")
 
+    # ★ Q43：可追溯性是**读数**，所以每次运行都打出来（不然它没机会被证伪）。
+    tr = traceability([rc for rc, *_ in todo_all])
+    print(f"  可追溯 {len(tr['ok'])} · 规则集已不在 {len(tr['gone'])}"
+          f" · **未测** {len(tr['untested'])} · 无版本号 {len(tr['no_version'])}"
+          f"（成对反查 (engine_version, code_version) —— 见 Q43）")
+
     if a.status:
         for rc, key, kind in p["unmapped"]:
             print(f"    ⚠ 未映射：{kind or '?'} `{key}` <- run_id {rc.get('run_id')}")
@@ -216,6 +274,11 @@ def main() -> int:
                   f" <- run_id {rc.get('run_id')}")
         for rc in p["no_key"]:
             print(f"    ⚠ 无路由键：run_id {rc.get('run_id')}（判定时未传 ad_account / ad_id）")
+        for rc, r in tr["gone"]:
+            print(f"    ⚠ 规则集已不在：run_id {rc.get('run_id')} · "
+                  f"ev={rc.get('engine_version')} cv={rc.get('code_version')} —— {r['note']}")
+        for rc, r in tr["untested"]:
+            print(f"    ⚠ ★ 未测：run_id {rc.get('run_id')} —— {r['note']}")
         return 0
 
     # ★ 硬门：送不出去必须响。三条各自说清缺的是什么（人 / 地址 / 路由键）。
@@ -241,6 +304,26 @@ def main() -> int:
     if not todo_all:
         print("✅ 没有待送达的回执（或全部已推送）")
         return 0
+
+    # ★ 第二道硬门（Q43）：路由通了，但如果**当时那份规则集已经反查不回去**，
+    #   这条回执送出去之后，将来没人答得出「它是按哪一版规则判的」——
+    #   而 `engine_manifest --check` 那段提示已经承诺过「重新固化不会让旧回执失效」。
+    #   ★「未测」与「已不在」在这里**必须分开报**，且都不许静默放行。
+    if tr["gone"] or tr["untested"] or tr["no_version"]:
+        print()
+        print("❌ 拒绝发送：有回执的**规则集反查不回去** —— 送出去也答不出「按哪一版判的」。")
+        for rc, r in tr["gone"]:
+            print(f"   · 规则集已不在：run_id {rc.get('run_id')} · "
+                  f"ev={rc.get('engine_version')} cv={rc.get('code_version')} —— {r['note']}")
+        for rc, r in tr["untested"]:
+            print(f"   · ★ 未测：run_id {rc.get('run_id')} —— {r['note']}")
+            print("     ★「未测」不是「没有」：处置是**去把账本找回来**，不是改这里。")
+        for rc in tr["no_version"]:
+            print(f"   · 回执里没有 engine_version / code_version：run_id {rc.get('run_id')}")
+        print()
+        print("   这不是工具故障，是**如实记账**（与上面那道路由门同一条口径："
+              "「未测」不许和「通过与红」长得一样）。")
+        return 2
 
     if p["fallback"]:
         print()

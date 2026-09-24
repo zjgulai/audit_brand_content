@@ -262,26 +262,98 @@ def archive_previous() -> str | None:
     return old.get("engine_version")
 
 
-def resolve_version(engine_version: str) -> dict | None:
-    """按 engine_version 找 manifest：先当前，再历史。找不到返回 None。
+def resolve_version(engine_version: str, code_version: str | None = None, *,
+                    manifest_path=None, history_path=None) -> dict:
+    """反查「当时那份规则集」。**默认口径是 (engine_version, code_version) 成对匹配。**
 
-    用途：拿到一条旧回执时，回答「当时那份规则集长什么样」。
+    ★ 2026-09-23（Q43 = 选项 A）—— 本函数此前的实现是**只按 engine_version 单键**回查、
+      并**正序取第一条命中**，而归档（`archive_previous()`）是按**成对**判、成对写的：
+      两者不对称。实测已踩到两次 —— 同一个 `engine_version` 在历史里并存两条不同
+      `code_version`（`a3218e7f…` 一次、`b990f681…` 一次），此后按单键反查会取到
+      **旧的那条**，而返回的东西看起来完全正常：`code_version` 悄悄是错的。
+
+    ★ 它**永不返回 None**：「查到几条」与「账本读没读得出」是**三件不同的事**
+      （有 / 没有 / **未测**），混进同一个 `None` 就等于把「未测」写成「没有」
+      （`AGENTS.md` §2.7 的 E1 口径：取不到的读数必须说「未测」，不许空着也不许当 0）。
+
+    ★ 调用点：`tools/push_receipts.py` 的 `traceability()` —— 每条**待送**回执送出去之前
+      核一次「当时那份规则集还查得到吗」。没有那个调用点，`--check` 失败时那段
+      「重新固化不会让旧回执失效」的提示就只是一句**没有任何东西在跑**的话（§2.4.2）。
+
+    返回：
+      match              成对命中**唯一**那条；0 条或多条都是 None
+      matches            全部命中（成对口径通常 0/1 条；单键口径可能多条）
+      sources            与 matches 对齐的 `"current"` / `"history"`
+      n                  len(matches)
+      key                `"pair"` | `"engine_only"`
+      ambiguous          命中 > 1 条 → True。★ 此时一律**不许挑第一条**
+      history_readable   归档账本读得出吗。False = **未测**，不是「没有」
+      note               人读的一句话（含坏行数 / 歧义说明）
     """
-    if MANIFEST_PATH.exists():
-        cur = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        if cur.get("engine_version") == engine_version:
-            return cur
-    if HISTORY_PATH.exists():
-        for ln in HISTORY_PATH.read_text(encoding="utf-8").splitlines():
-            if not ln.strip():
-                continue
-            try:
-                rec = json.loads(ln)
-            except json.JSONDecodeError:
-                continue
-            if rec.get("engine_version") == engine_version:
-                return rec
-    return None
+    mp = Path(manifest_path) if manifest_path else MANIFEST_PATH
+    hp = Path(history_path) if history_path else HISTORY_PATH
+    rows: list = []                      # [(where, record)]
+    notes: list = []
+    history_readable = True
+
+    try:
+        if mp.exists():
+            rows.append(("current", json.loads(mp.read_text(encoding="utf-8"))))
+        else:
+            notes.append("当前 manifest 不存在")
+    except (OSError, ValueError) as e:                                   # noqa: BLE001
+        history_readable = False
+        notes.append(f"当前 manifest 读不出：{e}")
+
+    bad_lines = 0
+    try:
+        if hp.exists():
+            for ln in hp.read_text(encoding="utf-8").splitlines():
+                if not ln.strip():
+                    continue
+                try:
+                    rows.append(("history", json.loads(ln)))
+                except json.JSONDecodeError:
+                    bad_lines += 1
+        else:
+            # ★「不存在」不等于「空」：账本是本机唯一副本（.gitignore），`receipts.LOSS.md`
+            #   记过一次真丢 —— 所以这里落未测，不落「查过了，没有」。
+            history_readable = False
+            notes.append("归档账本不存在（可能从未归档过，也可能是丢了 —— 那是本机唯一副本）")
+    except OSError as e:                                                 # noqa: BLE001
+        history_readable = False
+        notes.append(f"归档账本读不出：{e}")
+
+    if bad_lines:
+        # 有解析不了的行 → 我不能声称「历史我都查过了」，这就是未测。
+        history_readable = False
+        notes.append(f"归档账本有 {bad_lines} 行解析不了")
+
+    key = "pair" if code_version else "engine_only"
+    pairs = [(w, r) for w, r in rows if r.get("engine_version") == engine_version
+             and (code_version is None or r.get("code_version") == code_version)]
+    hits = [r for _, r in pairs]
+    sources = [w for w, _ in pairs]
+
+    n = len(hits)
+    ambiguous = n > 1
+    match = hits[0] if n == 1 else None
+    if ambiguous:
+        cvs = "、".join(sorted({str(h.get("code_version"))[:8] + "…" for h in hits}))
+        notes.append(
+            f"命中 {n} 条，各有不同的 code_version（{cvs}）—— ★ 旧实现在这里会**静默返回"
+            f"最早那一条**，于是 code_version 是错的；现在返回 match=None + ambiguous=True，"
+            f"要哪一条就把 code_version 一起传进来"
+        )
+    elif key == "engine_only":
+        notes.append("单键口径：本次恰好只命中 1 条 —— 但成对口径才是默认，"
+                     "回执里就带着 code_version，调用方应当把它一起传进来")
+    if n == 0:
+        notes.append("一条都没命中")
+
+    return {"match": match, "matches": hits, "sources": sources, "n": n, "key": key,
+            "ambiguous": ambiguous, "history_readable": history_readable,
+            "note": "；".join(notes)}
 
 
 def write_manifest(computed: dict | None = None, generated_at: str | None = None) -> dict:
@@ -398,16 +470,25 @@ def main() -> int:
             # ★ 这段提示原文写的是「重新固化会让所有引用旧 engine_version 的回执指向
             #   一份已不存在的规则集——这是特性，不是麻烦」，**与 archive_previous()
             #   的实现直接矛盾**：--write 正是先把「正要被覆盖的」manifest 追加进
-            #   `_data/manifest-history.jsonl`，resolve_version() 再按 engine_version
-            #   反查。ADR-0012 §6.1 在 2026-09-16 就记过这一条，并实测过 5 条旧回执
-            #   在四次重新固化后仍可逐条解析。
+            #   `_data/manifest-history.jsonl`，resolve_version() 再按
+            #   **(engine_version, code_version) 成对**反查。ADR-0012 §6.1 在 2026-09-16
+            #   就记过这一条，并实测过 5 条旧回执在四次重新固化后仍可逐条解析。
+            #   ★ 2026-09-23（Q43）补：这段提示原先只承诺「可按 engine_version 反查」，
+            #     而那个口径在历史里并存两条同 ev 记录时会取到旧的那条；且
+            #     resolve_version() 当时**一个调用点都没有** —— 一句对外说过的话
+            #     没有任何东西在跑它（AGENTS.md §2.4.2）。现在键与调用点都补上了。
             #   这句话 2026-09-17 改正 —— 它的代价是可量的：它让「该不该重新固化」
             #   看起来像一次有损操作，于是**没人敢固化**，漂移就这么留了下来。
             print("\n  处置：确认改动是有意的 → 跑 --write 重新固化；否则回滚制品。\n"
                   "  ★ 重新固化**不会**让旧回执失效：--write 先把「正要被覆盖的」manifest\n"
-                  "    追加进 _data/manifest-history.jsonl，resolve_version() 可按\n"
-                  "    engine_version 反查历史（ADR-0012 §6.1）。\n"
-                  "  ★ 但那份账本目前**不在版本控制内**（.gitignore）—— 归档是本机唯一副本。\n"
+                  "    追加进 _data/manifest-history.jsonl，旧回执可按\n"
+                  "    **(engine_version, code_version) 成对**反查历史（ADR-0012 §6.1）。\n"
+                  "  ★ 这句话的执行点：`resolve_version()` 的调用点在 tools/push_receipts.py\n"
+                  "    —— 每条待送回执送出去之前核一次「当时那份规则集还查得到吗」。\n"
+                  "    ★ 只给 engine_version 的单键口径，在历史里并存两条同 ev 记录时\n"
+                  "      **返回 ambiguous、不挑第一条** —— 那正是 Q43 修掉的错读数。\n"
+                  "  ★ 但那份账本目前**不在版本控制内**（.gitignore）—— 归档是本机唯一副本；\n"
+                  "    读不到时落**未测**，而不是「查过了，没有」。\n"
                   "    详见 ADR-0013 §十七 与 _data/receipts.LOSS.md。", file=sys.stderr)
         return 0 if ok else 1
 

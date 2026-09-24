@@ -36,6 +36,7 @@ sys.path.insert(0, str(SKEL))
 
 import judge as J  # noqa: E402
 import score as S  # noqa: E402
+import engine_manifest as EM  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
 
@@ -2622,6 +2623,90 @@ def main() -> int:
               _ctrl49,
               f"多一个空行：字节不等 {'✅' if _onebyte != _now else '❌'} · "
               f"而 strip 之后相等 {'✅（所以 strip 式写法会漏掉它）' if _onebyte.strip() == _now.strip() else '❌'}")
+
+    # ── V50–V53（Q43）旧回执的可追溯性：键的不对称 + 那句话的执行点 ──────
+    #   起因两件，且是**同一个形状的两半**：
+    #   ① `archive_previous()` 按 (engine_version, code_version) **成对**判、成对写，
+    #      而 `resolve_version()` 曾**只按 engine_version 单键**反查、正序取第一条命中 ——
+    #      历史里并存两条同 ev 记录时（本机实测已有两次）会取到**旧的那条**，
+    #      `code_version` 悄悄是错的，而返回的东西看起来完全正常。
+    #   ② `--check` 失败时那段提示**对使用者承诺**「重新固化不会让旧回执失效：
+    #      resolve_version() 可按 engine_version 反查历史」—— 而那个函数**全仓零调用点**：
+    #      一句对外说过的话，没有任何东西在跑它（AGENTS.md §2.4.2）。
+    if not a.only or a.only.startswith("V5"):
+        _T50 = Path(tempfile.mkdtemp())
+        _hist = _T50 / "history.jsonl"
+        _man = _T50 / "manifest.json"
+        # 合成账本：**两条同 ev 不同 cv** —— 就是本机真实踩到的那个形状
+        _hist.write_text("\n".join(json.dumps(r) for r in [
+            {"engine_version": "ev1111", "code_version": "cvOLD"},
+            {"engine_version": "ev1111", "code_version": "cvNEW"},
+        ]) + "\n", encoding="utf-8")
+        _man.write_text(json.dumps({"engine_version": "ev2222", "code_version": "cvCUR"}),
+                        encoding="utf-8")
+
+        _old = EM.resolve_version("ev1111", "cvOLD", manifest_path=_man, history_path=_hist)
+        _new = EM.resolve_version("ev1111", "cvNEW", manifest_path=_man, history_path=_hist)
+        check("V50", "★ 成对反查：同一个 engine_version 的两条历史记录**各取各的**"
+                     "（取错那条就是 Q43 修掉的错读数）",
+              _old["n"] == 1 and (_old["match"] or {}).get("code_version") == "cvOLD"
+              and _new["n"] == 1 and (_new["match"] or {}).get("code_version") == "cvNEW",
+              f"cv=cvOLD → {(_old['match'] or {}).get('code_version')} · "
+              f"cv=cvNEW → {(_new['match'] or {}).get('code_version')}")
+
+        _single = EM.resolve_version("ev1111", manifest_path=_man, history_path=_hist)
+        check("V51", "★ 只给 engine_version 时**不许挑第一条**：命中 2 条必须 ambiguous + match=None",
+              _single["n"] == 2 and _single["ambiguous"] is True and _single["match"] is None,
+              f"n={_single['n']} ambiguous={_single['ambiguous']} match={_single['match']} —— "
+              f"旧实现会静默返回最早那条（cvOLD），于是 code_version 是错的")
+
+        _miss = EM.resolve_version("evNOPE", "cvNOPE", manifest_path=_man, history_path=_hist)
+        _unread = EM.resolve_version("ev1111", "cvOLD", manifest_path=_man,
+                                     history_path=_T50 / "不存在的账本.jsonl")
+        check("V52", "★「没有」与「未测」必须分开：账本读不出 → history_readable=False，"
+                     "不是「查过了，没有」",
+              _miss["n"] == 0 and _miss["history_readable"] is True
+              and _unread["n"] == 0 and _unread["history_readable"] is False,
+              f"账本在 → readable={_miss['history_readable']}(n={_miss['n']}) · "
+              f"账本不在 → readable={_unread['history_readable']}(n={_unread['n']})")
+
+        # ★ 反向对照：账本里有**解析不了的行**时，同样不许声称「历史我都查过了」——
+        #   「跳过坏行 + 报告一切正常」是这一类工具最典型的静默失败。
+        _badhist = _T50 / "bad.jsonl"
+        _badhist.write_text('{"engine_version": "ev1111", "code_version": "cvOLD"}\n{坏行\n',
+                            encoding="utf-8")
+        _bad = EM.resolve_version("ev1111", "cvOLD", manifest_path=_man, history_path=_badhist)
+        check("V52b", "反向对照：账本有解析不了的行 → 同样落未测"
+                      "（不许跳过坏行还说自己查过了）",
+              _bad["history_readable"] is False and _bad["n"] == 1,
+              f"readable={_bad['history_readable']}（成对已命中 1 条仍不声称查全，坏行=1）· "
+              f"{_bad['note'][:60]}…")
+
+        # ── V53：**执行点** —— push_receipts 真的在用它，而且是**行为级**分类，
+        #   不是「源码里出现过 resolve_version」那种文本存在性断言（§2.4 点名的假执行点）。
+        sys.path.insert(0, str(ROOT / "tools"))
+        import push_receipts as PR                                        # noqa: PLC0415
+
+        _rc_ok = {"run_id": "jr-ok", "engine_version": "ev1111", "code_version": "cvOLD"}
+        _rc_gone = {"run_id": "jr-gone", "engine_version": "evNOPE", "code_version": "cvNOPE"}
+        _tr_ok = PR.traceability([_rc_ok], manifest_path=_man, history_path=_hist)
+        _tr_gone = PR.traceability([_rc_gone], manifest_path=_man, history_path=_hist)
+        _tr_unt = PR.traceability([_rc_gone], manifest_path=_man,
+                                  history_path=_T50 / "无.jsonl")
+        check("V53", "★ 执行点：可追溯性真的被分成 ok / gone / **未测** 三类"
+                     "（而不是只写在文档与提示里）",
+              len(_tr_ok["ok"]) == 1 and len(_tr_gone["gone"]) == 1
+              and len(_tr_unt["untested"]) == 1 and len(_tr_unt["gone"]) == 0,
+              f"命中 → ok={len(_tr_ok['ok'])} · 不在且账本在 → gone={len(_tr_gone['gone'])} · "
+              f"不在且账本读不出 → untested={len(_tr_unt['untested'])}"
+              f"（gone={len(_tr_unt['gone'])} —— ★ 这里若是 1，就是把「未测」报成了「没有」）")
+
+        _o53 = subprocess.run([sys.executable, "tools/push_receipts.py", "--status"],
+                              cwd=str(ROOT), capture_output=True, text=True)
+        check("V53b", "反向对照：真跑一次 `--status`，那一行读数必须真的打得出来"
+                      "（证明它不只是自证里成立）",
+              _o53.returncode == 0 and "可追溯" in _o53.stdout,
+              f"rc={_o53.returncode} · 输出含「可追溯」={'可追溯' in _o53.stdout}")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

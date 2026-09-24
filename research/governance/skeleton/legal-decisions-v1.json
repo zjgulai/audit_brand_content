@@ -2482,7 +2482,7 @@
       "id": "Q43",
       "kind": "design",
       "line": "engine",
-      "status": "open",
+      "status": "answered",
       "owner": "Owner",
       "raised_at": "2026-09-23",
       "title": "`resolve_version()` 按 `engine_version` 单键反查，而归档是按 (engine_version, code_version) 成对写的 —— 冻结一次就可能查出错的 code_version；而且它今天没有任何调用点",
@@ -2510,7 +2510,11 @@
       ],
       "default_if_unanswered": "沉默 = **选项 C**（什么都不做，原样维持：不改键、不接调用点、也不动那段提示）。★ 这个默认的代价已经发生过一次，不是将来时：2026-09-23 那次重固化之后，同 `engine_version` 的两条历史记录已经并存，此后任何按 engine_version 反查的动作都会取到 09-17 那一条（`code_version` 是错的）。换句话说「沉默」不是「先放着」，是**把一个错的读数留在盘上了**。",
       "where": "research/governance/skeleton/engine_manifest.py（`resolve_version` / `archive_previous`）· tools/push_receipts.py（若要接调用点）",
-      "$origin": "T17–T19 落地时重固化 engine-manifest 触发：改 `rules-v1.json` 一个字段 → engine_version 变 → `--write` 归档 → 历史里出现两条同 engine_version 记录。原计划里没有这一条，是执行时撞出来的。"
+      "$origin": "T17–T19 落地时重固化 engine-manifest 触发：改 `rules-v1.json` 一个字段 → engine_version 变 → `--write` 归档 → 历史里出现两条同 engine_version 记录。原计划里没有这一条，是执行时撞出来的。",
+      "answered_at": "2026-09-23",
+      "answered_by": "Owner",
+      "answer": "选项 A —— 先补覆盖、再定键",
+      "record": "engine_manifest.py 的 `resolve_version()` 改成按 (engine_version, code_version) **成对**匹配、永不返回 None（返回 match/matches/n/ambiguous/history_readable）；只给 engine_version 的单键口径在命中 >1 条时落 `ambiguous=True` + `match=None`，**不挑第一条**；账本读不出或有坏行时落 `history_readable=False`（未测，不是「没有」）。执行点接在 `tools/push_receipts.py` 的 `traceability()` —— 每条待送回执送出去之前按成对核一次「当时那份规则集还查得到吗」，反查不回就拒发（退 2）。自证：`verify_engine_contract.py` 的 V50/V51/V52/V52b/V53/V53b 六条；打断实现退回单键取首条时 V50/V51 双双变红（实测 rc=1）。"
     },
     {
       "id": "Q44",
