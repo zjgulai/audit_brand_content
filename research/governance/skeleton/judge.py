@@ -863,6 +863,22 @@ def judge(text: str, *, product_line: str | None = None, locale: str | None = No
         boundary["unknowns"].append(
             f"**证据来源收窄（T19）**：{narrowed['why']}。"
             f"结论因此从 `{narrowed['from']}` 落到 `manual_review`。")
+    # ★ Q45 = 选项 A（2026-09-23）：那条「未经法务确认」**不能只活在回执与工具说明里**。
+    #   回执那一侧是机器产出，而工具说明那一侧是「要求模型转述」—— 后者取决于模型当轮
+    #   记不记得；而 Q22 要防的「**一次研究被读成一次法务裁定**」发生在**回答**里，
+    #   不在回执里。写进 `unknowns` 之后，它与既有那条「每次都读 unknowns」的规矩直接接上。
+    #
+    #   ★ 触发条件严格照选项 A：**只在确实引用了未经确认的条款时加** ——
+    #     `unconfirmed_notice` 非空 ⟺ 引用集里至少有一条 `status=research`。
+    #     零命中的判定（没引用任何条款）**不加**：这一条要是一律出现，它就会变成一个
+    #     天天响的信号，而天天响的信号会被无视（§2.1.1）。
+    #
+    #   ★ 与回执**同源**（§2.4.5：同一个形状只许有一处实现）：这里只加一个标题前缀，
+    #     正文**逐字**用回执里那一份 —— 两处各写一句，迟早会有一句先改。
+    _unconf = _evidence.get("unconfirmed_notice")
+    if _unconf:
+        boundary.setdefault("unknowns", [])
+        boundary["unknowns"].append(f"**所引外部标准未经法务确认（Q45）**：{_unconf}")
 
     result = {
         "contract_version": CONTRACT_VERSION,

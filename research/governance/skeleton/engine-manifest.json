@@ -1,8 +1,8 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-24T07:43:48+00:00",
+  "generated_at": "2026-09-24T08:00:22+00:00",
   "engine_version": "b990f681f49c9c20",
-  "code_version": "99ef3b0bc3248302",
+  "code_version": "e6e33ea20ee09592",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
@@ -85,8 +85,8 @@
       "bytes": 34263
     },
     "judge.py": {
-      "sha256": "b4c5c71880b7b00fce9ec9c21041ae600fef9a3feac63448d1e0df53ee6287b8",
-      "bytes": 64312
+      "sha256": "93b8dd17a640e101c87cd8840b765cafe690f61fb47b136f3c781bff3afae9d7",
+      "bytes": 65641
     },
     "vocab.py": {
       "sha256": "b0b938687bb53721d87e249b630b9ed1c6f937adde0a002feae38c52b4533954",

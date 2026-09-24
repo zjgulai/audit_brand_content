@@ -2810,6 +2810,61 @@ def main() -> int:
               f"{_r54['verdict']['disposition']}（门二未判，所以**不**收窄）· "
               f"普通判定里有这个字段吗={'clause_gate' in (_r54_clean.get('verdict') or {})}（应为否）")
 
+        # ── V55（Q45）那句「未经法务确认」必须**机器产出**，不靠模型记性 ──────────
+        #   此前它只在两处：回执（机器产出）与 `judge_copy` 的工具说明（**要求模型转述**）。
+        #   而 Q22 要防的「一次研究被读成一次法务裁定」发生在**回答**里 —— 回答那一侧
+        #   取决于模型当轮记不记得。选项 A：写进 `boundary_statement.unknowns`
+        #   （与既有「每次都读 unknowns」的规矩接上），且**只在确实引用了未确认条款时加**。
+        _r55 = J.judge("Buy our breast pump, it cures mastitis and is FDA cleared!",
+                       origin="test")
+        _u55 = _r55["boundary_statement"]["unknowns"]
+        _q55 = [u for u in _u55 if "Q45" in u]
+        _notice55 = (_r55.get("receipt") or {}).get("unconfirmed_notice")
+        _plain55 = J.judge("Our bottle washer has a 6-cup capacity.", origin="test")
+        _u55b = _plain55["boundary_statement"]["unknowns"]
+        check("V55a", "★ 引用了未确认条款的判定，`boundary_statement.unknowns` 里必须有这条"
+                      "（机器产出 —— 不再取决于模型当轮记不记得）",
+              len(_q55) == 1 and "EXT-" in _q55[0],
+              f"{len(_q55)} 条 · 点名了外部标准编号={'EXT-' in (_q55[0] if _q55 else '')} · "
+              f"unknowns 共 {len(_u55)} 条")
+        check("V55b", "★ 反向对照：**零命中**（没引用任何条款）的判定**不许**带这条 —— "
+                      "否则它会变成一个天天响的信号（§2.1.1）",
+              not any("Q45" in u for u in _u55b),
+              f"零命中判定的 unknowns {len(_u55b)} 条，含 Q45 的 "
+              f"{sum(1 for u in _u55b if 'Q45' in u)} 条（应为 0）")
+        # ★ 同源要在**真写了回执**的那一次上比 —— 第一版这里没传 `receipt=True`，
+        #   于是 `unconfirmed_notice` 是 None、「同源」根本无从比（判据自己先说清这一点）。
+        with tempfile.TemporaryDirectory() as _t55d:
+            _r55c = J.judge("Buy our breast pump, it cures mastitis and is FDA cleared!",
+                            origin="test", receipt=True,
+                            receipt_path=Path(_t55d) / "r.jsonl")
+        _q55c = [u for u in _r55c["boundary_statement"]["unknowns"] if "Q45" in u]
+        _notice55 = (_r55c.get("receipt") or {}).get("unconfirmed_notice")
+        check("V55c", "★ 同源（§2.4.5）：boundary 里那一句只是**前缀 + 回执的原文**，"
+                      "不是另写一句 —— 两处各写一句迟早会有一句先改",
+              bool(_notice55) and len(_q55c) == 1 and _q55c[0].endswith(_notice55),
+              f"boundary 那条以回执 notice 结尾="
+              f"{bool(_q55c and _notice55 and _q55c[0].endswith(_notice55))}"
+              f" · notice {len(_notice55 or '')} 字")
+
+        # ★ 语料规模上的反向对照：**不是每条都带上它**（否则「只在引用了未确认条款时加」
+        #   这半句是空的）。这里给的是一个**比例读数**，不是一个写死的常量。
+        _n55 = _t55 = 0
+        for _r55x in _recs54:
+            _tx55 = ((_r55x.get("Primary Text") or "") + "\n"
+                     + (_r55x.get("Headline") or "")).strip()
+            if not _tx55:
+                continue
+            _t55 += 1
+            if any("Q45" in u for u in
+                   J.judge(_tx55, origin="test")["boundary_statement"]["unknowns"]):
+                _n55 += 1
+        check("V55d", "★ 规模上的反向对照：带上这条的判定既**不是全部**也不是零"
+                      "（「只在引用了未确认条款时加」这半句因此不是空话）",
+              0 < _n55 < _t55,
+              f"语料有文本的 {_t55} 条里 {_n55} 条带上它（{_n55 / max(_t55, 1) * 100:.1f}%）"
+              f" —— ★ 这就是「天天响的信号」的量，Q45 选项 A 的代价是**量出来的**")
+
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)
     if a.json:

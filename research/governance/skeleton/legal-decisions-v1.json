@@ -2563,7 +2563,7 @@
       "id": "Q45",
       "kind": "design",
       "line": "kb",
-      "status": "open",
+      "status": "answered",
       "owner": "Owner",
       "raised_at": "2026-09-23",
       "title": "「本次判定引用的外部标准未经法务确认」这句话，今天只在**回执**里与**工具说明**里 —— 要不要把它变成机器强制的（写进 boundary_statement）",
@@ -2588,7 +2588,11 @@
         }
       ],
       "default_if_unanswered": "沉默 = 选项 B（保持现状：只在回执里 + 工具说明要求转述）。★ 选 B 意味着接受「群里那句话说没说，取决于模型当轮记不记得」；回执那一侧的可追溯性不受影响（T4a/T4b/V48 已经守着）。",
-      "where": "`research/governance/skeleton/judge.py`（`_boundary()` 与回执的证据块）· `research/governance/skeleton/clause_ref.py`（`unconfirmed_notice()`）· `tools/agent/tools.mjs`（`judge_copy` 的工具说明）· `tools/verify_kb.py`（T4b 是回执那一侧的执行点）· `PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md` §五 T4。"
+      "where": "`research/governance/skeleton/judge.py`（`_boundary()` 与回执的证据块）· `research/governance/skeleton/clause_ref.py`（`unconfirmed_notice()`）· `tools/agent/tools.mjs`（`judge_copy` 的工具说明）· `tools/verify_kb.py`（T4b 是回执那一侧的执行点）· `PMO/守衡-知识库建设整体方案-PRD骨架-20260923.md` §五 T4。",
+      "answered_at": "2026-09-23",
+      "answered_by": "Owner",
+      "answer": "选项 A —— 写进 `boundary_statement.unknowns`，只在确实引用了未确认条款时加",
+      "record": "`judge.py` 在产出边界声明时，若回执的 `unconfirmed_notice` 非空，就往 `boundary_statement.unknowns` 追加一条 —— **前缀 + 回执原文逐字**（同源，§2.4.5：两处各写一句迟早会有一句先改）。触发条件严格照选项 A：`unconfirmed_notice` 非空 ⟺ 引用集里至少有一条 status=research；**零命中不加**。自证：`verify_engine_contract.py` 的 V55a（引用未确认条款 → 必须有且点名 EXT- 编号）、V55b（零命中 → 不许有）、V55c（与回执同源）、V55d（**规模上的反向对照**：语料里既不是全部也不是零）。打断（把 `_unconf` 直接置 None → 退回「只活在回执与工具说明里」）→ **V55a/V55c/V55d 三红、rc=1**；恢复后 202/202。★ **A 的代价已量出来**：语料有文本的 **232** 条里 **132** 条（**56.9%**）会带上这条 —— 这是「天天响的信号会被无视」（§2.1.1）的**具体量**，不是担心。★ 复核过账本提醒的那件事：全量跑完**没有一条既有断言被这条改动带红** （V21c/V47d 等逐字比 boundary 的断言都还在守）。★ 仍未做的（写下来）：`judge_copy` 工具说明那一侧**仍然没有执行点** （`grep judge_copy tools/*.py tools/agent/*.mjs` 只命中它自己）—— 选 A 之后回答侧已有机器产出，但「说明里写没写」依旧无人守；那正是选项 C 要补的，属新的决定。"
     }
   ],
   "$id_aliases": {
