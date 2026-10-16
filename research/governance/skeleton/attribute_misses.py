@@ -22,7 +22,6 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import score  # noqa: E402
 
-TEXT_FIELDS = ["Primary Text", "Headline"]
 WIDE_FIELDS = ["广告名称", "广告系列Campaign", "落地页URL", "广告组", "修改建议", "命中原因"]
 
 # 近似匹配：把片段压成字母数字骨架，看是否是子串关系

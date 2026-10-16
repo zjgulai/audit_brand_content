@@ -92,6 +92,7 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 | [`research/kb/README.md`](./research/kb/README.md) | **需求知识库**：文件地图 + 10 条黄金问题（每条配可复现命令） |
 | [`research/feishu/README.md`](./research/feishu/README.md) | 守衡在飞书里**能拿到什么**（资源索引 / 可达清单） |
 | [`research/landing/README.md`](./research/landing/README.md) | 落地页内容获取实测（批次 C） |
+| [`research/landing/momcozy-高风险图片检查清单-20260924.md`](./research/landing/momcozy-高风险图片检查清单-20260924.md) | momcozy.com 官网图片高风险初筛清单（2026-09-24，含 11 张证据图；来历与边界写在文首） |
 | [`research/method/调研报告-AI产品全流程方法与Kb2Agent编译链.md`](./research/method/调研报告-AI产品全流程方法与Kb2Agent编译链.md) | 知识工程调研报告（同目录另有 `Kb2Agent-方法论提炼.md`、`codex_research-方法论提炼.md`） |
 | [`research/distill/00-写作规范.md`](./research/distill/00-写作规范.md) → [`01-大纲.md`](./research/distill/01-大纲.md) → [`cross-cutting-findings.md`](./research/distill/cross-cutting-findings.md) | 竞品仓库拆解：写作规范 → 大纲 → 跨分片发现；分片在 `research/distill/shards/` |
 | [`research/replay/离线复现报告-20260916.md`](./research/replay/离线复现报告-20260916.md) | 离线复现报告 |
@@ -115,7 +116,8 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 
 ### 工程与自证 · `tools/`
 
-没有 `tools/README.md` —— 自证表在第三节，那才是真入口。
+[`tools/README.md`](./tools/README.md) 是 `tools/` 的工具索引（一行一个：什么时候用它、产物落哪，
+含那些零引用的诊断探针）；各子系统自证入口仍在第三节，那才是真入口。
 
 | 文件 | 是什么 |
 |---|---|
