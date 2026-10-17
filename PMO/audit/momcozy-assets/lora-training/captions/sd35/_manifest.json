@@ -1,0 +1,258 @@
+{
+  "model": "sd35",
+  "total_images": 42,
+  "images": [
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_01.png",
+      "caption": "Momcozy brand style, clean infographic design, 100 img 04, soft cream background, warm low-contrast lighting, sage green and dusty rose accents, premium feel, rounded corners, minimal layout",
+      "source": "infographic_banner_01_100_img_04.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_02.png",
+      "caption": "Momcozy brand style, marketing banner design, 100 img 06, warm gradient background, elegant composition, subtle bokeh, pill-shaped badge areas, no text",
+      "source": "infographic_banner_02_100_img_06.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_03.png",
+      "caption": "Momcozy brand style, clean infographic design, 100 img 03, soft cream background, warm low-contrast lighting, sage green and dusty rose accents, premium feel, rounded corners, minimal layout",
+      "source": "infographic_banner_03_100_img_03.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_04.png",
+      "caption": "Momcozy brand style, marketing banner design, 100 img 15, warm gradient background, elegant composition, subtle bokeh, pill-shaped badge areas, no text",
+      "source": "infographic_banner_04_100_img_15.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_05.png",
+      "caption": "Momcozy brand style, clean infographic design, 100 img 04, soft cream background, warm low-contrast lighting, sage green and dusty rose accents, premium feel, rounded corners, minimal layout",
+      "source": "infographic_banner_05_100_img_04.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_06.png",
+      "caption": "Momcozy brand style, marketing banner design, 100 img 02, warm gradient background, elegant composition, subtle bokeh, pill-shaped badge areas, no text",
+      "source": "infographic_banner_06_100_img_02.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_07.png",
+      "caption": "Momcozy brand style, clean infographic design, 100 img 03, soft cream background, warm low-contrast lighting, sage green and dusty rose accents, premium feel, rounded corners, minimal layout",
+      "source": "infographic_banner_07_100_img_03.jpg"
+    },
+    {
+      "scene": "infographic_banner",
+      "filename": "infographic_banner_08.png",
+      "caption": "Momcozy brand style, marketing banner design, 100 img 01, warm gradient background, elegant composition, subtle bokeh, pill-shaped badge areas, no text",
+      "source": "infographic_banner_08_100_img_01.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_01.png",
+      "caption": "Momcozy brand style, lifestyle editorial photograph, img 07, warm golden natural light, soft shadows, low contrast, cozy effortless mood, dusty rose and sage green accents, authentic moment, natural skin texture, shot on Canon EOS R5",
+      "source": "lifestyle_01_100_img_07.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_02.png",
+      "caption": "Momcozy brand style, warm lifestyle photo, img 06, sunlit room, gentle atmosphere, imperfect beauty, relaxed posture, creamy bokeh background",
+      "source": "lifestyle_02_100_img_06.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_03.png",
+      "caption": "Momcozy brand style, lifestyle editorial photograph, img 06, warm golden natural light, soft shadows, low contrast, cozy effortless mood, dusty rose and sage green accents, authentic moment, natural skin texture, shot on Canon EOS R5",
+      "source": "lifestyle_03_100_img_06.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_04.png",
+      "caption": "Momcozy brand style, warm lifestyle photo, img 01, sunlit room, gentle atmosphere, imperfect beauty, relaxed posture, creamy bokeh background",
+      "source": "lifestyle_04_100_img_01.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_05.png",
+      "caption": "Momcozy brand style, lifestyle editorial photograph, img 07, warm golden natural light, soft shadows, low contrast, cozy effortless mood, dusty rose and sage green accents, authentic moment, natural skin texture, shot on Canon EOS R5",
+      "source": "lifestyle_05_100_img_07.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_06.png",
+      "caption": "Momcozy brand style, warm lifestyle photo, img 08, sunlit room, gentle atmosphere, imperfect beauty, relaxed posture, creamy bokeh background",
+      "source": "lifestyle_06_100_img_08.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_07.png",
+      "caption": "Momcozy brand style, lifestyle editorial photograph, img 04, warm golden natural light, soft shadows, low contrast, cozy effortless mood, dusty rose and sage green accents, authentic moment, natural skin texture, shot on Canon EOS R5",
+      "source": "lifestyle_07_100_img_04.jpg"
+    },
+    {
+      "scene": "lifestyle",
+      "filename": "lifestyle_08.png",
+      "caption": "Momcozy brand style, warm lifestyle photo, img 06, sunlit room, gentle atmosphere, imperfect beauty, relaxed posture, creamy bokeh background",
+      "source": "lifestyle_08_100_img_06.jpg"
+    },
+    {
+      "scene": "other",
+      "filename": "other_01.png",
+      "caption": "Momcozy brand style, img 10, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_01_95_img_10.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_02.png",
+      "caption": "Momcozy brand style, img 15, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_02_95_img_15.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_03.png",
+      "caption": "Momcozy brand style, img 12, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_03_95_img_12.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_04.png",
+      "caption": "Momcozy brand style, img 12, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_04_95_img_12.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_05.png",
+      "caption": "Momcozy brand style, img 14, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_05_95_img_14.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_06.png",
+      "caption": "Momcozy brand style, img 09, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_06_95_img_09.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_07.png",
+      "caption": "Momcozy brand style, img 11, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_07_90_img_11.png"
+    },
+    {
+      "scene": "other",
+      "filename": "other_08.png",
+      "caption": "Momcozy brand style, img 14, warm tones, soft lighting, cozy atmosphere, premium quality",
+      "source": "other_08_90_img_14.png"
+    },
+    {
+      "scene": "packaging_unboxing",
+      "filename": "packaging_unboxing_01.png",
+      "caption": "Momcozy brand style, premium packaging photography, 100 img 05, soft matte finish, delicate tissue paper, cozy gift-giving atmosphere, warm natural light, lifestyle unboxing feel",
+      "source": "packaging_unboxing_01_100_img_05.jpg"
+    },
+    {
+      "scene": "packaging_unboxing",
+      "filename": "packaging_unboxing_02.png",
+      "caption": "Momcozy brand style, elegant product packaging, 100 img 02, unboxing moment, warm undertones, premium quality without luxury pretension",
+      "source": "packaging_unboxing_02_100_img_02.jpg"
+    },
+    {
+      "scene": "packaging_unboxing",
+      "filename": "packaging_unboxing_03.png",
+      "caption": "Momcozy brand style, premium packaging photography, 100 img 07, soft matte finish, delicate tissue paper, cozy gift-giving atmosphere, warm natural light, lifestyle unboxing feel",
+      "source": "packaging_unboxing_03_100_img_07.jpg"
+    },
+    {
+      "scene": "packaging_unboxing",
+      "filename": "packaging_unboxing_04.png",
+      "caption": "Momcozy brand style, elegant product packaging, 100 img 02, unboxing moment, warm undertones, premium quality without luxury pretension",
+      "source": "packaging_unboxing_04_100_img_02.webp"
+    },
+    {
+      "scene": "packaging_unboxing",
+      "filename": "packaging_unboxing_05.png",
+      "caption": "Momcozy brand style, premium packaging photography, 100 img 10, soft matte finish, delicate tissue paper, cozy gift-giving atmosphere, warm natural light, lifestyle unboxing feel",
+      "source": "packaging_unboxing_05_100_img_10.webp"
+    },
+    {
+      "scene": "packaging_unboxing",
+      "filename": "packaging_unboxing_06.png",
+      "caption": "Momcozy brand style, elegant product packaging, 95 img 11, unboxing moment, warm undertones, premium quality without luxury pretension",
+      "source": "packaging_unboxing_06_95_img_11.png"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_01.png",
+      "caption": "Momcozy brand style, professional product photography, 01 100 img 12, pure white background, soft even studio lighting with warm undertones, subtle soft shadow, premium quality feel, sharp focus, crisp detail, commercial catalog style",
+      "source": "product_white_bg_01_100_img_12.jpg"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_02.png",
+      "caption": "Momcozy brand style, clean product shot, 02 100 img 06, minimal white background, warm studio light, matte texture visible, 8k resolution",
+      "source": "product_white_bg_02_100_img_06.jpg"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_03.png",
+      "caption": "Momcozy brand style, professional product photography, 03 100 img 01, pure white background, soft even studio lighting with warm undertones, subtle soft shadow, premium quality feel, sharp focus, crisp detail, commercial catalog style",
+      "source": "product_white_bg_03_100_img_01.jpg"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_04.png",
+      "caption": "Momcozy brand style, clean product shot, 04 100 img 14, minimal white background, warm studio light, matte texture visible, 8k resolution",
+      "source": "product_white_bg_04_100_img_14.jpg"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_05.png",
+      "caption": "Momcozy brand style, professional product photography, 05 100 img 09, pure white background, soft even studio lighting with warm undertones, subtle soft shadow, premium quality feel, sharp focus, crisp detail, commercial catalog style",
+      "source": "product_white_bg_05_100_img_09.png"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_06.png",
+      "caption": "Momcozy brand style, clean product shot, 06 100 img 04, minimal white background, warm studio light, matte texture visible, 8k resolution",
+      "source": "product_white_bg_06_100_img_04.png"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_07.png",
+      "caption": "Momcozy brand style, professional product photography, 07 100 img 10, pure white background, soft even studio lighting with warm undertones, subtle soft shadow, premium quality feel, sharp focus, crisp detail, commercial catalog style",
+      "source": "product_white_bg_07_100_img_10.png"
+    },
+    {
+      "scene": "product_white_bg",
+      "filename": "product_white_bg_08.png",
+      "caption": "Momcozy brand style, clean product shot, 08 100 img 09, minimal white background, warm studio light, matte texture visible, 8k resolution",
+      "source": "product_white_bg_08_100_img_09.png"
+    },
+    {
+      "scene": "ugc",
+      "filename": "ugc_01.png",
+      "caption": "Momcozy brand style, authentic phone camera photo, img 05, natural indoor window light, slightly grainy, candid moment, real home environment, no filter aesthetic, warm yellow tint, iPhone photography",
+      "source": "ugc_01_97_img_05.jpg"
+    },
+    {
+      "scene": "ugc",
+      "filename": "ugc_02.png",
+      "caption": "Momcozy brand style, real user photo, img 13, authentic imperfection, natural clutter, unposed moment, genuine expression",
+      "source": "ugc_02_85_img_13.jpg"
+    },
+    {
+      "scene": "ugc",
+      "filename": "ugc_03.png",
+      "caption": "Momcozy brand style, authentic phone camera photo, img 04, natural indoor window light, slightly grainy, candid moment, real home environment, no filter aesthetic, warm yellow tint, iPhone photography",
+      "source": "ugc_03_80_img_04.jpg"
+    },
+    {
+      "scene": "ugc",
+      "filename": "ugc_04.png",
+      "caption": "Momcozy brand style, real user photo, img 10, authentic imperfection, natural clutter, unposed moment, genuine expression",
+      "source": "ugc_04_65_img_10.webp"
+    }
+  ]
+}

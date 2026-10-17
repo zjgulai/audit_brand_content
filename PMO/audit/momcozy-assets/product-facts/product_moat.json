@@ -1,0 +1,16 @@
+{
+  "brand": "Momcozy",
+  "category_matrix": {
+    "traffic_driver": ["Nursing Bras", "Standard Pumping Bras"],
+    "core_revenue": ["M5 Series", "S12 Pro"],
+    "high_margin_moat": ["Air 1 (Ultra-slim)", "KleanPal Pro Washer"]
+  },
+  "technical_leverage": {
+    "patent_core": "DoubleFit™ Hybrid Flange (Soft silicone + rigid PP seal)",
+    "efficiency_claim": "28.2% faster pumping; 11.68ml extra output avg.",
+    "spec_moat": "3rd/4th Gen Motors, <45dB noise level, up to 15 intensity levels"
+  },
+  "pricing_tier": "Mid-Premium ($120 - $370)",
+  "vulnerability": "Users complain about replacement part costs and app connectivity bugs.",
+  "ai_selection_insight": "Highly competitive in 'Lifestyle integration'. Best entry point for new users via high-quality bras, then upselling to smart pumps."
+}

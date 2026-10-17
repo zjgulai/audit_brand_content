@@ -1,0 +1,3 @@
+{"poll":1,"ts":"2026-10-17T12:22:03Z","polluted_files":0}
+{"event":"CLEAN","poll":1,"ts":"2026-10-17T12:22:03Z"}
+{"event":"TIMEOUT_OR_DONE","polls":1,"ts":"2026-10-17T12:22:04Z"}

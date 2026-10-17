@@ -1,0 +1,694 @@
+{
+  "schema_version": "momcozy-assets/1.0",
+  "generated_at": "2026-10-17T12:29:19Z",
+  "kind": "pointer-only",
+  "reason": "训练图按方案 Q4.5 A 子项不复制(只复制同名 .txt caption); 图体量大且许可未知",
+  "src_dir": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data",
+  "files": [
+    {
+      "subdir": "flux",
+      "filename": "infographic_banner_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/infographic_banner_01.png",
+      "real_size": 507273,
+      "sha256": "6e4a8c76f3a7de7a9c23ef43eec705231ff212b52337e53b6dc3d6e485d62685",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "infographic_banner_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/infographic_banner_02.png",
+      "real_size": 494634,
+      "sha256": "aaa6f8f6eb0f189e2123a92991335129b347a6b467ee4011fc9dd659f562ec98",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "infographic_banner_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/infographic_banner_03.png",
+      "real_size": 939927,
+      "sha256": "2603f6be8e764f4f571355cfe316edf2e7884a383d58436ae5f46a1ccacba2b2",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "infographic_banner_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/infographic_banner_04.png",
+      "real_size": 1075302,
+      "sha256": "5a2dc35223f35423034e1001d4cd2a842dfe36bf891c2b12a79476dd412fe2ba",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "infographic_banner_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/infographic_banner_05.png",
+      "real_size": 640001,
+      "sha256": "1512cc05c4d3a9996e2607543b71013d7a55236209af1165114720d22a1b1faf",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "infographic_banner_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/infographic_banner_06.png",
+      "real_size": 752502,
+      "sha256": "06785c402889e893dea00f80d61f4b5d04e8262ada02ee5037f37ad6cf173af2",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "lifestyle_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/lifestyle_01.png",
+      "real_size": 505006,
+      "sha256": "e373f347718851c7b59a0c282d3d99ccf20e298faca02b6d8546ce76a28dc1da",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "lifestyle_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/lifestyle_02.png",
+      "real_size": 700263,
+      "sha256": "d9462e2c65114f9a5f39993a23ade7024209353700a709c1748309d4c4ae1664",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "lifestyle_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/lifestyle_03.png",
+      "real_size": 401788,
+      "sha256": "35cc98889acff694749991526ce3764468e3697e24537d93474c33640c6dc678",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "lifestyle_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/lifestyle_04.png",
+      "real_size": 380933,
+      "sha256": "4c22941b82ffaae603c658903ec595adcdfebba83f5f72590fe68b82fe0cdafe",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "lifestyle_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/lifestyle_05.png",
+      "real_size": 414408,
+      "sha256": "2f496d3016d1a75886aba81db69815029d42a5e0f26d1f88199c0bf85f8bc4fb",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "lifestyle_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/lifestyle_06.png",
+      "real_size": 1062801,
+      "sha256": "0c4523ad4ecea679fa9bbf28d38146124a327f84e854473798ea255f5ff6c765",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "other_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/other_01.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "other_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/other_02.png",
+      "real_size": 37026,
+      "sha256": "4264b794d32312903112261d499f24a2eb9bd7455b5a1bb14498be7efae75d10",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "other_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/other_03.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "other_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/other_04.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "other_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/other_05.png",
+      "real_size": 37026,
+      "sha256": "4264b794d32312903112261d499f24a2eb9bd7455b5a1bb14498be7efae75d10",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "other_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/other_06.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "packaging_unboxing_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/packaging_unboxing_01.png",
+      "real_size": 381601,
+      "sha256": "c5dc42adcadb0723ffc41f6a204de3d1e40c75e5bcb565ee556ef3aea363a582",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "packaging_unboxing_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/packaging_unboxing_02.png",
+      "real_size": 823969,
+      "sha256": "09ccdbc74ad635b6f784ce7570089c95d64b503044ac955a67f7b1b583415623",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "packaging_unboxing_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/packaging_unboxing_03.png",
+      "real_size": 777241,
+      "sha256": "25b23d3413b5a70f65ac4b92ee49904f957def0907e90d4751be5f3b4d2853f2",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "packaging_unboxing_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/packaging_unboxing_04.png",
+      "real_size": 335398,
+      "sha256": "ead4d7ad48d3479766964e657b324758aac04dd5a4e8a55a756fd80c58a6be7a",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "packaging_unboxing_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/packaging_unboxing_05.png",
+      "real_size": 305545,
+      "sha256": "347a295d63b6a2615aa96e8f73de225bc37e69ad6b4a907a66f12835f0ebc5e6",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "packaging_unboxing_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/packaging_unboxing_06.png",
+      "real_size": 1068715,
+      "sha256": "80c2c7456bc04bfdb60334419ae772899611ec4af256ddd70b0d789de51b2893",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "product_white_bg_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/product_white_bg_01.png",
+      "real_size": 604756,
+      "sha256": "29e6f42e9824c7789f26815424e9c0ac7829450a260f1d50be487e4190841951",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "product_white_bg_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/product_white_bg_02.png",
+      "real_size": 473325,
+      "sha256": "4d5fe3b0a0a8c80529d45c13d6c5865832b84e30378564cf798cca7562951ec7",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "product_white_bg_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/product_white_bg_03.png",
+      "real_size": 953800,
+      "sha256": "89cd460a4b1e631b9589a271583d1054bcc0c5f359979017724c30db20451f3e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "product_white_bg_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/product_white_bg_04.png",
+      "real_size": 798806,
+      "sha256": "57cfbce1503d5af2e6722c6f21d7b0b974d4723b9aa4384e3df67ecdfc4e360f",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "product_white_bg_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/product_white_bg_05.png",
+      "real_size": 390756,
+      "sha256": "35f40edb231a595dc80fc9666a029232fd0b4ada771d84f566ddd6eb9d9c8925",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "product_white_bg_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/product_white_bg_06.png",
+      "real_size": 373353,
+      "sha256": "469b34c65dfc77b5f01a9cbd072b0386a1679a15ae98ad351c63814ca4c435e5",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "ugc_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/ugc_01.png",
+      "real_size": 1061520,
+      "sha256": "f8f8529ff90a9598ade6a65455363fb99e69f3ab043c586bf50fdcde5eec6386",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "ugc_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/ugc_02.png",
+      "real_size": 1437752,
+      "sha256": "c74c2c495e5695747bf2d1beda1827ce6ed76cf5bf48a5884e56e85fbf813f41",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "ugc_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/ugc_03.png",
+      "real_size": 575973,
+      "sha256": "37a32a23e187f032f9d886c20ebab196501603fc3d156761913ad35dd8df6cfa",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "flux",
+      "filename": "ugc_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/flux/ugc_04.png",
+      "real_size": 700499,
+      "sha256": "2517601872eae31f383ae2c3fe8ce8e7baf9361ea99c39859ec9d17b31f296c7",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_01.png",
+      "real_size": 507273,
+      "sha256": "6e4a8c76f3a7de7a9c23ef43eec705231ff212b52337e53b6dc3d6e485d62685",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_02.png",
+      "real_size": 494634,
+      "sha256": "aaa6f8f6eb0f189e2123a92991335129b347a6b467ee4011fc9dd659f562ec98",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_03.png",
+      "real_size": 939927,
+      "sha256": "2603f6be8e764f4f571355cfe316edf2e7884a383d58436ae5f46a1ccacba2b2",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_04.png",
+      "real_size": 1075302,
+      "sha256": "5a2dc35223f35423034e1001d4cd2a842dfe36bf891c2b12a79476dd412fe2ba",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_05.png",
+      "real_size": 640001,
+      "sha256": "1512cc05c4d3a9996e2607543b71013d7a55236209af1165114720d22a1b1faf",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_06.png",
+      "real_size": 752502,
+      "sha256": "06785c402889e893dea00f80d61f4b5d04e8262ada02ee5037f37ad6cf173af2",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_07.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_07.png",
+      "real_size": 803072,
+      "sha256": "f48508ee5ce19c4b92a2e3b924ccf4632308d5036d77cf4a2e1f48b3086b1abd",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "infographic_banner_08.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/infographic_banner_08.png",
+      "real_size": 910636,
+      "sha256": "fc9da020e3fd76dbd484de462a731b2b9ee00a5eabb7cd6340c328dff350191d",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_01.png",
+      "real_size": 505006,
+      "sha256": "e373f347718851c7b59a0c282d3d99ccf20e298faca02b6d8546ce76a28dc1da",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_02.png",
+      "real_size": 700263,
+      "sha256": "d9462e2c65114f9a5f39993a23ade7024209353700a709c1748309d4c4ae1664",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_03.png",
+      "real_size": 401788,
+      "sha256": "35cc98889acff694749991526ce3764468e3697e24537d93474c33640c6dc678",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_04.png",
+      "real_size": 380933,
+      "sha256": "4c22941b82ffaae603c658903ec595adcdfebba83f5f72590fe68b82fe0cdafe",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_05.png",
+      "real_size": 414408,
+      "sha256": "2f496d3016d1a75886aba81db69815029d42a5e0f26d1f88199c0bf85f8bc4fb",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_06.png",
+      "real_size": 1062801,
+      "sha256": "0c4523ad4ecea679fa9bbf28d38146124a327f84e854473798ea255f5ff6c765",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_07.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_07.png",
+      "real_size": 1305246,
+      "sha256": "3f452f27e58d2c778609122d7ee438a1013ea0c4d0fc1e7b883e357b0d366ba3",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "lifestyle_08.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/lifestyle_08.png",
+      "real_size": 1324100,
+      "sha256": "ceefdbaeb2d1211900393f44827b16e3052ac3046dd0422fbb97f2682c387b7c",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_01.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_02.png",
+      "real_size": 37026,
+      "sha256": "4264b794d32312903112261d499f24a2eb9bd7455b5a1bb14498be7efae75d10",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_03.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_04.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_05.png",
+      "real_size": 37026,
+      "sha256": "4264b794d32312903112261d499f24a2eb9bd7455b5a1bb14498be7efae75d10",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_06.png",
+      "real_size": 34730,
+      "sha256": "599666765ccf9b9f7c6b10ff0e0b4d95466d109253132410a218fbe191f6e77e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_07.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_07.png",
+      "real_size": 64077,
+      "sha256": "aa79a99a7606bfb02f64f3bbf68fc61c69b7341f9c88e0bf70f8b6febc3fe2c7",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "other_08.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/other_08.png",
+      "real_size": 40857,
+      "sha256": "ef1297fc49d6b1389d9fc9f05e5cf251fffffe79082961e53d7f7fde2fc42d74",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "packaging_unboxing_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/packaging_unboxing_01.png",
+      "real_size": 381601,
+      "sha256": "c5dc42adcadb0723ffc41f6a204de3d1e40c75e5bcb565ee556ef3aea363a582",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "packaging_unboxing_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/packaging_unboxing_02.png",
+      "real_size": 823969,
+      "sha256": "09ccdbc74ad635b6f784ce7570089c95d64b503044ac955a67f7b1b583415623",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "packaging_unboxing_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/packaging_unboxing_03.png",
+      "real_size": 777241,
+      "sha256": "25b23d3413b5a70f65ac4b92ee49904f957def0907e90d4751be5f3b4d2853f2",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "packaging_unboxing_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/packaging_unboxing_04.png",
+      "real_size": 335398,
+      "sha256": "ead4d7ad48d3479766964e657b324758aac04dd5a4e8a55a756fd80c58a6be7a",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "packaging_unboxing_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/packaging_unboxing_05.png",
+      "real_size": 305545,
+      "sha256": "347a295d63b6a2615aa96e8f73de225bc37e69ad6b4a907a66f12835f0ebc5e6",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "packaging_unboxing_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/packaging_unboxing_06.png",
+      "real_size": 1068715,
+      "sha256": "80c2c7456bc04bfdb60334419ae772899611ec4af256ddd70b0d789de51b2893",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_01.png",
+      "real_size": 604756,
+      "sha256": "29e6f42e9824c7789f26815424e9c0ac7829450a260f1d50be487e4190841951",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_02.png",
+      "real_size": 473325,
+      "sha256": "4d5fe3b0a0a8c80529d45c13d6c5865832b84e30378564cf798cca7562951ec7",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_03.png",
+      "real_size": 953800,
+      "sha256": "89cd460a4b1e631b9589a271583d1054bcc0c5f359979017724c30db20451f3e",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_04.png",
+      "real_size": 798806,
+      "sha256": "57cfbce1503d5af2e6722c6f21d7b0b974d4723b9aa4384e3df67ecdfc4e360f",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_05.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_05.png",
+      "real_size": 390756,
+      "sha256": "35f40edb231a595dc80fc9666a029232fd0b4ada771d84f566ddd6eb9d9c8925",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_06.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_06.png",
+      "real_size": 373353,
+      "sha256": "469b34c65dfc77b5f01a9cbd072b0386a1679a15ae98ad351c63814ca4c435e5",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_07.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_07.png",
+      "real_size": 324271,
+      "sha256": "0b219e8179dab1455f361b944266acaf12b4fbd41123252eed0a8b419e47d92b",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "product_white_bg_08.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/product_white_bg_08.png",
+      "real_size": 453856,
+      "sha256": "2f8fe1846e5f08ba80b9bcf8cb2c0b4eec7410fb514f629cb18ac7b69c5a8549",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "ugc_01.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/ugc_01.png",
+      "real_size": 1061520,
+      "sha256": "f8f8529ff90a9598ade6a65455363fb99e69f3ab043c586bf50fdcde5eec6386",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "ugc_02.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/ugc_02.png",
+      "real_size": 1437752,
+      "sha256": "c74c2c495e5695747bf2d1beda1827ce6ed76cf5bf48a5884e56e85fbf813f41",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "ugc_03.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/ugc_03.png",
+      "real_size": 575973,
+      "sha256": "37a32a23e187f032f9d886c20ebab196501603fc3d156761913ad35dd8df6cfa",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "subdir": "sd35",
+      "filename": "ugc_04.png",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_data/sd35/ugc_04.png",
+      "real_size": 700499,
+      "sha256": "2517601872eae31f383ae2c3fe8ce8e7baf9361ea99c39859ec9d17b31f296c7",
+      "license_status": "unknown",
+      "copied": false
+    }
+  ],
+  "files_count": 76
+}

@@ -1,0 +1,42 @@
+:root {
+  /* Brand Colors */
+  --momcozy-red: #E30022;
+  --momcozy-sage: #A8B8A0;
+  --momcozy-cream: #FDFBF7;
+  
+  /* Text & Surface */
+  --text-primary: #2D2D2D;
+  --text-secondary: #666666;
+  --bg-primary: var(--momcozy-cream);
+  --bg-card: #FFFFFF;
+  
+  /* Functional */
+  --status-success: #52C41A;
+  --status-error: var(--momcozy-red);
+  --status-warning: #FAAD14;
+  
+  /* Layout & Border */
+  --border-radius-lg: 24px;
+  --border-radius-md: 12px;
+  --spacing-unit: 8px;
+  --container-padding: 24px;
+  
+  /* Typography */
+  --font-heading: 'Lora', serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+/* Example Utility Classes */
+.btn-primary {
+  background-color: var(--momcozy-red);
+  color: #FFFFFF;
+  border-radius: var(--border-radius-lg);
+  padding: 12px 32px;
+  font-weight: 600;
+  border: none;
+  transition: opacity 0.2s ease;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}

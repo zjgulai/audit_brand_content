@@ -1,0 +1,26 @@
+{
+  "schema_version": "momcozy-assets/1.0",
+  "generated_at": "2026-10-17T12:29:19Z",
+  "kind": "pointer-only",
+  "reason": "LoRA 训练配置按方案 Q4.5/C 档只指针不复制；源为外部输入，不执行",
+  "src_dir": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_configs",
+  "files": [
+    {
+      "filename": "flux_style_lora.toml",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_configs/flux_style_lora.toml",
+      "real_size": 3093,
+      "sha256": "4ac8674b199f0140f1c225fbea5ec95a2fa19080897276bba23c665e09b97e7b",
+      "license_status": "unknown",
+      "copied": false
+    },
+    {
+      "filename": "sd35_identity_lora.toml",
+      "abs_path": "/Users/lute/Project/Brand_agent/Momcozy/lora_training_configs/sd35_identity_lora.toml",
+      "real_size": 3065,
+      "sha256": "7b8ea88bead9c0c4764ebd486e98f61d857fc09446d0d67f9a190f4555684bb5",
+      "license_status": "unknown",
+      "copied": false
+    }
+  ],
+  "files_count": 2
+}

@@ -1,0 +1,28 @@
+{
+  "brand": {
+    "primary": { "value": "#E30022", "type": "color", "description": "Momcozy Red, used for Logo and CTAs" },
+    "secondary": { "value": "#A8B8A0", "type": "color", "description": "Sage Green, for product-related accents" },
+    "surface": { "value": "#FDFBF7", "type": "color", "description": "Cream White background" }
+  },
+  "text": {
+    "primary": { "value": "#2D2D2D", "type": "color", "description": "Soft Black for readability" },
+    "secondary": { "value": "#666666", "type": "color", "description": "Muted gray for subtext" },
+    "on-brand": { "value": "#FFFFFF", "type": "color", "description": "White text on Red buttons" }
+  },
+  "interactive": {
+    "border-radius": { "value": "24px", "type": "dimension", "description": "Extreme rounded corners for a gentle feel" },
+    "border-width": { "value": "1px", "type": "dimension" },
+    "hover-overlay": { "value": "rgba(0, 0, 0, 0.05)", "type": "color" }
+  },
+  "spacing": {
+    "base": { "value": "8px", "type": "dimension" },
+    "container-padding": { "value": "24px", "type": "dimension" },
+    "section-gap": { "value": "64px", "type": "dimension" }
+  },
+  "typography": {
+    "font-family-heading": { "value": "'Lora', serif", "type": "fontFamily", "description": "Elegant serif for headlines" },
+    "font-family-body": { "value": "'Inter', sans-serif", "type": "fontFamily", "description": "Clean sans-serif for body text" },
+    "h1": { "fontSize": "48px", "fontWeight": "600", "lineHeight": "1.2" },
+    "body": { "fontSize": "16px", "fontWeight": "400", "lineHeight": "1.6" }
+  }
+}

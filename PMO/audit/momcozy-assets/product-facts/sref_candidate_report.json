@@ -1,0 +1,1291 @@
+{
+  "generated_at": "2026-05-23",
+  "total_scanned": 185,
+  "total_valid": 185,
+  "total_selected": 58,
+  "selection_criteria": {
+    "color_temp_range": "4000K-6500K (最佳4500K-6000K)",
+    "saturation": "< 0.60 (低-中饱和)",
+    "brightness": "0.35-0.80",
+    "contrast": "< 0.45 (低对比)",
+    "warm_ratio": "> 0.45"
+  },
+  "candidates": [
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 1,
+      "score": 100,
+      "filename": "lifestyle_01_100_img_07.jpg",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_07.jpg",
+      "metrics": {
+        "brightness": 0.705,
+        "saturation": 0.204,
+        "contrast": 0.27,
+        "color_temp": 4950.0,
+        "brand_color_ratio": 0.433,
+        "warm_ratio": 0.768,
+        "edge_density": 0.0485
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 2,
+      "score": 100,
+      "filename": "lifestyle_02_100_img_06.jpg",
+      "source": "SKU10_Momcozy_Reusable_Breast_Pads_14_Pack/assets/img_06.jpg",
+      "metrics": {
+        "brightness": 0.796,
+        "saturation": 0.148,
+        "contrast": 0.13,
+        "color_temp": 5245.0,
+        "brand_color_ratio": 0.3016,
+        "warm_ratio": 0.995,
+        "edge_density": 0.0477
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 3,
+      "score": 100,
+      "filename": "lifestyle_03_100_img_06.jpg",
+      "source": "SKU11_Momcozy_Contact_Free_Smart_Baby_Monitor/assets/img_06.jpg",
+      "metrics": {
+        "brightness": 0.806,
+        "saturation": 0.138,
+        "contrast": 0.199,
+        "color_temp": 5473.0,
+        "brand_color_ratio": 0.7934,
+        "warm_ratio": 0.991,
+        "edge_density": 0.0571
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 4,
+      "score": 100,
+      "filename": "lifestyle_04_100_img_01.jpg",
+      "source": "SKU11_Momcozy_Contact_Free_Smart_Baby_Monitor/assets/img_01.jpg",
+      "metrics": {
+        "brightness": 0.784,
+        "saturation": 0.225,
+        "contrast": 0.174,
+        "color_temp": 4579.0,
+        "brand_color_ratio": 0.1454,
+        "warm_ratio": 0.999,
+        "edge_density": 0.0377
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 5,
+      "score": 100,
+      "filename": "lifestyle_05_100_img_07.jpg",
+      "source": "SKU02_Feeding_Bundle_KleanPal_Pro_Baby_Bottle/assets/img_07.jpg",
+      "metrics": {
+        "brightness": 0.899,
+        "saturation": 0.109,
+        "contrast": 0.172,
+        "color_temp": 5631.0,
+        "brand_color_ratio": 0.5819,
+        "warm_ratio": 0.897,
+        "edge_density": 0.0587
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 6,
+      "score": 100,
+      "filename": "lifestyle_06_100_img_08.jpg",
+      "source": "SKU09_Professional_Breastfeeding_Bundle_Lactat/assets/img_08.jpg",
+      "metrics": {
+        "brightness": 0.887,
+        "saturation": 0.215,
+        "contrast": 0.145,
+        "color_temp": 4504.0,
+        "brand_color_ratio": 0.3153,
+        "warm_ratio": 0.833,
+        "edge_density": 0.0594
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 7,
+      "score": 100,
+      "filename": "lifestyle_07_100_img_04.jpg",
+      "source": "SKU12_Outing_Bundle_ChangeGo_Baby_Stroller_and/assets/img_04.jpg",
+      "metrics": {
+        "brightness": 0.492,
+        "saturation": 0.233,
+        "contrast": 0.272,
+        "color_temp": 4638.0,
+        "brand_color_ratio": 0.1913,
+        "warm_ratio": 0.839,
+        "edge_density": 0.1851
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 8,
+      "score": 100,
+      "filename": "lifestyle_08_100_img_06.jpg",
+      "source": "SKU12_Outing_Bundle_ChangeGo_Baby_Stroller_and/assets/img_06.jpg",
+      "metrics": {
+        "brightness": 0.414,
+        "saturation": 0.335,
+        "contrast": 0.218,
+        "color_temp": 3231.0,
+        "brand_color_ratio": 0.128,
+        "warm_ratio": 0.921,
+        "edge_density": 0.1649
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 9,
+      "score": 100,
+      "filename": "lifestyle_09_100_img_10.jpg",
+      "source": "SKU05_Momcozy_BreezyClear_Pro_2_in_1_Spray_Suc/assets/img_10.jpg",
+      "metrics": {
+        "brightness": 0.717,
+        "saturation": 0.15,
+        "contrast": 0.177,
+        "color_temp": 5363.0,
+        "brand_color_ratio": 0.2394,
+        "warm_ratio": 0.993,
+        "edge_density": 0.0409
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 10,
+      "score": 100,
+      "filename": "lifestyle_10_100_img_02.jpg",
+      "source": "SKU05_Momcozy_BreezyClear_Pro_2_in_1_Spray_Suc/assets/img_02.jpg",
+      "metrics": {
+        "brightness": 0.457,
+        "saturation": 0.191,
+        "contrast": 0.155,
+        "color_temp": 5179.0,
+        "brand_color_ratio": 0.0303,
+        "warm_ratio": 0.891,
+        "edge_density": 0.0754
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 11,
+      "score": 100,
+      "filename": "lifestyle_11_100_img_08.jpg",
+      "source": "SKU05_Momcozy_BreezyClear_Pro_2_in_1_Spray_Suc/assets/img_08.jpg",
+      "metrics": {
+        "brightness": 0.656,
+        "saturation": 0.287,
+        "contrast": 0.209,
+        "color_temp": 4403.0,
+        "brand_color_ratio": 0.4496,
+        "warm_ratio": 0.917,
+        "edge_density": 0.0589
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "lifestyle",
+      "scene_label": "SA-01 Lifestyle 生活方式情感锚点",
+      "rank": 12,
+      "score": 100,
+      "filename": "lifestyle_12_100_img_01.png",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_01.png",
+      "metrics": {
+        "brightness": 0.691,
+        "saturation": 0.226,
+        "contrast": 0.326,
+        "color_temp": 4750.0,
+        "brand_color_ratio": 0.449,
+        "warm_ratio": 0.738,
+        "edge_density": 0.059
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 150,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 1,
+      "score": 100,
+      "filename": "product_white_bg_01_100_img_12.jpg",
+      "source": "SKU03_Momcozy_Pro_Collagen_Belly_Firming_Moist/assets/img_12.jpg",
+      "metrics": {
+        "brightness": 0.911,
+        "saturation": 0.106,
+        "contrast": 0.137,
+        "color_temp": 5691.0,
+        "brand_color_ratio": 0.7522,
+        "warm_ratio": 0.491,
+        "edge_density": 0.0602
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 2,
+      "score": 100,
+      "filename": "product_white_bg_02_100_img_06.jpg",
+      "source": "SKU03_Momcozy_Pro_Collagen_Belly_Firming_Moist/assets/img_06.jpg",
+      "metrics": {
+        "brightness": 0.898,
+        "saturation": 0.11,
+        "contrast": 0.163,
+        "color_temp": 5708.0,
+        "brand_color_ratio": 0.5485,
+        "warm_ratio": 0.758,
+        "edge_density": 0.0752
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 3,
+      "score": 100,
+      "filename": "product_white_bg_03_100_img_01.jpg",
+      "source": "SKU03_Momcozy_Pro_Collagen_Belly_Firming_Moist/assets/img_01.jpg",
+      "metrics": {
+        "brightness": 0.795,
+        "saturation": 0.229,
+        "contrast": 0.271,
+        "color_temp": 4838.0,
+        "brand_color_ratio": 0.6038,
+        "warm_ratio": 0.928,
+        "edge_density": 0.1059
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 4,
+      "score": 100,
+      "filename": "product_white_bg_04_100_img_14.jpg",
+      "source": "SKU03_Momcozy_Pro_Collagen_Belly_Firming_Moist/assets/img_14.jpg",
+      "metrics": {
+        "brightness": 0.881,
+        "saturation": 0.162,
+        "contrast": 0.193,
+        "color_temp": 5482.0,
+        "brand_color_ratio": 0.6041,
+        "warm_ratio": 0.957,
+        "edge_density": 0.0899
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 5,
+      "score": 100,
+      "filename": "product_white_bg_05_100_img_09.png",
+      "source": "SKU06_Postpartum_Recovery_Bundle_Ergonest_Bell/assets/img_09.png",
+      "metrics": {
+        "brightness": 0.747,
+        "saturation": 0.104,
+        "contrast": 0.338,
+        "color_temp": 5666.0,
+        "brand_color_ratio": 0.5223,
+        "warm_ratio": 0.799,
+        "edge_density": 0.0185
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 6,
+      "score": 100,
+      "filename": "product_white_bg_06_100_img_04.png",
+      "source": "SKU01_M5_Smart/assets/img_04.png",
+      "metrics": {
+        "brightness": 0.896,
+        "saturation": 0.125,
+        "contrast": 0.172,
+        "color_temp": 5523.0,
+        "brand_color_ratio": 0.577,
+        "warm_ratio": 0.947,
+        "edge_density": 0.0658
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 7,
+      "score": 100,
+      "filename": "product_white_bg_07_100_img_10.png",
+      "source": "SKU01_M5_Smart/assets/img_10.png",
+      "metrics": {
+        "brightness": 0.913,
+        "saturation": 0.092,
+        "contrast": 0.204,
+        "color_temp": 5925.0,
+        "brand_color_ratio": 0.7569,
+        "warm_ratio": 0.895,
+        "edge_density": 0.0493
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 8,
+      "score": 100,
+      "filename": "product_white_bg_08_100_img_09.png",
+      "source": "SKU01_M5_Smart/assets/img_09.png",
+      "metrics": {
+        "brightness": 0.908,
+        "saturation": 0.083,
+        "contrast": 0.185,
+        "color_temp": 5936.0,
+        "brand_color_ratio": 0.7901,
+        "warm_ratio": 0.943,
+        "edge_density": 0.0559
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 9,
+      "score": 100,
+      "filename": "product_white_bg_09_100_img_13.webp",
+      "source": "SKU11_Momcozy_Contact_Free_Smart_Baby_Monitor/assets/img_13.webp",
+      "metrics": {
+        "brightness": 0.843,
+        "saturation": 0.107,
+        "contrast": 0.276,
+        "color_temp": 5822.0,
+        "brand_color_ratio": 0.7298,
+        "warm_ratio": 0.847,
+        "edge_density": 0.0704
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 10,
+      "score": 97,
+      "filename": "product_white_bg_10_97_img_05.jpg",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_05.jpg",
+      "metrics": {
+        "brightness": 0.907,
+        "saturation": 0.071,
+        "contrast": 0.196,
+        "color_temp": 6017.0,
+        "brand_color_ratio": 0.6743,
+        "warm_ratio": 0.572,
+        "edge_density": 0.0653
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 11,
+      "score": 97,
+      "filename": "product_white_bg_11_97_img_13.jpg",
+      "source": "SKU03_Momcozy_Pro_Collagen_Belly_Firming_Moist/assets/img_13.jpg",
+      "metrics": {
+        "brightness": 0.952,
+        "saturation": 0.049,
+        "contrast": 0.121,
+        "color_temp": 6175.0,
+        "brand_color_ratio": 0.9203,
+        "warm_ratio": 0.982,
+        "edge_density": 0.0451
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "product_white_bg",
+      "scene_label": "S2 白底产品图",
+      "rank": 12,
+      "score": 97,
+      "filename": "product_white_bg_12_97_img_10.jpg",
+      "source": "SKU11_Momcozy_Contact_Free_Smart_Baby_Monitor/assets/img_10.jpg",
+      "metrics": {
+        "brightness": 0.957,
+        "saturation": 0.018,
+        "contrast": 0.113,
+        "color_temp": 6373.0,
+        "brand_color_ratio": 0.9584,
+        "warm_ratio": 0.723,
+        "edge_density": 0.0316
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 1,
+      "score": 100,
+      "filename": "infographic_banner_01_100_img_04.jpg",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_04.jpg",
+      "metrics": {
+        "brightness": 0.907,
+        "saturation": 0.102,
+        "contrast": 0.146,
+        "color_temp": 5994.0,
+        "brand_color_ratio": 0.4381,
+        "warm_ratio": 0.59,
+        "edge_density": 0.0668
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 2,
+      "score": 100,
+      "filename": "infographic_banner_02_100_img_06.jpg",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_06.jpg",
+      "metrics": {
+        "brightness": 0.913,
+        "saturation": 0.122,
+        "contrast": 0.176,
+        "color_temp": 5813.0,
+        "brand_color_ratio": 0.3469,
+        "warm_ratio": 0.721,
+        "edge_density": 0.0605
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 3,
+      "score": 100,
+      "filename": "infographic_banner_03_100_img_03.jpg",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_03.jpg",
+      "metrics": {
+        "brightness": 0.744,
+        "saturation": 0.341,
+        "contrast": 0.28,
+        "color_temp": 4017.0,
+        "brand_color_ratio": 0.4381,
+        "warm_ratio": 0.948,
+        "edge_density": 0.1155
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 4,
+      "score": 100,
+      "filename": "infographic_banner_04_100_img_15.jpg",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_15.jpg",
+      "metrics": {
+        "brightness": 0.79,
+        "saturation": 0.197,
+        "contrast": 0.158,
+        "color_temp": 5403.0,
+        "brand_color_ratio": 0.4318,
+        "warm_ratio": 0.75,
+        "edge_density": 0.0864
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 5,
+      "score": 100,
+      "filename": "infographic_banner_05_100_img_04.jpg",
+      "source": "SKU06_Postpartum_Recovery_Bundle_Ergonest_Bell/assets/img_04.jpg",
+      "metrics": {
+        "brightness": 0.763,
+        "saturation": 0.19,
+        "contrast": 0.26,
+        "color_temp": 4867.0,
+        "brand_color_ratio": 0.2024,
+        "warm_ratio": 0.92,
+        "edge_density": 0.0611
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 6,
+      "score": 100,
+      "filename": "infographic_banner_06_100_img_02.jpg",
+      "source": "SKU06_Postpartum_Recovery_Bundle_Ergonest_Bell/assets/img_02.jpg",
+      "metrics": {
+        "brightness": 0.791,
+        "saturation": 0.206,
+        "contrast": 0.237,
+        "color_temp": 4756.0,
+        "brand_color_ratio": 0.1893,
+        "warm_ratio": 0.992,
+        "edge_density": 0.0639
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 7,
+      "score": 100,
+      "filename": "infographic_banner_07_100_img_03.jpg",
+      "source": "SKU06_Postpartum_Recovery_Bundle_Ergonest_Bell/assets/img_03.jpg",
+      "metrics": {
+        "brightness": 0.791,
+        "saturation": 0.212,
+        "contrast": 0.241,
+        "color_temp": 4553.0,
+        "brand_color_ratio": 0.1569,
+        "warm_ratio": 0.947,
+        "edge_density": 0.0749
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 8,
+      "score": 100,
+      "filename": "infographic_banner_08_100_img_01.jpg",
+      "source": "SKU06_Postpartum_Recovery_Bundle_Ergonest_Bell/assets/img_01.jpg",
+      "metrics": {
+        "brightness": 0.779,
+        "saturation": 0.221,
+        "contrast": 0.282,
+        "color_temp": 4537.0,
+        "brand_color_ratio": 0.3796,
+        "warm_ratio": 0.925,
+        "edge_density": 0.0725
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 9,
+      "score": 100,
+      "filename": "infographic_banner_09_100_img_07.jpg",
+      "source": "SKU10_Momcozy_Reusable_Breast_Pads_14_Pack/assets/img_07.jpg",
+      "metrics": {
+        "brightness": 0.707,
+        "saturation": 0.129,
+        "contrast": 0.19,
+        "color_temp": 5487.0,
+        "brand_color_ratio": 0.2798,
+        "warm_ratio": 0.954,
+        "edge_density": 0.0637
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 10,
+      "score": 100,
+      "filename": "infographic_banner_10_100_img_15.jpg",
+      "source": "SKU03_Momcozy_Pro_Collagen_Belly_Firming_Moist/assets/img_15.jpg",
+      "metrics": {
+        "brightness": 0.841,
+        "saturation": 0.204,
+        "contrast": 0.169,
+        "color_temp": 4674.0,
+        "brand_color_ratio": 0.4417,
+        "warm_ratio": 1.0,
+        "edge_density": 0.071
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 11,
+      "score": 100,
+      "filename": "infographic_banner_11_100_img_05.jpg",
+      "source": "SKU01_M5_Smart/assets/img_05.jpg",
+      "metrics": {
+        "brightness": 0.693,
+        "saturation": 0.301,
+        "contrast": 0.201,
+        "color_temp": 4329.0,
+        "brand_color_ratio": 0.3973,
+        "warm_ratio": 0.901,
+        "edge_density": 0.1167
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "infographic_banner",
+      "scene_label": "SA-02/SA-03 信息图/Banner",
+      "rank": 12,
+      "score": 100,
+      "filename": "infographic_banner_12_100_img_02.jpg",
+      "source": "SKU01_M5_Smart/assets/img_02.jpg",
+      "metrics": {
+        "brightness": 0.576,
+        "saturation": 0.228,
+        "contrast": 0.16,
+        "color_temp": 4652.0,
+        "brand_color_ratio": 0.6106,
+        "warm_ratio": 0.866,
+        "edge_density": 0.1526
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 120,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "packaging_unboxing",
+      "scene_label": "S5 包装开箱",
+      "rank": 1,
+      "score": 100,
+      "filename": "packaging_unboxing_01_100_img_05.jpg",
+      "source": "SKU09_Professional_Breastfeeding_Bundle_Lactat/assets/img_05.jpg",
+      "metrics": {
+        "brightness": 0.902,
+        "saturation": 0.161,
+        "contrast": 0.126,
+        "color_temp": 5157.0,
+        "brand_color_ratio": 0.1474,
+        "warm_ratio": 0.999,
+        "edge_density": 0.024
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 200,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "packaging_unboxing",
+      "scene_label": "S5 包装开箱",
+      "rank": 2,
+      "score": 100,
+      "filename": "packaging_unboxing_02_100_img_02.jpg",
+      "source": "SKU12_Outing_Bundle_ChangeGo_Baby_Stroller_and/assets/img_02.jpg",
+      "metrics": {
+        "brightness": 0.56,
+        "saturation": 0.072,
+        "contrast": 0.374,
+        "color_temp": 6441.0,
+        "brand_color_ratio": 0.478,
+        "warm_ratio": 0.469,
+        "edge_density": 0.0562
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 200,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "packaging_unboxing",
+      "scene_label": "S5 包装开箱",
+      "rank": 3,
+      "score": 100,
+      "filename": "packaging_unboxing_03_100_img_07.jpg",
+      "source": "SKU05_Momcozy_BreezyClear_Pro_2_in_1_Spray_Suc/assets/img_07.jpg",
+      "metrics": {
+        "brightness": 0.767,
+        "saturation": 0.185,
+        "contrast": 0.143,
+        "color_temp": 4955.0,
+        "brand_color_ratio": 0.5092,
+        "warm_ratio": 0.932,
+        "edge_density": 0.028
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 200,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "packaging_unboxing",
+      "scene_label": "S5 包装开箱",
+      "rank": 4,
+      "score": 100,
+      "filename": "packaging_unboxing_04_100_img_02.webp",
+      "source": "SKU01_M5_Smart/assets/img_02.webp",
+      "metrics": {
+        "brightness": 0.902,
+        "saturation": 0.119,
+        "contrast": 0.131,
+        "color_temp": 5504.0,
+        "brand_color_ratio": 0.5307,
+        "warm_ratio": 0.967,
+        "edge_density": 0.0307
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 200,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "packaging_unboxing",
+      "scene_label": "S5 包装开箱",
+      "rank": 5,
+      "score": 100,
+      "filename": "packaging_unboxing_05_100_img_10.webp",
+      "source": "SKU02_S12_Pro/assets/img_10.webp",
+      "metrics": {
+        "brightness": 0.926,
+        "saturation": 0.096,
+        "contrast": 0.108,
+        "color_temp": 5841.0,
+        "brand_color_ratio": 0.5034,
+        "warm_ratio": 0.974,
+        "edge_density": 0.0259
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 200,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "packaging_unboxing",
+      "scene_label": "S5 包装开箱",
+      "rank": 6,
+      "score": 95,
+      "filename": "packaging_unboxing_06_95_img_11.png",
+      "source": "SKU06_Postpartum_Recovery_Bundle_Ergonest_Bell/assets/img_11.png",
+      "metrics": {
+        "brightness": 0.588,
+        "saturation": 0.182,
+        "contrast": 0.339,
+        "color_temp": 3985.0,
+        "brand_color_ratio": 0.1342,
+        "warm_ratio": 0.565,
+        "edge_density": 0.033
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 200,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "ugc",
+      "scene_label": "S6 UGC真实感",
+      "rank": 1,
+      "score": 97,
+      "filename": "ugc_01_97_img_05.jpg",
+      "source": "SKU12_Outing_Bundle_ChangeGo_Baby_Stroller_and/assets/img_05.jpg",
+      "metrics": {
+        "brightness": 0.254,
+        "saturation": 0.312,
+        "contrast": 0.212,
+        "color_temp": 4216.0,
+        "brand_color_ratio": 0.0697,
+        "warm_ratio": 0.941,
+        "edge_density": 0.0836
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "ugc",
+      "scene_label": "S6 UGC真实感",
+      "rank": 2,
+      "score": 85,
+      "filename": "ugc_02_85_img_13.jpg",
+      "source": "SKU12_Outing_Bundle_ChangeGo_Baby_Stroller_and/assets/img_13.jpg",
+      "metrics": {
+        "brightness": 0.35,
+        "saturation": 0.321,
+        "contrast": 0.2,
+        "color_temp": 3950.0,
+        "brand_color_ratio": 0.1019,
+        "warm_ratio": 0.91,
+        "edge_density": 0.1139
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "ugc",
+      "scene_label": "S6 UGC真实感",
+      "rank": 3,
+      "score": 80,
+      "filename": "ugc_03_80_img_04.jpg",
+      "source": "SKU11_Momcozy_Contact_Free_Smart_Baby_Monitor/assets/img_04.jpg",
+      "metrics": {
+        "brightness": 0.311,
+        "saturation": 0.479,
+        "contrast": 0.164,
+        "color_temp": 2000.0,
+        "brand_color_ratio": 0.0695,
+        "warm_ratio": 0.994,
+        "edge_density": 0.0913
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "ugc",
+      "scene_label": "S6 UGC真实感",
+      "rank": 4,
+      "score": 65,
+      "filename": "ugc_04_65_img_10.webp",
+      "source": "SKU01_Pump_Clean_Bundle_M9_Hands_free_Breast_P/assets/img_10.webp",
+      "metrics": {
+        "brightness": 0.384,
+        "saturation": 0.771,
+        "contrast": 0.23,
+        "color_temp": 2000.0,
+        "brand_color_ratio": 0.0559,
+        "warm_ratio": 0.962,
+        "edge_density": 0.0537
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 1,
+      "score": 95,
+      "filename": "other_01_95_img_10.png",
+      "source": "SKU10_Momcozy_Reusable_Breast_Pads_14_Pack/assets/img_10.png",
+      "metrics": {
+        "brightness": 0.138,
+        "saturation": 0.025,
+        "contrast": 0.29,
+        "color_temp": 5188.0,
+        "brand_color_ratio": 0.0517,
+        "warm_ratio": 0.159,
+        "edge_density": 0.0117
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 2,
+      "score": 95,
+      "filename": "other_02_95_img_15.png",
+      "source": "SKU10_Momcozy_Reusable_Breast_Pads_14_Pack/assets/img_15.png",
+      "metrics": {
+        "brightness": 0.122,
+        "saturation": 0.024,
+        "contrast": 0.258,
+        "color_temp": 5638.0,
+        "brand_color_ratio": 0.0705,
+        "warm_ratio": 0.105,
+        "edge_density": 0.0352
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 3,
+      "score": 95,
+      "filename": "other_03_95_img_12.png",
+      "source": "SKU02_Feeding_Bundle_KleanPal_Pro_Baby_Bottle/assets/img_12.png",
+      "metrics": {
+        "brightness": 0.138,
+        "saturation": 0.025,
+        "contrast": 0.29,
+        "color_temp": 5188.0,
+        "brand_color_ratio": 0.0517,
+        "warm_ratio": 0.159,
+        "edge_density": 0.0117
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 4,
+      "score": 95,
+      "filename": "other_04_95_img_12.png",
+      "source": "SKU09_Professional_Breastfeeding_Bundle_Lactat/assets/img_12.png",
+      "metrics": {
+        "brightness": 0.138,
+        "saturation": 0.025,
+        "contrast": 0.29,
+        "color_temp": 5188.0,
+        "brand_color_ratio": 0.0517,
+        "warm_ratio": 0.159,
+        "edge_density": 0.0117
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 5,
+      "score": 95,
+      "filename": "other_05_95_img_14.png",
+      "source": "SKU04_Momcozy_Microwave_Steam_Sterilizer_Bags/assets/img_14.png",
+      "metrics": {
+        "brightness": 0.122,
+        "saturation": 0.024,
+        "contrast": 0.258,
+        "color_temp": 5638.0,
+        "brand_color_ratio": 0.0705,
+        "warm_ratio": 0.105,
+        "edge_density": 0.0352
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 6,
+      "score": 95,
+      "filename": "other_06_95_img_09.png",
+      "source": "SKU04_Momcozy_Microwave_Steam_Sterilizer_Bags/assets/img_09.png",
+      "metrics": {
+        "brightness": 0.138,
+        "saturation": 0.025,
+        "contrast": 0.29,
+        "color_temp": 5188.0,
+        "brand_color_ratio": 0.0517,
+        "warm_ratio": 0.159,
+        "edge_density": 0.0117
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 7,
+      "score": 90,
+      "filename": "other_07_90_img_11.png",
+      "source": "SKU10_Momcozy_Reusable_Breast_Pads_14_Pack/assets/img_11.png",
+      "metrics": {
+        "brightness": 0.315,
+        "saturation": 0.068,
+        "contrast": 0.37,
+        "color_temp": 5385.0,
+        "brand_color_ratio": 0.0678,
+        "warm_ratio": 0.322,
+        "edge_density": 0.033
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 8,
+      "score": 90,
+      "filename": "other_08_90_img_14.png",
+      "source": "SKU10_Momcozy_Reusable_Breast_Pads_14_Pack/assets/img_14.png",
+      "metrics": {
+        "brightness": 0.175,
+        "saturation": 0.027,
+        "contrast": 0.332,
+        "color_temp": 5821.0,
+        "brand_color_ratio": 0.1021,
+        "warm_ratio": 0.142,
+        "edge_density": 0.0307
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 9,
+      "score": 90,
+      "filename": "other_09_90_img_13.png",
+      "source": "SKU02_Feeding_Bundle_KleanPal_Pro_Baby_Bottle/assets/img_13.png",
+      "metrics": {
+        "brightness": 0.315,
+        "saturation": 0.068,
+        "contrast": 0.37,
+        "color_temp": 5385.0,
+        "brand_color_ratio": 0.0678,
+        "warm_ratio": 0.322,
+        "edge_density": 0.033
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 10,
+      "score": 90,
+      "filename": "other_10_90_img_13.png",
+      "source": "SKU09_Professional_Breastfeeding_Bundle_Lactat/assets/img_13.png",
+      "metrics": {
+        "brightness": 0.315,
+        "saturation": 0.068,
+        "contrast": 0.37,
+        "color_temp": 5385.0,
+        "brand_color_ratio": 0.0678,
+        "warm_ratio": 0.322,
+        "edge_density": 0.033
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 11,
+      "score": 90,
+      "filename": "other_11_90_img_10.png",
+      "source": "SKU04_Momcozy_Microwave_Steam_Sterilizer_Bags/assets/img_10.png",
+      "metrics": {
+        "brightness": 0.315,
+        "saturation": 0.068,
+        "contrast": 0.37,
+        "color_temp": 5385.0,
+        "brand_color_ratio": 0.0678,
+        "warm_ratio": 0.322,
+        "edge_density": 0.033
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    },
+    {
+      "scene_type": "other",
+      "scene_label": "其他",
+      "rank": 12,
+      "score": 90,
+      "filename": "other_12_90_img_13.png",
+      "source": "SKU04_Momcozy_Microwave_Steam_Sterilizer_Bags/assets/img_13.png",
+      "metrics": {
+        "brightness": 0.175,
+        "saturation": 0.027,
+        "contrast": 0.332,
+        "color_temp": 5821.0,
+        "brand_color_ratio": 0.1021,
+        "warm_ratio": 0.142,
+        "edge_density": 0.0307
+      },
+      "sref_usage": {
+        "mj_sref_url": "[UPLOAD_TO_MJ_TO_GET_URL]",
+        "recommended_sw": 80,
+        "notes": ""
+      }
+    }
+  ]
+}
