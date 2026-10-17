@@ -20,7 +20,8 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# CP_SCF_ROOT 可覆盖(selftest 用临时目录,绝不碰真仓库 —— §2.4.4 自证不许有副作用)
+REPO_ROOT="${CP_SCF_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 LOGS_DIR="${REPO_ROOT}/PMO/_logs"
 QUAR_DIR="${REPO_ROOT}/PMO/_quarantine"
 mkdir -p "$LOGS_DIR" "$QUAR_DIR"
@@ -51,14 +52,15 @@ detect_type() {
   esac
 }
 
+# 扩展名说是什么,内容就必须是什么(不信 MIME 探测、更不信 URL 后缀)
 magic_check() {
-  local f="$1" t="$2"
-  case "$t" in
-    image/jpeg)
+  local f="$1"
+  case "${f##*.}" in
+    jpg|jpeg)
       head -c 3 "$f" | xxd -p | grep -qi '^ffd8ff' ;;
-    image/png)
+    png)
       head -c 8 "$f" | xxd -p | grep -qi '^89504e470d0a1a0a' ;;
-    image/webp)
+    webp)
       local hdr
       hdr="$(head -c 12 "$f" | xxd -p)"
       [[ "${hdr:0:8}" == "52494646" && "${hdr:16:8}" == "57454250" ]] ;;
@@ -120,23 +122,39 @@ cp_one() {
   cp -p "$src" "$tmp"
   # 步骤 3: 原子 rename
   mv "$tmp" "$dst"
-  # 步骤 4: 校验
+
+  # ── 故障注入:只在 selftest 下生效(证伪"校验器真的会红") ──────────
+  if [ "${CP_SCF_SELFTEST:-0}" = "1" ]; then
+    case "${CP_SCF_FAULT:-}" in
+      truncate) python3 -c 'import sys;p=sys.argv[1];d=open(p,"rb").read();open(p,"wb").write(d[:max(0,len(d)-1)])' "$dst" ;;
+      corrupt)  python3 -c 'import sys;p=sys.argv[1];b=bytearray(open(p,"rb").read());b[0]^=0xFF;open(p,"wb").write(bytes(b))' "$dst" ;;
+    esac
+  fi
+
+  # 步骤 4: 校验(顺序:size → magic → sha —— magic 先于 sha,才能各自单独变红)
   local dst_sha dst_size
   dst_sha="$(sha256_of "$dst")"
   dst_size="$(size_of "$dst")"
+
+  quarantine_failed() {
+    local why="$1" note="$2"
+    local q="${QUAR_DIR}/$(basename "$dst").failed-$(date -u +%Y%m%dT%H%M%SZ)"
+    mv "$dst" "$q" 2>/dev/null || true
+    log_action cp "$src" "$dst" "$src_sha" "$src_size" "$src_mtime" "$src_type" "unknown" "$dst_sha" "$dst_size" "$why" "$kind" "$series" "$note"
+    echo "FAIL ($why): $dst → $q" >&2
+    return 1
+  }
+
   if [ "$src_size" != "$dst_size" ]; then
-    log_action cp "$src" "$dst" "$src_sha" "$src_size" "$src_mtime" "$src_type" "unknown" "$dst_sha" "$dst_size" "size_mismatch" "$kind" "$series" "expected_${src_size}_got_${dst_size}"
-    echo "FAIL (size mismatch): $dst" >&2
+    quarantine_failed "size_mismatch" "expected_${src_size}_got_${dst_size}"
+    return 1
+  fi
+  if ! magic_check "$dst"; then
+    quarantine_failed "magic_mismatch" "type=${src_type}"
     return 1
   fi
   if [ "$src_sha" != "$dst_sha" ]; then
-    log_action cp "$src" "$dst" "$src_sha" "$src_size" "$src_mtime" "$src_type" "unknown" "$dst_sha" "$dst_size" "sha256_mismatch" "$kind" "$series" "src=${src_sha}_dst=${dst_sha}"
-    echo "FAIL (sha mismatch): $dst" >&2
-    return 1
-  fi
-  if ! magic_check "$dst" "$src_type"; then
-    log_action cp "$src" "$dst" "$src_sha" "$src_size" "$src_mtime" "$src_type" "unknown" "$dst_sha" "$dst_size" "magic_mismatch" "$kind" "$series" "type=${src_type}"
-    echo "FAIL (magic mismatch): $dst" >&2
+    quarantine_failed "sha256_mismatch" "src=${src_sha}_dst=${dst_sha}"
     return 1
   fi
   log_action cp "$src" "$dst" "$src_sha" "$src_size" "$src_mtime" "$src_type" "unknown" "$dst_sha" "$dst_size" "ok" "$kind" "$series" ""
@@ -152,8 +170,110 @@ case "${1:-}" in
     done < "$list"
     ;;
   --selftest)
-    # 8 条反向对照(占位,主流程先把 153 文件落盘,selftest 在落盘后跑)
-    echo "selftest TBD after main run"
+    # ── 8 条反向对照:每条都要求"该红时必红、该闭嘴时必闭嘴" ──────────
+    # 隔离:全部写入 mktemp 目录,真仓库一个字节都不碰(§2.4.4)
+    tmp="$(mktemp -d /tmp/cp_scf_selftest.XXXXXX)"
+    trap 'rm -rf "$tmp"' EXIT
+    export CP_SCF_ROOT="$tmp"
+    export CP_SCF_SELFTEST=1
+    LOGS_DIR="$tmp/PMO/_logs"
+    QUAR_DIR="$tmp/PMO/_quarantine"
+    mkdir -p "$LOGS_DIR" "$QUAR_DIR" "$tmp/src" "$tmp/dst"
+
+    pass=0; fail=0
+    ok()  { echo "PASS: $1"; pass=$((pass+1)); }
+    bad() { echo "FAIL: $1" >&2; fail=$((fail+1)); }
+
+    printf 'hello momcozy\n' > "$tmp/src/good.txt"
+    printf 'not really a jpeg\n' > "$tmp/src/fake.jpg"
+
+    # S1 正常复制:内容一致 + 日志 status=ok + license=unknown
+    if cp_one "$tmp/src/good.txt" "$tmp/dst/good.txt" selftest s1 >/dev/null 2>&1 \
+       && python3 -c 'import sys;sys.exit(0 if open(sys.argv[1],"rb").read()==open(sys.argv[2],"rb").read() else 1)' "$tmp/src/good.txt" "$tmp/dst/good.txt"; then
+      ok "S1 正常复制(内容级一致)"
+    else
+      bad "S1 正常复制"
+    fi
+
+    # S2 幂等:同内容重跑必须 SKIP,且不新增 cp 动作日志
+    before=$(cat "$LOGS_DIR"/cp_*.jsonl 2>/dev/null | grep -c '"action":"cp"' || true)
+    out=$(cp_one "$tmp/src/good.txt" "$tmp/dst/good.txt" selftest s2 2>&1 || true)
+    after=$(cat "$LOGS_DIR"/cp_*.jsonl 2>/dev/null | grep -c '"action":"cp"' || true)
+    if echo "$out" | grep -q '^SKIP' && [ "${before:-0}" = "${after:-0}" ]; then
+      ok "S2 幂等重跑 SKIP 且无重复写"
+    else
+      bad "S2 幂等重跑 (before=$before after=$after out=$out)"
+    fi
+
+    # S3 冲突:内容不同 → 旧件进隔离区、新内容落位、显式记账
+    printf 'hello momcozy CHANGED\n' > "$tmp/src/good.txt"
+    out=$(cp_one "$tmp/src/good.txt" "$tmp/dst/good.txt" selftest s3 2>&1 || true)
+    if echo "$out" | grep -q '^CONFLICT' \
+       && ls "$QUAR_DIR"/good.txt.bak-* >/dev/null 2>&1 \
+       && grep -q '"action":"conflict"' "$LOGS_DIR"/cp_conflict.jsonl 2>/dev/null; then
+      ok "S3 冲突不覆盖 + 隔离 + 记账"
+    else
+      bad "S3 冲突处理: $out"
+    fi
+
+    # S4 size 反向:截断注入必须被 size_mismatch 拦下,失败件不进 dst
+    printf 'abcdefghij\n' > "$tmp/src/size.txt"
+    out=$(CP_SCF_FAULT=truncate cp_one "$tmp/src/size.txt" "$tmp/dst/size.txt" selftest s4 2>&1 || true)
+    if echo "$out" | grep -q 'size_mismatch' && [ ! -f "$tmp/dst/size.txt" ] \
+       && ls "$QUAR_DIR"/size.txt.failed-* >/dev/null 2>&1; then
+      ok "S4 size 恒等拦截(失败件入隔离区)"
+    else
+      bad "S4 size 拦截: $out"
+    fi
+
+    # S5 magic 反向:扩展名 .jpg + 文本内容必须被拦下
+    out=$(cp_one "$tmp/src/fake.jpg" "$tmp/dst/fake.jpg" selftest s5 2>&1 || true)
+    if echo "$out" | grep -q 'magic_mismatch' && [ ! -f "$tmp/dst/fake.jpg" ]; then
+      ok "S5 magic 与扩展名不符被拦下"
+    else
+      bad "S5 magic 拦截: $out"
+    fi
+
+    # S6 sha 反向:同长度翻一个字节必须被 sha256_mismatch 拦下
+    printf 'abcdefghij\n' > "$tmp/src/sha.txt"
+    out=$(CP_SCF_FAULT=corrupt cp_one "$tmp/src/sha.txt" "$tmp/dst/sha.txt" selftest s6 2>&1 || true)
+    if echo "$out" | grep -q 'sha256_mismatch' && [ ! -f "$tmp/dst/sha.txt" ]; then
+      ok "S6 sha256 恒等拦截"
+    else
+      bad "S6 sha 拦截: $out"
+    fi
+
+    # S7 license 强制 unknown(任何一行都不许出现非 unknown)
+    badlic=$(cat "$LOGS_DIR"/cp_*.jsonl 2>/dev/null | grep -c '"src_license_status":"unknown"' || true)
+    totlic=$(cat "$LOGS_DIR"/cp_*.jsonl 2>/dev/null | wc -l | tr -d ' ')
+    if [ -n "$totlic" ] && [ "$badlic" = "$totlic" ]; then
+      ok "S7 license_status 全 unknown ($totlic/$totlic)"
+    else
+      bad "S7 license 字段 ($badlic/$totlic)"
+    fi
+
+    # S8 原子性:全程不许残留临时文件;日志必须逐行可解析 JSON
+    leftovers=$(find "$tmp" -name '*.tmp.*' 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$leftovers" = "0" ] && python3 -c '
+import sys, glob, json
+for p in glob.glob(sys.argv[1] + "/cp_*.jsonl"):
+    for line in open(p, encoding="utf-8"):
+        if line.strip():
+            json.loads(line)
+print("jsonl-ok")' "$LOGS_DIR" | grep -q 'jsonl-ok'; then
+      ok "S8 无临时残留 + JSONL 可解析"
+    else
+      bad "S8 原子性/JSONL (leftovers=$leftovers)"
+    fi
+
+    echo "----------------------------------------"
+    if [ "$fail" -eq 0 ]; then
+      echo "✅ $pass/8 全过"
+      exit 0
+    else
+      echo "❌ $pass passed, $fail failed" >&2
+      exit 1
+    fi
     ;;
   "")
     echo "usage: $0 <src> <dst> [kind] [series]" >&2
