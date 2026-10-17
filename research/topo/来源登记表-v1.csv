@@ -1,0 +1,447 @@
+登记ID,层,标题,权威机构,条款位置,出处链接,提交/来源,形态,可读,复核方式,覆盖T码,状态
+EXT-001,L-PLAT,Healthcare products and services,Amazon（Amazon Ads 帮助中心）,Healthcare products and services > 引言段（正文第 3,https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A,调研(直接),文本,是,法务逐条核条款原文,T6.1.regulatory-status,待确认
+EXT-002,L-PLAT,Healthcare products and services,Amazon（Amazon Ads 帮助中心）,Healthcare products and services > Consumer ,https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-003,L-PLAT,Healthcare products and services,Amazon（Amazon Ads 帮助中心）,Healthcare products and services > Health cl,https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A,调研(直接),文本,是,法务逐条核条款原文,T2.3.unsourced-data、T2.3.sourced-data、T3.1.clinical-endorsem,待确认
+EXT-004,L-PLAT,Healthcare products and services,Amazon（Amazon Ads 帮助中心）,Healthcare products and services > Prohibite,https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A,调研(直接),文本,是,法务逐条核条款原文,T3.3.institution-grade,待确认
+EXT-005,L-PLAT,Healthcare products and services,Amazon（Amazon Ads 帮助中心）,Healthcare products and services > Country-s,https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A,调研(直接),文本,是,法务逐条核条款原文,T3.2.expert-endorsement、T3.2.lactation-consultant、T3.1.clini,待确认
+EXT-006,L-PLAT,Claims and substantiation,Amazon（Amazon Ads 帮助中心）,Claims and substantiation > Prohibited conte,https://advertising.amazon.com/help/G6UU66YLSCUYDULQ,调研(直接),文本,是,法务逐条核条款原文,T6.1.regulatory-status、T3.1.clinical-endorsement,待确认
+EXT-007,L-PLAT,Claims and substantiation,Amazon（Amazon Ads 帮助中心）,Claims and substantiation > Prohibited conte,https://advertising.amazon.com/help/G6UU66YLSCUYDULQ,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-008,L-PLAT,Claims and substantiation,Amazon（Amazon Ads 帮助中心）,Claims and substantiation > Restricted conte,https://advertising.amazon.com/help/G6UU66YLSCUYDULQ,调研(直接),文本,是,法务逐条核条款原文,T2.3.sourced-data、T2.3.unsourced-data、T3.1.clinical-endorsem,待确认
+EXT-009,L-PLAT,Claims and substantiation,Amazon（Amazon Ads 帮助中心）,Claims and substantiation > Restricted conte,https://advertising.amazon.com/help/G6UU66YLSCUYDULQ,调研(直接),文本,是,法务逐条核条款原文,T3.1.clinical-endorsement、T3.2.expert-endorsement,待确认
+EXT-010,L-PLAT,Claims and substantiation,Amazon（Amazon Ads 帮助中心）,Claims and substantiation > Restricted conte,https://advertising.amazon.com/help/G6UU66YLSCUYDULQ,调研(直接),文本,是,法务逐条核条款原文,T4.1.named-comparison、T4.2.industry-comparison、T2.3.unsource,待确认
+EXT-011,L-PLAT,Prohibited content across all supply,Amazon（Amazon Ads 帮助中心）,Prohibited content across all supply > 全局禁止清,https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ,调研(直接),文本,是,法务逐条核条款原文,T7.2.pain-scenario、T8.1.anxiety-pressure,待确认
+EXT-012,L-PLAT,Prohibited content across all supply,Amazon（Amazon Ads 帮助中心）,Prohibited content across all supply > 全局禁止清,https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-013,L-PLAT,Prohibited content across all supply,Amazon（Amazon Ads 帮助中心）,Prohibited content across all supply > 全局禁止清,https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-014,L-PLAT,Prohibited products and services across all supply,Amazon（Amazon Ads 帮助中心）,Prohibited products and services across all ,https://advertising.amazon.com/help/GZS8A5XCFQJTS88N,调研(直接),文本,是,法务逐条核条款原文,T3.3.institution-grade,待确认
+EXT-015,L-PLAT,General requirements,Amazon（Amazon Ads 帮助中心）,General requirements > Advertisers are requi,https://advertising.amazon.com/help/G4U9JBZH3664JWX2,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-016,L-PLAT,General requirements,Amazon（Amazon Ads 帮助中心）,General requirements > Advertisers are requi,https://advertising.amazon.com/help/G4U9JBZH3664JWX2,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-017,L-PLAT,Baby formula and feeding accessories,Amazon（Amazon Ads 帮助中心）,Baby formula and feeding accessories > 引言段（正,https://advertising.amazon.com/help/GFNDKT3FYGDL54VB,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-018,L-PLAT,Baby formula and feeding accessories,Amazon（Amazon Ads 帮助中心）,Baby formula and feeding accessories > Suppl,https://advertising.amazon.com/help/GFNDKT3FYGDL54VB,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-019,L-PLAT,Health and Wellness,Meta（Transparency Center · A,Health and Wellness > Health and Wellbeing >,https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-020,L-PLAT,Health and Wellness,Meta（Transparency Center · A,Health and Wellness > Health and Wellbeing >,https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/,调研(直接),文本,是,法务逐条核条款原文,T8.1.anxiety-pressure,待确认
+EXT-021,L-PLAT,Health and Wellness,Meta（Transparency Center · A,Health and Wellness > Health and Wellbeing >,https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/,调研(直接),文本,是,法务逐条核条款原文,T1.1.medical-cure、T3.2.expert-endorsement,待确认
+EXT-022,L-PLAT,Health and Wellness,Meta（Transparency Center · A,Health and Wellness > Health and Wellbeing >,https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/,调研(直接),文本,是,法务逐条核条款原文,T8.2.urgency-scarcity、T2.3.unsourced-data,待确认
+EXT-023,L-PLAT,Introduction to the Advertising Standards,Meta（Transparency Center · A,Introduction to the Advertising Standards > ,https://transparency.meta.com/policies/ad-standards/,调研(直接),文本,是,法务逐条核条款原文,T8.1.anxiety-pressure,待确认
+EXT-024,L-PLAT,Introduction to the Advertising Standards,Meta（Transparency Center · A,Introduction to the Advertising Standards > ,https://transparency.meta.com/policies/ad-standards/,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-025,L-PLAT,Healthcare and medicines,Google（Google Ads 政策帮助中心）,Healthcare and medicines > Unapproved substa,https://support.google.com/adspolicy/answer/176031,调研(直接),文本,是,法务逐条核条款原文,T1.1.medical-cure、T1.2.medical-prevent、T6.1.regulatory-statu,待确认
+EXT-026,L-PLAT,Healthcare and medicines,Google（Google Ads 政策帮助中心）,Healthcare and medicines > Unapproved substa,https://support.google.com/adspolicy/answer/176031,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-027,L-PLAT,Healthcare and medicines,Google（Google Ads 政策帮助中心）,Healthcare and medicines > Clinical trial re,https://support.google.com/adspolicy/answer/176031,调研(直接),文本,是,法务逐条核条款原文,T5.1.safety-claim,待确认
+EXT-028,L-PLAT,Misrepresentation,Google（Google Ads 政策帮助中心）,Misrepresentation > Clickbait ads（第 2 段）,https://support.google.com/adspolicy/answer/6020955,调研(直接),文本,是,法务逐条核条款原文,T8.1.anxiety-pressure、T8.2.urgency-scarcity,待确认
+EXT-029,L-PLAT,Misrepresentation,Google（Google Ads 政策帮助中心）,Misrepresentation > Unreliable claims,https://support.google.com/adspolicy/answer/6020955,调研(直接),文本,是,法务逐条核条款原文,T2.2.fit-all-claim、T2.3.unsourced-data,待确认
+EXT-030,L-PLAT,Misrepresentation,Google（Google Ads 政策帮助中心）,Misrepresentation > Unacceptable business pr,https://support.google.com/adspolicy/answer/6020955,调研(直接),文本,是,法务逐条核条款原文,T7.1.hospital-scenario、T3.3.institution-grade,待确认
+EXT-031,L-PLAT,Misrepresentation,Google（Google Ads 政策帮助中心）,Misrepresentation > Misleading representatio,https://support.google.com/adspolicy/answer/6020955,调研(直接),文本,是,法务逐条核条款原文,T3.2.expert-endorsement、T3.3.institution-grade,待确认
+EXT-032,L-FED,Is It Really 'FDA Approved'?（Consumer Updates）,U.S. Food and Drug Administr,The FDA doesn't approve health care provider,https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved,调研(直接),文本,是,法务逐条核条款原文,T6.1.regulatory-status,待确认
+EXT-033,L-FED,Is It Really 'FDA Approved'?（Consumer Updates）,U.S. Food and Drug Administr,"The FDA uses a risk-based, tiered approach f",https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved,调研(直接),文本,是,法务逐条核条款原文,T6.1.regulatory-status,待确认
+EXT-034,L-FED,Breast Pumps（Medical Devices > Consumer Products）,U.S. Food and Drug Administr,Breast Pumps > 正文第 1 段第 1 句,https://www.fda.gov/medical-devices/consumer-products/breast-pumps,调研(直接),文本,是,法务逐条核条款原文,T6.1.regulatory-status,待确认
+EXT-035,L-FED,Breast Pumps（Medical Devices > Consumer Products）,U.S. Food and Drug Administr,Breast Pumps > 正文第 1 段第 3 句,https://www.fda.gov/medical-devices/consumer-products/breast-pumps,调研(直接),文本,是,法务逐条核条款原文,T2.1.1.milk-supply、T1.5.duct-unclog、T2.1.2.pain-relief,待确认
+EXT-036,L-FED,Breast Pumps（Medical Devices > Consumer Products）,U.S. Food and Drug Administr,Breast Pumps > 正文第 2 段（mimic suckling 一句）,https://www.fda.gov/medical-devices/consumer-products/breast-pumps,调研(直接),文本,是,法务逐条核条款原文,T2.2.mimic-claim,待确认
+EXT-037,L-FED,Breast Pumps（Medical Devices > Consumer Products）,U.S. Food and Drug Administr,Breast Pumps > 正文第 3 段（免责一句）,https://www.fda.gov/medical-devices/consumer-products/breast-pumps,调研(直接),文本,是,法务逐条核条款原文,T7.1.hospital-scenario,待确认
+EXT-038,L-FED,General Wellness: Policy for Low Risk Devices（Guidan,U.S. Food and Drug Administr,General Wellness: Policy for Low Risk Device,https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices,调研(直接),文本,是,法务逐条核条款原文,T1.1.medical-cure、T1.2.medical-prevent、T6.1.regulatory-statu,待确认
+EXT-039,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > Introd,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T2.3.unsourced-data、T2.3.sourced-data、T2.2.suction-claim、T2.,待确认
+EXT-040,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > 科学证据标准,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T3.1.clinical-endorsement、T2.3.sourced-data,待确认
+EXT-041,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > 科学证据标准,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T3.1.clinical-endorsement,待确认
+EXT-042,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > 1. Cla,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T3.2.expert-endorsement、T2.3.unsourced-data,待确认
+EXT-043,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > 1. Cla,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T2.3.unsourced-data、T5.1.safety-claim,待确认
+EXT-044,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > When a,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T3.2.expert-endorsement、T3.2.lactation-consultant、T3.1.clini,待确认
+EXT-045,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > 4. Mis,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T6.1.regulatory-status,待确认
+EXT-046,L-FED,Health Products Compliance Guidance,U.S. Federal Trade Commissio,Health Products Compliance Guidance > 3. Use,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance,调研(直接),文本,是,法务逐条核条款原文,T1.1.medical-cure、T2.3.unsourced-data,待确认
+EXT-047,L-UK,Advertise your medicines,Medicines and Healthcare pro,Advertise your medicines > Advertise to the ,https://www.gov.uk/guidance/advertise-your-medicines,调研(直接),文本,是,法务逐条核条款原文,T3.2.expert-endorsement、T3.1.clinical-endorsement、T3.2.lacta,待确认
+EXT-048,L-UK,Advertise your medicines,Medicines and Healthcare pro,Advertise your medicines > Advertise to the ,https://www.gov.uk/guidance/advertise-your-medicines,调研(直接),文本,是,法务逐条核条款原文,T4.1.named-comparison,待确认
+EXT-049,L-UK,Advertise your medicines,Medicines and Healthcare pro,Advertise your medicines > Advertise to the ,https://www.gov.uk/guidance/advertise-your-medicines,调研(直接),文本,是,法务逐条核条款原文,T5.1.safety-claim,待确认
+EXT-050,L-UK,Advertise your medicines,Medicines and Healthcare pro,Advertise your medicines > Advertise to the ,https://www.gov.uk/guidance/advertise-your-medicines,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-051,L-UK,Advertise your medicines,Medicines and Healthcare pro,Advertise your medicines > Advertise to the ,https://www.gov.uk/guidance/advertise-your-medicines,调研(直接),文本,是,法务逐条核条款原文,T1.1.medical-cure,待确认
+EXT-052,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,T2.3.unsourced-data、T2.3.sourced-data、T3.1.clinical-endorsem,待确认
+EXT-053,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,T1.2.medical-prevent、T1.1.medical-cure,待确认
+EXT-054,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,T5.1.safety-claim,待确认
+EXT-055,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,T3.2.expert-endorsement、T3.2.lactation-consultant,待确认
+EXT-056,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,T4.1.named-comparison、T5.1.safety-claim,待确认
+EXT-057,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+EXT-058,L-UK,"CAP Code — Section 12: Medicines, medical devices, h",Advertising Standards Author,UK Code of Non-broadcast Advertising (CAP Co,https://www.asa.org.uk/type/non_broadcast/code_section/12.html,调研(直接),文本,是,法务逐条核条款原文,T7.1.hospital-scenario、T7.2.pain-scenario,待确认
+EXT-059,L-PLAT,Branded Content Policy（TikTok 法律条款页）,TikTok,Branded Content Policy > What do you need to,https://www.tiktok.com/legal/page/global/bc-policy/en,调研(直接),文本,是,法务逐条核条款原文,T2.3.unsourced-data,待确认
+EXT-060,L-PLAT,Branded Content Policy（TikTok 法律条款页）,TikTok,"Branded Content Policy > In addition, you mu",https://www.tiktok.com/legal/page/global/bc-policy/en,调研(直接),文本,是,法务逐条核条款原文,T8.1.anxiety-pressure,待确认
+EXT-061,L-PLAT,Branded Content Policy（TikTok 法律条款页）,TikTok,Branded Content Policy > Prohibited Industri,https://www.tiktok.com/legal/page/global/bc-policy/en,调研(直接),文本,是,法务逐条核条款原文,T7.1.hospital-scenario、T3.3.institution-grade,待确认
+EXT-062,L-PLAT,Branded Content Policy（TikTok 法律条款页）,TikTok,"Branded Content Policy > In addition, you mu",https://www.tiktok.com/legal/page/global/bc-policy/en,调研(直接),文本,是,法务逐条核条款原文,（无 —— 本地规则库无对应条目）,待确认
+recvw7XIUgdDyv,L-CASE,【原则性错误】文案 一般用吸奶器吸奶的时候，是不会这样抱着宝宝的～特别是月龄小的,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-17 18:44 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgaYJS,L-CASE,"【措辞表达】文案 1. 这些cta目前有点儿无效，直接去掉换成 大箭头。
+原因：",设计审核群·张悦,,,飞书群「设计审核」· 2026-09-05 00:00 · 张悦,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUgQmI8,L-CASE,"【品牌一致性】文案 1.呈现产品试搭效果。
+【问题要点】
+1. 1.呈现产品试搭",设计审核群·刘芳,,,飞书群「设计审核」· 2026-08-29 02:44 · 刘芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgO7N6,L-CASE,【原则性错误】文案 1. 首Banner 标题和需求方确认一下 to 和 a 是,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-27 20:14 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUg72fA,L-CASE,【原则性错误】文案 奶瓶不建议倒着放，对于宝宝和妈妈来说，奶瓶的卫生重要至极，所,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-11 22:53 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgaMLu,L-CASE,【品牌一致性】文案 1. 目前一般根据业务不同国家渠道的重点产品进行陈列，乌兹别,设计审核群·牛园园,,,飞书群「设计审核」· 2026-08-05 23:20 · 牛园园,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgP5bC,L-CASE,"【措辞表达】文案 【终审-@吴礼芳 】姐姐再看看调整了吸奶器比例大小后的呀。
+【",设计审核群·闫琪雯,,,飞书群「设计审核」· 2026-07-27 19:38 · 闫琪雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUg0inE,L-CASE,"【品牌一致性】文案 1. logo用错了，这是旧版本logo。
+【问题要点】
+1",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-12 02:46 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgACVh,L-CASE,"【原则性错误】视频 图1 【终审-@吴礼芳 】麻烦看看呀。
+【问题要点】
+1. ",设计审核群·赵乐萱,,,飞书群「设计审核」· 2026-09-02 19:53 · 赵乐萱,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgilme,L-CASE,【品牌一致性】文案 我上午就看到了~设计美感是好看的，我只是想到了他们之前这类的,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-20 02:00 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgGnxv,L-CASE,【原则性错误】视频 需求里特意写画面不要过于完美，现在的画面就是感觉太完美了，妈,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-07-31 01:42 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgbbCi,L-CASE,"【品牌一致性】文案 2.卡片的花朵结构不做改变。
+原因：<u>**修改：需求变更",设计审核群·陈欣玮,,,飞书群「设计审核」· 2026-09-24 23:40 · 陈欣玮,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgLTie,L-CASE,【原则性错误】视频 P16 海报上需要有“UP TO 201% OFF” (最高,设计审核群·林曼雅,,,飞书群「设计审核」· 2026-09-24 22:28 · 林曼雅,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUg4PB0,L-CASE,【品牌一致性】视频 图1 视觉要求：封面不要出现产品，使用妈妈哺乳的生活场景图，,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-24 00:49 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgtTxw,L-CASE,"【原则性错误】文案 这个质感好像不对。
+原因：避免太靠图片下方,容易被人流遮挡，",设计审核群·关轶夫,,,飞书群「设计审核」· 2026-09-22 00:56 · 关轶夫,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgkGAb,L-CASE,【品牌一致性】文案 头图建议：宝宝与妈妈在客厅、餐厅等居家空间中互动，体现秋日自,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-20 22:59 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgXEvk,L-CASE,【原则性错误】视频 图 1 主标题醒目柔和，画面是宝宝跟爸爸同床，并且睡在柔软的,设计审核群·李新,,,飞书群「设计审核」· 2026-09-19 01:22 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgZKhH,L-CASE,【品牌一致性】文案 ·供应商将根据搭建手册要求对方案进行调整（我们要搭建手册一直,设计审核群·刘芳,,,飞书群「设计审核」· 2026-09-17 07:15 · 刘芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgYOgk,L-CASE,【措辞表达】文案 头图建议：妈妈为宝宝清洁的场景，最好包含Momcozy产品（。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-17 02:23 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUgqgAd,L-CASE,"【品牌一致性】文案 秋促的有个物料需要看一下~。
+【问题要点】
+1. 秋促的有个",设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-11 18:15 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgpnro,L-CASE,【品牌一致性】视频 1.需要重点突出 MVV 文案内容，保证文案是画面的视觉重点,设计审核群·连家杰,,,飞书群「设计审核」· 2026-09-09 23:16 · 连家杰,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgK7Tp,L-CASE,"【原则性错误】文案 图1 【终审-@吴礼芳 】麻烦看看呀。
+【问题要点】
+1. ",设计审核群·李诗萍,,,飞书群「设计审核」· 2026-09-03 01:26 · 李诗萍,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgJEGU,L-CASE,【品牌一致性】文案 板块3: 参与路径：Join → Featured → En,设计审核群·闫琪雯,,,飞书群「设计审核」· 2026-08-13 02:10 · 闫琪雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgLj3x,L-CASE,【品牌一致性】视频 主图banner：整体使用真人生活方式实景图，不要插画感，整,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-12 23:36 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgTB1Q,L-CASE,"【原则性错误】文案。
+@闫琪雯 
+这个M不对",设计审核群·关轶夫,,,飞书群「设计审核」· 2026-08-12 19:06 · 关轶夫,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgTReJ,L-CASE,"【文化禁忌】文案 【终审-@吴礼芳 】姐麻烦看看呀。
+原因：避免出现可乐等不太健",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-07-30 18:54 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,文化禁忌
+recvw7XIUgdA2m,L-CASE,【文化禁忌】文案 尾图建议：傍晚户外场景，妈妈坐在草地毯子上看着宝宝，宝宝坐在。,设计审核群·李新,,,飞书群「设计审核」· 2026-07-26 00:34 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,文化禁忌
+recvw7XIUgP0Zb,L-CASE,【品牌一致性】文案 1.细节反馈内容👇https://momcozy-in.fe,设计审核群·牛园园,,,飞书群「设计审核」· 2026-08-28 01:56 · 牛园园,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgNR66,L-CASE,【品牌一致性】文案 这是momcozy 的插画风格，Parru 的不要用同风格。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-10 21:50 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgKTWM,L-CASE,"【文化禁忌】文案 设计要求：头图建议。
+【问题要点】
+1. 设计要求：头图建议：",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-08-05 03:05 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,文化禁忌
+recvw7XIUgNomr,L-CASE,【品牌一致性】视频 海报1-渠道延展，优化调整部分：选用秋季的亲子互动实拍照，在,设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-24 22:20 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUg06K0,L-CASE,【审核问题】文案 建议选择露出例如奶瓶清洗机、餐椅、摇椅、爬爬垫、监视器等产品。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-23 18:40 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XIUgWSxJ,L-CASE,【品牌一致性】文案 封面 通过错误/正确对比插画，展示睡姿和睡眠辅助用品误区，警,设计审核群·李新,,,飞书群「设计审核」· 2026-09-23 03:16 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgPt8L,L-CASE,"【品牌一致性】文案 【终审-@吴礼芳 】麻烦看看呀。
+【问题要点】
+1. 【终审",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-09-23 01:08 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgnJYu,L-CASE,"【措辞表达】文案 设计要求PD地图：形式见参考图，色调结合KV，颜色不要太深。
+",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-22 22:08 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUg7gAL,L-CASE,"【措辞表达】文案 设计要求文案合规性调整，涉及22页内容。
+【问题要点】
+1. ",设计审核群·郅笑颜,,,飞书群「设计审核」· 2026-09-21 18:53 · 郅笑颜,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUgJPcj,L-CASE,"【品牌一致性】视频 画面中央是一个正在抱宝宝的妈妈，但不要让宝宝占满画面。
+【问",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-21 01:35 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgkQRI,L-CASE,【品牌一致性】视频 ③ 场景要体现“真实日常清洁”，但水槽、奶瓶、配件不要堆得过,设计审核群·梁玥琦,,,飞书群「设计审核」· 2026-09-17 02:22 · 梁玥琦,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgZO5T,L-CASE,"【原则性错误】文案 图1 【终审-@吴礼芳  】麻烦看看呀。
+【问题要点】
+1.",设计审核群·赵乐萱,,,飞书群「设计审核」· 2026-09-16 19:28 · 赵乐萱,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgWZi1,L-CASE,"【品牌一致性】文案 【终审-@吴礼芳   】麻烦看看这个呀。
+【问题要点】
+1.",设计审核群·陈东墨,,,飞书群「设计审核」· 2026-09-15 23:35 · 陈东墨,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUgJWv7,L-CASE,【原则性错误】文案 终审@吴礼芳 麻烦看看这个呀。,设计审核群·李新,,,飞书群「设计审核」· 2026-09-14 22:59 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XIUgFaLV,L-CASE,【品牌一致性】文案 三个产品向：吸奶器kv保留 ，清洗机更换为bottle wa,设计审核群·韦化,,,飞书群「设计审核」· 2026-09-11 19:24 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUg4Vll,L-CASE,【品牌一致性】文案 设计需求：Vic官方肖像置于右侧，左侧设置三个浅粉色问题，避,设计审核群·李新,,,飞书群「设计审核」· 2026-09-08 20:26 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUg9gUX,L-CASE,【措辞表达】文案 设计要求：按照brief要求替换原本EDM页面的货币符号和部。,设计审核群·连家杰,,,飞书群「设计审核」· 2026-09-08 01:44 · 连家杰,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUgAws7,L-CASE,【措辞表达】文案 设计要求：按照brief要求替换原本EDM的货币符号和部分数。,设计审核群·连家杰,,,飞书群「设计审核」· 2026-09-08 01:08 · 连家杰,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XIUgWWAn,L-CASE,"【品牌一致性】文案 - 产品替换，由KV版7个替换为8个产品。
+【问题要点】
+1",设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-07 22:14 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XIUg5uyB,L-CASE,"【措辞表达】视频 【终审-@吴礼芳 】姐姐看看这个呀。
+【问题要点】
+1. 【终",设计审核群·闫琪雯,,,飞书群「设计审核」· 2026-09-07 19:32 · 闫琪雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XJiSv8T5,L-CASE,"【原则性错误】文案 【终审-@吴礼芳 】麻烦看看呀。
+【问题要点】
+1. 【终审",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-02 22:03 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XJiSOk22,L-CASE,【措辞表达】文案 【终审-@吴礼芳】麻烦看看呀。,设计审核群·韦化,,,飞书群「设计审核」· 2026-09-02 01:46 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XJiSGLEX,L-CASE,【品牌一致性】文案 图1 图2: 解密页，使用第一页的三幅插图调整，带上明显的对,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-26 18:55 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiS3bU5,L-CASE,【审核问题】文案 头图建议：清晨通勤，妈妈坐在车内，浅色西装外套内搭哺乳内衣（。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-21 02:08 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSxcMC,L-CASE,【原则性错误】文案 尾图：插图-礼物盒迸发出各种产品，结合各款式内衣，不对某款做,设计审核群·闫琪雯,,,飞书群「设计审核」· 2026-08-19 01:28 · 闫琪雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XJiSjanK,L-CASE,【原则性错误】文案 【终审-@吴礼芳 】麻烦看看呀。,设计审核群·蓝涵,,,飞书群「设计审核」· 2026-08-14 23:29 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XJiSEDgG,L-CASE,"【品牌一致性】文案 折扣会不会不够明显。
+【问题要点】
+1. 折扣会不会不够明显",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-14 01:45 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSowyB,L-CASE,"【品牌一致性】文案 1.风格:温暖的、关怀的。
+【问题要点】
+1. 1.风格:温",设计审核群·韦化,,,飞书群「设计审核」· 2026-08-14 00:29 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSCBzC,L-CASE,"【审核问题】文案 终审-@吴礼芳  】麻烦看看呀。
+【问题要点】
+1. 终审-@",设计审核群·李新,,,飞书群「设计审核」· 2026-08-11 23:11 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiS0LMV,L-CASE,"【品牌一致性】文案 1. 兹别克站点优先摆放渠道主推爆款 s12、m9、m5。
+",设计审核群·刘芳,,,飞书群「设计审核」· 2026-08-11 00:21 · 刘芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSiXAU,L-CASE,"【措辞表达】视频 2.妈妈选择奖项上市宣发海报，突出奖项，参考电商图。
+【问题要",设计审核群·李新,,,飞书群「设计审核」· 2026-08-06 01:00 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XJiSHvnR,L-CASE,"【措辞表达】视频 2·秒杀选品更换。
+【问题要点】
+1. 2·秒杀选品更换
+2.",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-07-30 23:42 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XJiS5DGY,L-CASE,"【品牌一致性】视频 可以加入手绘下划线、圆圈和小星星，但不要做成规整清单。
+原因",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-07-29 01:57 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSifVQ,L-CASE,"【原则性错误】文案 封面 【终审-@吴礼芳   】姐帮忙看看呀。
+【问题要点】
+",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-07-27 22:44 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw7XJiSUC86,L-CASE,"【合规红线】视频 P21 【终审-@吴礼芳 】帮忙看看呀。
+【问题要点】
+1. ",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-07-25 03:21 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,合规红线
+recvw7XJiS0m6e,L-CASE,【审核问题】文案 看看还需要调整吗。,设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-21 18:30 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSnRu9,L-CASE,【审核问题】文案 ·Boots渠道吸奶器纸托盘展示道具已选择方案，需要出图纸给。,设计审核群·吴嘉琪,,,飞书群「设计审核」· 2026-09-20 23:20 · 吴嘉琪,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSwPxW,L-CASE,"【审核问题】文案。
+@吴礼芳 
+已调整~麻烦再看看",设计审核群·陈东墨,,,飞书群「设计审核」· 2026-09-16 21:13 · 陈东墨,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSR3fk,L-CASE,"【品牌一致性】文案 1.挂式衣架: 磨砂亚克力材质,搭配透明防滑条.。
+【问题要",设计审核群·邓东赋,,,飞书群「设计审核」· 2026-09-12 03:23 · 邓东赋,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSw14s,L-CASE,"【品牌一致性】文案 设计需求：底色采用：#FCE4E2 不要画完整人物。
+【问题",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-11 23:28 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiS1QAk,L-CASE,【品牌一致性】视频 较上轮调整内容：1️⃣与需求方沟通加上对应产品no.1备注 ,设计审核群·董希,,,飞书群「设计审核」· 2026-09-11 18:50 · 董希,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSpXlw,L-CASE,【审核问题】文案 封面 （在joy姐的建议下把正文标题尝试了添加更生动的item,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-10 01:14 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSDUWn,L-CASE,【审核问题】文案 项目需求：paruu老品优化-银质因为存在差评问题，在原图片。,设计审核群·董希,,,飞书群「设计审核」· 2026-09-04 00:27 · 董希,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSyehR,L-CASE,【审核问题】文案 项目需求：paruu老品优化-银质因为存在差评问题，在原图片。,设计审核群·董希,,,飞书群「设计审核」· 2026-09-04 00:20 · 董希,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSwf3z,L-CASE,【品牌一致性】文案 【终审@吴礼芳 】 麻烦帮忙看看呀~YouAreTheBes,设计审核群·郅笑颜,,,飞书群「设计审核」· 2026-09-01 01:21 · 郅笑颜,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSWWRE,L-CASE,"【品牌一致性】文案 封面 不要三款产品平均分配视觉权重。
+【问题要点】
+1. 不",设计审核群·韦化,,,飞书群「设计审核」· 2026-08-31 22:22 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw7XJiSRQan,L-CASE,【审核问题】文案 封面 项目名：8.20上线【会员杂志】-哺乳时何时应该换边喂奶,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-24 23:29 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiS19RM,L-CASE,"【措辞表达】文案 设计要求：修改文案，替换了宝宝。
+【问题要点】
+1. 设计要求",设计审核群·林曼雅,,,飞书群「设计审核」· 2026-08-18 23:50 · 林曼雅,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XJiSGYS1,L-CASE,"【措辞表达】文案 可以露出安心的笑容，但不要这么开心。
+【问题要点】
+1. 可以",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-11 01:19 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvw7XJiShyQh,L-CASE,"【审核问题】文案 1. 产品背板中有效信息不要被产品遮挡。
+【问题要点】
+1. ",设计审核群·吴嘉琪,,,飞书群「设计审核」· 2026-07-28 19:49 · 吴嘉琪,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSLbtM,L-CASE,【审核问题】文案 图1 确认一下要不要改成华氏度。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-07-25 00:58 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSjgNa,L-CASE,"【审核问题】文案 【终审-@吴礼芳 】姐姐麻烦看看～。
+【问题要点】
+1. 【终",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-25 00:34 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiStzFf,L-CASE,【审核问题】文案 1. 冻奶壶冰格款产品外观调整重新渲染&后期合成，其他设计保。,设计审核群·董希,,,飞书群「设计审核」· 2026-09-24 02:56 · 董希,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSTSi8,L-CASE,"【审核问题】文案 再看一下秋促社媒海报的调整。
+【问题要点】
+1. 再看一下秋促",设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-22 00:13 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSE78x,L-CASE,"【审核问题】文案 【终审-@吴礼芳 】姐姐麻烦看看呀。
+【问题要点】
+1. 【终",设计审核群·郅笑颜,,,飞书群「设计审核」· 2026-09-20 23:02 · 郅笑颜,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiS5ORS,L-CASE,"【审核问题】文案 【终审-@吴礼芳 】姐姐看看这个呀。
+【问题要点】
+1. 【终",设计审核群·闫琪雯,,,飞书群「设计审核」· 2026-09-17 02:49 · 闫琪雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSzmOO,L-CASE,【审核问题】文案 【终审-@吴礼芳  】麻烦看一下。,设计审核群·董希,,,飞书群「设计审核」· 2026-09-15 23:34 · 董希,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSslM3,L-CASE,"【审核问题】文案 【终审-@吴礼芳 】辛苦姐姐看看这个呀。
+【问题要点】
+1. ",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-09-14 20:39 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSp4TP,L-CASE,【审核问题】文案 设计要求：将产品中的air1和M9 换成S9pro 和S12。,设计审核群·蓝涵,,,飞书群「设计审核」· 2026-08-19 01:49 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiS3Jfl,L-CASE,"【审核问题】文案 终审@吴礼芳 看看呀。
+【问题要点】
+1. 终审@吴礼芳 看看",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-08-19 01:35 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSVV5X,L-CASE,"【审核问题】文案 初审@关轶夫   看看呀。
+【问题要点】
+1. 初审@关轶夫 ",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-08-18 23:55 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSk3jg,L-CASE,【审核问题】文案 同理，婴幼儿品线的社媒，也不要按个人山头的方式存放。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-18 00:34 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSNTFQ,L-CASE,"【审核问题】文案 设计要求：修改一：产品替换。
+【问题要点】
+1. 设计要求：修",设计审核群·韦化,,,飞书群「设计审核」· 2026-08-15 02:51 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiS3iWk,L-CASE,【审核问题】文案 音符可以不要这么乱，从大到小有一定的秩序感，悠扬一点。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-14 18:40 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiSf9Kg,L-CASE,"【审核问题】文案 【终审-@吴礼芳 @关轶夫】麻烦看下这张的调整。
+【问题要点】",设计审核群·王家佐,,,飞书群「设计审核」· 2026-08-08 02:56 · 王家佐,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiStrmN,L-CASE,【审核问题】文案 需求方提出修改：妈妈和宝宝都尽量选择偏拉美裔的人种，排版调整。,设计审核群·李诗萍,,,飞书群「设计审核」· 2026-07-30 00:16 · 李诗萍,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw7XJiS2JaZ,L-CASE,"【审核问题】文案 【终审−@吴礼芳 】再看看呀,后面3张修改了。
+【问题要点】
+",设计审核群·韦化,,,飞书群「设计审核」· 2026-07-28 03:19 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvw8Tx3zVihU,L-CASE,【原则性错误】图片 P16 海报上需要有“UP TO 201% OFF” (最高,设计审核群·林曼雅,,,飞书群「设计审核」· 2026-09-25 04:16 · 林曼雅,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvw8Tx3zafet,L-CASE,【品牌一致性】图片 建议核心思路：Brand / Mom Lifestyle →,设计审核群·韦化,,,飞书群「设计审核」· 2026-09-25 04:11 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvw8Tx3zcjwb,L-CASE,"【原则性错误】图片 有时感觉吸奶后一切都必须井然有序。
+【问题要点】
+1. 有时",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-25 01:44 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvweKJlZYRQa,L-CASE,【品牌一致性】图片 1. 第一改吸奶器产品图海报，logo 下的slogan 去,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-25 07:34 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvweKJlZkABw,L-CASE,"【原则性错误】图片 有时感觉吸奶后一切都必须井然有序。
+【问题要点】
+1. 有时",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-26 04:44 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwkmr4Khk4H,L-CASE,"【品牌一致性】图片 选Plan A，妈妈能不要有帘子挡住吗。
+【问题要点】
+1.",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-26 07:07 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwwiEKD6Vf8,L-CASE,【品牌一致性】图片 其实我是在想Momcozy的内容发在ROOT的小红书账号上。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-29 00:34 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwwiEKDgRaq,L-CASE,"【品牌一致性】图片 这个问题已经提了不下5遍了。
+【问题要点】
+1. 这个问题已",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-28 23:42 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwwiEKDQUJz,L-CASE,【审核问题】图片 1. 现在出现的两只都是右手～而且加上两个手后是轻轻打开社盒。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-28 19:55 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwwiEKDTDWq,L-CASE,"【品牌一致性】图片 只需要展示一款吸奶器,能够适配所有型号,画面能够更换的,安装",设计审核群·邓东赋,,,飞书群「设计审核」· 2026-09-29 03:40 · 邓东赋,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwwiEKDJ2HZ,L-CASE,【原则性错误】图片 P16 海报上需要有“UP TO 20% OFF” (最高X,设计审核群·林曼雅,,,飞书群「设计审核」· 2026-09-28 19:04 · 林曼雅,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwwiEKDfhmV,L-CASE,【审核问题】图片 我们以前也有这个root账号粉调的。,设计审核群·陈东墨,,,飞书群「设计审核」· 2026-09-29 00:37 · 陈东墨,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwwiEKDGpL3,L-CASE,"【措辞表达】图片 2.白噪音产品灯光色改为蓝紫色渐变。
+【问题要点】
+1. 2.",设计审核群·陈欣玮,,,飞书群「设计审核」· 2026-09-29 00:28 · 陈欣玮,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwwiEKDafc4,L-CASE,"【措辞表达】图片 P21 【终审- @吴礼芳 】麻烦看看呀～。
+【问题要点】
+1",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-09-28 20:24 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwC9IMVtANl,L-CASE,【品牌一致性】图片 【终审-   @吴礼芳   】麻烦看一下~。,设计审核群·吕瀚雯,,,飞书群「设计审核」· 2026-09-30 03:03 · 吕瀚雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwC9IMVKBil,L-CASE,【措辞表达】图片 2. 亚马逊快递盒里装着3件momcozy的产品(已确认用下。,设计审核群·梁玥琦,,,飞书群「设计审核」· 2026-09-30 00:56 · 梁玥琦,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwC9IMVHb0Q,L-CASE,"【审核问题】图片 修复产品细节、光影、清晰度，替换奶瓶清洗剂片包装图。
+【问题要",设计审核群·李新,,,飞书群「设计审核」· 2026-09-29 22:30 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwC9IMVeaGY,L-CASE,"【品牌一致性】图片 只需要展示一款吸奶器,能够适配所有型号,画面能够更换的,安装",设计审核群·邓东赋,,,飞书群「设计审核」· 2026-09-29 20:08 · 邓东赋,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwC9IMVtAza,L-CASE,"【原则性错误】图片 【终审-   @吴礼芳   】麻烦看看呀～。
+【问题要点】
+",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-30 03:30 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwC9IMV4MhK,L-CASE,"【文化禁忌】图片 【终审- @吴礼芳 】麻烦看看呀～。
+【问题要点】
+1. 【终",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-09-30 01:21 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,文化禁忌
+recvwC9IMViM3X,L-CASE,"【措辞表达】图片 【终审-@吴礼芳  】姐姐麻烦看看呀～。
+【问题要点】
+1. ",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-30 01:03 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwHbaKauoOj,L-CASE,【原则性错误】图片 一般用吸奶器吸奶的时候，是不会这样抱着宝宝的～特别是月龄小的,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-17 18:44 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKaZJdv,L-CASE,"【措辞表达】图片 1. 这些cta目前有点儿无效，直接去掉换成 大箭头。
+【问题",设计审核群·张悦,,,飞书群「设计审核」· 2026-09-05 00:00 · 张悦,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwHbaKajdAB,L-CASE,【品牌一致性】图片 1.复核一下人和镜子高度的对比（有些镜子和人物比例来说人有1,设计审核群·牛园园,,,飞书群「设计审核」· 2026-08-27 18:15 · 牛园园,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaj9Jt,L-CASE,【品牌一致性】图片 其实我是在想Momcozy的内容发在ROOT的小红书账号上。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-29 00:34 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaC4T5,L-CASE,【原则性错误】图片 1. 首Banner 标题和需求方确认一下 to 和 a 是,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-27 20:14 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKaTOC6,L-CASE,【原则性错误】图片 奶瓶不建议倒着放，对于宝宝和妈妈来说，奶瓶的卫生重要至极，所,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-11 22:53 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKaO3wn,L-CASE,"【品牌一致性】图片 这个问题已经提了不下5遍了。
+【问题要点】
+1. 这个问题已",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-28 23:42 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKa5gpj,L-CASE,【审核问题】图片 1. 现在出现的两只都是右手～而且加上两个手后是轻轻打开社盒。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-28 19:55 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKavElD,L-CASE,【品牌一致性】图片 1. 第一改吸奶器产品图海报，logo 下的slogan 去,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-25 07:34 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaYwDz,L-CASE,【品牌一致性】图片 1. 目前一般根据业务不同国家渠道的重点产品进行陈列，乌兹别,设计审核群·牛园园,,,飞书群「设计审核」· 2026-08-05 23:20 · 牛园园,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKahvU3,L-CASE,【品牌一致性】图片 2、尽可能把重点产品、主打产品放在最优的位置，比如我们品牌的,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-05 23:04 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKabXsI,L-CASE,【审核问题】图片 CTA应该是要居中的，一般不会把CTA放在一侧的角落。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-30 02:30 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaqq83,L-CASE,"【品牌一致性】图片 1. logo用错了，这是旧版本logo。
+原因：不要有这种",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-12 02:46 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKabUP7,L-CASE,【措辞表达】图片 最后这一张图片的文字和背景有点儿冲突，建议加一层透明渐变la。,设计审核群·张悦,,,飞书群「设计审核」· 2026-09-02 02:09 · 张悦,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwHbaKajcT5,L-CASE,【品牌一致性】图片 我上午就看到了~设计美感是好看的，我只是想到了他们之前这类的,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-20 02:00 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKajY78,L-CASE,【原则性错误】图片 需求里特意写画面不要过于完美，现在的画面就是感觉太完美了，妈,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-07-31 01:42 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKauLfT,L-CASE,【品牌一致性】图片 图2 视觉要求：封面不要出现产品，使用妈妈哺乳的生活场景图，,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-24 00:49 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKack49,L-CASE,【原则性错误】图片 这个质感好像不对。,设计审核群·关轶夫,,,飞书群「设计审核」· 2026-09-22 00:56 · 关轶夫,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKatwUb,L-CASE,【品牌一致性】图片 头图建议：宝宝与妈妈在客厅、餐厅等居家空间中互动，体现秋日自,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-20 22:59 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaiZgZ,L-CASE,【原则性错误】图片 图 2 主标题醒目柔和，画面是宝宝跟爸爸同床，并且睡在柔软的,设计审核群·李新,,,飞书群「设计审核」· 2026-09-19 01:22 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKalfh3,L-CASE,【措辞表达】图片 头图建议：妈妈为宝宝清洁的场景，最好包含Momcozy产品（。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-17 02:23 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvwHbaKatxkv,L-CASE,【品牌一致性】图片 1.需要重点突出 MVV 文案内容，保证文案是画面的视觉重点,设计审核群·连家杰,,,飞书群「设计审核」· 2026-09-09 23:16 · 连家杰,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaIVRQ,L-CASE,【审核问题】图片 这个宝宝这么大应该没有抓物能力。,设计审核群·张悦,,,飞书群「设计审核」· 2026-09-03 00:51 · 张悦,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaACl7,L-CASE,【品牌一致性】图片 主图banner：整体使用真人生活方式实景图，不要插画感，整,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-12 23:36 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaRzEd,L-CASE,"【原则性错误】图片。
+@闫琪雯 
+这个M不对",设计审核群·关轶夫,,,飞书群「设计审核」· 2026-08-12 19:06 · 关轶夫,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKaokxq,L-CASE,"【文化禁忌】图片 【终审-@吴礼芳 】姐麻烦看看呀。
+原因：避免出现可乐等不太健",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-07-30 18:54 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,文化禁忌
+recvwHbaKaibzt,L-CASE,【品牌一致性】文字 我知道，那也是我们这边主导设计的，我只是考虑以后想实现ROO,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-29 00:40 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaDBrs,L-CASE,【审核问题】图片 我们以前也有这个root账号粉调的。,设计审核群·陈东墨,,,飞书群「设计审核」· 2026-09-29 00:37 · 陈东墨,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaOEhP,L-CASE,"【品牌一致性】图片 选Plan A，妈妈能不要有帘子挡住吗。
+【问题要点】
+1.",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-26 07:07 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKalAzR,L-CASE,【审核问题】图片 这张要不要挪一挪位置，现在有两个吸奶器被裁到～。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-09-16 20:51 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKa9bfF,L-CASE,【品牌一致性】图片 1.细节反馈内容👇https://momcozy-in.fe,设计审核群·牛园园,,,飞书群「设计审核」· 2026-08-28 01:56 · 牛园园,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKa3msa,L-CASE,【品牌一致性】图片 这是momcozy 的插画风格，Parru 的不要用同风格。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-10 21:50 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKahjgE,L-CASE,"【原则性错误】图片 有时感觉吸奶后一切都必须井然有序。
+【问题要点】
+1. 有时",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-26 04:44 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKakZME,L-CASE,【审核问题】图片 建议选择露出例如奶瓶清洗机、餐椅、摇椅、爬爬垫、监视器等产品。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-23 18:40 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaTmRM,L-CASE,【品牌一致性】图片 封面 通过错误/正确对比插画，展示睡姿和睡眠辅助用品误区，警,设计审核群·李新,,,飞书群「设计审核」· 2026-09-23 03:16 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaDt5m,L-CASE,"【品牌一致性】图片 画面中央是一个正在抱宝宝的妈妈，但不要让宝宝占满画面。
+原因",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-09-21 01:35 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaB94l,L-CASE,【品牌一致性】图片 ③ 场景要体现“真实日常清洁”，但水槽、奶瓶、配件不要堆得过,设计审核群·梁玥琦,,,飞书群「设计审核」· 2026-09-17 02:22 · 梁玥琦,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaJS4w,L-CASE,"【品牌一致性】图片 - 产品替换，由KV版7个替换为8个产品。
+【问题要点】
+1",设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-07 22:14 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKa4vX1,L-CASE,【审核问题】图片 头图建议：清晨通勤，妈妈坐在车内，浅色西装外套内搭哺乳内衣（。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-21 02:08 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKa1C0h,L-CASE,【原则性错误】图片 尾图：插图-礼物盒迸发出各种产品，结合各款式内衣，不对某款做,设计审核群·闫琪雯,,,飞书群「设计审核」· 2026-08-19 01:28 · 闫琪雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+recvwHbaKahNMG,L-CASE,【品牌一致性】图片 【终审 - @吴礼芳 】麻烦再看看呀，修改了排版方式，重点突,设计审核群·韦化,,,飞书群「设计审核」· 2026-08-14 00:29 · 韦化,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKaYNiG,L-CASE,"【审核问题】图片 终审-@吴礼芳  】麻烦看看呀。
+【问题要点】
+1. 终审-@",设计审核群·李新,,,飞书群「设计审核」· 2026-08-11 23:11 · 李新,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKayCjB,L-CASE,"【审核问题】图片。
+@李新 
+这些可以去掉",设计审核群·关轶夫,,,飞书群「设计审核」· 2026-08-06 01:00 · 关轶夫,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaScSG,L-CASE,"【品牌一致性】图片 可以加入手绘下划线、圆圈和小星星，但不要做成规整清单。
+原因",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-07-29 01:57 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+recvwHbaKavxPT,L-CASE,"【合规红线】图片 P21 【终审-@吴礼芳 】帮忙看看呀。
+【问题要点】
+1. ",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-07-25 03:21 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,合规红线
+recvwHbaKap7e3,L-CASE,【审核问题】图片 看看还需要调整吗。,设计审核群·吴悠,,,飞书群「设计审核」· 2026-09-21 18:30 · 吴悠,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaVYK6,L-CASE,【审核问题】图片 （在joy姐的建议下把正文标题尝试了添加更生动的item n。,设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-09-10 01:14 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKaX1Iv,L-CASE,"【审核问题】图片 封面 【终审-@吴礼芳 】姐麻烦看看呀。
+【问题要点】
+1. ",设计审核群·饶雨诗,,,飞书群「设计审核」· 2026-08-24 23:29 · 饶雨诗,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKazB2j,L-CASE,"【审核问题】图片 可以露出安心的笑容，但不要这么开心。
+【问题要点】
+1. 可以",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-11 01:19 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbaKagaob,L-CASE,"【审核问题】图片 1. 产品背板中有效信息不要被产品遮挡。
+原因：不要被产品遮挡",设计审核群·吴嘉琪,,,飞书群「设计审核」· 2026-07-28 19:49 · 吴嘉琪,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbbboeB3m,L-CASE,【审核问题】图片 确认一下要不要改成华氏度。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-07-25 00:58 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbbbo4n7m,L-CASE,【审核问题】图片 同理，婴幼儿品线的社媒，也不要按个人山头的方式存放。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-18 00:34 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbbbo2Tx7,L-CASE,【审核问题】文字 https://www.figma.com/design/0。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-18 00:28 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbbboUqI8,L-CASE,【审核问题】图片 音符可以不要这么乱，从大到小有一定的秩序感，悠扬一点。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-14 18:40 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvwHbbboq5mX,L-CASE,"【审核问题】图片 折扣会不会不够明显。
+【问题要点】
+1. 折扣会不会不够明显
+",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-08-14 01:45 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+recvxQakrBpg9T,L-CASE,"【措辞表达】图片 1. Mom-to-Mom Chats。
+【问题要点】
+1. ",设计审核群·吕瀚雯,,,飞书群「设计审核」· 2026-10-13 04:28 · 吕瀚雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+recvxQakrBJNJG,L-CASE,【品牌一致性】图片 画面顶部必须明确出现 A MOMCOZY COMMUNITY,设计审核群·吕瀚雯,,,飞书群「设计审核」· 2026-10-12 18:38 · 吕瀚雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+reczz28MuEZpPz,L-CASE,"【措辞表达】图片 1. Mom-to-Mom Chats。
+【问题要点】
+1. ",设计审核群·吕瀚雯,,,飞书群「设计审核」· 2026-10-14 01:48 · 吕瀚雯,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+reczz28MuEZpPO,L-CASE,【合规红线】图片 1. 奶瓶清洗机/消毒烘干机不建议直接放在厚软布、毛毯、绒布。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-10-14 00:05 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,合规红线
+reczz28NIkGoWE,L-CASE,【审核问题】图片 这几个圆可以去掉，这是一个尿布桶，是用来丢用过的尿布的不是用。,设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-10-15 01:05 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,(未分类)
+reczz28NIkGoUO,L-CASE,【原则性错误】图片 figma中评论了，还挺多问题，发出来之前自己先检查一遍基础,设计审核群·闫满,,,飞书群「设计审核」· 2026-10-15 01:16 · 闫满,图片+文本,文本可读·图红线不取,按原因分类抽验,,原则性错误
+reczz28NIkGoVg,L-CASE,"【措辞表达】图片 但能不能更轻松一点呢。
+原因：不能更轻松一点呢？
+【问题要点】",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-10-14 18:56 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+reczz28NIkGoV8,L-CASE,"【品牌一致性】图片 图 4 【初审-@关轶夫  】麻烦看看呀～。
+【问题要点】
+",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-10-14 23:18 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+reczz28NhFOFE0,L-CASE,"【品牌一致性】图片 图 4 【初审-@关轶夫  】麻烦看看呀～。
+【问题要点】
+",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-10-16 00:25 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+reczz28NhFOFFX,L-CASE,"【措辞表达】图片 但能不能更轻松一点呢。
+原因：不能更轻松一点呢？
+【问题要点】",设计审核群·蓝涵,,,飞书群「设计审核」· 2026-10-16 00:05 · 蓝涵,图片+文本,文本可读·图红线不取,按原因分类抽验,,措辞表达
+reczz28NhFOFE4,L-CASE,"【品牌一致性】图片 图 4 【终审-@吴礼芳  】麻烦看看呀～。
+【问题要点】
+",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-10-16 01:30 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+reczz28O5nOBm3,L-CASE,"【品牌一致性】图片 而且把立体体去掉，让插画更扁平。
+【问题要点】
+1. 而且把",设计审核群·吴礼芳,,,飞书群「设计审核」· 2026-10-16 23:18 · 吴礼芳,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+reczz28O5nOBlw,L-CASE,"【品牌一致性】图片 图 4 【终审-@吴礼芳  】麻烦看看呀～。
+【问题要点】
+",设计审核群·姚棉元,,,飞书群「设计审核」· 2026-10-16 22:10 · 姚棉元,图片+文本,文本可读·图红线不取,按原因分类抽验,,品牌一致性
+#6,(待判),【IMC跟进】W1再营销整合营销方案 - 飞书云文档,Misty,,,Misty·手工提交,云文档,是,提交人自证用途,,外部标准
+#19,(待判),,银舒涵,,https://momcozy-in.feishu.cn/file/T1tNbhPnmoq8gAxj4MZcHmX6nUc,银舒涵·手工提交,附件,否·红线不取,提交人自证用途,,外部标准
+#20,(待判),,银舒涵,,https://momcozy-in.feishu.cn/file/IWbobAGHAoDcycxRFWNcBYd1nY6,银舒涵·手工提交,附件,否·红线不取,提交人自证用途,,外部标准
+#21,(待判),,银舒涵,,https://momcozy-in.feishu.cn/file/HUngb4wwpovNsXxapcIcH2RZnyb,银舒涵·手工提交,附件,否·红线不取,提交人自证用途,,外部标准
+#30,(待判),APP资料库索引-睡眠RAG资料 - 飞书云文档,Tyra,,,Tyra·手工提交,云文档,是,提交人自证用途,,外部标准
+#31,(待判),OGC内容生产与审核 - 飞书云文档,刘丹,,,刘丹·手工提交,云文档,是,提交人自证用途,,外部标准
+#33,(待判),母婴设计常识清单 V2.0 - 飞书云文档,吴礼芳（Sarah）,,,吴礼芳（Sarah）·手工提交,云文档,是,提交人自证用途,,外部标准
+#22,(待判),,银舒涵,,https://biu6ihvvco.feishu.cn/wiki/Ws8Gwp4t0inTxlktBGAcVG7qnNe,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#23,(待判),,银舒涵,,https://biu6ihvvco.feishu.cn/wiki/M3tWwmh8xi4V3EkKPITcIaAknRc,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#24,(待判),,银舒涵,,https://biu6ihvvco.feishu.cn/wiki/YzyvwdrsEiBSQXkaEk3ceJpsn0g,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#25,(待判),,银舒涵,,https://biu6ihvvco.feishu.cn/wiki/WCpUwlELIi6sDlkyPN7cZ1vonQf,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#26,(待判),,银舒涵,,https://biu6ihvvco.feishu.cn/wiki/DAd6wOcX2iWuWhkZqqlc0AZxncg,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#27,(待判),,银舒涵,,https://docs.google.com/document/d/1Bi-xyN1CiFPVYrkOwYwr2ArGxEAh88nnL3T4Ln1ghgE/edit,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#29,(待判),,银舒涵,,https://momcozy-in.feishu.cn/wiki/KISzwvc8OifWk8kI5cBcTtU6n9g,银舒涵·手工提交,云文档,是,提交人自证用途,,正面与负面样本
+#12,(待判),Breast Pump MarComms Claim Guidelines_CN-EN,Misty,,,Misty·手工提交,云文档,是,提交人自证用途,,措辞表达库
+#13,(待判),Breast Pump MarComms Claim Guidelines_EN,Misty,,,Misty·手工提交,云文档,是,提交人自证用途,,措辞表达库
+#17,(待判),Momcozy 品牌文案与字体应用规范 - 飞书云文档,张悦（joy）,,,张悦（joy）·手工提交,云文档,是,提交人自证用途,,措辞表达库
+#5,(待判),吸奶器广告文案·品线内容边界风控 - 飞书云文档,易思琦（Mio）,,,易思琦（Mio）·手工提交,云文档,是,提交人自证用途,,措辞表达库|外部标准
+#15,(待判),喂养电器组对外资料汇总.xlsx - 飞书云文档,William,,,William·手工提交,云文档,是,提交人自证用途,,产品描述库
+#18,(待判),婴幼儿品线_产品基础信息汇总 - 飞书云文档,Rita,,,Rita·手工提交,云文档,是,提交人自证用途,,产品描述库
+#32,(待判),婴幼儿品线One Page,李蓝欣,,,李蓝欣·手工提交,云文档,是,提交人自证用途,,产品描述库
+#34,(待判),Momcozy | Leading the Way in Breastfeeding Comfort |,William,,,William·手工提交,云文档,是,提交人自证用途,,产品描述库
+#1,(待判),MOMCOZY吸奶器产品信息内容汇总 - 飞书云文档,Emma,,,Emma·手工提交,云文档,是,提交人自证用途,,产品描述库
+#2,(待判),MOMCOZY婴幼儿品线产品信息内容汇总 - 飞书云文档,Emma,,,Emma·手工提交,云文档,是,提交人自证用途,,产品描述库
+#16,(待判),MOMCOZY喂养品线产品信息内容汇总 - 飞书云文档,Emma,,,Emma·手工提交,云文档,是,提交人自证用途,,产品描述库
+#4,(待判),W1卖点匹配证据库_检索阅读版_0827更新 - 飞书云文档,Emma,,,Emma·手工提交,云文档,是,提交人自证用途,,产品描述库
+#7,(待判),202608 营销内容生命周期内容合规审核规范建设-需求框架整理 - 飞书云文档,钱撷羽（Sharon）,,,钱撷羽（Sharon）·手工提交,云文档,是,提交人自证用途,,其它
+#8,(待判),【创意】需求排期与任务管理 - 飞书云文档,Roxie,,,Roxie·手工提交,云文档,是,提交人自证用途,,素材库
+#9,(待判),广告创意跟进 - 飞书云文档,Roxie,,,Roxie·手工提交,云文档,是,提交人自证用途,,素材库
+#10,(待判),品线SEO任务管理系统 - 飞书云文档,林建纯（Rikka）,,,林建纯（Rikka）·手工提交,云文档,是,提交人自证用途,,素材库
+#11,(待判),英语站站点blog全表,林建纯（Rikka）,,,林建纯（Rikka）·手工提交,云文档,是,提交人自证用途,,素材库
+#14,(待判),Momcozy DeepClean Bottle Washer (D8) Materials - Goo,William,,,William·手工提交,云文档,是,提交人自证用途,,素材库
+H01,L-BRAND,医疗功效声明（治疗/治愈/诊断/疏通堵奶/治疗或预防乳腺炎；边界允许：缓解涨奶 ease/relieve,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H02,L-BRAND,催乳/增产/奶量产出承诺（含裸 more milk、催产素、长期奶量、裸奶阵/排空功效claim，无 F,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H03,L-BRAND,未经备案的临床/科学背书,吸奶器广告文案审计_红绿灯.xlsx 规则库,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H04,L-BRAND,无据的医生/专家推荐背书,吸奶器广告文案审计_红绿灯.xlsx 规则库,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H05,L-BRAND,虚假安全承诺（best/#1/No.1/最佳/最好等排名最高级按2026-09-09口径放开，海外广告允,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H06,L-BRAND,FDA 表述错误（吸奶器为 cleared/registered，非 approved/certifie,吸奶器广告文案审计_红绿灯.xlsx 规则库,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H07,L-BRAND,疼痛功效承诺（pain-free/no pain/without pain/pain relief/le,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H08,L-BRAND,无数据支撑的违法对比 / 贬低竞品,吸奶器广告文案审计_红绿灯.xlsx 规则库,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M01,L-BRAND,静音程度夸大（建议改为 low noise / quiet mode）,吸奶器广告文案审计_红绿灯.xlsx 规则库,审慎关注,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M02,L-BRAND,吸力夸大用语（建议改为客观档位描述）,吸奶器广告文案审计_红绿灯.xlsx 规则库,审慎关注,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M03,L-BRAND,未标注来源的效果数据声明,吸奶器广告文案审计_红绿灯.xlsx 规则库,审慎关注,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M04,L-BRAND,制造焦虑的压力话术,吸奶器广告文案审计_红绿灯.xlsx 规则库,审慎关注,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M05,L-BRAND,等级背书用语（需核实是否有对应认证）,吸奶器广告文案审计_红绿灯.xlsx 规则库,人工复核,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M06,L-BRAND,模糊对比（无具体数据支撑）,吸奶器广告文案审计_红绿灯.xlsx 规则库,审慎关注,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+U01,L-BRAND,含泌乳顾问/认证头衔，需核实是否真实合作,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,人工复核,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+U02,L-BRAND,保险/HSA/FSA报销声明：站点报销资质已具备（2026-09-09用户确认），规则停用、不再判险,吸奶器广告文案审计_红绿灯.xlsx 规则库,人工复核,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,停用
+U03,L-BRAND,涉及医院/NICU 场景，需核实临床适用性声明,吸奶器广告文案审计_红绿灯.xlsx 规则库,人工复核,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+安全词,L-BRAND,客观功能/真实认证关键词（正面提示，不参与降级）,吸奶器广告文案审计_红绿灯.xlsx 规则库,安全词白名单,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+U04,L-BRAND,疼痛/堵奶场景化名词表述（sore/painful/clogged ducts）：需人工判定是痛点场景描,W1利益点边界表(SWMYUF)刷新 + 吸奶器广告文案审计,人工复核,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+H09,L-BRAND,智能闭环/仿生虚假宣称（自动识别节奏、模拟/复制宝宝、饱腹反馈、降低奶量焦虑）；只允许“参考自然哺乳节奏,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,严格限制红线,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用
+M07,L-BRAND,效率/漏奶/奶流/移除量/短时排乳类claim需W1自身对照数据或放松叙事限定（品线反馈 W1-01黄/,W1卖点表达边界（品线反馈2026-09-10 T4）+ 吸,审慎关注,,人工整理(xlsx),文本,是,引擎已读·自证覆盖,,启用

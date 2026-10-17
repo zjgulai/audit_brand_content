@@ -1,0 +1,45 @@
+domain,kind,n,n_origins,origins,fields,sample
+momcozy.com,① 自有站点（产品事实）,227,6,品线内容边界规则库[主Base·人写]/广告文案明细×174 ; 内容治理问题描述/内容治理数据采集×32 ; 内容治理问题描述/内容处理问题描述×16,落地页URL×174 ; 采集数据×32 ; 送审问题×16,https://momcozy.com/pages/insurance-partners-in-us
+de.momcozy.com,① 自有站点（产品事实）,82,1,品线内容边界规则库[主Base·人写]/广告文案明细×82,落地页URL×82,https://de.momcozy.com/collections/electric-breast-pump
+fr.momcozy.com,① 自有站点（产品事实）,34,1,品线内容边界规则库[主Base·人写]/广告文案明细×34,落地页URL×34,https://fr.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control
+ca.momcozy.com,① 自有站点（产品事实）,28,1,品线内容边界规则库[主Base·人写]/广告文案明细×28,落地页URL×28,https://ca.momcozy.com/products/momcozy-mobile-flow-hands-free-breast-pump?variant=47796181303483
+uk.momcozy.com,① 自有站点（产品事实）,26,1,品线内容边界规则库[主Base·人写]/广告文案明细×26,落地页URL×26,https://uk.momcozy.com/collections/wearable-breast-pump
+es.momcozy.com,① 自有站点（产品事实）,22,1,品线内容边界规则库[主Base·人写]/广告文案明细×22,落地页URL×22,https://es.momcozy.com/products/momcozy-mobile-style-hands-free-breast-pump
+pl.momcozy.com,① 自有站点（产品事实）,20,1,品线内容边界规则库[主Base·人写]/广告文案明细×20,落地页URL×20,https://pl.momcozy.com/products/s12-pro-quick-wearable-breast-pump
+eu.momcozy.com,① 自有站点（产品事实）,14,1,品线内容边界规则库[主Base·人写]/广告文案明细×14,落地页URL×14,https://eu.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control
+au.momcozy.com,① 自有站点（产品事实）,6,1,品线内容边界规则库[主Base·人写]/广告文案明细×6,落地页URL×6,https://au.momcozy.com/products/m5-smart-wearable-breast-pump-upgraded-with-app-control
+momcozy-in.fe。,① 自有站点（产品事实）,2,1,内容治理-知识库/负面样本×2,具体原因/分析×2,https://momcozy-in.fe。
+support.momcozy.com,① 自有站点（产品事实）,1,1,内容治理-知识库/材料收集×1,材料链接×1,https://support.momcozy.com/
+www.ftc.gov,② 外部权威·法规,175,54,需求知识库/外部标准库（待法务确认）×16 ; 内容治理-知识库/规则库×16 ; 内容治理问题描述/内容治理数据采集×10,inline×130 ; 出处链接×16 ; 来源链接×16,https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance
+www.fda.gov,② 外部权威·法规,72,21,需求知识库/外部标准库（待法务确认）×14 ; 内容治理-知识库/规则库×14 ; 内容治理问题描述/内容处理问题描述×4,inline×36 ; 出处链接×14 ; 来源链接×14,https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved
+www.asa.org.uk,② 外部权威·法规,14,1,需求知识库/外部标准库（待法务确认）×14,出处链接×14,https://www.asa.org.uk/type/non_broadcast/code_section/12.html
+www.gov.uk,② 外部权威·法规,10,1,需求知识库/外部标准库（待法务确认）×10,出处链接×10,https://www.gov.uk/guidance/advertise-your-medicines
+www.nhtsa.gov,② 外部权威·法规,2,1,正文/GYDUd9gnPo×2,inline×2,https://www.nhtsa.gov/risky-driving/distracted-driving
+www.dol.gov,② 外部权威·法规,2,1,正文/TErEdVQluo×2,inline×2,https://www.dol.gov/agencies/whd/pump-at-work
+advertising.amazon.com,③ 外部权威·平台政策,276,57,需求知识库/外部标准库（待法务确认）×36 ; 内容治理-知识库/规则库×36 ; 内容治理问题描述/内容治理数据采集×10,inline×192 ; 出处链接×36 ; 来源链接×36,https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A
+www.amazon.com,③ 外部权威·平台政策,43,4,内容治理问题描述/内容治理数据采集×19 ; 内容治理问题描述/内容处理问题描述×18 ; 内容治理问题描述/产品审×5,采集数据×19 ; 送审问题×18 ; 素材原文×5,https://www.amazon.com/dp/B0FHQJWPTN
+www.youtube.com,③ 外部权威·平台政策,39,2,内容治理问题描述/内容治理数据采集×25 ; 内容治理问题描述/内容处理问题描述×14,采集数据×25 ; 送审问题×14,https://www.youtube.com/watch?v=RLF9-789hh8
+support.google.com,③ 外部权威·平台政策,38,7,需求知识库/外部标准库（待法务确认）×14 ; 内容治理-知识库/规则库×14 ; 正文/Sl0edqDe3o×2,出处链接×14 ; 来源链接×14 ; inline×10,https://support.google.com/adspolicy/answer/176031
+transparency.meta.com,③ 外部权威·平台政策,31,6,需求知识库/外部标准库（待法务确认）×12 ; 内容治理-知识库/规则库×12 ; 内容治理问题描述/内容治理数据采集×2,出处链接×12 ; 来源链接×12 ; inline×4,https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/
+www.tiktok.com,③ 外部权威·平台政策,27,10,需求知识库/外部标准库（待法务确认）×8 ; 内容治理-知识库/规则库×8 ; 正文/TzRtdkrjmo×2,inline×10 ; 出处链接×8 ; 来源链接×8,https://www.tiktok.com/legal/page/global/bc-policy/en
+m.media-amazon.com,③ 外部权威·平台政策,10,1,内容治理问题描述/内容治理数据采集×10,采集数据×10,https://m.media-amazon.com/images/I/61XxlbC243L._AC_SL1500_.jpg
+docs.google.com,③ 外部权威·平台政策,9,2,需求知识库/需求台账×7 ; 内容治理-知识库/材料收集×2,交付物×6 ; 材料链接×2 ; 标题×1,https://docs.google.com/presentation/d/1FUxGbmdYDer61bROEU8ztNsSqhdyvgYxOrzO4wplHSo/edit?usp=sharing
+drive.google.com,③ 外部权威·平台政策,5,3,正文/A0fxdtmKxo×3 ; 内容治理-知识库/材料收集×1 ; 正文/NPKldCDgZo×1,inline×4 ; 材料链接×1,https://drive.google.com/drive/folders/1vZTtB4rydhqBcZWWreqa0Y2z7JF81Lmw
+i.ytimg.com,④ 工具/CDN,20,1,内容治理问题描述/内容治理数据采集×20,采集数据×20,https://i.ytimg.com/vi/VwANGOaT4vs/hqdefault.jpg
+cdn.shopify.com,④ 工具/CDN,16,2,内容治理问题描述/内容治理数据采集×15 ; 内容治理问题描述/产品审×1,采集数据×15 ; 素材原文×1,https://cdn.shopify.com/s/files/1/0559/2321/2486/files/bd04243680971b5d9eb2953a7c0898d6.png?v=1791960227
+www.figma.com,④ 工具/CDN,12,1,内容治理-知识库/负面样本×12,原文反馈×9 ; 具体原因/分析×3,https://www.figma.com/design/Oh8IifoeIufibGOitOV1bW/Paruu-%E5%86%BB%E5%A5%B6%E5%A3%B6-260911?node-id=18-4&t=64
+alidocs.dingtalk.com,④ 工具/CDN,1,1,需求知识库/需求台账×1,交付物×1,https://alidocs.dingtalk.com/spreadsheetv2/03omPaOlHgJrO0YX/edit?anchorId=804133588202&chInfo=im&utm_medium=im
+吸奶器广告文案审计_红绿灯.xlsx,⑤ 其他,13,1,品线内容边界规则库[主Base·人写]/品线内容边界规则库×13,依据来源×13,http://吸奶器广告文案审计_红绿灯.xlsx
+W1卖点表达边界（品线反馈2026-09-10,⑤ 其他,7,1,品线内容边界规则库[主Base·人写]/品线内容边界规则库×7,依据来源×7,http://W1卖点表达边界（品线反馈2026-09-10
+www.amazon.de,⑤ 其他,2,1,品线内容边界规则库[主Base·人写]/广告文案明细×2,落地页URL×2,https://www.amazon.de/dp/B0G1MW5TB6/
+m,⑤ 其他,2,2,内容治理问题描述/内容处理问题描述×1 ; 内容治理问题描述/内容治理数据采集×1,送审问题×1 ; 采集数据×1,https://m
+capitalizemytitle.com,⑤ 其他,2,2,正文/QX0Yw2ne×1 ; 正文/RMTWdHAjFo×1,inline×2,https://capitalizemytitle.com/
+...）,⑤ 其他,2,1,正文/PXfBdjTwFo×2,inline×2,https://...）
+W1利益点边界表(SWMYUF,⑤ 其他,1,1,品线内容边界规则库[主Base·人写]/品线内容边界规则库×1,依据来源×1,http://W1利益点边界表(SWMYUF
+www.instagram.com,⑤ 其他,1,1,正文/NPKldCDgZo×1,inline×1,https://www.instagram.com/julieandcorey/
+...）2.【消费者安全-使用姿势】图片,⑤ 其他,1,1,正文/PXfBdjTwFo×1,inline×1,https://...）2.【消费者安全-使用姿势】图片
+...）建议转,⑤ 其他,1,1,正文/PXfBdjTwFo×1,inline×1,https://...）建议转
+open.feishu.cn(API),飞书·API下载地址,668,1,内容治理-知识库/负面样本×668,图片素材×668,https://open.feishu.cn/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=T60nb1hwzo6xg8xSq9yc4t
+biu6ihvvco.feishu.cn,飞书·他租户,10,1,内容治理-知识库/材料收集×10,材料链接×10,https://biu6ihvvco.feishu.cn/wiki/Ws8Gwp4t0inTxlktBGAcVG7qnNe
+feishu.cn,飞书·他租户,5,1,正文/PXfBdjTwFo×5,inline×5,https://feishu.cn/review/xxx
+momcozy-in.feishu.cn,飞书·本租户,360,40,内容治理问题描述/内容处理问题描述×148 ; 内容治理问题描述/内容治理数据采集×119 ; 内容治理-知识库/材料收集×28,报告链接×135 ; 问题分类汇总×95 ; inline×39,https://momcozy-in.feishu.cn/sheets/BX0QshqWThhY6HtDEFCcnMpsnRc?sheet=SWMYUF

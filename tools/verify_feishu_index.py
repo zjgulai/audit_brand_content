@@ -229,68 +229,73 @@ def main():
     ck("E", "E9 生成物未被环境填充（read 工具打得开）", not padded,
        f"{padded} —— 跑 python3 tools/feishu_index.py 会自动 depad")
 
-    # ---- M（2026-09-18 新增）：红线「飞书内容禁止下载」的执行点
+    # ---- M（2026-09-18 新增；2026-10-17 改线后重写判据）
     #
-    # 委托方明确：**飞书上的内容禁止下载**。这条不是风格偏好，是硬约束，
-    # 所以它必须有一个**会变红的执行点** —— 否则它就只是一句话（见 AGENTS.md §2.4）。
-    # 本段把红线钉在三处：代码里不许有下载调用、产物里不许有附件二进制、
-    # 文档里不许把这条删掉。任何一处松掉，这里就红。
+    # 2026-09-18 的原判据是「飞书内容禁止下载」；2026-10-17 委托方改定
+    # 「你都可以下载」，原判据整条作废（AGENTS.md §2.6）。改线后仍成立的是
+    # **下载物不许进公开仓**，所以本段钉三处：
+    #   ① 每个下载调用点必须登记（消费者 + 落盘路径）—— M1；
+    #   ② 那个检测器必须真会红 —— M2 / M2b（行为级，不是文本检查）；
+    #   ③ 飞书产物里不许有未登记的附件二进制 —— M3。
+    #
+    # ★ 2026-10-17 组装：M1 不再在这里维护第二套 AST 扫描器。
+    #   调用点扫描（Python + JS）、登记表字段、landing_root 的判据统一在
+    #   tools/verify_download_governance.py 的 DG-1 / DG-2。
+    #   两处就是两套：旧 M1 只比 `$allow` 字符串，而登记表已经换成 `entries`，
+    #   它读不到任何东西 —— 那正是「名字出现过 ≠ 拦得住」（AGENTS.md §2.4）。
     import ast as _ast
 
     HTTP_HELPERS = {"_get", "_post", "_req", "_request", "get", "post",
                     "urlopen", "fetch", "download"}
 
-    def _str_lit(a):
-        if isinstance(a, _ast.Constant) and isinstance(a.value, str):
-            return a.value
-        if isinstance(a, _ast.JoinedStr):
-            return "".join(v.value for v in a.values
-                           if isinstance(v, _ast.Constant) and isinstance(v.value, str))
-        return ""
+    _tools_dir = os.path.dirname(os.path.abspath(__file__))
+    if _tools_dir not in sys.path:
+        sys.path.insert(0, _tools_dir)
+    import verify_download_governance as _dg
 
-    def _download_calls(src):
-        """AST 级扫描：注释和文档字符串**不算**，只有真的发起调用才算。
+    _dg_reg = _dg.evaluate_registration(REPO)
+    _dg_reds = list(_dg_reg.get("reds") or [])
+    _dg_untested = list(_dg_reg.get("untested") or [])
+    ck("M", "M1 每个附件下载调用点都已登记（消费者 + 落盘路径）",
+       _dg_reg["ok"],
+       "DG-1 {}；DG-2 {}；红 {} 条{}；未测 {} 条{}".format(
+           _dg_reg["DG-1"]["detail"], _dg_reg["DG-2"]["detail"],
+           len(_dg_reds), (":" + str(_dg_reds[:3])) if _dg_reds else "",
+           len(_dg_untested),
+           (":" + str(_dg_untested[:2])) if _dg_untested else ""))
 
-        （所以 fetch_file 的留档说明里可以照写 `download` 字样，不会误报。）
-        """
-        out = []
-        for n in _ast.walk(_ast.parse(src)):
-            if not isinstance(n, _ast.Call):
-                continue
-            f = n.func
-            fname = f.id if isinstance(f, _ast.Name) else getattr(f, "attr", "")
-            if fname not in HTTP_HELPERS:
-                continue
-            for a in n.args:
-                s = _str_lit(a)
-                if not s or not (s.startswith("/") or s.startswith("http")):
-                    continue
-                if "/download" in s or "/medias/" in s:
-                    out.append((getattr(n, "lineno", 0), f"{fname}({s[:70]})"))
-        return out
+    # M2 行为级反向对照：把**同一个** M1 判据喂给「真实调用集 + 一个未登记调用」，
+    # 它必须红。只断言函数存在是文本检查（AGENTS.md §2.4）；这里真跑一次，
+    # 并且走的是 M1 刚用过的那个入口与真实登记表。
+    _dg_fake = {
+        "path": "tools/_m2_unregistered_probe.py",
+        "symbol": "g",
+        "lineno": 3,
+        "col_offset": 4,
+        "sink": "http",
+        "shape": "fstring",
+        "api": "https://open.feishu.cn/open-apis/drive/v1/files/<expr>/download",
+        "marker": "/download",
+    }
+    _dg_probe = _dg.evaluate_registration(
+        REPO, calls=list(_dg_reg.get("calls") or []) + [_dg_fake])
+    ck("M", "M2 DG-1 判据对未登记调用必须红（否则 M1 恒真）",
+       (not _dg_probe["ok"])
+       and any("少登记" in red for red in _dg_probe["reds"]),
+       "真实调用 {} 个 + 1 个假调用 → reds {}".format(
+           len(_dg_reg.get("calls") or []), _dg_probe["reds"][:2]))
 
-    hits = []
-    for fn in sorted(os.listdir(os.path.join(REPO, "tools"))):
-        if not fn.endswith(".py"):
-            continue
-        p = os.path.join(REPO, "tools", fn)
-        try:
-            src = open(p, encoding="utf-8").read()
-        except Exception:
-            continue
-        for ln, call in _download_calls(src):
-            hits.append(f"{fn}:{ln} {call}")
-    ck("M", "M1 tools/ 下没有任何附件下载通道的调用（AST 级）", not hits,
-       f"发现 {len(hits)} 处：{hits[:4]}")
-
-    # M2 断言本身要能变红 —— 拿一段**已知带下载调用**的代码喂给它，必须报出来。
-    # 没有这一条，M1 可能只是个恒真的空转。
-    _probe = ('def f(tok, t):\n'
-              '    """文档里写 download 不算"""\n'
-              '    return _get(f"{BASE}/drive/v1/files/{t}/download", tok)\n')
-    ck("M", "M2 该检测器确实会红（喂已知坏样本）",
-       len(_download_calls(_probe)) == 1,
-       f"喂进去 1 处坏调用，检出 {len(_download_calls(_probe))} 处")
+    # M2b 端到端行为级证明：导入的判据在临时仓库里面对**真实的 .py 与 .mjs**
+    # 下载调用必须红，补登记后必须绿。这证明 M1 用的不是一条恒真函数，
+    # 也证明两个扫描器真的接进来了 —— 源码里写个 import 不算接线。
+    try:
+        _dg_control = _dg.control_dg6()
+        _dg_control_ok = bool(_dg_control["ok"])
+        _dg_control_detail = _dg_control["detail"]
+    except Exception as exc:  # 控制跑不起来 = 未测，不许当成通过
+        _dg_control_ok, _dg_control_detail = False, "控制跑不起来：%s" % exc
+    ck("M", "M2b DG 判据端到端会红也会绿（真实扫描器已接入）",
+       _dg_control_ok, _dg_control_detail)
 
     # M3 飞书取回的产物里不许有附件二进制（正文抽取走的是只读接口，是文本）
     feishu_dir = os.path.join(REPO, "research", "feishu")
@@ -314,18 +319,62 @@ def main():
     _nxt = _sec.find("\n## ", 1)
     if _nxt > 0:
         _sec = _sec[:_nxt]
-    ck("M", "M4 AGENTS.md §2.6 已写明「飞书内容禁止下载」且不再是空的「待补」",
-       "禁止下载" in _sec and "待补" not in _sec,
-       f"§2.6 长度 {len(_sec)} 字，红线未落到文档 —— 执行点就成了孤岛")
+    # ★ 2026-10-17：M4 的判据必须**跟着改线一起改**。
+    #   旧判据查「禁止下载」四个字在不在 —— 而它在新文本里**作为废止记录仍然出现**，
+    #   于是改线之后这条断言会**假绿**。这是 AGENTS.md §2.4 点名的「名字出现过 ≠ 拦得住」，
+    #   此刻正长在防它的断言自己身上。
+    #   新判据查「现行口径是不是允许下载」，且**必须带着改线日期**（可追溯谁改的）。
+    _allow_now = ("可以读取，包括附件" in _sec) and ("2026-10-17" in _sec)
+    _old_ban = "**下载附件**（xlsx / pdf / 图片 / 视频 / 文档） | ⛔" in _sec
+    ck("M", "M4 AGENTS.md §2.6 写的是**现行**口径（允许下载 + 改线日期），不是废止记录",
+       _allow_now and not _old_ban,
+       f"§2.6 长度 {len(_sec)} 字；允许={_allow_now}；残留旧禁令表行={_old_ban}")
 
-    # M5 fetch_file 自身一次网络调用都不能有（连权限探测也不做）
-    fs = open(os.path.join(REPO, "tools", "feishu_index.py"), encoding="utf-8").read()
-    _ff = next((n for n in _ast.walk(_ast.parse(fs))
-                if isinstance(n, _ast.FunctionDef) and n.name == "fetch_file"), None)
-    _calls = [getattr(c.func, "id", getattr(c.func, "attr", ""))
-              for c in _ast.walk(_ff) if isinstance(c, _ast.Call)] if _ff else ["<未找到 fetch_file>"]
-    ck("M", "M5 fetch_file 不做任何网络调用（不下载、也不探测）",
-       all(c not in HTTP_HELPERS for c in _calls), f"调用了：{_calls}")
+    # M5 —— ★ 2026-10-17 改成**与 DG-2 同源**，不再自己判一遍。
+    #
+    #   上一版 M5 的判据是「fetch_file 的源码里有没有 tempfile/TMPDIR//tmp 这几个字符串」——
+    #   **写个注释就满足**。这是 AGENTS.md §2.4 点名的「名字出现过 ≠ 拦得住」，
+    #   而它此刻正长在验它自己的断言上。
+    #
+    #   现在的做法：直接调用 `verify_download_governance.evaluate_dg2()`，
+    #   用**同一份 landing_root 校验结果**。两处各判一遍 = 两套判据，迟早各绿。
+    try:
+        sys.path.insert(0, os.path.join(REPO, "tools"))
+        import verify_download_governance as _dgv  # noqa: E402
+        _dg2 = _dgv.evaluate_dg2()
+        ck("M", "M5 下载落盘根与 DG-2 同源（不是自己再判一遍）",
+           _dg2.get("ok", False),
+           f"DG-2 报了红：{str(_dg2.get('reds') or _dg2)[:160]}")
+    except Exception as _e:
+        ck("M", "M5 下载落盘根与 DG-2 同源（不是自己再判一遍）", False,
+           f"调不到 verify_download_governance.evaluate_dg2：{_e!r}")
+
+    # M6 —— ★ 2026-10-17 加：**传播 DG 的总判定**。
+    #
+    #   为什么必须有这一条：M5 只接了 DG-2（落盘根），而 DG-3（仓内二进制 / PII）
+    #   红着的时候，本脚本仍然能 42 项全过 —— 于是**总自证会误报绿**。
+    #   一条「只接了自己想接的那一项」的判据，比没有更糟：它给了全部通过的错觉。
+    #
+    #   判据形态：调 evaluate_all() 拿总 verdict，**红 → 红，未测 → 未测**，
+    #   不许把「未测」当「通过」（AGENTS.md §2.4.2 的 L3 同口径）。
+    try:
+        sys.path.insert(0, os.path.join(REPO, "tools"))
+        import verify_download_governance as _dgv2  # noqa: E402
+        _all = _dgv2.evaluate_all()
+        _v = _all.get("verdict")
+        if _v == "red":
+            _n = sum(len((_all.get(d) or {}).get("reds") or []) for d in
+                     ("DG-1", "DG-2", "DG-3", "DG-4", "DG-5", "DG-6"))
+            ck("M", "M6 下载治理总判定已传播（DG 红则本脚本红）", False,
+               f"DG verdict=red，共 {_n} 条红；明细见 `python3 tools/verify_download_governance.py`")
+        elif _v == "untested":
+            ck("M", "M6 下载治理总判定已传播（DG 红则本脚本红）", False,
+               "DG verdict=untested —— 未测不是通过")
+        else:
+            ck("M", "M6 下载治理总判定已传播（DG 红则本脚本红）", True, "")
+    except Exception as _e:
+        ck("M", "M6 下载治理总判定已传播（DG 红则本脚本红）", False,
+           f"调不到 verify_download_governance.evaluate_all：{_e!r}")
 
     # ---- H（2026-09-22 新增）：飞书 HTTP 助手只许有**一份** —— 防漂移复活
     #

@@ -1,0 +1,14 @@
+﻿叶子,问题,通道,ID,内容,条款位置,是否同一问题
+T5.1.safety-claim,安全承诺,①外部标准库,EXT-027,临床试验招募类推广不得暗示受试产品是安全的（同节还写明不得制造误导性预期）。,Healthcare and medicines > Clinical trial recruitm,
+T5.1.safety-claim,安全承诺,③材料收集,#12,Breast Pump MarComms Claim Guidelines_CN-EN,措辞表达库,
+T5.1.safety-claim,安全承诺,④引擎规则源,H05,虚假安全承诺（best/#1/No.1/最佳/最好等排名最高级按2026-09-09口径放开，海外广告允许，不再判险）,严格限制红线,
+T3.2.expert-endorsement,专家背书,①外部标准库,EXT-005,（巴西、新西兰）广告不得含由医疗专业人员作出、暗示专业建议/偏好/推荐的表述；约束点是「暗示推荐」，不要求出现人名或职称。,Healthcare products and services > Country-specifi,
+T3.2.expert-endorsement,专家背书,②负面样本,recvw7XIUgXEvk,"【原则性错误】视频 图 1 主标题醒目柔和，画面是宝宝跟爸爸同床，并且睡在柔软的枕头上（。
+【问题要点】
+1. 主标题醒目柔和，画面是宝宝跟爸爸同床，并且睡在柔软的枕头上（画面是新手爸爸带婴儿错误睡觉，呈现危险的错误场景",原则性错误,
+T3.2.expert-endorsement,专家背书,③材料收集,#12,Breast Pump MarComms Claim Guidelines_CN-EN,措辞表达库,
+T3.2.expert-endorsement,专家背书,④引擎规则源,H04,无据的医生/专家推荐背书,严格限制红线,
+T4.1.named-comparison,具名对比,①外部标准库,EXT-010,与竞品比较的宣称需给出 substantiation（来源+日期，24 个月内）；页面举例即「比领先品牌多缓解 50% 疼痛」。,Claims and substantiation > Restricted content > C,
+T4.1.named-comparison,具名对比,③材料收集,#15,喂养电器组对外资料汇总.xlsx - 飞书云文档,产品描述库,
+T4.1.named-comparison,具名对比,④引擎规则源,H08,无数据支撑的违法对比 / 贬低竞品,严格限制红线,
+T2.1.1.milk-supply,奶量,①外部标准库,EXT-035,FDA 页面把「维持或增加奶量、缓解胀奶与堵奶、牵出扁平或凹陷乳头以便含乳」列为吸奶器的用途——这些是器械预期用途，而不是需要额外举证的功效宣称。,Breast Pumps > 正文第 1 段第 3 句,

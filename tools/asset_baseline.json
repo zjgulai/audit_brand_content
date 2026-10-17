@@ -1,0 +1,463 @@
+{
+ "$note": "自有素材基线。这里列出的二进制是项目自己的素材（品牌资产/设计稿/测试样本），不是从飞书下载的内容。未列出的二进制一律红（除非在 download_callers.json 里登记为 never_tracked）。",
+ "$created": "2026-10-17",
+ "assets": {
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_01_100_img_04.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "9ee8a5475b379edc53a2b7bda67147c353eb948c04780c9250fcb825287ba9ae"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_02_100_img_06.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "d05fd5e901d3306c6c8f2b6612dc3b8b9ad24d5a83c2748983081fe13e830ed6"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_03_100_img_03.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "9451e9924f5fd79ce0cda077d40a7877d90aa82c21dd55398fef1557d417cb40"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_04_100_img_15.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "12e89e3a5468daf2ce20df1b954c891584c1851f5fa5dcc14c0ae5edeb5060ba"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_05_100_img_04.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "7041741611fcdd92962840bba070c58769370138d176c32701c21f2ee167958a"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_06_100_img_02.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "2c9ca0e0c3bd1138c6efbde838d74e3e127c1556ec2979f30228ab9ea6cf94ee"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_07_100_img_03.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "3cde744d9059b3025d57c8aa55c4be9b6f6c7123d3ef750a4235a7c519074d52"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_08_100_img_01.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "64f08b45a39e91e22b3e9623d3f661ced3821c832badbc86d913d1ada797a6c4"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_09_100_img_07.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "ad0151e12fec0d8353cde779eae68f1f826498d15a2e3f4000881a46408afcf2"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_10_100_img_15.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "8895ce25d868ac576db8ede29849b7d26cd6dadb6ef88ad7a22d314826d0aaf1"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_11_100_img_05.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "2f6e726910d7d7f9138e17e82ec8f5c6daf92d3fa2583c86c3ca3ad9f898f7a2"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/infographic_banner_12_100_img_02.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "87b1ba4f73177ca3b34426b4f5625eeda09008abff326bd7720237856044ab41"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_01_100_img_07.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "0c2cbdf16e64430a2a5f152f8c528ad5a09545ae19ba0b9fdaffaae5991cd397"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_02_100_img_06.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "05113efe5183a91db7cf574927364a00cf0d818e445019d9e3907b4cca46bf80"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_03_100_img_06.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "9894cb4c7f060985ebee47cb1fb4bf72a91461691cf4208450a7df8faff6cb57"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_04_100_img_01.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "81407563772d8c9a8b337cd2830dc800d0ae97219a353199313b6c82b2c522b7"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_05_100_img_07.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "5c6b326fd64317dd57d8a812ce87c65a6ff26fa6c3cd3ac575b837aa9b1540cd"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_06_100_img_08.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "63053caed920f251009db406fb3cf929ccfa1fb447efbb9b705f390d04dc2fb2"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_07_100_img_04.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "5ce2e50babb56a4473c825f0561360ed6c215f503210f2de79262f8b2e35e3ae"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_08_100_img_06.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "3abf5d48dc71731a2fa4fbda0a67f09c3ebd526fe0b7bcbbb20f40ad395146b8"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_09_100_img_10.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "5d3361d85f8f38a60d5624e6fe231f8fdf4213e8493797c612108e12d881be7a"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_10_100_img_02.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "8b00b579b93159fbdd7f99d25b563c12ecc50620c3c38045f599f47cc6d9886e"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_11_100_img_08.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "1ba58c8970a4d5c0625b5e8f8150b05b70d47b7918bc35aa33e571848b1e0d2e"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/lifestyle_12_100_img_01.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "09630bd4acb14a0fe83052f782a9e341980c6c8c9cb8dfbc8dd8df117a53dbd0"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_01_95_img_10.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "065f2582d8df75cf3f3719dac4e9a7872659ad22a597c11c7e39237f6e953822"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_02_95_img_15.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "492297836391a5b38af4b4b5abdb95c3d3063a6a54d108c782ac4e01e3b84b64"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_03_95_img_12.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "065f2582d8df75cf3f3719dac4e9a7872659ad22a597c11c7e39237f6e953822"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_04_95_img_12.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "065f2582d8df75cf3f3719dac4e9a7872659ad22a597c11c7e39237f6e953822"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_05_95_img_14.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "492297836391a5b38af4b4b5abdb95c3d3063a6a54d108c782ac4e01e3b84b64"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_06_95_img_09.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "065f2582d8df75cf3f3719dac4e9a7872659ad22a597c11c7e39237f6e953822"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_07_90_img_11.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "43388f6067ab56103e91cffef7b9fbf9cc2b277c294ba4b1027e2d9b830172ee"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_08_90_img_14.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "bbf69b7ffaae9f91bca17c8d9dd232623ee1391a6f076aea9c9efdb646c5dc1f"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_09_90_img_13.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "43388f6067ab56103e91cffef7b9fbf9cc2b277c294ba4b1027e2d9b830172ee"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_10_90_img_13.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "43388f6067ab56103e91cffef7b9fbf9cc2b277c294ba4b1027e2d9b830172ee"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_11_90_img_10.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "43388f6067ab56103e91cffef7b9fbf9cc2b277c294ba4b1027e2d9b830172ee"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/other_12_90_img_13.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "bbf69b7ffaae9f91bca17c8d9dd232623ee1391a6f076aea9c9efdb646c5dc1f"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/packaging_unboxing_01_100_img_05.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "e721948ec519696eb148655058c0a0b6e43ea66c9fb27b4f360c0300f53e4433"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/packaging_unboxing_02_100_img_02.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "806735c4e3eee85274a258d25e20371ae7c4261597f0757b02a5f9a023fe15d5"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/packaging_unboxing_03_100_img_07.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "7a158c346b4195952db311f85896a144d83adda4dc847a4d74f49374d5ed6b6c"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/packaging_unboxing_04_100_img_02.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "08d609048ca42509cf7be985f3741bfcad04e912b2e5202101f0bd7831f04c20"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/packaging_unboxing_05_100_img_10.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "92b90aba82757dedb6432fa50ab5acf885a78f8eb0616a6d4ef6a58860ffd252"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/packaging_unboxing_06_95_img_11.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "be19ce9bfe380948d20d6eaad25118490dedcf06eaa236a3c7bca77225223dcc"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_01_100_img_12.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "2bd8b9a45bcef3f01ee596f78f17c6f1e3684cd7642b449d346bde08f99192e2"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_02_100_img_06.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "f92be4fda117867ce413ae8a366efb4756d7eeffc999f80404bc694f87c6f140"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_03_100_img_01.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "429fd3ab5e9d235395093b8e3c925107dd8b4edebec5e1ed7005eb8194ce20d2"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_04_100_img_14.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "94516aa310e874a7e8f399ff7eb8739e6229a0b92b7c297e309a8496c18c5bff"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_05_100_img_09.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "f8e3b21bdfd25f1a140b2e5cc4e25f4518487b8e90972653cef280bfd55401ee"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_06_100_img_04.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "04a5e62fc5742b0d5cb27df28d2eded92078e2a304801d08b75db3113eb4fb2e"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_07_100_img_10.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "2b0807d481e1bfeef40377a576491327abbecf3447c8e084f41e70ac1cae07a8"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_08_100_img_09.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "4769889ed40da390c832f7990f91d6ac88b3627e7817a15fcf080f8c6f762d4f"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_09_100_img_13.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "d7a3e0dd08e80088b4a77262124d56d62da981d72b8d5c93f2440c8c34c91ee1"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_10_97_img_05.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "ac3ef78799a5c4aacec2a4f9061ae509fb6f61b9c2aee83d4af118dc6e602376"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_11_97_img_13.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "4846b282644ba92635a5b4ebd1d121940a9789873539c4954c11eeb3840ea5fc"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/product_white_bg_12_97_img_10.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "5818b45128dcad311d61b0d35e982eb7373bd887c8123211f18103152dcaa24a"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/ugc_01_97_img_05.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "5a64460cb3e9cda275ebc52cab371e8c74c55b9cb884e1b662ab6bb74fae121a"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/ugc_02_85_img_13.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "d62f5a726b138cd07965af2381c393f23879eedb390fbb89916d3b7b40450e96"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/ugc_03_80_img_04.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "1a56253b00c69fa0e315cd0cee0a526f8112d45ba8d2c007778147215a9ddd55"
+  },
+  "PMO/audit/momcozy-assets/sref-candidates/ugc_04_65_img_10.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "3b09cb250af0d1065827538bc701e09d466eac8fdc4bc214fdee8b6988b7fba0"
+  },
+  "dsh-browser-ext/assets/icons/deepseek-256.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "d1e6058d19b04817a623dc6e3a99405c70defaf412e9296edf7dbe2032ff7cbe"
+  },
+  "dsh-browser-ext/assets/icons/icon128.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "2d6800c1fb5f22c129102bdae8a89abde5e76951fe5a12036399d59e2449a1a2"
+  },
+  "dsh-browser-ext/assets/icons/icon16.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "092b31cefc82b2e6b638d7765f60885054921ee4f0bbfa9ea77ac267b0c586c9"
+  },
+  "dsh-browser-ext/assets/icons/icon32.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "57772ec978caaaf0a5d3016be14334dd02447feea327945c18e73441fef10642"
+  },
+  "dsh-browser-ext/assets/icons/icon48.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "6bd3606adf4dad46cf6393dca7fd2430678c0e7568dc994ce37fd868a4c8c831"
+  },
+  "dsh-browser-ext/panel/assets/deepseek-256.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "d1e6058d19b04817a623dc6e3a99405c70defaf412e9296edf7dbe2032ff7cbe"
+  },
+  "research/landing/risk01_Global-No1徽章.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "be3b41cffcb6cab1f2a94d9514c3ea378af8e46aac095a3aa308a35cc8264911"
+  },
+  "research/landing/risk02_销量第一徽章产品图.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "25c8e7f718583629157e53ae8500cfa820b59539eb4af98de64ed57ffd48829c"
+  },
+  "research/landing/risk03_奥运运动员代言横幅.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "87a7ca709336a7af702e0e47977708ce2d74e6b105283d34326efa746c4d4aff"
+  },
+  "research/landing/risk07_USA-TODAY最受信赖品牌徽章.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "89e152dde5a8717e1266e5d53e0a74c93a5356f63ba91d9d953d2222caa8b1df"
+  },
+  "research/landing/risk12_全球第一奶瓶清洗机品牌横幅.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "3a32ddac6f7a5b73db61b902cd511ca488b7b230144376063ccda1138fa2e38c"
+  },
+  "research/landing/risk13_亚马逊三年销量第一宣称.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "deb34030b41fcc9959bc3e4596ba80f20d5d2a31445f291999e2d44cb9a0f73a"
+  },
+  "research/landing/risk14_首款乳腺友好吸奶器宣称.png": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "a0e648681d6fea0275190215665cbfb5a957d1f64d4166e1240c319fba14cd9a"
+  },
+  "research/landing/risk15_医院级解决方案宣称.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "173f10ab6ae0bf5d3540fc9f1cb3ba95436ab7b269d978e6f62edaf276c5efca"
+  },
+  "research/landing/risk16_防黑客绝对安全宣称.jpg": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "51b12848a8042e4c5c6fc520e0b0c179a35e56bfdc866a491c95ca399fc8405b"
+  },
+  "research/landing/risk17_亚马逊评论背书墙.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "a3b525c33e7b9191dd1952c9692e78ce98aac432445b446842a07791d44193c7"
+  },
+  "research/landing/risk18_权威媒体评测背书墙.webp": {
+   "source": "项目自有素材",
+   "note": "2026-10-17 建立基线时已跟踪；非飞书下载物",
+   "approved_by": "委托方 2026-10-17",
+   "sha256": "6439890797d64c3d3f113c1fa09c9dbf96b9defcaa7e11176d0ede64aa430a47"
+  },
+  "dsh-browser-ext/assets/icons/deepseek.ico": {
+   "source": "项目自有素材",
+   "note": "浏览器扩展构建产物（非飞书下载物）；构建配方 .vendor/dsh-browser-main/extensions/dsh-browser/scripts/build.mjs，AGENTS.md §2.1 的 verify_browser_ext_artifact.py 会逐文件复核 sha256",
+   "approved_by": "委托方 2026-10-17（自有素材基线同批；装配验证器时补漏登记）",
+   "sha256": "30a4420e6e4dcb17fd7de560c5004346c2bc8cd971d2d5f5ee15326603e51321"
+  }
+ },
+ "prefixes": []
+}

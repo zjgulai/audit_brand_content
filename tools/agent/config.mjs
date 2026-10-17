@@ -102,6 +102,24 @@ export const config = {
     /** 工具循环最多迭代几次（防失控） */
     maxToolIters: Number(process.env.SHOUHENG_MAX_TOOL_ITERS || 6),
   },
+  /**
+   * 知识库（另一台机器上的 DSH 内容治理知识库，走 ngrok 只读 OpenAPI）。
+   *
+   * ★ 这里**只放一个开关，不在这里加载凭据**，有两个理由：
+   *   1. 它是可降级的外部依赖 —— 对端关机、隧道过期、ngrok 换域名都会让它不可用，
+   *      而那是**正常运行状态之一**，不该让守衡整个起不来。凭据装载与失败话术
+   *      都在 kb_client.mjs 里，由真正的调用点转成人话。
+   *   2. 在 config.mjs 里 import kb_client 会绕成环（kb_client 要 import REPO_ROOT/STATE_DIR）。
+   *
+   * 设 SHOUHENG_KB_ENABLED=0 可以整块关掉。凭据见 ~/.dsh/credentials/shouheng-kb.json。
+   */
+  kb: {
+    enabled: process.env.SHOUHENG_KB_ENABLED !== '0',
+    // ★ 这里**故意没有** quotaPerDay。日上限的唯一真值源是服务端：
+    //   检索响应里的 quota.limitPerDay（实测 1000）。本地再配一份，
+    //   就是给「余额」造了第二个真值源 —— 上一版正是这么把 used=41
+    //   报成余额的（服务端真值 292）。余额一律读 kb_client.quotaState()。
+  },
   /** 允许守衡响应的群（空数组 = 不限制）。目前只放打通验证过的那个群。 */
   allowedChats: (process.env.SHOUHENG_ALLOWED_CHATS || '').split(',').map(s => s.trim()).filter(Boolean),
   /** 被 @ 才响应（群聊里避免刷屏）；私聊一律响应 */
