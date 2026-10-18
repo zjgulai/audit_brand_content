@@ -89,7 +89,7 @@ Playbook 的**五步**是产品流水线;本文的 **S0–S9** 是工程阶段(�
 
 > 模块定义以 `技术解决方案-v1.md` §2(27 模块)为准;本表只做**工作流定位**,不复制模块职责。
 
-| # | 模块 | 阶段 | owner 归属 | UI 触点 | API(UIUX@6252cdee §8.7) | 验收组 |
+| # | 模块 | 阶段 | owner 归属 | UI 触点 | API(UIUX@67bcd19e §8.7) | 验收组 |
 |---:|---|---|---|---|---|---|
 | 1 | submission_router | S0 | 后端 | 提交入口 | POST /submissions | AU/SD、L1-0b/c |
 | 2 | normalizer | S2 | 后端 | 案件详情(解析态) | GET /cases/{id} | L1-1…L1-4b |
@@ -132,8 +132,8 @@ Playbook 的**五步**是产品流水线;本文的 **S0–S9** 是工程阶段(�
 | `Finding` / `ValidatedFinding` | P@ff51fc87 §3.3.4;T@28498c99 §1bis.1 | append-only;Draft 不落盘 |
 | `decision_table` 输入/输出 | P@ff51fc87 §3.3.8;T@28498c99 §2 #11 | 15 链 + I1–I7;唯一状态来源 |
 | 回执 `Receipt` | P@ff51fc87 §3.3.3;T@28498c99 §1bis.3 | 含 `skipped` 空数组、obligations |
-| 签发绑定字段 | UIUX@6252cdee §8.4 / Appendix A SB | 全字段,本文件不复述 |
-| API 起止状态/409/幂等 | UIUX@6252cdee Appendix B | 本文件只引用 |
+| 签发绑定字段 | UIUX@67bcd19e §8.4 / Appendix A SB | 全字段,本文件不复述 |
+| API 起止状态/409/幂等 | UIUX@67bcd19e Appendix B | 本文件只引用 |
 
 > **`fetch_error` 稳定 id**:仍属 **S-3 open**(`T@28498c99 §8 S-3`);本文不裁定。
 
@@ -141,14 +141,14 @@ Playbook 的**五步**是产品流水线;本文的 **S0–S9** 是工程阶段(�
 
 | 决策 | 对齐方式 |
 |---|---|
-| 五类失效输入(内容指纹 / rule_snapshot / kb_snapshot / 已用 authority_ref 版本 / 冲突表版本) | 引 UIUX@6252cdee §UJ-4 / Appendix A INV;本文 S7.7 展开五类 |
-| 签名绑定全字段 | 引 UIUX@6252cdee §8.4 / SB-1…SB-11;本文 S7.5 只列类别 |
-| Draft autosave | 引 UIUX@6252cdee §UJ-2 / Appendix C D-101;本文 S7.2 只写「保存 draft」 |
+| 五类失效输入(内容指纹 / rule_snapshot / kb_snapshot / 已用 authority_ref 版本 / 冲突表版本) | 引 UIUX@67bcd19e §UJ-4 / Appendix A INV;本文 S7.7 展开五类 |
+| 签名绑定全字段 | 引 UIUX@67bcd19e §8.4 / SB-1…SB-11;本文 S7.5 只列类别 |
+| Draft autosave | 引 UIUX@67bcd19e §UJ-2 / Appendix C D-101;本文 S7.2 只写「保存 draft」 |
 | JCS 媒体指纹(TS-27) | 引 P@ff51fc87 §4.5.8 + A@432f4a2c #130;本文 S8a.2 只在媒体产物处引用 |
-| session / step-up | 引 UIUX@6252cdee §8.3 / §10.2 + P@ff51fc87 §4.5.1(TS-1/11/13) |
-| ACL / SoD | 引 UIUX@6252cdee §1.3 / §1.4 |
-| appeal / takedown / grant | 引 UIUX@6252cdee §UJ-3/§UJ-5/§1.5 + Appendix A AP/TD/TF/GR |
-| Compose / OCR / ASR / WCAG / 证据级别 | 引 UIUX@6252cdee §9/§6.3/§13;本文不复制 UI 细节 |
+| session / step-up | 引 UIUX@67bcd19e §8.3 / §10.2 + P@ff51fc87 §4.5.1(TS-1/11/13) |
+| ACL / SoD | 引 UIUX@67bcd19e §1.3 / §1.4 |
+| appeal / takedown / grant | 引 UIUX@67bcd19e §UJ-3/§UJ-5/§1.5 + Appendix A AP/TD/TF/GR |
+| Compose / OCR / ASR / WCAG / 证据级别 | 引 UIUX@67bcd19e §9/§6.3/§13;本文不复制 UI 细节 |
 
 ### 0.8 验收可执行性约定
 
@@ -164,7 +164,7 @@ Playbook 的**五步**是产品流水线;本文的 **S0–S9** 是工程阶段(�
 ### S0.1 Owner 与职责
 
 - **唯一入口**:`submission_router`(`T@28498c99 §2 #1`)。四维取值校验、`unsupported` 拒绝、不归一化。
-- **入口传输**:`feishu_io`(只读接入与传输原语,`T@28498c99 §2 #25`);ingress 复用 `ws_daemon`(`UIUX@6252cdee §8.2`)。
+- **入口传输**:`feishu_io`(只读接入与传输原语,`T@28498c99 §2 #25`);ingress 复用 `ws_daemon`(`UIUX@67bcd19e §8.2`)。
 - **Attempt 唯一写者**:`submission_router`(`T@28498c99 §1bis.2`)。
 
 ### S0.2 输入四维契约
@@ -205,13 +205,13 @@ submitted ──accepted──> (进入 S1)
 | 未测 | `Attempt` 读不出 → 报告 L1-7 显示「未测」而非 0 | `T@28498c99 §1bis.2` |
 | 幂等 | 同一 `submission_id` 可含多次 attempt;`attempt_id` 稳定 | `T@28498c99 §1bis.2` |
 | 审计 | `entered_at`、`outcome`、`ir_id|不存在`、`receipt_id|不存在` | `T@28498c99 §1bis.2` |
-| 入站去重 | `event_id` 去重 + `events-inbox.jsonl` + cursor(进程不在时事件仍丢,明写) | `UIUX@6252cdee §8.6` |
+| 入站去重 | `event_id` 去重 + `events-inbox.jsonl` + cursor(进程不在时事件仍丢,明写) | `UIUX@67bcd19e §8.6` |
 
 ### S0.6 UI 触点与 API
 
-- API:`POST /api/v1/submissions`(群/表/Web 同路由),`UIUX@6252cdee §8.7`。
+- API:`POST /api/v1/submissions`(群/表/Web 同路由),`UIUX@67bcd19e §8.7`。
 - UI:提交入口(群消息、飞书文档链接、多维表批量、Web);NAS/上传文件若出现,必须显示「未支持」而不是静默失败。
-- 工作台不展示原始媒体内容以外的敏感信息;读取审计单独记录(`UIUX@6252cdee §8.8`)。
+- 工作台不展示原始媒体内容以外的敏感信息;读取审计单独记录(`UIUX@67bcd19e §8.8`)。
 
 ### S0.7 验收与反向对照
 
@@ -238,7 +238,7 @@ submitted ──accepted──> (进入 S1)
 
 ### S1.3 同步 / 异步
 
-- 每 case 唯一 active review job,串行不并行(`UIUX@6252cdee §8.6`)。
+- 每 case 唯一 active review job,串行不并行(`UIUX@67bcd19e §8.6`)。
 - 每次 spawn 一个一次性 worker 子进程(架构,`T@28498c99 §1`)。
 
 ### S1.4 状态机
@@ -249,8 +249,8 @@ queued ──spawn──> running ──exit──> succeeded | failed | timeout
    └──── successor(新变化)────────────┘
 ```
 
-- queued job 可合并 `change_set`;running job 快照不可变;新变化建 successor 等待当前结束(`UIUX@6252cdee §8.6`)。
-- 入队幂等键:`invalidated_event_id` 或 `case_id + signature_id + change_set_hash`(`UIUX@6252cdee §8.6`)。
+- queued job 可合并 `change_set`;running job 快照不可变;新变化建 successor 等待当前结束(`UIUX@67bcd19e §8.6`)。
+- 入队幂等键:`invalidated_event_id` 或 `case_id + signature_id + change_set_hash`(`UIUX@67bcd19e §8.6`)。
 
 ### S1.5 失败 / 未测 / 幂等 / 审计
 
@@ -258,13 +258,13 @@ queued ──spawn──> running ──exit──> succeeded | failed | timeout
 |---|---|---|
 | 失败 | worker_crash / timeout / bad_output 只落 `run_record`,不写回执 `run_state=ERROR` | `T@28498c99 §2 #4` |
 | 未测 | `run_record` 读不出 → 该次运行计「未测」,不得当 0 | 沿用 L1-7 口径 |
-| 幂等 | job 入队幂等键(见上) | `UIUX@6252cdee §8.6` |
+| 幂等 | job 入队幂等键(见上) | `UIUX@67bcd19e §8.6` |
 | 审计 | `run_id` / `exit_code` / `signal` / stdout+stderr sha256 | `T@28498c99 §2 #4` |
 | 第一阶段 | **不做自动重试、不做 TTL 回收重跑** | `T@28498c99 §2 #4` |
 
 ### S1.6 UI 触点与 API
 
-- API:案件列表/详情 `GET /api/v1/cases`、`GET /api/v1/cases/{id}`(`UIUX@6252cdee §8.7`)。
+- API:案件列表/详情 `GET /api/v1/cases`、`GET /api/v1/cases/{id}`(`UIUX@67bcd19e §8.7`)。
 - UI:案件详情显示 job 状态、最近一次 run 的 outcome;失败时展示原因类别(不展示 stderr 全文)。
 
 ### S1.7 验收与反向对照
@@ -297,7 +297,7 @@ queued ──spawn──> running ──exit──> succeeded | failed | timeout
 
 ### S2.3 同步 / 异步
 
-worker 内同步;OCR/ASR/VLM 为同步外部调用(CPU-first,`UIUX@6252cdee §9.2`),超时归 S1 的 timeout。
+worker 内同步;OCR/ASR/VLM 为同步外部调用(CPU-first,`UIUX@67bcd19e §9.2`),超时归 S1 的 timeout。
 
 ### S2.4 状态机
 
@@ -381,7 +381,7 @@ DraftFinding(内存,从未落盘,无 id)
 ### S3.6 UI 触点与 API
 
 - 工作台展示每条 finding 的依据与状态;「依据缺失/过期/冲突」用不同标记。
-- 规则/控制点为只读:`GET /api/v1/rules`、`GET /api/v1/control-points`、`GET /api/v1/routing`(`UIUX@6252cdee §8.7`)。
+- 规则/控制点为只读:`GET /api/v1/rules`、`GET /api/v1/control-points`、`GET /api/v1/routing`(`UIUX@67bcd19e §8.7`)。
 - 无「人工直接改判定」API;人工动作只能新建 finding(S4)。
 
 ### S3.7 验收与反向对照
@@ -423,7 +423,7 @@ DraftFinding(内存,从未落盘,无 id)
 
 ### S4.5 UI 触点与 API
 
-- 复核动作:`POST /api/v1/cases/{id}/actions`(confirm/reject/reassign)(`UIUX@6252cdee §8.7`)。
+- 复核动作:`POST /api/v1/cases/{id}/actions`(confirm/reject/reassign)(`UIUX@67bcd19e §8.7`)。
 - UI 必须显示「这条当初是机器看出来的还是人提出来的」(`source_finding_id` 链路)。
 
 ### S4.6 验收与反向对照
@@ -510,7 +510,7 @@ worker 内同步;`case_watch` 定时异步。
 
 ### S6.6 UI / API
 
-- 复核队列 `GET /api/v1/queue`;案件 claim/**unclaim**/reassign(`UIUX@6252cdee §8.7`;unclaim 是释放领取,不是发布 release)。
+- 复核队列 `GET /api/v1/queue`;案件 claim/**unclaim**/reassign(`UIUX@67bcd19e §8.7`;unclaim 是释放领取,不是发布 release)。
 - 案件详情显示标签、层、并行义务、时限。
 
 ### S6.7 验收与反向对照
@@ -545,22 +545,22 @@ worker 内同步;`case_watch` 定时异步。
 | 复核台账与抽样 | `reviews_ledger` |
 | 签发 / 撤回 / 失效重审 | `release_gate` |
 | 超时升级 | `case_watch` |
-| 定时任务(SLA/retention/outbox 对账) | scheduler(UIUX@6252cdee §8.2) |
-| 领取 / lease / 草稿交接 | **owner 未定 → 开发阻断**;候选 `disposition_router`(队列/分派)与 `reviews_ledger`(草稿/台账),未拍板前不得实现。交互见 `UIUX@6252cdee §UJ-2`;TS-33/34 见 `待确认 §二之四` |
+| 定时任务(SLA/retention/outbox 对账) | scheduler(UIUX@67bcd19e §8.2) |
+| 领取 / lease / 草稿交接 | **owner 未定 → 开发阻断**;候选 `disposition_router`(队列/分派)与 `reviews_ledger`(草稿/台账),未拍板前不得实现。交互见 `UIUX@67bcd19e §UJ-2`;TS-33/34 见 `待确认 §二之四` |
 
 ### S7.2 输入 / 输出
 
 - 复核:案件 + finding → 人工结论(新建 confirmed/rejected)。
 - **领取与草稿**:claim 原子独占;lease 30 分钟无活动自动释放并保存 draft;新审核员可只读查看前任 draft,
   **显式 adopt 一份 primary draft**(其余 draft 仅引用片段/字段并记 `source_draft_id`)。
-  细节以 `UIUX@6252cdee §UJ-2` 与 `待确认 §二之四`(TS-33/34、多草稿采纳、主草稿选择)为准,本文不复述权限细节。
-- 签发:案件 + `ReviewIR` 版本 + **全字段绑定**(内容/双指纹/规则与 KB 快照/已用 refs/冲突表版本/媒体指纹 root/签名人/时间/step-up/理由,见 `UIUX@6252cdee §8.4` 与 Appendix A SB)→ `release_signatures`。
+  细节以 `UIUX@67bcd19e §UJ-2` 与 `待确认 §二之四`(TS-33/34、多草稿采纳、主草稿选择)为准,本文不复述权限细节。
+- 签发:案件 + `ReviewIR` 版本 + **全字段绑定**(内容/双指纹/规则与 KB 快照/已用 refs/冲突表版本/媒体指纹 root/签名人/时间/step-up/理由,见 `UIUX@67bcd19e §8.4` 与 Appendix A SB)→ `release_signatures`。
 - 失效:内容/依据/冲突裁定/送审指纹变化 → `invalidated` → 全量重审 job。
 - 申诉:appeal 事件 → 暂停/迁移/撤回。
 
 ### S7.3 同步 / 异步
 
-人工动作同步(带 step-up);失效检测与重审入队异步(事件+job 原子写,`UIUX@6252cdee §8.6`)。
+人工动作同步(带 step-up);失效检测与重审入队异步(事件+job 原子写,`UIUX@67bcd19e §8.6`)。
 
 ### S7.4 状态机
 
@@ -569,7 +569,7 @@ pending_release ──sign──> signed ──revoke──> revoked
        └──reject──> rejected ──修改重提──> 审查流程
 signed ──内容/依据/指纹/冲突变化──> invalidated ──全量重审──> pending_release
 ```
-(`UIUX@6252cdee §10.1`)
+(`UIUX@67bcd19e §10.1`)
 
 复核对列/领取:
 
@@ -579,26 +579,26 @@ claimed ──lease 30m 无活动──> released(draft 已保存)
 claimed ──lease/version 冲突──> conflict(乐观锁拒绝,不静默覆盖)
 ```
 
-申诉状态与下线任务状态分别见 `UIUX@6252cdee §5.2/§5.4`。
+申诉状态与下线任务状态分别见 `UIUX@67bcd19e §5.2/§5.4`。
 
 ### S7.5 失败 / 未测 / 幂等 / 审计
 
 | 项 | 口径 | 出处 |
 |---|---|---|
-| 权限 | 人级 allowlist + tenant/product_line + SoD(非提交人、非最终复核人) | `UIUX@6252cdee §10.2` |
-| 幂等 | 写操作带 `Idempotency-Key`;重复 sign/revoke 必须拒 | `UIUX@6252cdee §8.7` |
-| 审计 | 签发绑定**全字段**(内容版本/IR id+version/双指纹/规则与 KB 快照/已用 authority_ref 版本/冲突表版本/媒体各类指纹+集合 root/签名版本/签名人/时间/step-up ref/理由);撤销审计独立账本。字段清单以 `UIUX@6252cdee §8.4` + Appendix A SB-1…SB-11 为准,本文不复述 | `UIUX@6252cdee §8.4`,`验收表-v3` SB 组 |
-| 未测 | readiness 无法判时显示「未测」,不显示通过 | `UIUX@6252cdee §10.3` |
-| 失效 | 自动失效无 override;event+job 原子写 | `UIUX@6252cdee §8.6` |
+| 权限 | 人级 allowlist + tenant/product_line + SoD(非提交人、非最终复核人) | `UIUX@67bcd19e §10.2` |
+| 幂等 | 写操作带 `Idempotency-Key`;重复 sign/revoke 必须拒 | `UIUX@67bcd19e §8.7` |
+| 审计 | 签发绑定**全字段**(内容版本/IR id+version/双指纹/规则与 KB 快照/已用 authority_ref 版本/冲突表版本/媒体各类指纹+集合 root/签名版本/签名人/时间/step-up ref/理由);撤销审计独立账本。字段清单以 `UIUX@67bcd19e §8.4` + Appendix A SB-1…SB-11 为准,本文不复述 | `UIUX@67bcd19e §8.4`,`验收表-v3` SB 组 |
+| 未测 | readiness 无法判时显示「未测」,不显示通过 | `UIUX@67bcd19e §10.3` |
+| 失效 | 自动失效无 override;event+job 原子写 | `UIUX@67bcd19e §8.6` |
 | 领取幂等 | 两个用户并发 claim 同一案件:恰好一个成功,另一个明确失败;重复 claim 拒绝 | `验收表-v3` TS-31 |
 | lease 幂等 | lease/version 乐观锁:并发写只有一个成功,另一个收到明确冲突 | `验收表-v3` TS-33 |
 | 草稿审计 | adopt 记录 `source_draft_id`;原稿不可改;不自动进入结论 | `待确认 §二之四`(TS-34 拟) |
-| autosave | 表单字段/notes/evidence selections/references 全量快照;只有 explicit submit 才进 formal finding/decision | `UIUX@6252cdee Appendix C D-101` |
+| autosave | 表单字段/notes/evidence selections/references 全量快照;只有 explicit submit 才进 formal finding/decision | `UIUX@67bcd19e Appendix C D-101` |
 
 ### S7.6 UI / API
 
 - 待签发 `GET /api/v1/release/pending`;readiness `GET /api/v1/cases/{id}/release-readiness`;
-  **唯一受控入口** `POST /api/v1/cases/{id}/release-decision`;撤回 `.../release-revoke`(`UIUX@6252cdee §8.7`)。
+  **唯一受控入口** `POST /api/v1/cases/{id}/release-decision`;撤回 `.../release-revoke`(`UIUX@67bcd19e §8.7`)。
 - 申诉:`GET/POST /api/v1/appeals`,迁移/撤回(同上)。
 - 下线任务:`GET /api/v1/takedown-tasks` + start/complete/fail/retry/reassign/waive(同上)。
 
@@ -640,11 +640,11 @@ claimed ──lease/version 冲突──> conflict(乐观锁拒绝,不静默覆�
 - 卡片:唯一形态决策在 `send_gateway`;卡片被拒降级纯文本;群内永不出现卡片标记原始字符(L4-4/L4-6)。
 - **媒体集合指纹**:按 `P@ff51fc87 §4.5.8`(TS-27)执行——每项 RFC 8785 JCS 规范化 → SHA-256,
   按 `kind + stable_id` 排序 → root hash;跨语言(Node/TypeScript/Python)逐字节一致;不称 Merkle。
-  签发绑定的 `media_fingerprints_root_hash` 以该算法为准(`UIUX@6252cdee §8.4`)。
+  签发绑定的 `media_fingerprints_root_hash` 以该算法为准(`UIUX@67bcd19e §8.4`)。
 
 ### S8a.3 同步 / 异步
 
-renderer 同步;report_store 落盘同步(内容寻址);发送经 outbox 异步(`UIUX@6252cdee §8.6`)。
+renderer 同步;report_store 落盘同步(内容寻址);发送经 outbox 异步(`UIUX@67bcd19e §8.6`)。
 
 ### S8a.4 状态机(初次输出)
 
@@ -664,7 +664,7 @@ IR changed ──新文件,旧报告不改不删(R2)
 
 ### S8a.6 UI / API
 
-- 报告:`GET /api/v1/reports`、`GET /api/v1/reports/{id}`、`POST .../resign`(`UIUX@6252cdee §8.7`)。
+- 报告:`GET /api/v1/reports`、`GET /api/v1/reports/{id}`、`POST .../resign`(`UIUX@67bcd19e §8.7`)。
 - UI:静态报告只读;工作台不提供「编辑报告」。
 
 ### S8a.7 验收与反向对照
@@ -746,7 +746,7 @@ IR changed ──新文件,旧报告不改不删(R2)
 
 ### S9.4 UI / API
 
-- `/metrics` 仅内部,阶段一**禁止独立 metrics dashboard**(`UIUX@6252cdee §12.1`,`UIUX@6252cdee §8.7`)。
+- `/metrics` 仅内部,阶段一**禁止独立 metrics dashboard**(`UIUX@67bcd19e §12.1`,`UIUX@67bcd19e §8.7`)。
 - 工作台只在案件/报告内展示与本案相关的计数。
 
 ### S9.5 失败 / 未测 / 幂等 / 审计
@@ -779,7 +779,7 @@ IR changed ──新文件,旧报告不改不删(R2)
 | 失败 | 四类 `failure_kind` 分别可数;不许静默跳过 | `P@ff51fc87 §3.2` |
 | 未测 | 与「通过」「红」三态不同;读不出必须写「未测」 | `T@28498c99 §1bis.2` |
 | 幂等 | 入口 `attempt_id`、job 幂等键、finding id、外发 logical_delivery_id、写 API `Idempotency-Key` | 各阶段 |
-| 审计 | 安全审计独立 append-only JSONL + 前缀哈希链;读取审计独立 access-log | `UIUX@6252cdee §8.8` |
+| 审计 | 安全审计独立 append-only JSONL + 前缀哈希链;读取审计独立 access-log | `UIUX@67bcd19e §8.8` |
 | 原子提交 | P-1:staging→rename→manifest.tmp→fsync→rename manifest(唯一可见提交点) | `T@28498c99 §1ter.5` |
 | 崩溃恢复 | committed / orphan / uncommitted / garbage 四态穷举 | `T@28498c99 §1ter.5` |
 
@@ -875,7 +875,7 @@ IR changed ──新文件,旧报告不改不删(R2)
 | GAP-2 | `source.kind=文档` 与 `content_type=文档` 读混 | `T@28498c99 §4 残留` |
 | GAP-3 | 语义直接确认绕过人工进 BLOCK 的代价,依赖 C1–C4 + M1–M3 七条 | `P@ff51fc87 §3.3.4.1` |
 | GAP-4 | 阈值一律「先跑基线再定」,未定前开关默认关闭 | `P@ff51fc87 §3.3.4.1` |
-| GAP-5 | ~~`rule_class_registry` 无管理 API~~ → **已定**:规则/控制点 Web 只读,配置走权威源 | `UIUX@6252cdee Appendix C D-106` |
+| GAP-5 | ~~`rule_class_registry` 无管理 API~~ → **已定**:规则/控制点 Web 只读,配置走权威源 | `UIUX@67bcd19e Appendix C D-106` |
 
 ---
 
@@ -942,16 +942,16 @@ IR changed ──新文件,旧报告不改不删(R2)
 | 开工门状态 | T@28498c99 §8 |
 | 模块计数(已统一 27) | T@28498c99 §0 / §2 |
 | 控制点主表定义 / U2 | P@ff51fc87 §5.2–5.3 + §6(U2) |
-| claim / lease / draft / adopt | UIUX@6252cdee §UJ-2 / Appendix A QC |
-| 签名绑定字段 | UIUX@6252cdee §8.4 / Appendix A SB |
-| 五类失效输入 | UIUX@6252cdee §UJ-4 / Appendix A INV |
+| claim / lease / draft / adopt | UIUX@67bcd19e §UJ-2 / Appendix A QC |
+| 签名绑定字段 | UIUX@67bcd19e §8.4 / Appendix A SB |
+| 五类失效输入 | UIUX@67bcd19e §UJ-4 / Appendix A INV |
 | JCS 媒体指纹 | P@ff51fc87 §4.5.8(TS-27);A@432f4a2c #130 |
-| UI/UX 角色与旅程 | UIUX@6252cdee §1–§2 |
-| 页面与状态矩阵 | UIUX@6252cdee §3–§5 |
-| 前端/后端规格 | UIUX@6252cdee §7–§9 |
-| API 目录/状态机 | UIUX@6252cdee §8.7 + Appendix B |
-| G-1 单章 | UIUX@6252cdee §10 |
-| 测试与验收 ID | UIUX@6252cdee §11 + Appendix A |
+| UI/UX 角色与旅程 | UIUX@67bcd19e §1–§2 |
+| 页面与状态矩阵 | UIUX@67bcd19e §3–§5 |
+| 前端/后端规格 | UIUX@67bcd19e §7–§9 |
+| API 目录/状态机 | UIUX@67bcd19e §8.7 + Appendix B |
+| G-1 单章 | UIUX@67bcd19e §10 |
+| 测试与验收 ID | UIUX@67bcd19e §11 + Appendix A |
 | 证据矩阵 | EV@34fda3a0 §一 / §十三 |
 | PRD P0 四答案 | R@9be0c9f7 §2.2 / §6 |
 | 验收表 v3 | A@432f4a2c |
@@ -965,7 +965,7 @@ IR changed ──新文件,旧报告不改不删(R2)
 |---|---|---|
 | `Playbook/内容审查Agent-产品Playbook-v1.1.md` | `ff51fc87f5aa477ba9536355d8f38fcadab2c2fb39f3cb6471e7ebd9fa9e03b8` | 110908 |
 | `Playbook/技术解决方案-v1.md` | `28498c99716b0f45a39b65f5efec279e30c30c8a145621f8f5b7df1feeec4ef2` | 159522 |
-| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | `6252cdeedc23b2e8abe382d067b16dfaa472bd54b5cac8141b6067c7f98d264a` | 80364 |
+| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | `67bcd19e0603e25c7a428e0efd016604b4396024beb9ebfe4aa7947181bcfd25` | 80364 |
 | `PRD/内容审查Agent-PRD-优化版-v2.0.md` | `9be0c9f7e2fb8afe835bc426d760770f5df2391984a2a9eb94d23507eb2d540f` | 105836 |
 | `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | `432f4a2c073dc87d13f52df4574262ac9d1a7d170b0831efe0283db85d450c69` | 110129 |
 | `PMO/audit/待确认-技术栈与工程选型-v1.md` | `2e6340ab36b5d1332b802440ca232e40b26433f41078a39c3bea03c827ec68c8` | 14168 |

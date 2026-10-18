@@ -18,8 +18,8 @@
 | `Playbook/内容审查Agent-产品Playbook-v1.1.md` | v1.1（条件性 RATIFIED，S-1 后） | 1666 | 110,908 | `ff51fc87f5aa` |
 | `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | v3（136 项，S-1 后） | 313 | 110,072 | `d4811e055463` |
 | `Playbook/技术解决方案-v1.md` | v1（S-1 后） | 1,335 | 159,522 | `28498c99716b` |
-| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1（引用重冻后） | 1429 | 80,364 | `6252cdeedc23` |
-| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1（引用重冻后） | 976 | 53,613 | `b013e3dfa7c5` |
+| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1（引用重冻后） | 1429 | 80,364 | `67bcd19e0603` |
+| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1（引用重冻后） | 976 | 53,613 | `20e74e508c08` |
 | `PMO/audit/内容审查Agent-行业证据矩阵-v1.md` | v1.2 | 380 | 46,714 | `34fda3a04909` |
 | `PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md` | v1.1（K-01…K-52） | 132 | 77,206 | `03b8c0742bd4` |
 | `PMO/audit/内容审查Agent-决策总账-v2-20261018.md` | v2（124 决定 / 140 指针） | 219 | 63,523 | `92b2a2c5c9a4` |
@@ -155,6 +155,12 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 - **验收**：跑一次 → 输出 `passed / failed / untested` 三态；缺 test_id 的行落 untested。
 
 **第 0 阶段退出门**：T0-01…T0-10 全部通过 + `verify_solution_meta.py`/`verify_acceptance_index.py`/`verify_depad.py` 全绿。
+
+> ### ✅ 出门结论（2026-10-18）
+>
+> 10 个 ticket 全部通过；**11 处假绿已修并做变异验证**；最终变异探针 6/6 真红（rc=1，无假绿、无 rc=2）；
+> 契约冻结且引用重冻完成（旧 hash 全仓 0）；`verify_control_points.py` 12/12。
+> **四道门仍标「部分」**（P-1 / G-4 / G-5 / G-6），余项作为并行跟进；第 1 阶段入口判据满足。
 
 ### 4.1 进度（2026-10-18）
 
