@@ -165,13 +165,13 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 | T0-07 会话与 step-up（切片 1） | ✅ **通过** | `base/auth_session.py`（157 行）+ `tools/verify_auth_session.py`（174 行）；实跑 **22/22，rc=0**，含三条反向对照（去 single-use / 去 absolute / cookie 塞 tenant） |
 | T0-07 RBAC/ACL（切片 2） | ✅ **通过** | `base/rbac.py`（137 行）+ `tools/verify_rbac.py`（197 行）；实跑 **35/35，rc=0**，含四条反向对照（去 scope / 去 SoD / 去 IT 内容限制 / 全拒坏实现） |
 | T0-07 余留 | ⚠️ | 注入时钟非真实等待；未做并发多写者；cookie 轮换/限流/锁定未做；DB 丢失为删文件模拟；takedown 人级 allowlist 未接入；IT/机器元数据读取未按对象收敛；grant 的 tenant/product_line scope 未校验 |
-| T0-01 控制点主表 | ✅ **通过（结构）** | 20 码 / 九字段 / 两表集合恒等；族分布 宣称14/披露3/事实3；**空 4 族（场景/权利/渠道/品牌）**；routing 20 owner 已填并带 layer/due/escalation/appeal（v2）；U02 停用码有 `authority_ref_exemption` + `known_gaps` 记录；`contract_impact` 已列主合同待同步四处。**点位内容仍待产品+法务签署（U2 未闭）** |
+| T0-01 控制点主表 | ✅ **通过（结构，已返修；补了验证器）** | 20 码 / 九字段 / 两表集合恒等；族分布 宣称14/披露3/事实3；**空 4 族（场景/权利/渠道/品牌）**；routing 20 owner 已填并带 layer/due/escalation/appeal（v2）；U02 停用码有 `authority_ref_exemption` + `known_gaps`；`contract_impact` 已列同步四处。**新增 `tools/verify_control_points.py`：12/12 通过**（L6-1/2/4/6 + routing 集合与字段 + 空族双向一致；四条反向对照）。**点位内容仍待产品+法务签署（U2 未闭）** |
 | T0-02 fetch_error id | ✅ **通过** | 规则已改为 `sha256(kind ‖ 0x1F ‖ normalized_locator)`，**不含时间桶**；ID-3 反转为「跨小时/跨天/重试必须同 id」；attempt 区分交给 `attempt_id` |
 | T0-03 claim owner | ✅ 内容通过 | 裁定文本已交付；同步进技术方案/工作流留到主合同同步批 |
 | T0-09 外发最小化 / PII（G-6） | ✅ **通过** | `tools/redact.py`（10,093B）+ `tools/verify_redact.py`（10,392B）；实跑 **76 项检查 / 0 红 / 正样本 17 / 负样本 8**，rc=0 |
 | T0-08 沙箱（G-5） | ✅ **通过** | `base/sandbox.py`（8,198B）+ `tools/verify_sandbox.py`（9,116B）；实跑 **11/11，rc=0**，含四条反向对照（去 CPU 限制 / 去超时 / 去 cwd 隔离 / 正常样本防全拦）；超限与普通失败可区分 |
-| T0-05 outbox | ✅ **通过** | `tools/agent/outbound.mjs` + `outbound.test.mjs`；实跑 **21/21**，含「同一 id 只发一次 / 卡片+文本只发一次 / reply 不重发 / proactive 重发 / 缺 id 拒发」，**未发真消息** |
-| T0-06 durable inbox | ✅ **通过** | `tools/agent/inbox.mjs` + `inbox.test.mjs`；实跑 **12/12**，含重复投递只处理一次、处理中崩溃续传、坏游标保守回退（宁可重放不跳过） |
+| T0-05 outbox | ✅ **通过（含两轮对抗审查，38/38）** | `tools/agent/outbound.mjs` + `outbound.test.mjs`；实跑 **21/21**，含「同一 id 只发一次 / 卡片+文本只发一次 / reply 不重发 / proactive 重发 / 缺 id 拒发」，**未发真消息** |
+| T0-06 durable inbox | ✅ **通过（含两轮对抗审查，29/29）** | `tools/agent/inbox.mjs` + `inbox.test.mjs`；实跑 **12/12**，含重复投递只处理一次、处理中崩溃续传、坏游标保守回退（宁可重放不跳过） |
 | T0-10 验收执行器 | ✅ **通过（含 T0-10b 加固）** | `tools/verify_acceptance_run.py` + 自测；实跑 **0 passed / 0 failed / 136 untested，rc=2**（正确：无执行点不许报通过）；自测 **6/6**，含「命令经 T0-08 沙箱执行」与「去掉 cwd 隔离 → 仓内出现文件」反向对照 |
 
 ---
