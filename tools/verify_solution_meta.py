@@ -140,7 +140,19 @@ def main() -> int:
     # ---- M-8：§8 阻断门的状态列 + 头部 open/closed 计数 ----
     # 存在理由：门清单只有「有/没有」时，清掉一条与没清掉在文档上长得一样 ——
     # 头部写「19 条」而实际 4 条已清，读的人会以为 19 条全没动。
-    gates = re.findall(r"^\| \*\*([BSGPA]-\d+)\*\* \|.*\| `(open|closed)` \|", s, re.M)
+    # ★ 正则必须**非贪婪**并且锚住「状态列是第 5 格」。
+    # 2026-10-18 实测过这个坑：B-1 那一行曾被写成 `| open | closed | 证据 |`（7 列变 8 列），
+    # 而旧写的贪婪 `.*` 会匹配**最后一个** `closed`，于是把一条 open 的门算成 closed，
+    # 头部读数仍是「自洽」的 —— 一条被假绿掩盖的假绿。见 K-51 / 坑点台账。
+    gates = re.findall(
+        r"^\| \*\*([BSGPA]-\d+)\*\* \|(?:(?!\|).)*\|(?:(?!\|).)*\|(?:(?!\|).)*\| `(open|closed)` \|",
+        s, re.M)
+    # 每行必须正好 6 格 = 7 个竖线。多一格说明有人「追加」而不是「替换」。
+    malformed = []
+    for line in s.splitlines():
+        m = re.match(r"^\| \*\*(?:[BSGPA]-\d+)\*\* \|", line)
+        if m and line.count("|") != 7:
+            malformed.append(line.count("|"))
     n_open = sum(1 for _, v in gates if v == "open")
     n_closed = sum(1 for _, v in gates if v == "closed")
     hdr_open = re.search(r"共 (\d+) 条 —— \*\*open (\d+) / closed (\d+)\*\*", head)
@@ -152,6 +164,12 @@ def main() -> int:
           + ("" if hdr_open else "  ← 头部没有 open/closed 声称"))
     if not ok8:
         bad.append("M-8")
+    # M-8b：列数必须规整。这一条独立存在，因为「列数错」与「状态读错」是两件事 ——
+    # 没有它，上面那个假绿会一直被算成「通过」。
+    print(f"  {'✅' if not malformed else '❌'} M-8b 门行列数规整（每个门行 7 个竖线）"
+          + ("" if not malformed else f"  ← {len(malformed)} 行列数不对：{malformed}"))
+    if malformed:
+        bad.append("M-8b")
         untagged = len(re.findall(r"^\| \*\*[BSGPA]-\d+\*\* \|", s, re.M)) - len(gates)
         if untagged:
             print(f"      有 {untagged} 行没有状态列")
