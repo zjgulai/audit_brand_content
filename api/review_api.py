@@ -92,6 +92,7 @@ class CaseSummary(BaseModel):
 class CaseDetail(BaseModel):
     case_id: str
     ir: ReviewIR
+    review: Optional[Dict[str, Any]] = None
 
 
 class ReportSummary(BaseModel):
@@ -285,6 +286,7 @@ def create_app(*, session_store=None, repository=None, principals=None,
     app.state.release_gate = release_gate or ReleaseGate(sessions=store)
     app.state.idempotency = {}
     app.state.idempotency_lock = threading.Lock()
+    repo_ledger = app.state.reviews_ledger
 
     @app.exception_handler(HTTPException)
     async def _http_error(request: Request, exc: HTTPException):
@@ -332,13 +334,20 @@ def create_app(*, session_store=None, repository=None, principals=None,
         if case is None:
             raise HTTPException(404, "案件不存在")
         require_read(principal, case)
-        return {"case_id": id, "ir": case["ir"]}
+        return {"case_id": id, "ir": case["ir"],
+                "review": repo_ledger.get_case(id)}
 
     @app.get("/api/v1/queue", response_model=List[CaseSummary])
     def queue(principal=Depends(principal_dep)):
         return [_summary(c) for c in repo.list_cases()
                 if can_read_content(principal, c)
                 and _ir_state(c) in ("REVIEW", "待自决")]
+
+    @app.get("/review-api/queue", response_model=List[CaseSummary])
+    def review_api_queue(principal=Depends(principal_dep)):
+        """联调别名：只读列出所有可读案件，不改任何状态。"""
+        return [_summary(c) for c in repo.list_cases()
+                if can_read_content(principal, c)]
 
     @app.get("/api/v1/reports", response_model=List[ReportSummary])
     def list_reports(principal=Depends(principal_dep)):

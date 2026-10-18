@@ -40,8 +40,10 @@ class ReassignBody(VersionBody):
 
 
 class ActionBody(VersionBody):
-    finding_id: str
     action: str
+    finding_id: Optional[str] = None
+    draft: Optional[Dict[str, Any]] = None
+    conclusion: Optional[Dict[str, Any]] = None
 
 
 class AppealCreate(BaseModel):
@@ -322,8 +324,24 @@ def register_write_routes(app, *, principal_dep):
             current = ledger.get_case(id)["version"]
             if body.version != current:
                 raise HTTPException(409, "version_conflict: 案件版本已变化")
+            if body.action == "save_draft":
+                draft = body.draft or {}
+                return _ledger_call(lambda: ledger.autosave(
+                    id, principal["id"], body.version,
+                    form=draft.get("form") or {},
+                    notes=draft.get("notes") or "",
+                    evidence_selections=draft.get("evidence_selections") or [],
+                    references=draft.get("references") or [],
+                    primary=bool(draft.get("primary", True))))
+            if body.action == "submit":
+                if not isinstance(body.conclusion, dict):
+                    raise HTTPException(400, "submit 必须带 conclusion")
+                return _ledger_call(lambda: ledger.submit(
+                    id, principal["id"], body.version, body.conclusion))
             if body.action not in ("confirm", "reject"):
-                raise HTTPException(400, "action 必须是 confirm/reject")
+                raise HTTPException(400, "action 必须是 confirm/reject/save_draft/submit")
+            if not body.finding_id:
+                raise HTTPException(400, "confirm/reject 必须带 finding_id")
             old = findings.get(body.finding_id)
             if old is None:
                 raise HTTPException(404, "finding 不存在")

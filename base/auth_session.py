@@ -42,7 +42,9 @@ def is_opaque_cookie(value):
 class SessionStore(object):
     def __init__(self, db_path):
         self.db_path = db_path
-        self._conn = sqlite3.connect(db_path)
+        # FastAPI / TestClient 的同步依赖可能在 portal/threadpool 线程执行；
+        # 连接创建于主线程，必须允许跨线程使用（仍由单连接串行化）。
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute(
             """CREATE TABLE IF NOT EXISTS sessions (

@@ -200,6 +200,25 @@ def main():
     result = build().run(request)
     ir, receipt, decision = result["ir"], result["receipt"], result["decision"]
 
+    # 联调导出：只写到 SMOKE_DUMP_IR 指定的临时目录，不写仓内。
+    dump = os.environ.get("SMOKE_DUMP_IR")
+    if dump:
+        os.makedirs(dump, exist_ok=True)
+        with open(os.path.join(dump, "ir.json"), "w", encoding="utf-8") as f:
+            json.dump(ir, f, ensure_ascii=False, indent=2)
+        case = {
+            "case_id": "case-smoke",
+            "tenant": "t1",
+            "product_line": "pump",
+            "submitter_id": "u_sub",
+            "final_reviewer_id": "u_dp3",
+            "assignee_id": "u_dp3",
+            "actionable": True,
+            "ir": ir,
+        }
+        with open(os.path.join(dump, "cases.json"), "w", encoding="utf-8") as f:
+            json.dump([case], f, ensure_ascii=False, indent=2)
+
     attempt = router.submit(submission, ir_id=ir["ir_id"], receipt_id=receipt["receipt_id"])
     T("S4 Attempt 落账且 outcome=accepted", attempt.get("outcome") == "accepted", str(attempt))
     T("S5 五步各一次", result.get("steps") == list(O.STEP_ORDER), str(result.get("steps")))
