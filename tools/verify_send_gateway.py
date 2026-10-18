@@ -202,6 +202,43 @@ def main() -> int:
     else:
         results.append(("5c ws_daemon.mjs 不存在 → 跳过", True, "文件不在"))
 
+    # ═══════ 6. 外发最小化（G-6）：唯一出口 decide_mode ═══════
+    pos = "联系 13800138000，身份证 11010519491231002X，路径 /Users/lute/secret.txt"
+    out = decide_mode(pos)
+    redactions = out.get("redactions") or []
+    ok("6a 正样本：手机号/身份证/内部路径原值不出现",
+       all(x not in out["text"] for x in
+           ("13800138000", "11010519491231002X", "/Users/lute/secret.txt")),
+       f"text={out['text']!r}")
+    ok("6b 正样本：redactions 非空且含 kind/span",
+       bool(redactions) and all({"kind", "span"} <= set(r) for r in redactions),
+       f"redactions={redactions}")
+    ok("6c 正样本：命中 phone_cn/cn_id/abs_path",
+       {r["kind"] for r in redactions} >= {"phone_cn", "cn_id", "abs_path"},
+       f"kinds={sorted({r['kind'] for r in redactions})}")
+
+    card_out = decide_mode(
+        '[[card:verdict]]\n{"title":"联系 13800138000","body":"ok"}')
+    ok("6d 卡片正文也过 redact",
+       card_out["mode"] == "card"
+       and "13800138000" not in (card_out.get("text") or "")
+       and "13800138000" not in str(card_out.get("payload"))
+       and bool(card_out.get("redactions")),
+       f"payload={card_out.get('payload')!r} text={card_out.get('text')!r}")
+
+    degraded = decide_mode('[[card:verdict]]\n{坏 JSON 联系 13800138000')
+    ok("6e 降级文本也过 redact",
+       degraded["mode"] == "text"
+       and "13800138000" not in (degraded.get("text") or "")
+       and bool(degraded.get("redactions")),
+       f"text={degraded.get('text')!r} redactions={degraded.get('redactions')}")
+
+    neg = "订单号 2026101801，详见 https://example.com/item/13800138000"
+    neg_out = decide_mode(neg)
+    ok("6f 负样本：10 位订单号与 URL 内数字不被误遮",
+       neg_out["text"] == neg and neg_out.get("redactions") == [],
+       f"text={neg_out.get('text')!r} redactions={neg_out.get('redactions')}")
+
     # ── 汇总 ──
     passed = sum(1 for _, p, _ in results if p)
     total = len(results)

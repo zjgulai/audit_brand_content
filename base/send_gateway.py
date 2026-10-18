@@ -44,6 +44,8 @@ import json
 import re
 from typing import Any, Iterable, Sequence
 
+from tools.redact import redact
+
 # 与 `tools/reply-cards/envelope.mjs` 对齐的常量。
 # ★ 为什么这里要重复一份：Python 核心要做独立可测的判断，不能 import 一个 .mjs。
 #   两处一致性由 `verify_send_gateway.py` 的静态对拍断言守住（读 .mjs 里的数值比对）。
@@ -60,6 +62,35 @@ class GatewayError(Exception):
 
 
 # ═══════════════════════ ① 形态决策（唯一一处）═══════════════════════
+
+def _minimize_value(value, redactions):
+    """递归遮蔽最终外发文本/卡片 payload 里的敏感片段。"""
+    if isinstance(value, str):
+        safe, findings = redact(value)
+        for f in findings:
+            redactions.append({
+                "kind": f.get("type"),
+                "span": [f.get("start"), f.get("end")],
+            })
+        return safe
+    if isinstance(value, list):
+        return [_minimize_value(v, redactions) for v in value]
+    if isinstance(value, dict):
+        return {k: _minimize_value(v, redactions) for k, v in value.items()}
+    return value
+
+
+def _minimize_result(result):
+    """唯一外发最小化出口：正文与卡片 payload 都过 redact。"""
+    redactions = []
+    if isinstance(result, dict):
+        if "text" in result:
+            result["text"] = _minimize_value(result["text"], redactions)
+        if "payload" in result and result["payload"] is not None:
+            result["payload"] = _minimize_value(result["payload"], redactions)
+        result["redactions"] = redactions
+    return result
+
 
 def decide_mode(raw_reply: str, *, has_eligible_card: bool = True) -> dict:
     """
@@ -78,26 +109,25 @@ def decide_mode(raw_reply: str, *, has_eligible_card: bool = True) -> dict:
 
     card = parse_card_block(raw_reply)
     if card is None:
-        return {"mode": "text", "kind": None, "payload": None,
-                "text": strip_card_marks(raw_reply)}
-
-    if not has_eligible_card:
+        out = {"mode": "text", "kind": None, "payload": None,
+               "text": strip_card_marks(raw_reply)}
+    elif not has_eligible_card:
         # 调用方明确说「这次不收卡片」（例如某条通道不支持）
-        return {"mode": "text", "kind": None, "payload": None,
-                "text": strip_card_marks(raw_reply)}
-
-    if card.get("parse_error"):
-        return {"mode": "text", "kind": None, "payload": None,
-                "text": strip_card_marks(raw_reply),
-                "dropped_reason": card["parse_error"]}
-
-    if card.get("kind") not in VALID_KINDS:
-        return {"mode": "text", "kind": None, "payload": None,
-                "text": strip_card_marks(raw_reply),
-                "dropped_reason": f"卡片类型 {card.get('kind')!r} 不在白名单"}
-
-    return {"mode": "card", "kind": card["kind"], "payload": card.get("payload"),
-            "text": strip_card_marks(raw_reply)}
+        out = {"mode": "text", "kind": None, "payload": None,
+               "text": strip_card_marks(raw_reply)}
+    elif card.get("parse_error"):
+        out = {"mode": "text", "kind": None, "payload": None,
+               "text": strip_card_marks(raw_reply),
+               "dropped_reason": card["parse_error"]}
+    elif card.get("kind") not in VALID_KINDS:
+        out = {"mode": "text", "kind": None, "payload": None,
+               "text": strip_card_marks(raw_reply),
+               "dropped_reason": f"卡片类型 {card.get('kind')!r} 不在白名单"}
+    else:
+        out = {"mode": "card", "kind": card["kind"],
+               "payload": card.get("payload"),
+               "text": strip_card_marks(raw_reply)}
+    return _minimize_result(out)
 
 
 def parse_card_block(raw_reply: str) -> dict | None:
