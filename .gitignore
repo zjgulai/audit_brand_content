@@ -103,3 +103,6 @@ PMO/shouheng-state/
 # macOS
 .DS_Store
 **/.DS_Store
+
+# Python venv (uv sync)
+.venv/

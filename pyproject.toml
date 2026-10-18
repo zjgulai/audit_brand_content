@@ -1,0 +1,14 @@
+[project]
+name = "audit-multi-content"
+version = "0.1.0"
+description = "内容审查 Agent：运行时与 Web 工作台装配层（阶段一）"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.6",
+    "pydantic==2.10.4",
+    "uvicorn==0.34.0",
+]
+
+[tool.uv]
+# 开发/CI/生产必须 `uv sync --locked`（G-02）；不许无锁安装。
+package = false
