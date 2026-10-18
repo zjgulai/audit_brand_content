@@ -1,0 +1,90 @@
+:root {
+  color: #1f2933;
+  background: #f7f9fb;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #0b63ce;
+}
+
+code {
+  background: #eef2f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__header {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+  background: #123;
+  color: #fff;
+}
+
+.shell__header a {
+  color: #cfe3ff;
+  margin-right: 1rem;
+  text-decoration: none;
+}
+
+.shell__header a.active {
+  color: #fff;
+  font-weight: 600;
+}
+
+.shell__api {
+  margin-left: auto;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.shell__main {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 960px;
+}
+
+.shell__footer {
+  padding: 0.8rem 1.5rem;
+  font-size: 0.8rem;
+  color: #52606d;
+  border-top: 1px solid #d9e2ec;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  background: #fff;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+th {
+  background: #eef2f6;
+}
+
+.error {
+  color: #b42318;
+}
+
+.hint {
+  color: #52606d;
+  font-size: 0.9rem;
+}
