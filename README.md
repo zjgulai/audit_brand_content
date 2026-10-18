@@ -154,6 +154,57 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 
 ---
 
+## 二·补、第 1 阶段文档索引（2026-10-19）
+
+> 这些文档此前没有入边（`verify_doc_reachability.py` 的未归类清单）。本索引是它们的入口；
+> 新增第一方文档时，先把它登记到这里，再跑一次可达性自证。
+> `PMO/audit/momcozy-assets/` 是采集/训练资产包（89 份），入口是它自己的总索引，不逐份列。
+
+**Playbook / PRD**
+
+- `Playbook/内容审查Agent-产品Playbook-v0.md`
+- `Playbook/内容审查Agent-产品Playbook-v1.md`
+- `Playbook/内容审查Agent-产品Playbook-v1.1.md`
+- `Playbook/技术解决方案-v1.md`
+- `Playbook/Playbook-v1-修订清单-20261017.md`
+- `PRD/内容审查Agent-PRD-优化版-v2.0.md`
+- `PRD/feishu/_history/内容审查Agent-PRD-v1.0@20260923T1806.md`
+
+**PMO / audit / implement**
+
+- `PMO/Momcozy-品牌资产落盘方案-20261017-v1.md`
+- `PMO/audit/Playbook-v1.1-专项核验-20261017.md`
+- `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md`
+- `PMO/audit/内容审查Agent-决策总账-v2-20261018.md`
+- `PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md`
+- `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md`
+- `PMO/audit/内容审查Agent-行业证据矩阵-v1.md`
+- `PMO/audit/决策溯源账-v1-20261017.md`
+- `PMO/audit/待确认-技术栈与工程选型-v1.md`
+- `PMO/audit/故障登记-F-001-守衡启动链断裂-20261017.md`
+- `PMO/audit/核验-收敛报告-20261017.md`
+- `PMO/audit/红线冲突登记-CR-001-飞书附件入公开仓-20261017.md`
+- `PMO/audit/验收表-v2-覆盖全部判据-20261017.md`
+- `PMO/audit/验收表-v3-覆盖全部判据-20261017.md`
+- `PMO/implement/T0-02-fetch-error-id-rule.md`
+- `PMO/implement/T0-03-claim-owner.md`
+- `PMO/implement/内容审查Agent-implement-阶段计划-v1.md`
+- `PMO/事故登记-ENV-001-4096污染-20261017.md`
+- `PMO/回话草稿-外部标准库-20260922.txt`
+- `PMO/守衡-四事闭环-归因优化验收-20260922.md`
+- `PMO/飞书写通道-落地记录-20260922.md`
+
+**research**
+
+- `research/governance/control-points-README.md`
+- `research/topo/README.md`
+
+**资产包入口**
+
+- `PMO/audit/momcozy-assets/index/asset_package_index.md`
+
+---
+
 ## 三、自证命令表（改了哪个子系统，就跑到它变绿）
 
 `AGENTS.md` §2.1 是这张表的权威版本，本表与它必须一致。**退出码语义**：全过退 0；

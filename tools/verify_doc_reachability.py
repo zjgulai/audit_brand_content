@@ -133,8 +133,9 @@ TOPDIRS = (
 #   两个口径在重写后**重合**（「只在宽口径下可达」= 0 份），说明重写后
 #   再没有哪份文档是**只能靠代码提到过**才可达的。
 #
-# 100 = 三个豁免类之和（本文件 `-v` 会逐类打印，E1 断言这个恒等式）：
-#   VENDORED_THIRD_PARTY 67 · CAPTURED_EXTERNAL 13 · SCRATCH 20 · 未归类 0
+# 100 = 四个豁免类之和（本文件 `-v` 会逐类打印，E1 断言这个恒等式）：
+#   VENDORED_THIRD_PARTY · EXTERNAL_SNAPSHOT · RAW_MATERIAL · SCRATCH · CAPTURED_ASSET
+#   （2026-10-19 当前 CAPTURED_ASSET=89，其余为 0；以 `-v` 的实跑读数为准）
 # 也就是：重写后**第一方文档 0 份不可达**（D 断言的就是这一条）。
 #
 # ⚠️ 这个数会跟着仓库动，钉住它就是为了让「动」变成红的：
@@ -190,6 +191,14 @@ EXEMPT_CLASSES = (
         "**别人的文字**的逐字快照（别家产品的 README、X 上一条帖子）。改它们等于篡改证据，"
         "所以不逐份挂入口。",
         None,
+    ),
+    (
+        "CAPTURED_ASSET",
+        lambda p: p.startswith("PMO/audit/momcozy-assets/"),
+        "momcozy 采集/训练资产包（captions / prompts / rules / meta-doc / index）。"
+        "它是**资产留档**，不是逐篇阅读的文档；入口是 index/asset_package_index.md 那张总索引。"
+        "逐份把 89 个 captions 挂到 README 会制造噪音，且会掩盖真正的入口。",
+        "PMO/audit/momcozy-assets/index/asset_package_index.md",
     ),
     (
         "RAW_MATERIAL",

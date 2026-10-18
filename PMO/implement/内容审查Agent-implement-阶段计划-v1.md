@@ -322,6 +322,21 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 | T2-04 | 下线任务 + 双人 waive | T2-03 | TD-1…21、TF-1…19 |
 | T2-05 | 通知（in-app + 飞书） | T2-03 | TS-22、RM-1…8 |
 | T2-06 | 前端工作台（React 19 + TS + Vite） | T2-01 | FE-1…7、UX-01…10 |
+| **T2-02a** | **`reviews_ledger`（领取/lease/draft/抽样台账）**——写 API 的前置（2026-10-19 补） | T2-01 | QC-1…35、L5-3 |
+
+### 6.1 进度（2026-10-19）
+
+| Ticket | 状态 | 读数 |
+|---|---|---|
+| 环境门（uv/pyproject/uv.lock） | ✅ 通过 | uv 0.13.1；FastAPI 0.115.6 / Pydantic 2.10.4 / uvicorn 0.34.0；`uv sync --locked` 通过 |
+| 仓库治理（验证器登记 / 文档可达性） | ✅ 通过 | 登记 53 个、203/203 + 反向 209/209；可达性 12/12 + 反向 34/34；`CAPTURED_ASSET` 窄豁免带反向对照 |
+| T2-01 只读 API | ✅ 通过（5 变异全红） | 15/15；OpenAPI 3.1；API 不 import 判定模块；401/403 矩阵 |
+| T2-02a reviews_ledger | ✅ 通过（5 变异全红） | 20/20；并发 claim、lease+draft、autosave 不产 formal、adopt derived_from、四层抽样 |
+| T2-02 写 API | ✅ 通过（5 变异全红） | 25/25；claim/unclaim/reassign/actions/appeals/takedown；release 端点当时 501 占位 |
+| T2-03 release_gate | ✅ 通过（6 项指定变异全红） | 53/53；全字段绑定+signature_hash、五类失效、自动重审 job、SoD+step-up、机器写放行被拒 |
+| T2-04 takedown | ✅ 通过 | 54/54；状态机、回填三选一、双人 waive、每日提醒去重、无硬时限 |
+| T2-05 notifications | ⏳ 进行中 | — |
+| T2-06 前端工作台 | ⏳ 未派 | — |
 
 **第 2 阶段退出门**：G-13/G-14 通过；「机器/前端直写 release_status」反向对照必须 403。
 

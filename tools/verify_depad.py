@@ -69,7 +69,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXTS = (".md", ".py", ".mjs", ".js", ".cjs", ".ts", ".json", ".yml", ".yaml",
         ".txt", ".csv", ".tsv", ".sh", ".toml", ".cfg", ".ini", ".html", ".css")
 # 不进这些目录 —— 依赖、虚拟环境、浏览器缓存不是我们的内容
-SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv-r4", ".pylibs",
+SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", ".venv-r4", ".pylibs",
              ".vendor", ".tools", "_chromeprof_cdp", ".mypy_cache", ".pytest_cache"}
 
 PAD = 4096                       # 实测的固定差值
