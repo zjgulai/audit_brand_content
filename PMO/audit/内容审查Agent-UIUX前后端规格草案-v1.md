@@ -4,10 +4,10 @@
 > 日期：2026-10-18
 > 依据：UI/UX 审计 v0.2（已验收）、技术审计 v0.3（已冻结）、用户逐题拍板的技术栈与产品口径。
 > 状态：**DRAFT（规格草案，待评审）**；本文件只描述规格，不代表已实现或已验收。
-> **设计 ≠ 实现**：本文件所有 [已定] 只表示“设计决策已定”，**P1 代码、页面、API、部署均未实现**；所有 [门] 未清前不得进入实现。P-1 / G-2 / G-3 / G-4 / G-5 / G-6 / S-3 等上游门仍 open 的，本文不得被读成已闭环。
+> **设计 ≠ 实现**：本文件所有 [已定] 只表示“设计决策已定”，**P1 代码、页面、API、部署均未实现**；所有 [门] 未清前不得进入实现。P-1 / G-2 / G-3 / G-4 / G-5 / G-6 等上游门仍 open 的，本文不得被读成已闭环（S-3 已于 2026-10-18 关闭定义/登记门）。
 >
 > **v1.3 变更记录（2026-10-18）**：
-> 1. 明确 ContentUnit 仅由 normalizer 产出；Web/报告只读 ReviewIR；`fetch_error` 稳定 id 仍为 **S-3 open**。
+> 1. 明确 ContentUnit 仅由 normalizer 产出；Web/报告只读 ReviewIR；`fetch_error` 稳定 id 已随 **S-3 closed**（2026-10-18，T0-02 规则；消费者同步清单见工作流 §S2.8）。
 > 2. UJ 头部新增五步 ↔ S0–S9 映射，并写明全量跑完、无提前停。
 > 3. 媒体 root hash 明确 **RFC 8785 JCS → UTF-8 canonical bytes → SHA-256**，stable sorted manifest，并要求 Python/TS golden vectors。
 > 4. 复核并保留 v1.2 的 `/unclaim`、签名绑定全字段、五类失效输入、draft autosave、session、queue、takedown、appeal、grant、WCAG。
@@ -29,7 +29,7 @@
 > |---|---|---|---|---|
 > | R | `PRD/内容审查Agent-PRD-优化版-v2.0.md` | `9be0c9f7e2fb` | 1745 | **终验后重冻**（2026-10-18） |
 > | P | `Playbook/内容审查Agent-产品Playbook-v1.1.md` | `ff51fc87f5aa` | 1666 | **S-1 后重冻**（2026-10-18） |
-> | T | `Playbook/技术解决方案-v1.md` | `28498c99716b` | 1335 | **S-1 后重冻**（2026-10-18） |
+> | T | `Playbook/技术解决方案-v1.md` | `d3093e2d4d9d` | 1335 | **S-1 后重冻**（2026-10-18） |
 > | A | `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | `432f4a2c073d` | 313 | **S-1 后重冻**（2026-10-18） |
 > | D | `PMO/audit/决策溯源账-v1-20261017.md` | `d6b4635590d4` | 242 | 当前快照 |
 > | ADR12 | `ADR/ADR-0012-判定引擎产品化与处置分层.md` | `674575a44fa3` | 1066 | 当前快照 |
@@ -58,7 +58,7 @@
 | **静态报告** | 不可变存档：六区块、覆盖证明、回执号、指纹、签名链接 | 不承载操作、不原地修改 |
 | **多维表** | 批量提交入口、只读状态投影 | 不做状态回写、不做审批、不做权限面 |
 
-依据：R@9be0c9f7e2fb:937/949/951、P@ff51fc87f5aa:941-945/979/993-995、T@28498c99716b:1092/D-2、ADR-0013:123（历史“不做前端”已被用户“建设完整工作台”决策取代）。
+依据：R@9be0c9f7e2fb:937/949/951、P@ff51fc87f5aa:941-945/979/993-995、T@d3093e2d4d9d:1092/D-2、ADR-0013:123（历史“不做前端”已被用户“建设完整工作台”决策取代）。
 
 ## 0.3 系统状态 vs 人工动作 [已定]
 
@@ -153,7 +153,7 @@
 |---|---|
 | `ContentUnit v1` | **只由 `normalizer` 产出**（worker 内、orchestrator 第①步）；`submission_router` 只校验/转交，不产单元、不写 IR |
 | `ReviewIR` | 运行级唯一真相，由 `orchestrator` 在运行末组装、`artifact_store` 落盘；**Web/报告只读 ReviewIR**，不得改 IR、不得从 UI 推导判定 |
-| `fetch_error` 无正文的稳定 id | **仍为 S-3 open**；未定前不得把“无正文失败”单元当成已定契约 |
+| `fetch_error` 无正文的稳定 id | **S-3 已 closed（2026-10-18，定义/登记）**：`unit_id = sha256(source.kind ‖ 0x1F ‖ normalized_locator)`，不含时间桶；`attempt_id` 单列；消费者同步清单见工作流 §S2.8 |
 | 设计 vs 实现 | 以上均为设计口径；P1 未实现，P-1/G-2/G-3/G-4/G-5/G-6 仍 open |
 
 ## 2.0.1 五步 ↔ S0–S9 映射 [已定]
@@ -253,7 +253,7 @@
 
 - 失效/自动重审：**仅 Web 工作台 in-app**（inbox/unread/read_at/ack），不发飞书/个人/群；文案只能说“已产生工作台通知”，不得说“已送达”。
 - 下线任务：每日 + 状态变化主动通知（飞书），不受 in-app 口径影响。
-- 所有对外发送走 outbox；飞书无幂等键，按来源 at-most/at-least（T@28498c99716b:381-422）。
+- 所有对外发送走 outbox；飞书无幂等键，按来源 at-most/at-least（T@d3093e2d4d9d:381-422）。
 
 ---
 
@@ -560,7 +560,7 @@ metrics_snapshots, control_points, routing, rule_class_switches, authority_confl
 
 - **文件 + manifest 是唯一真相**；DB 仅投影。
 - P-1 原子提交：staging → rename 到最终不可变路径 → 写 manifest.tmp → fsync → rename manifest（唯一可见提交点）。
-- 崩溃恢复四态：committed / orphan / uncommitted / garbage（T@28498c99716b:333-344）。
+- 崩溃恢复四态：committed / orphan / uncommitted / garbage（T@d3093e2d4d9d:333-344）。
 - 投影写者唯一；启动/定时从 manifest 幂等重建；重建后与 manifest 对拍。
 - **权威提交后 DB 失败**：不回滚权威、不返假成功；返回 `202 + projection_lag + authority_snapshot + reconcile_token`；read-your-write 用权威快照。
 - SQLite：WAL、busy_timeout、短事务、单写者。
@@ -859,7 +859,7 @@ signed ──内容/依据/指纹/冲突变化──> invalidated ──全量�
 
 | 项 | 状态 | 说明 |
 |---|---|---|
-| **S-3** | **open** | `fetch_error` 无正文时的稳定 id 规则未定；未定前不得把失败单元当已定契约 |
+| **S-3** | `closed`（**仅定义/登记**） | 2026-10-18 T0-02 定稿：`unit_id = sha256(source.kind ‖ 0x1F ‖ normalized_locator)`，不含时间桶；`attempt_id` 单列；消费者同步清单 8 项见工作流 §S2.8。**P-1 原子写入仍 open，不表示实现已上线** |
 | P-1 | open | 跨产物原子提交仅有设计，代码未写 |
 | G-2 | open | outbox 仅有设计，代码未写 |
 | G-3 | open | durable inbox 只覆盖“已推进来的事件”；进程不在时仍丢 |
@@ -928,26 +928,26 @@ signed ──内容/依据/指纹/冲突变化──> invalidated ──全量�
 | C-4 | 角色/权限矩阵三套计数（8/5/6） | R@9be0c9f7e2fb:883/916、DIFF:105 | 以 §1 本文件角色表为准，回写 |
 | C-5 | 抽检分层 PRD 两层 vs 验收四层 | R@9be0c9f7e2fb:750-751 vs P@ff51fc87f5aa:1244/A@432f4a2c073d:159 | 以验收四层为准，回写 PRD |
 | C-6 | 规则文本“已放开” vs 行为“仍在拦” | R@9be0c9f7e2fb:661-667 | 法务裁定后回写 |
-| C-7 | **源文档行号漂移**：P 由 1381→1666 行（`ff51fc87f5aa`）、T 由 1281→1335 行（`28498c99716b`），旧行号可能指错 | §0 源文档清单 | v1.3.1 已按 S-1 后的 hash 重冻；每次引用校验必须带 `@短hash`，裸行号不得当现值 |
+| C-7 | **源文档行号漂移**：P 由 1381→1666 行（`ff51fc87f5aa`）、T 由 1281→1335 行（`d3093e2d4d9d`），旧行号可能指错 | §0 源文档清单 | v1.3.1 已按 S-1 后的 hash 重冻；每次引用校验必须带 `@短hash`，裸行号不得当现值 |
 
 ---
 
 # 15. 附：关键引用
 
 > **引用规则（v1.3）**：正文引用一律**先写章节号**，再用 `缩写@短hash` 校准；**行号只作辅助**，不得当现值。
-> 当前短 hash：T=`28498c99716b`、P=`ff51fc87f5aa`、A=`432f4a2c073d`、EV=`34fda3a04909`；**UIUX 自身=待最终冻结**（自指纹采用遮罩算法：把记录自身 hash 的行替换为 `<SELF>` 后算 sha256，不得直接嵌入自身 hash）。
+> 当前短 hash：T=`d3093e2d4d9d`、P=`ff51fc87f5aa`、A=`432f4a2c073d`、EV=`34fda3a04909`；**UIUX 自身=待最终冻结**（自指纹采用遮罩算法：把记录自身 hash 的行替换为 `<SELF>` 后算 sha256，不得直接嵌入自身 hash）。
 > ⚠️ P/T/A 仍在变动（17:13–17:29 有写入），标“待最终冻结”；冻结前必须重跑引用校验。
 
-- 部署形态：T@28498c99716b:42-43
-- P-1 原子提交：T@28498c99716b:294-359
-- G-2 outbox：T@28498c99716b:381-422
-- G-3 inbox：T@28498c99716b:426-444
-- artifact_store 数据根：T@28498c99716b:475
-- G-1 open：T@28498c99716b:1071
-- G-4 auth/tenant：T@28498c99716b:1074
-- D-2 静态报告：T@28498c99716b:1092、T@28498c99716b:1136-1148
-- D-4 留存：T@28498c99716b:1181-1205
-- D-5 SLA：T@28498c99716b:1209-1234
+- 部署形态：T@d3093e2d4d9d:42-43
+- P-1 原子提交：T@d3093e2d4d9d:294-359
+- G-2 outbox：T@d3093e2d4d9d:381-422
+- G-3 inbox：T@d3093e2d4d9d:426-444
+- artifact_store 数据根：T@d3093e2d4d9d:475
+- G-1 open：T@d3093e2d4d9d:1071
+- G-4 auth/tenant：T@d3093e2d4d9d:1074
+- D-2 静态报告：T@d3093e2d4d9d:1092、T@d3093e2d4d9d:1136-1148
+- D-4 留存：T@d3093e2d4d9d:1181-1205
+- D-5 SLA：T@d3093e2d4d9d:1209-1234
 - 五标签/不等于放行：P@ff51fc87f5aa:137-139、P@ff51fc87f5aa:1014、A@432f4a2c073d:129 #68、R@9be0c9f7e2fb:684-687、ADR-0012:228-230
 - 报告六区块：P@ff51fc87f5aa:1019
 - 群消息一句+链接：P@ff51fc87f5aa:979/995

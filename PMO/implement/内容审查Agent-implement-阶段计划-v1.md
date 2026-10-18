@@ -17,9 +17,9 @@
 |---|---|---:|---:|---|
 | `Playbook/内容审查Agent-产品Playbook-v1.1.md` | v1.1（条件性 RATIFIED，S-1 后） | 1666 | 110,908 | `ff51fc87f5aa` |
 | `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | v3（136 项，S-1 后） | 313 | 110,072 | `d4811e055463` |
-| `Playbook/技术解决方案-v1.md` | v1（S-1 后） | 1,335 | 159,522 | `28498c99716b` |
-| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1（引用重冻后） | 1429 | 80,364 | `67bcd19e0603` |
-| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1（引用重冻后） | 976 | 53,613 | `20e74e508c08` |
+| `Playbook/技术解决方案-v1.md` | v1（S-3 同步后） | 1,335 | 159,756 | `d3093e2d4d9d` |
+| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1（引用重冻后） | 1429 | 80,364 | `818561aecf13` |
+| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1（引用重冻后） | 976 | 53,613 | `e9d51e21e9d5` |
 | `PMO/audit/内容审查Agent-行业证据矩阵-v1.md` | v1.2 | 380 | 46,714 | `34fda3a04909` |
 | `PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md` | v1.1（K-01…K-52） | 132 | 77,206 | `03b8c0742bd4` |
 | `PMO/audit/内容审查Agent-决策总账-v2-20261018.md` | v2（124 决定 / 140 指针） | 219 | 63,523 | `92b2a2c5c9a4` |
@@ -96,12 +96,14 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 ### T0-02 · `fetch_error` 稳定 id 规则（S-3 设计关门）
 
 - **owner**：`normalizer` + `contract_suite`
-- **产出**：规则文本 + `content-unit-v1` 的 id 生成函数定义：
-  `unit_id = sha256(source.kind + 规范化来源地址 + 抓取时刻桶)`，**无正文也稳定**；
-  同一来源两次失败得同一 id；不同来源不碰撞。
-- **验收**：构造无正文 `fetch_error` 样本两次 → `unit_id` 相同；换来源 → 不同。
-- **反向对照**：把时刻桶去掉 → 同源两次不同 id → 红。
-- **门**：S-3 closed（消费者同步清单同时登记）。
+- **产出**：规则文本 + 无正文 id 生成定义：
+  `unit_id = sha256(source.kind ‖ 0x1F ‖ normalized_locator)`，**不含时间桶**；
+  同一来源跨小时/跨天/重试得同一 id；不同来源不碰撞；`attempt_id` 单列。
+  完整规则、ID-1/2/3 与正反例：`PMO/implement/T0-02-fetch-error-id-rule.md`。
+- **验收**：构造无正文 `fetch_error` 样本两次（含跨小时/跨天/重试）→ `unit_id` 相同；换 kind/locator → 不同。
+- **反向对照**：id 输入加入时间桶 / 错误文案 / 进程内序号 → ID-1/2/3 必红。
+- **消费者同步清单**：8 项登记于技术方案 §8 S-3 与工作流 §S2.8（normalizer/contract_suite、submission_router、job_dispatcher/orchestrator、artifact_store、report_renderer/report_store、disposition_router/case_watch、metrics_read_model、contract_validator）。
+- **门**：S-3 closed（**定义/登记**完成；P-1 原子写入仍 open —— 不表示实现已上线）。
 
 ### T0-03 · claim/lease/draft 模块归属（设计关门）
 
@@ -205,6 +207,7 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 
 | 门 | 状态 | 已具备 | 仍缺（跟进 ticket） |
 |---|---|---|---|
+| S-3 fetch_error id | **关闭（定义/登记）** | T0-02 定稿：`unit_id = sha256(source.kind ‖ 0x1F ‖ normalized_locator)`，不含时间桶；消费者同步清单 8 项登记于技术方案 §8 / 工作流 §S2.8 | — |
 | P-1 原子提交 | **部分** | 原子提交 + 六崩溃点 + 恢复四态 | stale lock 清理；真实断电；投影对拍（T0-04b） |
 | G-2 outbox | **关闭** | 21/21，含四类反向对照 | — |
 | G-3 durable inbox | **关闭** | 12/12，含续传与坏游标回退 | — |
@@ -232,6 +235,56 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 
 ---
 
+### 4.1d 第 1 阶段进行中（2026-10-18 晚，编排器 4b 登记）
+
+| Ticket | 状态 | 验证器读数 | 交付者 | 变异审计 |
+|---|---|---|---|---|
+| T1-C1 契约 schema | ✅ 返修后 46/46（待 9a 复验变异） | 46/46 rc=0 | 0e | VC-1d/VC-1e/VC-B1..B4 已修，待变异复核 |
+| T1-01 提交入口 | ✅ 返修后 40/40（待 9a 复验变异） | 40/40 rc=0 | 6d/0e | SR-ADV1/SR-ADV2 已修，待变异复核 |
+| T1-03 任务调度 | ✅ 验收通过（假绿已修） | 58/58 rc=0 | cleanup | JD-ADV1/2/3 已修并复验 |
+| T1-07 finding_store | ✅ 返修后 33/33（待 9a 复验变异） | 33/33 rc=0 | 0e | FS-ADV1/2/3 已修（REQUIRED_KEYS 生效、active() 有测试、M1 守卫），待变异复核 |
+| T1-04 rule_judge + 控制点注册表 | ✅ 验收通过 | 34/34 rc=0 | cleanup | 待 9a 复核 |
+| T1-02 normalizer | ✅ 基线通过，待审计 | 37/37 rc=0（6d 自做 4 变异全红） | 6d | **待 9a 变异审计** |
+| T1-06 evidence_sync | ✅ 基线通过，待审计 | 60/60 rc=0（7 组变异全红） | cleanup | **待 9a 变异审计** |
+| T1-08 coverage_composer | ✅ 基线通过，待审计 | 26/26 rc=0（6 条反向对照） | 0e | **待 9a 变异审计** |
+| T1-05 semantic_judge | ⚠️ 实现 30/30，验证器自身异常 rc=2 | 实现通过；验证器半成品（`unit_pos` 函数当记录传入） | 6d / 9a | 待 9a 修验证器 + 补 6d 的 5 类变异 |
+| T1-09 decision_table | ✅ 基线通过（8 变异全红） | 62/62 rc=0 | cleanup | 待 9a 复核 |
+| T1-10 disposition_router | ✅ 基线通过（9 变异全红 + AST 扫描） | 74/74 rc=0 | cleanup | 待 9a 复核 |
+| T1-11 report_render | ✅ 基线通过（5 变异全红） | 59/59 rc=0（Node） | 6d | 待 9a 复核 |
+| T1-12 report_store | ✅ 基线通过（9 变异全红） | 38/38 rc=0 | cleanup | 待 9a 复核 |
+| T1-13 send_gateway | ✅ 基线通过（两红为验证器误报已修） | 25/25 rc=0 | 0e | 待 9a 复核 |
+| T1-14 metrics_read_model | ✅ 基线通过（9 变异全红） | 38/38 rc=0 | cleanup | 待 9a 复核 |
+| T1-15 orchestrator | ✅ 基线通过（6 变异全红） | 26/26 rc=0 | 6d | 待 9a 复核 |
+
+**全仓验证器快照（2026-10-19 00:40，编排器实跑 19 个检查器）**：18 绿 / 1 未测 ——
+`contracts 46`、`submission_router 40`、`job_dispatcher 58`、`normalizer 37`、`rule_judge 34`、
+`evidence_sync 60`、`finding_store 33`、`coverage_composer 26`、`decision_table 62`、
+`disposition_router 74`、`report_store 38`、`report_render 59`、`control_points 12`、
+`atomic 21`、`auth 27`、`rbac 49`、`sandbox 14`、`redact 99`；`semantic_judge` = **rc=2（验证器自身异常）**。
+
+> ⚠️ **rc=0 不等于通过**：9a 已证明其中 4 张 ticket（T1-C1/T1-01/T1-07/T1-03 修复前）在删掉关键守卫后
+> 仍全绿。**放行判据 = 基线 rc=0 + 9a 变异审计全探针真红**，缺一不可。
+
+**第 1 阶段存活假绿清单（9a 批次②③④⑤抓到，全部未修复前不得放行）：**
+
+| # | 位置 | 问题 | 修法要点 | 归属 | 状态 |
+|---|---|---|---|---|---|
+| SR-ADV1 | `submission_router.py:122-127` | 文档类型走非飞书链接未被拒（无用例覆盖） | 补 content_type=文档 + 群消息/free_text → rejected_unsupported | 6d | 待修 |
+| SR-ADV2 | `submission_router.py:291` | 同 submission_id 重试序号可恒为 1 | 补同 id 连续 submit 两次断言 attempt_id 不同 | 6d | 待修 |
+| JD-ADV1 | `job_dispatcher.py:257` | _stale() 死 PID 锁清理无用例覆盖 | 补死锁清理成功 + 活锁保留两条用例 | cleanup | **已修** ✅ |
+| JD-ADV2 | `job_dispatcher.py:430-431` | commit_failed 退路可绕过（未模拟 commit 失败） | mock store.commit 抛异常，断言 outcome=commit_failed | cleanup | **已修** ✅ |
+| JD-ADV3 | `job_dispatcher.py:149-150` | external_label 校验可绕过；run_state=OK 时 None 被放行 | 按 Playbook §3.3.2 改五值校验 + D 段补拒收断言 | cleanup | **已修** ✅ |
+| VC-1d | `attempt-v1.schema.json:66` | rejected_unsupported 允许带 receipt_id（漏负样本） | 补 rejected+receipt_id 与 failed+receipt_id 两条负样本 | 0e | 待修 |
+| VC-1e | `verify_contracts.py:175` | `unsupported_keywords()` 不递归 `allOf` | 递归遍历 allOf 列表元素 | 0e | 待修 |
+| VC-B1..B4 | `verify_contracts.py:300-352` | 行为断言与 schema 零连接（`rc` 赋值不用） | 真读 contracts/ 或改名 helper 单测并剔出契约验收 | 0e | 待修 |
+| FS-ADV1 | `finding_store.py:77-81` | `REQUIRED_KEYS` 死常量，`quote`/`derived_from` 未校验 | 接上校验 + 两条负样本 | 0e | 待修 |
+| FS-ADV2 | `finding_store.py:300` | `active()` 从未被测试（改恒返 [] 仍绿） | 补四态过滤用例 | 0e | 待修 |
+| FS-ADV3 | `finding_store.py` | M1（semantic 直接 confirmed 须 `confirmed_by_rule_class=True`）未实现 | 补守卫 + 正反断言 | 0e | 待修 |
+
+**委托方裁定（2026-10-18 晚）**：`commit_failed` outcome **保留并写入规格**（job_dispatcher 五态之一，表达「worker 成功但产物落盘失败」）。
+
+---
+
 ## 5. 第 1 阶段：核心流水线（S0–S9）
 
 > 目标：**一条内容从入口到报告真的跑通**，判定只有一个来源。
@@ -252,8 +305,9 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 | T1-12 | `report_store` 静态报告 + 重签 | report_store | T1-11 | R1/R2/R3、L4-2 |
 | T1-13 | `send_gateway` 卡片/文本 + 兜底 | send_gateway | T1-11 | L4-4/6、MSG-1…4 |
 | T1-14 | `metrics_read_model` 四指标 | metrics_read_model | T1-12 | L5-1/2/5 |
+| **T1-15** | **`orchestrator` 五步串联 + ReviewIR 组装 + 回执**（**2026-10-19 补：原计划漏了编排器本体**） | orchestrator | T1-01…T1-13 | L2-7、L6-6、V5；五步各一次、无回边、无提前停；`skipped=[]` |
 
-**第 1 阶段退出门**：T1-01…T1-14 通过 + 一条端到端样本产出 IR/报告/群消息；
+**第 1 阶段退出门**：T1-01…T1-15 通过 + 一条端到端样本产出 IR/报告/群消息；
 `coverage=partial → REVIEW` 与「五档全部待放行」两条反向对照必须红过。
 
 ---

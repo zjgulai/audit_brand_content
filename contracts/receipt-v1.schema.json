@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "receipt-v1.schema.json",
+  "title": "receipt-v1 —— 执行回执（Playbook §3.3.3 十一字段 + 技术方案六个扩展字段）",
+  "description": "L2-7 要能验收就必须有这张表。基础十一字段见 Playbook §3.3.3；扩展六字段见技术方案模块 3。★ skipped 必须是空数组而不是缺字段 —— 「没有跳过」和「没记跳过」长得一样，正是本项目反复踩的形状。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_id", "unit_id", "skill_id", "skill_version", "skill_hash",
+    "started_at", "ended_at", "steps", "skipped",
+    "rule_snapshot", "kb_snapshot",
+    "obligations", "invariant_violation", "control_points_ran",
+    "control_points_version", "video_sampling", "disposition"
+  ],
+  "properties": {
+    "receipt_id": { "type": "string", "minLength": 1, "description": "唯一标识" },
+    "unit_id": { "type": "string", "minLength": 1, "description": "对应内容单元（ContentUnit.unit_id）" },
+    "skill_id": { "type": "string", "minLength": 1 },
+    "skill_version": { "type": "string", "minLength": 1 },
+    "skill_hash": { "type": "string", "minLength": 1, "description": "skill 内容指纹（改一个字就变）" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": "string", "format": "date-time" },
+    "steps": {
+      "type": "array",
+      "description": "每步：步名 / 输入摘要 / 输出摘要 / 耗时",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "input_digest", "output_digest", "elapsed_ms"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": ["normalize", "judge", "dispose", "output", "evaluate"],
+            "description": "五步封闭集合。★ 第一阶段五步各执行一次、无回边、无轮次（委托方 2026-10-18 定）"
+          },
+          "input_digest": { "type": "string", "minLength": 1 },
+          "output_digest": { "type": "string", "minLength": 1 },
+          "elapsed_ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "description": "★ 空数组也要出现。缺字段与空数组是两件事。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "reason"],
+        "properties": {
+          "step": { "type": "string", "minLength": 1 },
+          "reason": {
+            "type": "string",
+            "enum": ["no_capability", "no_rule", "not_wired"],
+            "description": "§4.3 的未审原因封闭集合。★ 第一阶段**没有**「提前停」这个原因（RL/§3.3.7 2026-10-18 改定：不启用提前停）"
+          }
+        }
+      }
+    },
+    "rule_snapshot": { "type": "string", "minLength": 1, "description": "规则库指纹" },
+    "kb_snapshot": { "type": "string", "minLength": 1, "description": "知识库指纹" },
+    "model_id": { "type": "string", "description": "❌ 必填？用了模型时必填（条件必填见 allOf）" },
+
+    "obligations": {
+      "type": "array",
+      "description": "并行义务（§3.3.8.1b）。必须同时出现在报告与回执里 —— 没有字段那句话就没有落点",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "finding_id"],
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "finding_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "invariant_violation": {
+      "type": ["object", "null"],
+      "description": "I1–I7 违反时的唯一 ERROR 出口；无违反时为 null（不是缺字段）",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": { "type": "string", "enum": ["I1", "I2", "I3", "I4", "I5", "I6", "I7"] },
+        "detail": { "type": "string", "minLength": 1 }
+      }
+    },
+    "control_points_ran": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "实际跑过的 control_code 列表。★ 第一阶段「跳过余下判定子步」不存在，所以这不是「跑了一部分」的口径，而是完整清单"
+    },
+    "control_points_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "L6-6：回执记的是**实际使用**的控制点主表版本"
+    },
+    "video_sampling": {
+      "type": ["object", "null"],
+      "description": "V5 抽帧参数。非视频内容为 null（不是缺字段）",
+      "additionalProperties": false,
+      "required": ["interval_ms", "total_frames"],
+      "properties": {
+        "interval_ms": { "type": "integer", "minimum": 1 },
+        "total_frames": { "type": "integer", "minimum": 0 },
+        "start_offset_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "layer", "release_status"],
+      "description": "处置结果。★ release_status 第一阶段恒为「待放行」——RL-2/R1 已定，机器标签永不等放行",
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"]
+        },
+        "layer": { "type": "string", "enum": ["DP0", "DP1", "DP2", "DP3", "DP4"] },
+        "release_status": {
+          "type": "string",
+          "enum": ["待放行"],
+          "description": "★ 只有这一个值。放行状态由 release_gate 改，**不在回执里改**（L3-5：不存在标签到发布状态的直连路径）"
+        }
+      }
+    }
+  },
+  "x-notes": [
+    "★ 五步齐全（normalize/judge/dispose/output/evaluate 各一次）**不是**靠 schema 的 allOf 表达的。",
+    "  本校验器不支持 minContains；硬写一个只含 comment、then 为空的 allOf 块，会得到一个「看起来在校验、其实恒真」的东西 ——",
+    "  那正是本项目台账 K-06（名字出现过 ≠ 拦得住）的形状。它改由 tools/verify_contracts.py 的行为断言覆盖：构造缺一步的样本，必须红。",
+    "★ model_id 的条件必填同理，改为行为断言。",
+    "★ skipped 必须是空数组而不是缺字段 —— 「没有跳过」和「没记跳过」长得一样，正是本项目反复踩的形状。"
+  ]
+}

@@ -173,6 +173,20 @@ SOURCE_KINDS = (
     "video",            # 视频（正文来自 ASR / 字幕；B1）
 )
 
+# ── 入口四维取值域（T1-01 submission_router；与 Playbook §3.1 逐值一致）。
+# ★ `SOURCE_KINDS` 仍只列**可产出 ContentUnit 的受支持载体**；`文档` 是
+#   Playbook 明确登记的 unsupported 取值，单独放在 SOURCE_KIND_DOMAIN 里，
+#   不塞进 SOURCE_KINDS —— 否则 H8 会把一个「没能力审」的取值当成受支持。
+CONTENT_TYPES = ("文本", "图片", "视频", "文档", "结构化记录")
+CONTENT_STAGES = ("brief", "final_content")
+ENTRY_CHANNELS = ("群消息", "飞书文档链接", "落地页 URL", "多维表批量",
+                  "NAS", "上传文件")
+UNSUPPORTED_ENTRY_CHANNELS = ("NAS", "上传文件")
+SOURCE_KIND_DOMAIN = SOURCE_KINDS + ("文档",)
+UNSUPPORTED_SOURCE_KINDS = ("文档",)
+OUTCOMES = ("accepted", "rejected_unsupported", "failed")
+FAILURE_KINDS = ("fetch_error", "parse_error", "empty", "unsupported")
+
 # ── 归一化登记表。改这里 = 改所有 unit 的 text_sha256。
 NORMALIZATION_REGISTRY = {
     "text-v1": {

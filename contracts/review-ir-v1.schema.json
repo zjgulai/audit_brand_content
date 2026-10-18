@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-ir-v1.schema.json",
+  "title": "review-ir-v1 —— 运行级 ReviewIR（唯一真相）",
+  "description": "委托方 2026-10-18 定：运行级 ReviewIR 为唯一真相。ContentUnit v1 只是它引用的输入对象，不再叫 IR。source_ir_version 只指向 ReviewIR（Playbook §4.3 R1）。本 schema 只列运行级必需结构，子结构引用已定义 schema，不重复定义。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ir_id", "ir_version", "content_unit_ref", "source_ir_version",
+    "findings", "decision", "coverage", "receipt_ref",
+    "rule_snapshot", "kb_snapshot", "control_points_version",
+    "created_at"
+  ],
+  "properties": {
+    "ir_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "运行级唯一标识。★ 全局只有一个 IR id —— 这是 S-3 裁定的直接后果（报告反查不会再出现两个 IR id）"
+    },
+    "ir_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "本 IR 的版本号。R2：IR 变了就生成新报告，旧报告不改不删"
+    },
+    "source_ir_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "★ R1：报告落盘时记的「渲染自哪个 ReviewIR 版本」。**只指向 ReviewIR**，不指向 ContentUnit —— 这是 S-3 的核心裁定"
+    },
+    "content_unit_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "kind"],
+      "description": "指向被评审的 ContentUnit v1（输入对象，不是 IR）",
+      "properties": {
+        "unit_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "★ 抓取失败（fetch_error）时也必须有 —— 由 T0-02 规则派生：sha256(source.kind || 0x1F || normalized_locator)，不带时间桶"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["free_text", "landing_page", "image", "video", "文档"],
+          "description": "source.kind"
+        },
+        "parse_status": {
+          "type": "string",
+          "enum": ["ok", "partial", "failed"],
+          "description": "★ failed 时 ContentUnit 无正文，但 ReviewIR 仍存在 —— 失败本身要有稳定身份"
+        },
+        "failure_kind": {
+          "type": "string",
+          "enum": ["fetch_error", "parse_error", "empty", "unsupported"],
+          "description": "parse_status=failed 时必填（条件必填见 allOf）"
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "★ 只收 ValidatedFinding（S-1 三段式：DraftFinding 只在内存里传，从不落盘）。空数组合法：本次审查没发现问题不等于没审",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_id", "control_code", "status", "severity", "produced_by", "derived_from"],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "★ 每次实质状态变化**新建一条、新 id**（Playbook §3.3.4.2）。验收 16 断言「两条 finding_id 相同必须拒绝」"
+          },
+          "control_code": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["candidate", "confirmed", "rejected", "superseded"] },
+          "severity": {
+            "type": "string",
+            "enum": ["L0", "L1", "L2", "L3", "L4", "L5"],
+            "description": "★ L 是严重度。P0–P3 是检测层（detected_by），两者不是一回事"
+          },
+          "produced_by": { "type": "string", "enum": ["rule", "semantic", "human"] },
+          "derived_from": {
+            "type": ["string", "null"],
+            "description": "★ append-only 的来源。非首次产出时必须指向旧 finding_id；首次产出为 null"
+          },
+          "authority_state": {
+            "type": "string",
+            "enum": ["ok", "missing", "expired", "conflict"],
+            "description": "★ 由 evidence_sync 在判定步内算出。status=confirmed 时必填（DF-2）"
+          },
+          "detected_by": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2", "P3"],
+            "description": "检测层。MC-1 要求提前停的命中必须是 P0（字面类）—— 但第一阶段不启用提前停"
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "layer", "release_status"],
+      "description": "★ 判定只由 decision_table 算（L2-1a）。IR 里的 decision 是**冻结快照**，不是可重算的活数据",
+      "properties": {
+        "state": { "type": "string", "enum": ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"] },
+        "layer": { "type": "string", "enum": ["DP0", "DP1", "DP2", "DP3", "DP4"] },
+        "release_status": {
+          "type": "string",
+          "enum": ["待放行"],
+          "description": "★ 恒为「待放行」。放行是 release_gate 的动作，不进 IR（L3-5）"
+        },
+        "obligations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_state", "modalities_evaluated", "rules_version", "control_points_applied"],
+      "description": "四项覆盖证明（Playbook §3.3.5）。★ coverage_state 只能由 coverage_composer 派生",
+      "properties": {
+        "coverage_state": {
+          "type": "string",
+          "enum": ["full", "partial", "missing"],
+          "description": "missing / partial / full。★ partial 永不 PASS（L1-6）"
+        },
+        "modalities_evaluated": { "type": "array", "items": { "type": "string" } },
+        "rules_version": { "type": "string", "minLength": 1 },
+        "control_points_applied": { "type": "array", "items": { "type": "string" } },
+        "not_evaluated_reason": {
+          "type": "array",
+          "description": "「未跑的为什么」。★ 空族按「未做·无控制点」计入，不许从数组里消失",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["what", "why"],
+            "properties": {
+              "what": { "type": "string", "minLength": 1 },
+              "why": { "type": "string", "enum": ["no_capability", "no_rule", "not_wired"] }
+            }
+          }
+        }
+      }
+    },
+    "receipt_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "指向 receipt-v1.receipt_id"
+    },
+    "rule_snapshot": { "type": "string", "minLength": 1 },
+    "kb_snapshot": { "type": "string", "minLength": 1 },
+    "control_points_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "L6-6：实际使用的主表版本"
+    },
+    "media_fingerprints": {
+      "type": ["object", "null"],
+      "description": "TS-24：四类媒体产物各一枚独立指纹，不许压成一个总指纹（压成一个就分不出是哪一样导致的失效）",
+      "additionalProperties": false,
+      "required": ["frame_manifest_hash", "ocr_output_hash", "asr_output_hash", "model_config_hash"],
+      "properties": {
+        "frame_manifest_hash": { "type": "string", "minLength": 1 },
+        "keyframe_set_hash": { "type": "string" },
+        "ocr_output_hash": { "type": "string", "minLength": 1 },
+        "asr_output_hash": { "type": "string", "minLength": 1 },
+        "model_config_hash": { "type": "string", "minLength": 1 },
+        "sampling_config_hash": { "type": "string" },
+        "media_fingerprints_root_hash": { "type": "string" }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "content_unit_ref": { "properties": { "parse_status": { "const": "failed" } }, "required": ["parse_status"] } },
+        "required": ["content_unit_ref"]
+      },
+      "then": {
+        "properties": { "content_unit_ref": { "required": ["failure_kind"] } }
+      }
+    }
+  ],
+  "x-notes": [
+    "★ findings[] 里 status=confirmed 必须有 authority_state（DF-2）—— 这条用 allOf 表达会很长且本校验器支持有限，改由 verify_contracts.py 行为断言覆盖。",
+    "★ findings[] 的 finding_id 必须全局唯一（验收 16）—— JSON Schema 无法表达数组内唯一性约束，同样由行为断言覆盖。",
+    "★ 本 schema 里的 decision 是**冻结快照**。任何人想在这里「顺手算一遍状态」，都是在造第二个判定实现，违反 L2-1a。"
+  ]
+}

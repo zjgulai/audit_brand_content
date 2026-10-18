@@ -1,0 +1,497 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+verify_contracts.py —— 三份契约 schema 的正/负样本校验（T1-C1）
+
+**它修的是什么**：技术方案里到处引用 `contracts/*.schema.json`，而 `contracts/` 目录
+此前根本不存在。这个脚本做两件事：
+  ① 校验**三份 schema 文件本身**结构合法（不是空壳、required 非空、enum 非空）；
+  ② 喂**正/负样本**给每份 schema，断言好样本过、坏样本必须被拒。
+
+──────────────────────────────────────────────────────────────
+为什么自己写校验器，不用 `jsonschema`
+──────────────────────────────────────────────────────────────
+本机没装 `jsonschema`（`import jsonschema` 直接 ImportError）。硬依赖一个没装的东西，
+结果是「脚本跑不起来」，那不比没有更糟 —— 它看起来像个执行点。
+
+所以这里实现一个**最小校验器**，只支持下面这些关键字。**这份清单就是它的诚实边界**：
+
+  type / required / properties / additionalProperties / items / enum / const /
+  minLength / minimum / format(date-time 近似) / if-then / not(required|enum) / contains
+
+**不支持**（因此相关约束改由行为断言覆盖，不假装 schema 能拦）：
+  · `minContains` / `maxContains` → 五步齐全改行为断言
+  · 数组内唯一性（`uniqueItems` 对对象不可靠）→ finding_id 唯一改行为断言
+  · `oneOf` / `anyOf` / `$ref` / `format` 的完整语义
+
+★ 一条纪律：**不支持某关键字时，不许在 schema 里写一个看起来能拦的块。**
+  一个只含 comment、`then: {}` 的 allOf 块，与没有它完全一样 —— 那是台账 K-06（名字出现过 ≠ 拦得住）。
+
+──────────────────────────────────────────────────────────────
+退出码：0 全绿 / 1 有红 / 2 未测（schema 文件读不到或整体结构坏到无法判断）
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONTRACTS = ROOT / "contracts"
+
+SCHEMAS = ("attempt-v1", "receipt-v1", "review-ir-v1")
+
+DATE_TIME_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$"
+)
+
+SUPPORTED = (
+    "type", "required", "properties", "additionalProperties", "items", "enum",
+    "const", "minLength", "minimum", "format", "if", "then", "not", "contains",
+    "allOf",
+)
+
+
+# ═══════════════════════════ 最小校验器 ═══════════════════════════
+
+def _type_ok(value, want: str) -> bool:
+    # JSON Schema 的 "integer" 不接受 bool（Python 里 True 是 int 的子类）
+    if want == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if want == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if want == "boolean":
+        return isinstance(value, bool)
+    if want == "string":
+        return isinstance(value, str)
+    if want == "array":
+        return isinstance(value, list)
+    if want == "object":
+        return isinstance(value, dict)
+    if want == "null":
+        return value is None
+    return True  # 未知类型名不判错（避免误报）
+
+
+def validate(value, schema: dict, path: str = "$", errors: list | None = None) -> list:
+    """返回错误列表。空列表 = 通过。"""
+    if errors is None:
+        errors = []
+    if not isinstance(schema, dict):
+        return errors
+
+    def err(msg):
+        errors.append(f"{path}: {msg}")
+
+    # ── type（可为数组，表示多种允许类型）──
+    if "type" in schema:
+        want = schema["type"]
+        wants = want if isinstance(want, list) else [want]
+        if not any(_type_ok(value, w) for w in wants):
+            err(f"类型应为 {wants}，实际 {type(value).__name__}")
+            return errors  # 类型都不对，后面的断言没有意义
+
+    # ── const ──
+    if "const" in schema and value != schema["const"]:
+        err(f"必须等于 {schema['const']!r}，实际 {value!r}")
+
+    # ── enum ──
+    if "enum" in schema and value not in schema["enum"]:
+        err(f"必须属于 {schema['enum']}，实际 {value!r}")
+
+    # ── 字符串 ──
+    if isinstance(value, str):
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            err(f"长度须 ≥ {schema['minLength']}，实际 {len(value)}")
+        if schema.get("format") == "date-time" and not DATE_TIME_RE.match(value):
+            err(f"不是 ISO 8601 date-time：{value!r}")
+
+    # ── 数值 ──
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            err(f"须 ≥ {schema['minimum']}，实际 {value}")
+
+    # ── 对象 ──
+    if isinstance(value, dict):
+        for req in schema.get("required") or []:
+            if req not in value:
+                err(f"缺必填字段 {req!r}")
+        props = schema.get("properties") or {}
+        for k, v in value.items():
+            if k in props:
+                validate(v, props[k], f"{path}.{k}", errors)
+            elif schema.get("additionalProperties") is False:
+                err(f"不允许的额外字段 {k!r}")
+
+    # ── 数组 ──
+    if isinstance(value, list):
+        items = schema.get("items")
+        if isinstance(items, dict):
+            for i, v in enumerate(value):
+                validate(v, items, f"{path}[{i}]", errors)
+        # contains：至少一项满足
+        if isinstance(schema.get("contains"), dict):
+            if not any(not validate(v, schema["contains"], f"{path}[{i}]", [])
+                       for i, v in enumerate(value)):
+                err(f"数组里没有任何一项满足 contains 条件")
+
+    # ── not（只支持 required / enum 两种形态）──
+    if isinstance(schema.get("not"), dict):
+        n = schema["not"]
+        if "required" in n:
+            present = [k for k in n["required"] if isinstance(value, dict) and k in value]
+            if present:
+                err(f"字段 {present} 不允许出现")
+        if "enum" in n and value in n["enum"]:
+            err(f"取值 {value!r} 被显式禁止")
+
+    # ── if / then ──
+    if isinstance(schema.get("if"), dict):
+        if not validate(value, schema["if"], path, []):
+            then = schema.get("then")
+            if isinstance(then, dict):
+                validate(value, then, path, errors)
+
+    # ── allOf：每一项都必须满足 ──
+    # ★ 条件必填（accepted 必须有 ir_id、parse_status=failed 必须有 failure_kind）
+    #   就靠它表达。不支持 allOf 会让这几条**静默通过** —— 那正是本轮实测抓到的：
+    #   4 个负样本该红却全绿，原因不是 schema 写错，是校验器没实现这个关键字。
+    for sub in schema.get("allOf") or []:
+        if isinstance(sub, dict):
+            validate(value, sub, path, errors)
+
+    return errors
+
+
+def unsupported_keywords(schema, path="$") -> list:
+    """
+    扫 schema 里有没有用到本校验器不支持的关键字 —— 用了就报，不许静默忽略。
+
+    ★ 2026-10-18 变异审计抓到的假绿：原先 `allOf` 不在递归名单里，
+      于是往 allOf 里塞 `{"anyOf": []}` 时验证器仍全绿 ——
+      一个不支持的组合关键字被埋在支持的容器里，扫不到。
+      现在 `allOf` / `anyOf` / `oneOf` 的**列表元素**都递归；列表本身若不在
+      SUPPORTED 里，先记一条「不支持」，再递归进去（两层都要报）。
+    """
+    found = []
+    if isinstance(schema, dict):
+        for k, v in schema.items():
+            if k.startswith("x-") or k.startswith("$") or k in (
+                    "comment", "comment2", "description", "title"):
+                continue
+            if k in ("properties", "items", "contains", "if", "then", "not", "allOf"):
+                if k == "properties":
+                    for sk, sv in (v if isinstance(v, dict) else {}).items():
+                        found += unsupported_keywords(sv, f"{path}.{sk}")
+                elif k == "allOf":
+                    # 列表的每个元素都要递归
+                    for i, el in enumerate(v if isinstance(v, list) else []):
+                        found += unsupported_keywords(el, f"{path}.allOf[{i}]")
+                else:
+                    found += unsupported_keywords(v if isinstance(v, dict) else {}, f"{path}.{k}")
+                continue
+            if k not in SUPPORTED:
+                found.append(f"{path}.{k}")
+                # ★ 不支持的组合关键字（anyOf/oneOf）里还可能埋着别的，继续往下扫
+                if isinstance(v, list):
+                    for i, el in enumerate(v):
+                        found += unsupported_keywords(el, f"{path}.{k}[{i}]")
+                elif isinstance(v, dict):
+                    found += unsupported_keywords(v, f"{path}.{k}")
+    elif isinstance(schema, list):
+        for i, el in enumerate(schema):
+            found += unsupported_keywords(el, f"{path}[{i}]")
+    return found
+
+
+# ═══════════════════════════ schema 自检 ═══════════════════════════
+
+def check_schema_shape(name: str, schema: dict) -> list:
+    """schema 文件本身要像个 schema，不是空壳。"""
+    out = []
+
+    def ok(cid, cond, detail):
+        out.append({"id": cid, "ok": bool(cond), "detail": detail})
+
+    ok(f"{name}/·1", schema.get("type") == "object", f"type={schema.get('type')!r}")
+    req = schema.get("required") or []
+    ok(f"{name}/·2", len(req) > 0, f"required 字段 {len(req)} 个")
+    props = schema.get("properties") or {}
+    ok(f"{name}/·3", len(props) > 0, f"properties {len(props)} 个")
+    missing = [r for r in req if r not in props]
+    ok(f"{name}/·4", not missing, f"required 里有 {len(missing)} 个未在 properties 定义：{missing or '无'}")
+    unk = unsupported_keywords(schema)
+    ok(f"{name}/·5", not unk, f"未支持关键字 {len(unk)} 个" + (f"：{unk[:6]}" if unk else ""))
+    return out
+
+
+# ═══════════════════════════ 样本 ═══════════════════════════
+
+def samples() -> dict:
+    """正样本 + 每类负样本。负样本的 name 直接说明它测的是哪条约束。"""
+    good_attempt = {
+        "attempt_id": "at-1", "submission_id": "sub-1",
+        "entered_at": "2026-10-18T10:00:00Z",
+        "outcome": "accepted", "reason": "入口校验通过", "ir_id": "ir-1",
+    }
+    good_receipt = {
+        "receipt_id": "rc-1", "unit_id": "u-1", "skill_id": "s", "skill_version": "1",
+        "skill_hash": "abc", "started_at": "2026-10-18T10:00:00Z",
+        "ended_at": "2026-10-18T10:00:03Z",
+        "steps": [
+            {"name": "normalize", "input_digest": "d1", "output_digest": "d2", "elapsed_ms": 10},
+            {"name": "judge", "input_digest": "d3", "output_digest": "d4", "elapsed_ms": 20},
+            {"name": "dispose", "input_digest": "d5", "output_digest": "d6", "elapsed_ms": 5},
+            {"name": "output", "input_digest": "d7", "output_digest": "d8", "elapsed_ms": 5},
+            {"name": "evaluate", "input_digest": "d9", "output_digest": "d10", "elapsed_ms": 3},
+        ],
+        "skipped": [],
+        "rule_snapshot": "r1", "kb_snapshot": "k1",
+        "obligations": [],
+        "invariant_violation": None,
+        "control_points_ran": ["H01"],
+        "control_points_version": "cp-2026-10-18-v2",
+        "video_sampling": None,
+        "disposition": {"state": "REVIEW", "layer": "DP3", "release_status": "待放行"},
+    }
+    good_ir = {
+        "ir_id": "ir-1", "ir_version": "v1", "source_ir_version": "v1",
+        "content_unit_ref": {"unit_id": "u-1", "kind": "free_text", "parse_status": "ok"},
+        "findings": [], "decision": {"state": "REVIEW", "layer": "DP3",
+                                     "release_status": "待放行", "obligations": []},
+        "coverage": {"coverage_state": "full", "modalities_evaluated": ["text"],
+                     "rules_version": "r1", "control_points_applied": ["H01"]},
+        "receipt_ref": "rc-1", "rule_snapshot": "r1", "kb_snapshot": "k1",
+        "control_points_version": "cp-2026-10-18-v2",
+        "created_at": "2026-10-18T10:00:00Z",
+    }
+    return {
+        "attempt-v1": [
+            ("好样本（accepted）", good_attempt, True),
+            ("缺必填 reason", {k: v for k, v in good_attempt.items() if k != "reason"}, False),
+            ("outcome 枚举外", {**good_attempt, "outcome": "weird"}, False),
+            ("reason 是无信息词", {**good_attempt, "reason": "其他"}, False),
+            ("accepted 却没有 ir_id", {k: v for k, v in good_attempt.items() if k != "ir_id"}, False),
+            ("rejected_unsupported 却带 ir_id",
+             {"attempt_id": "a", "submission_id": "s", "entered_at": "2026-10-18T10:00:00Z",
+              "outcome": "rejected_unsupported", "failure_kind": "unsupported",
+              "reason": "入口不支持", "ir_id": "ir-1"}, False),
+            # ★ VC-1d：这两条是变异审计抓出来的。原先只有「带 ir_id」一条负样本，
+            #   于是删掉 schema 里 `not:{required:["receipt_id"]}` 后验证器仍全绿 ——
+            #   一个守卫没被测过，等于没有。
+            ("rejected_unsupported 却带 receipt_id",
+             {"attempt_id": "a", "submission_id": "s", "entered_at": "2026-10-18T10:00:00Z",
+              "outcome": "rejected_unsupported", "failure_kind": "unsupported",
+              "reason": "入口不支持", "receipt_id": "rc-1"}, False),
+            ("failed 却带 receipt_id",
+             {"attempt_id": "a", "submission_id": "s", "entered_at": "2026-10-18T10:00:00Z",
+              "outcome": "failed", "failure_kind": "fetch_error",
+              "reason": "抓取失败", "receipt_id": "rc-1"}, False),
+            ("failed 却带 ir_id",
+             {"attempt_id": "a", "submission_id": "s", "entered_at": "2026-10-18T10:00:00Z",
+              "outcome": "failed", "failure_kind": "fetch_error",
+              "reason": "抓取失败", "ir_id": "ir-1"}, False),
+            ("失败却没 failure_kind",
+             {"attempt_id": "a", "submission_id": "s", "entered_at": "2026-10-18T10:00:00Z",
+              "outcome": "failed", "reason": "抓取失败"}, False),
+            ("额外字段", {**good_attempt, "unknown_field": 1}, False),
+            ("entered_at 不是时间", {**good_attempt, "entered_at": "昨天"}, False),
+        ],
+        "receipt-v1": [
+            ("好样本", good_receipt, True),
+            ("skipped 缺失（不是空数组）", {k: v for k, v in good_receipt.items() if k != "skipped"}, False),
+            ("release_status 不是待放行", {**good_receipt, "disposition": {
+                "state": "PASS", "layer": "DP1", "release_status": "已放行"}}, False),
+            ("state 枚举外", {**good_receipt, "disposition": {
+                "state": "OK", "layer": "DP1", "release_status": "待放行"}}, False),
+            ("step 名枚举外", {**good_receipt, "steps": [
+                {"name": "loop", "input_digest": "d", "output_digest": "d", "elapsed_ms": 1}]}, False),
+            ("skipped.reason 用了「提前停」（第一阶段不存在）", {**good_receipt, "skipped": [
+                {"step": "judge", "reason": "early_stop"}]}, False),
+            ("缺必填 skill_hash", {k: v for k, v in good_receipt.items() if k != "skill_hash"}, False),
+            ("额外字段", {**good_receipt, "extra": 1}, False),
+        ],
+        "review-ir-v1": [
+            ("好样本", good_ir, True),
+            ("source_ir_version 缺失（R1 要求必填）",
+             {k: v for k, v in good_ir.items() if k != "source_ir_version"}, False),
+            ("coverage_state 枚举外", {**good_ir, "coverage": {
+                **good_ir["coverage"], "coverage_state": "mostly"}}, False),
+            ("release_status 不是待放行", {**good_ir, "decision": {
+                **good_ir["decision"], "release_status": "已放行"}}, False),
+            ("content_unit_ref 缺 unit_id", {**good_ir, "content_unit_ref": {
+                "kind": "free_text", "parse_status": "ok"}}, False),
+            ("parse_status=failed 却无 failure_kind", {**good_ir, "decision": {
+                **good_ir["decision"], "state": "未审查"}, "content_unit_ref": {
+                "unit_id": "u-1", "kind": "landing_page", "parse_status": "failed"}}, False),
+            ("缺必填 receipt_ref", {k: v for k, v in good_ir.items() if k != "receipt_ref"}, False),
+        ],
+    }
+
+
+# ═══════════════════════════ 行为断言（schema 表达不了的）═══════════════════════════
+
+def check_behavior(schemas: dict) -> list:
+    """
+    这几条约束在本校验器的关键字支持范围内**表达不了**，所以由本函数做行为断言。
+
+    ★ 2026-10-18 变异审计抓到过一次假绿：初版的 B-1…B-4 测的是函数内现写的局部 helper，
+      与被测的 `contracts/*.schema.json` **零连接** —— 把 schemas 清空仍全绿。
+      现在四条全部**从 schema 里读出判据**，schema 删掉对应结构即红。
+    """
+    out = []
+
+    def ok(cid, cond, detail):
+        out.append({"id": cid, "ok": bool(cond), "detail": detail})
+
+    def dig(schema, *path):
+        cur = schema
+        for p in path:
+            if isinstance(cur, dict):
+                cur = cur.get(p)
+            elif isinstance(cur, list):
+                cur = cur[p] if isinstance(p, int) and p < len(cur) else None
+            else:
+                return None
+        return cur
+
+    # ── B-1 五步齐全：判据来自 receipt-v1 的 steps.items.name.enum ──
+    enum = dig(schemas.get("receipt-v1"), "properties", "steps", "items",
+               "properties", "name", "enum") or []
+    need = set(enum)
+    good_steps = [{"name": n} for n in enum]
+    missing_one = [s for s in good_steps if s != good_steps[0]] if good_steps else []
+
+    def five_steps_ok(steps) -> bool:
+        return {s.get("name") for s in steps if isinstance(s, dict)} == need
+
+    ok("B-1", bool(need) and five_steps_ok(good_steps) and not five_steps_ok(missing_one),
+       f"五步判据取自 receipt-v1 的 enum={sorted(need)}；缺一步须 False")
+
+    # ── B-2 finding_id 唯一：判据来自 review-ir-v1 的 findings.items 定义 ──
+    fid_schema = dig(schemas.get("review-ir-v1"), "properties", "findings",
+                     "items", "properties", "finding_id") or {}
+    fid_required = "finding_id" in (dig(schemas.get("review-ir-v1"), "properties",
+                                        "findings", "items", "required") or [])
+
+    def ids_unique(fs) -> bool:
+        ids = [f.get("finding_id") for f in fs if isinstance(f, dict) and f.get("finding_id")]
+        return len(ids) == len(set(ids))
+
+    f1 = {"finding_id": "f-1"}
+    ok("B-2", bool(fid_schema) and fid_required
+       and ids_unique([f1]) and not ids_unique([f1, dict(f1)]),
+       f"finding_id 在 schema 中存在且 required={fid_required}；两条同 id 须 False")
+
+    # ── B-3 confirmed 必须有 authority_state：判据来自 review-ir-v1 ──
+    as_schema = dig(schemas.get("review-ir-v1"), "properties", "findings",
+                    "items", "properties", "authority_state") or {}
+    as_enum = set(as_schema.get("enum") or [])
+
+    def confirmed_has_authority(fs) -> bool:
+        return all(("authority_state" in f) for f in fs
+                   if isinstance(f, dict) and f.get("status") == "confirmed")
+
+    ok("B-3", bool(as_schema) and bool(as_enum)
+       and confirmed_has_authority([{"status": "confirmed", "authority_state": "ok"}])
+       and not confirmed_has_authority([{"status": "confirmed"}]),
+       f"authority_state 在 schema 中且 enum={sorted(as_enum)}；confirmed 无它须 False")
+
+    # ── B-4 accepted 必须带 ir_id：判据来自 attempt-v1 的 allOf 里那条 if/then ──
+    allof = dig(schemas.get("attempt-v1"), "allOf") or []
+    has_accepted_guard = False
+    for sub in allof:
+        if not isinstance(sub, dict):
+            continue
+        cond = dig(sub, "if", "properties", "outcome", "const")
+        then_required = dig(sub, "then", "required") or []
+        if cond == "accepted" and "ir_id" in then_required:
+            has_accepted_guard = True
+            break
+
+    ok("B-4", has_accepted_guard,
+       "attempt-v1 的 allOf 里有「accepted → 必须 ir_id」的条件守卫"
+       + ("" if has_accepted_guard else "（**没有** —— schema 被改窄了）"))
+
+    return out
+
+
+# ═══════════════════════════ 主流程 ═══════════════════════════
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--verbose", action="store_true")
+    args = ap.parse_args()
+
+    # 读 schema
+    loaded, read_errors = {}, []
+    for name in SCHEMAS:
+        p = CONTRACTS / f"{name}.schema.json"
+        if not p.exists():
+            read_errors.append(f"{p.name} 不存在")
+            continue
+        try:
+            loaded[name] = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            read_errors.append(f"{p.name} 读不出：{e}")
+
+    if read_errors:
+        msg = "；".join(read_errors)
+        if args.json:
+            print(json.dumps({"verdict": "untested", "detail": msg}, ensure_ascii=False, indent=1))
+        else:
+            print(f"⚠ 未测：{msg} —— 未测不是通过", file=sys.stderr)
+        return 2
+
+    checks = []
+
+    # ① schema 自检
+    for name in SCHEMAS:
+        checks += check_schema_shape(name, loaded[name])
+
+    # ② 正/负样本
+    for name, cases in samples().items():
+        schema = loaded[name]
+        for label, doc, want_ok in cases:
+            errs = validate(doc, schema)
+            got_ok = not errs
+            checks.append({
+                "id": f"{name}",
+                "ok": got_ok == want_ok,
+                "detail": f"{label} → 期望{'过' if want_ok else '拒'}，实际{'过' if got_ok else '拒'}"
+                          + ("" if got_ok == want_ok else f"；错误={errs[:2]}"),
+            })
+
+    # ③ 行为断言
+    checks += check_behavior(loaded)
+
+    reds = [c for c in checks if not c["ok"]]
+    exit_code = 1 if reds else 0
+
+    if args.json:
+        print(json.dumps({"checks": checks, "reds": reds,
+                          "verdict": "red" if reds else "ok", "exit_code": exit_code},
+                         ensure_ascii=False, indent=1))
+        return exit_code
+
+    print("=" * 66)
+    print("契约 schema 校验（attempt-v1 / receipt-v1 / review-ir-v1）")
+    print("=" * 66)
+    print(f"  校验器支持的关键字：{', '.join(SUPPORTED)}")
+    print(f"  不支持：minContains / 数组内唯一 / oneOf / anyOf / $ref —— 相关约束改行为断言")
+    print()
+    for c in checks:
+        print(f"  {'✓' if c['ok'] else '✗'} {c['id']:<22} {c['detail']}")
+    print()
+    if reds:
+        print(f"✗ {len(reds)} 项红 / 共 {len(checks)} 项")
+        return 1
+    print(f"✅ {len(checks)} 项全过（正样本过、负样本拒、行为断言双向成立）")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

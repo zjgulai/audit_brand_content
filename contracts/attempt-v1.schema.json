@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "attempt-v1.schema.json",
+  "title": "attempt-v1 —— 一次入口提交的记录",
+  "description": "技术方案 §1bis.2。submission_router 是唯一写者。存在理由：unsupported 死在入口、从来没进过 worker，run_record 里一条都不会有 —— 而它正是最需要计数的那一类（我们根本没能力审）。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["attempt_id", "submission_id", "entered_at", "outcome", "reason"],
+  "properties": {
+    "attempt_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "一次入口提交的稳定 id"
+    },
+    "submission_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "同一次用户提交可含多次 attempt（重试）"
+    },
+    "entered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "进入入口的时刻（ISO 8601）"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["accepted", "rejected_unsupported", "failed"],
+      "description": "三种结局，封闭集合"
+    },
+    "failure_kind": {
+      "type": "string",
+      "enum": ["fetch_error", "parse_error", "empty", "unsupported"],
+      "description": "accepted 时缺省；否则必填（条件必填，见 allOf）"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["其他", "未知错误", "unknown", "other", "n/a", "-"] },
+      "description": "人或机器可读的原因。不许写「其他」「未知错误」这类无信息词 —— 那种词让「为什么失败」永远查不出来"
+    },
+    "ir_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "accepted 时必填；其余必须不存在"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "走完流程才有；rejected_unsupported 必须不存在"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "accepted" } }, "required": ["outcome"] },
+      "then": {
+        "required": ["ir_id"],
+        "not": { "required": ["failure_kind"] }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "rejected_unsupported" } }, "required": ["outcome"] },
+      "then": {
+        "required": ["failure_kind"],
+        "allOf": [
+          { "not": { "required": ["ir_id"] } },
+          { "not": { "required": ["receipt_id"] } }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "failed" } }, "required": ["outcome"] },
+      "then": {
+        "required": ["failure_kind"],
+        "allOf": [
+          { "not": { "required": ["ir_id"] } },
+          { "not": { "required": ["receipt_id"] } }
+        ]
+      }
+    }
+  ]
+}
