@@ -16,6 +16,7 @@ command 退出 0 → passed；非 0 → failed。
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -32,6 +33,8 @@ except Exception as exc:  # noqa: BLE001
 DEFAULT_TABLE = os.path.join(
     REPO_ROOT, "PMO", "audit",
     "验收表-v3-覆盖全部判据-20261017.md")
+DEFAULT_MAP = os.path.join(
+    REPO_ROOT, "tests", "acceptance", "verifier_map.json")
 
 RE_TEST_ID = re.compile(r"test_id\s*[:=]\s*([A-Za-z0-9_.-]+)")
 RE_FIXTURE = re.compile(r"fixture\s*[:=]\s*([^\s;<>]+)")
@@ -63,6 +66,41 @@ def parse_table(path):
                 "fixture": fixture.group(1) if fixture else None,
                 "command": command.group(1).strip().strip("`") if command else None,
             })
+    return rows
+
+
+def load_mapping(path=DEFAULT_MAP):
+    """加载「验收表行号 → 可执行验证器」映射。缺失/坏文件 → 空映射（仍三态）。"""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        rows = data.get("rows") if isinstance(data, dict) else None
+        return rows if isinstance(rows, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _render(value):
+    venv_python = os.path.join(REPO_ROOT, ".venv", "bin", "python")
+    return (str(value)
+            .replace("{root}", REPO_ROOT)
+            .replace("{venv}", venv_python)
+            .replace("{python}", sys.executable))
+
+
+def apply_mapping(rows, mapping):
+    """只填空缺的执行字段；行号 + criteria 必须双重匹配，避免表漂移后误接。"""
+    for row in rows:
+        if row.get("test_id") or row.get("fixture") or row.get("command"):
+            continue
+        item = mapping.get(str(row["n"]))
+        if not isinstance(item, dict):
+            continue
+        if item.get("criteria") and item["criteria"] != row["criteria"]:
+            continue
+        row["test_id"] = item.get("test_id")
+        row["fixture"] = _render(item.get("fixture") or "")
+        row["command"] = _render(item.get("command") or "")
     return rows
 
 
@@ -103,12 +141,16 @@ def main():
         print("UNTESTED: 验收表读不出: %s" % exc)
         return 2
 
+    rows = apply_mapping(rows, load_mapping())
+    mapped = sum(1 for r in rows
+                 if r.get("test_id") and r.get("fixture") and r.get("command"))
     counts = {"passed": 0, "failed": 0, "untested": 0}
     for row in rows:
         status, detail = run_row(row)
         counts[status] += 1
         if status != "passed":
             print("%s #%s %s %s" % (status.upper(), row["n"], row["action"], detail))
+    print("mapped=%d" % mapped)
     print("passed=%d failed=%d untested=%d" % (
         counts["passed"], counts["failed"], counts["untested"]))
 

@@ -7,6 +7,7 @@
 """
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -55,10 +56,16 @@ def main():
             print("FAIL: %s %s" % (name, detail), file=sys.stderr)
             failed += 1
 
-    # 真实表：0 passed / 0 failed / 136 untested，rc=2
+    # 真实表：已接验证器的行通过，其余仍 untested；总数仍 136，rc=2
     rc, out = _run(REAL_TABLE)
-    report(rc == 2 and "passed=0 failed=0 untested=136" in out,
-           "真实表 → 0/0/136 untested，rc=2", "rc=%s out=%s" % (rc, out[-200:]))
+    mm = re.search(r"mapped=(\d+)", out)
+    mp = re.search(r"passed=(\d+) failed=(\d+) untested=(\d+)", out)
+    ok_real = (rc == 2 and mm and int(mm.group(1)) > 0 and mp
+               and int(mp.group(1)) > 0 and int(mp.group(2)) == 0
+               and int(mp.group(3)) > 0
+               and int(mp.group(1)) + int(mp.group(3)) == 136)
+    report(ok_real, "真实表 → 映射行通过、其余 untested、rc=2",
+           "rc=%s out=%s" % (rc, out[-200:]))
 
     # 反向对照 1：test_id + fixture + command true → passed=1 rc=0
     fixture = tempfile.NamedTemporaryFile(delete=False)
@@ -98,13 +105,13 @@ def main():
     if run_untrusted is not None and sb is not None:
         code = ("import subprocess,sys\n"
                 "sys.exit(subprocess.call(%r, shell=True))" % write_cmd)
-        real_run = sb.subprocess.run
+        real_popen = sb._popen
 
         def repo_cwd(*args, **kwargs):
             kwargs["cwd"] = REPO_ROOT
-            return real_run(*args, **kwargs)
+            return real_popen(*args, **kwargs)
 
-        with mock.patch.object(sb.subprocess, "run", repo_cwd):
+        with mock.patch.object(sb, "_popen", repo_cwd):
             r = run_untrusted(code, timeout=10, cpu_seconds=5)
         report(r["ok"] and os.path.exists(probe),
                "R-cwd 去掉 cwd 隔离 → 仓内出现（反向对照成立）", repr(r))
