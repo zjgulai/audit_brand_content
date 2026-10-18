@@ -208,12 +208,12 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 | 门 | 状态 | 已具备 | 仍缺（跟进 ticket） |
 |---|---|---|---|
 | S-3 fetch_error id | **关闭（定义/登记）** | T0-02 定稿：`unit_id = sha256(source.kind ‖ 0x1F ‖ normalized_locator)`，不含时间桶；消费者同步清单 8 项登记于技术方案 §8 / 工作流 §S2.8 | — |
-| P-1 原子提交 | **部分** | 原子提交 + 六崩溃点 + 恢复四态 | stale lock 清理；真实断电；投影对拍（T0-04b） |
+| P-1 原子提交 | **部分（组件关闭，真实断电未测）** | 原子提交 + 六崩溃点 + 恢复四态 + **stale lock 清理 + 投影重建/manifest 对拍（27/27，C19–C24）** | 真实断电只能记未测，不冒充 |
 | G-2 outbox | **关闭** | 21/21，含四类反向对照 | — |
 | G-3 durable inbox | **关闭** | 12/12，含续传与坏游标回退 | — |
-| G-4 认证/RBAC | **部分** | session/step-up 22/22；RBAC/ACL 35/35 | takedown 人级 allowlist；IT/机器元数据按对象收敛；grant 的 scope 校验（T0-07b） |
-| G-5 沙箱 | **部分** | rlimit/超时/cwd/env/禁网(进程内) 11/11 | OS 级隔离；绝对路径读；孙进程回收（T0-08b） |
-| G-6 最小化 | **部分** | redact 76 项，含逐规则承重 | 接入 report_renderer/send_gateway 实际链路（第 1/2 阶段） |
+| G-4 认证/RBAC | **部分** | session/step-up 22/22；RBAC/ACL 35/35 | takedown 人级 allowlist；IT/机器元数据按对象收敛；grant 的 scope 校验（T0-07b，0e 在办） |
+| G-5 沙箱 | **关闭（组件）** | **20/20**：绝对路径放行/拒绝、孙进程 killpg 回收、env 白名单、RLIMIT_AS 不可用时显式记未测 | — |
+| G-6 最小化 | **关闭（链路接入）** | redact 99 项 + **send_gateway 唯一出口接入（31/31，正样本遮蔽/负样本不误遮/删调用 6 条红）** | — |
 
 **第 1 阶段入口判据**：G-2/G-3 已关闭；P-1 组件可用（stale lock 作为 T0-04b 并行）；
 G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在**第 2 阶段（工作台）开工前**必须关闭。
@@ -282,6 +282,36 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 | FS-ADV3 | `finding_store.py` | M1（semantic 直接 confirmed 须 `confirmed_by_rule_class=True`）未实现 | 补守卫 + 正反断言 | 0e | 待修 |
 
 **委托方裁定（2026-10-18 晚）**：`commit_failed` outcome **保留并写入规格**（job_dispatcher 五态之一，表达「worker 成功但产物落盘失败」）。
+
+---
+
+### 4.1e 第 2 阶段进行中 + 公开仓历史重写（2026-10-19，编排器 4b 登记）
+
+**历史重写（委托方授权，一次性）**：
+- 58 张客户素材图 `PMO/audit/momcozy-assets/sref-candidates/`（14.3MB）已从全部 81 个提交历史移除。
+- 远端 main `0f140909` → **`fa97050d`**（只推重写后的远端当前位置，未发布本地领先的 13 个提交）。
+- 本地 main → **`04ca8089`**；`.git` 25M → 11M；旧提交 `890d50e` 已不可达；工作区未提交文件全部保留。
+- 备份：`~/audit_backups/audit_repo_backup_20261019_0316.bundle`（旧历史唯一副本，勿删）。
+- 残留：`verify_no_media_in_repo` DL-3a 仍报 17 个二进制，全部为 `dsh-browser-ext/assets/icons/`（产品自身资产）；DL-3b 未测（`AUDIT_MEDIA_ROOT` 未配置）。
+
+**第 2 阶段验收读数（编排器实跑）**：
+
+| 验证器 | 读数 | 变异抽查 | 判定 |
+|---|---|---|---|
+| `verify_review_api` | 15/15 rc=0（uv 环境，OpenAPI 3.1） | — | ✅ 越权三连挡住、API 不重算 |
+| `verify_write_api` | 31/31 rc=0 | — | ✅ sign/revoke/reject 真实成功，403/409 矩阵成立 |
+| `verify_reviews_ledger` | 20/20 rc=0 | 删 claim 守卫 → 2 条断言级红 | ✅ |
+| `verify_release_gate` | 53/53 rc=0 | 删 SoD 守卫 → **6 条断言级红、0 Traceback**（假红已修） | ✅ |
+| `verify_takedown` | 54/54 rc=0 | 删 never_tracked/仓外判定 → 2 条断言级红 | ✅ |
+| `smoke_end_to_end`（核心链路） | **38/38 rc=0**（真实模块全链路） | 内置「partial 永不 PASS」反向对照 | ✅ 核心流水线跑通 |
+| `verify_metrics_read_model` | 38/38 rc=0 | — | ✅ |
+| `verify_notifications` | 40/40 rc=0 | — | ✅ |
+
+**假绿修复进展**：`contracts` 43→46、`finding_store` 25→33、`submission_router` 38→40，均 rc=0（待 9a 复跑确认）。
+
+**过程中发现并修复的环境问题**：`base/__pycache__/coverage_composer.cpython-312.pyc` 与 `base/coverage_composer.cpython-39.pyc` 损坏（UTF-8 解码失败），导致端到端冒烟导入失败——K-27 同形；清除项目缓存子树后即绿。`base/` 目录下直接躺着 `.pyc` 属异常，已删除。
+
+**并行分工（2026-10-19）**：0e=G-4 门残差（takedown 人级 allowlist / IT 按对象收敛 / grant scope）；6d=API↔IR 联调测试；cleanup=前端工作台 v0 脚手架；9a=decision_table/disposition_router/orchestrator/report_store 四批变异审计。
 
 ---
 
