@@ -65,6 +65,7 @@ class ArtifactStore(object):
             os.makedirs(d, exist_ok=True)
         self._assert_same_fs()
         self._clean_stale_locks()
+        self._clean_stale_staging()
 
     def _assert_same_fs(self):
         devs = set()
@@ -129,6 +130,27 @@ class ArtifactStore(object):
                     os.unlink(path)
                 except OSError:
                     pass
+
+    def _lock_is_live(self, run_id):
+        path = os.path.join(self.locks, run_id + ".lock")
+        try:
+            with open(path, encoding="utf-8") as f:
+                pid = json.load(f).get("pid")
+            return pid is not None and _pid_alive(int(pid))
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _clean_stale_staging(self):
+        """清掉没有活锁的 staging 残留；活锁对应的 staging 一律保留。"""
+        if not os.path.isdir(self.staging):
+            return
+        for name in os.listdir(self.staging):
+            path = os.path.join(self.staging, name)
+            if not os.path.isdir(path):
+                continue
+            if self._lock_is_live(name):
+                continue
+            shutil.rmtree(path, ignore_errors=True)
 
     def _lock(self, run_id):
         path = os.path.join(self.locks, run_id + ".lock")
@@ -291,6 +313,73 @@ class ArtifactStore(object):
                 if rel:
                     paths.add(os.path.normpath(rel))
         return paths
+
+    def rebuild_projection(self, run_id):
+        """从 manifest 重建投影，并与磁盘实际文件逐条对拍。
+
+        返回 {ok, entries, missing, extra, mismatched, manifest_entries, disk_entries}：
+          missing    = manifest 多出来的条目（磁盘没有）
+          extra      = 磁盘多出来的文件（manifest 没有）
+          mismatched = 路径存在但 sha256 不符
+        其他 run 的 manifest 已引用的文件不计入本 run 的 extra（blobs 可共享）。
+        """
+        manifest = self.read_manifest(run_id)
+        if manifest is None:
+            return {"ok": False, "error": "manifest_missing", "entries": [],
+                    "missing": [], "extra": [], "mismatched": [],
+                    "manifest_entries": 0, "disk_entries": 0}
+        expected = {}
+        for entry in manifest.get("entries", []):
+            rel = os.path.normpath(entry.get("path", ""))
+            expected[rel] = entry.get("sha256")
+
+        other = set()
+        if os.path.isdir(self.manifests):
+            for name in os.listdir(self.manifests):
+                if not name.endswith(".json") or name == run_id + ".json":
+                    continue
+                try:
+                    with open(os.path.join(self.manifests, name),
+                              encoding="utf-8") as f:
+                        m = json.load(f)
+                except Exception:  # noqa: BLE001
+                    continue
+                for entry in m.get("entries", []):
+                    rel = entry.get("path")
+                    if rel:
+                        other.add(os.path.normpath(rel))
+
+        actual = {}
+        for base in (self.blobs, self.ir, self.receipts, self.reports):
+            for dirpath, _dirnames, filenames in os.walk(base):
+                for fn in filenames:
+                    path = os.path.join(dirpath, fn)
+                    rel = os.path.normpath(os.path.relpath(path, self.root))
+                    if rel in other:
+                        continue
+                    with open(path, "rb") as f:
+                        actual[rel] = _sha256(f.read())
+
+        missing = sorted(set(expected) - set(actual))
+        extra = sorted(set(actual) - set(expected))
+        mismatched = sorted(k for k in set(expected) & set(actual)
+                            if expected[k] != actual[k])
+        entries = []
+        for rel in sorted(set(expected) | set(actual)):
+            entries.append({
+                "path": rel,
+                "manifest_sha256": expected.get(rel),
+                "actual_sha256": actual.get(rel),
+            })
+        return {
+            "ok": not (missing or extra or mismatched),
+            "entries": entries,
+            "missing": missing,
+            "extra": extra,
+            "mismatched": mismatched,
+            "manifest_entries": len(expected),
+            "disk_entries": len(actual),
+        }
 
     def recover(self, run_id):
         """返回 (state, detail)。四态：committed / orphan / uncommitted / garbage。"""

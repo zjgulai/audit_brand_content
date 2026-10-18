@@ -316,6 +316,99 @@ def main():
     finally:
         shutil.rmtree(root18, ignore_errors=True)
 
+    # C19 崩溃遗留 staging：无活锁 → 启动清理
+    root19 = tempfile.mkdtemp(prefix="staging-stale-")
+    try:
+        stale_dir = os.path.join(root19, "staging", "run-stale")
+        os.makedirs(stale_dir, exist_ok=True)
+        with open(os.path.join(stale_dir, "0.tmp"), "wb") as f:
+            f.write(b"orphan")
+        ArtifactStore(root19)
+        report(not os.path.exists(stale_dir),
+               "C19 无活锁的 staging 残留 → 启动清理", "")
+    finally:
+        shutil.rmtree(root19, ignore_errors=True)
+
+    # C20 活锁对应的 staging 不得清理（反向对照）
+    root20 = tempfile.mkdtemp(prefix="staging-live-")
+    try:
+        live_dir = os.path.join(root20, "staging", "run-live")
+        os.makedirs(live_dir, exist_ok=True)
+        with open(os.path.join(live_dir, "0.tmp"), "wb") as f:
+            f.write(b"live")
+        os.makedirs(os.path.join(root20, "locks"), exist_ok=True)
+        with open(os.path.join(root20, "locks", "run-live.lock"),
+                  "w", encoding="utf-8") as f:
+            json.dump({"pid": os.getpid(), "ts": time.time()}, f)
+        ArtifactStore(root20)
+        report(os.path.isdir(live_dir),
+               "C20 活锁 staging 不被清理（反向对照）", "")
+    finally:
+        shutil.rmtree(root20, ignore_errors=True)
+
+    # C21 从 manifest 重建投影：数量/路径/sha 全对
+    root21 = tempfile.mkdtemp(prefix="projection-ok-")
+    try:
+        store21 = ArtifactStore(root21)
+        store21.commit("run-proj", _artifacts())
+        proj = store21.rebuild_projection("run-proj")
+        report(proj["ok"] is True
+               and proj["manifest_entries"] == 3
+               and proj["disk_entries"] == 3
+               and not proj["missing"] and not proj["extra"]
+               and not proj["mismatched"],
+               "C21 manifest 重建投影与磁盘逐条一致", repr(proj))
+    finally:
+        shutil.rmtree(root21, ignore_errors=True)
+
+    # C22 manifest 多一条 → missing 红
+    root22 = tempfile.mkdtemp(prefix="projection-extra-entry-")
+    try:
+        store22 = ArtifactStore(root22)
+        store22.commit("run-extra", _artifacts())
+        manifest = store22.read_manifest("run-extra")
+        ghost = "blobs/" + "0" * 64
+        manifest["entries"].append({"path": ghost, "sha256": "0" * 64})
+        with open(os.path.join(store22.manifests, "run-extra.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump(manifest, f)
+        proj = store22.rebuild_projection("run-extra")
+        report(not proj["ok"] and ghost in proj["missing"],
+               "C22 manifest 多一条 → missing 红", repr(proj))
+    finally:
+        shutil.rmtree(root22, ignore_errors=True)
+
+    # C23 manifest 少一条 → extra 红
+    root23 = tempfile.mkdtemp(prefix="projection-fewer-entry-")
+    try:
+        store23 = ArtifactStore(root23)
+        store23.commit("run-few", _artifacts())
+        manifest = store23.read_manifest("run-few")
+        removed = manifest["entries"].pop()["path"]
+        with open(os.path.join(store23.manifests, "run-few.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump(manifest, f)
+        proj = store23.rebuild_projection("run-few")
+        report(not proj["ok"] and removed in proj["extra"],
+               "C23 manifest 少一条 → extra 红", repr(proj))
+    finally:
+        shutil.rmtree(root23, ignore_errors=True)
+
+    # C24 文件 sha 不符 → mismatched 红
+    root24 = tempfile.mkdtemp(prefix="projection-sha-")
+    try:
+        store24 = ArtifactStore(root24)
+        store24.commit("run-sha", _artifacts())
+        manifest = store24.read_manifest("run-sha")
+        victim_rel = manifest["entries"][0]["path"]
+        with open(os.path.join(root24, victim_rel), "ab") as f:
+            f.write(b"x")
+        proj = store24.rebuild_projection("run-sha")
+        report(not proj["ok"] and victim_rel in proj["mismatched"],
+               "C24 文件 sha 不符 → mismatched 红", repr(proj))
+    finally:
+        shutil.rmtree(root24, ignore_errors=True)
+
     # R1 测试注入（不改生产函数）：跳过产物提升，只 rename manifest
     rootR = tempfile.mkdtemp(prefix="manifest-only-")
     try:
