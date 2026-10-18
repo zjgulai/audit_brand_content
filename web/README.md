@@ -78,6 +78,29 @@ VITE_REVIEW_API_BASE=https://example.com/review-api npm run build
 开发代理：`vite.config.ts` 把 `/review-api` 代理到 `REVIEW_API_PROXY`（默认 `http://127.0.0.1:8010`），dev-up 会注入实际后端端口。
 重写规则：`/review-api/queue` 保持原样（后端联调别名），其余 `/review-api/*` 重写到 `/api/v1/*`（cases / reports 只读端点）。
 
+## 无障碍（WCAG 2.2 AA 基线）
+
+`scripts/a11y_check.mjs` 对 `/queue`、`/cases/:caseId`、`/reports/:reportId` 三页跑
+可自动化检查（Chrome CDP；离线环境未引入 axe-core）：
+
+- `html[lang]` 非空
+- 每页恰好一个 `h1`
+- `img` 有非空 `alt`（当前工程无图片）
+- `input/select/textarea` 有 label（label/for、包裹 label、aria-label/labelledby）
+- 按钮有可访问名称
+- skip-link 存在且指向 `#main`
+- 存在 `:focus-visible` 规则，聚焦元素有可见轮廓
+- 文本颜色对比：普通文本 ≥4.5、大字 ≥3.0；背景图/渐变/透明度非 1 的项跳过并列入 `unmeasured`
+
+`dev-up.sh` 第 8 步会跑它，失败非零。
+
+**当前读数**：30 项检查 / 0 违规（三页各 10 项）。
+**修复前**：30 项 / 9 违规 —— 每页各 3 项：缺 skip-link、无 `:focus-visible` 规则、聚焦元素无可见轮廓。
+
+**明确未测（必须人工）**：键盘全流程、读屏语义与焦点顺序、动态内容播报、
+200% 缩放 / reflow、`prefers-reduced-motion`、文本覆盖图片/渐变时的对比、真实用户测试。
+自动对比度是近似计算，不等同于完整 WCAG 审计。
+
 ## 构建
 
 ```bash

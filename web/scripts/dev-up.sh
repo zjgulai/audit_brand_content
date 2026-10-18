@@ -50,7 +50,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[1/7] smoke 生成临时投影（不写仓内）"
+echo "[1/8] smoke 生成临时投影（不写仓内）"
 SMOKE_DUMP_IR="${DATA}" python3 "${ROOT}/tools/smoke_end_to_end.py" \
   > "${RUN_DIR}/smoke.log" 2>&1
 test -s "${DATA}/cases.json"
@@ -58,16 +58,16 @@ test -s "${DATA}/cases.json"
   > "${RUN_DIR}/seed.log" 2>&1
 test -s "${DATA}/reports.json"
 
-echo "[2/7] npm run build"
+echo "[2/8] npm run build"
 ( cd "${WEB}" && npm run build ) > "${RUN_DIR}/build.log" 2>&1
 test -d "${WEB}/dist"
 
-echo "[3/7] 创建本地 session（u_dp3 / t1）"
+echo "[3/8] 创建本地 session（u_dp3 / t1）"
 COOKIE="$("${PY}" "${WEB}/scripts/make_session.py" \
   --db "${RUN_DIR}/sessions.db" --principal u_dp3 --tenant t1)"
 test -n "${COOKIE}"
 
-echo "[4/7] 启动 review-api :${API_PORT}"
+echo "[4/8] 启动 review-api :${API_PORT}"
 REVIEW_API_DATA_ROOT="${DATA}" \
 REVIEW_API_SESSION_DB="${RUN_DIR}/sessions.db" \
 "${UV}" review_api_dev:app --app-dir "${WEB}/scripts" \
@@ -75,7 +75,7 @@ REVIEW_API_SESSION_DB="${RUN_DIR}/sessions.db" \
   > "${RUN_DIR}/api.log" 2>&1 &
 API_PID=$!
 
-echo "[5/7] 启动 Vite dev :${WEB_PORT}（/review-api 代理到 :${API_PORT}）"
+echo "[5/8] 启动 Vite dev :${WEB_PORT}（/review-api 代理到 :${API_PORT}）"
 ( cd "${WEB}" && REVIEW_API_PROXY="http://127.0.0.1:${API_PORT}" \
   exec ./node_modules/.bin/vite --host 127.0.0.1 --port "${WEB_PORT}" --strictPort ) \
   > "${RUN_DIR}/web.log" 2>&1 &
@@ -107,7 +107,7 @@ if [ "${ready}" -ne 1 ]; then
   exit 1
 fi
 
-echo "[6/7] curl /review-api/queue"
+echo "[6/8] curl /review-api/queue"
 HTTP_STATUS="$(curl --max-time 5 -s -o "${RUN_DIR}/queue.json" \
   -w '%{http_code}' \
   -H "Cookie: session=${COOKIE}" \
@@ -121,7 +121,7 @@ if ! grep -q 'case-smoke' "${RUN_DIR}/queue.json"; then
   exit 1
 fi
 
-echo "[7/7] 页面断言：队列 → 案件详情 → 报告"
+echo "[7/8] 页面断言：队列 → 案件详情 → 报告"
 node "${WEB}/scripts/check_pages.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --cookie "${COOKIE}" \
@@ -130,6 +130,15 @@ node "${WEB}/scripts/check_pages.mjs" \
   --screenshots "${RUN_DIR}" \
   > "${RUN_DIR}/page.json" 2> "${RUN_DIR}/page.err"
 cat "${RUN_DIR}/page.json"
+
+echo "[8/8] 无障碍自动检查（三页）"
+node "${WEB}/scripts/a11y_check.mjs" \
+  --base "http://127.0.0.1:${WEB_PORT}" \
+  --cookie "${COOKIE}" \
+  --pages "/queue,/cases/case-smoke,/reports/report-smoke" \
+  --out "${RUN_DIR}/a11y.json" \
+  > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
+cat "${RUN_DIR}/a11y.stdout"
 
 echo "API_PORT=${API_PORT}"
 echo "WEB_PORT=${WEB_PORT}"

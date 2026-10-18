@@ -12,6 +12,37 @@ a {
   color: #0b63ce;
 }
 
+/* 键盘焦点必须可见（WCAG 2.2 AA）。:focus 同时覆盖程序化聚焦的检查。 */
+a:focus-visible,
+a:focus,
+button:focus-visible,
+button:focus,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #0b63ce;
+  outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -4rem;
+  z-index: 10;
+  padding: 0.5rem 0.8rem;
+  background: #fff;
+  color: #0b63ce;
+  border-radius: 4px;
+}
+
+.skip-link:focus {
+  top: 0.75rem;
+  outline: 3px solid #0b63ce;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff;
+}
+
 code {
   background: #eef2f6;
   padding: 0.1rem 0.3rem;
