@@ -15,11 +15,11 @@
 
 | 文件 | 版本 | 行数 | 字节 | sha256（短） |
 |---|---|---:|---:|---|
-| `Playbook/内容审查Agent-产品Playbook-v1.1.md` | v1.1（条件性 RATIFIED） | 1661 | 109,930 | `0218869d3096` |
-| `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | v3（136 项） | 313 | 109,575 | `7ad18cdc2cec` |
-| `Playbook/技术解决方案-v1.md` | v1 | 1,335+ | 159,509+ | 见头部（随最终绑定滚动） |
-| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1 | 1429 | 80,317 | `3c573da18b3e` |
-| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1 | 981 | 52,916 | `ae14015ca66c` |
+| `Playbook/内容审查Agent-产品Playbook-v1.1.md` | v1.1（条件性 RATIFIED，S-1 后） | 1666 | 110,908 | `ff51fc87f5aa` |
+| `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | v3（136 项，S-1 后） | 313 | 110,072 | `d4811e055463` |
+| `Playbook/技术解决方案-v1.md` | v1（S-1 后） | 1,335 | 159,522 | `28498c99716b` |
+| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1（引用重冻后） | 1429 | 80,364 | `6252cdeedc23` |
+| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1（引用重冻后） | 976 | 53,613 | `b013e3dfa7c5` |
 | `PMO/audit/内容审查Agent-行业证据矩阵-v1.md` | v1.2 | 380 | 46,714 | `34fda3a04909` |
 | `PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md` | v1.1（K-01…K-52） | 132 | 77,206 | `03b8c0742bd4` |
 | `PMO/audit/内容审查Agent-决策总账-v2-20261018.md` | v2（124 决定 / 140 指针） | 219 | 63,523 | `92b2a2c5c9a4` |
@@ -43,7 +43,7 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 | 类 | 门 | 关闭方式 | 阶段 |
 |---|---|---|---|
 | **设计类** | S-3（`fetch_error` 稳定 id） | 定稿规则文本 + 契约字段，写入技术方案 §8 | 第 0 阶段 |
-| **设计类** | U2 控制点主表（首批 20 码 + 空三族留白） | 交付 `control-points-v1.json` / `routing-v1.json` + schema；**待产品+法务签署** | 第 0 阶段 |
+| **设计类** | U2 控制点主表（首批 20 码 + 空族 `empty_families` 留白，当前四族） | 交付 `control-points-v1.json` / `routing-v1.json` + schema；**待产品+法务签署** | 第 0 阶段 |
 | **设计类** | claim/lease/draft 模块 owner | 指派 `reviews_ledger` + `disposition_router` 边界并写入技术方案 | 第 0 阶段 |
 | **实现类** | P-1 原子提交 | 代码 + 六种崩溃点注入 + manifest 对拍 | 第 0 阶段 |
 | **实现类** | G-2 outbox | 代码 + 四条反向对照（含卡片/文本合流） | 第 0 阶段 |
@@ -87,7 +87,7 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 
 - **owner**：`control_point_registry`
 - **产出**：`research/governance/control-points-v1.json`（9 字段 × 首批 H01–H09 / M01–M07 / U01–U04）、
-  `research/governance/routing-v1.json`（4 字段）；空三族（场景/权利/渠道）显式 `无控制点`。
+  `research/governance/routing-v1.json`（5 字段：`owner/layer/due/escalation/appeal`）；空族以 `empty_families` 为准（当前四族：场景/权利/渠道/品牌）显式 `无控制点`。
 - **验收**：`L6-1…L6-6` 逐条；`control_code` 集合恰为 20；`安全词` 不在表内；两表 `control_code` 集合恒等。
 - **反向对照**：删一个码 → 红；空族写成 `not_applicable` → 红；两表集合不等 → 红。
 - **门**：U2 的**结构部分**关闭；**点位内容待产品+法务签署**（签前不得声称 U2 已闭）。
@@ -175,6 +175,25 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 | T0-10 验收执行器 | ✅ **通过（含 T0-10b 加固）** | `tools/verify_acceptance_run.py` + 自测；实跑 **0 passed / 0 failed / 136 untested，rc=2**（正确：无执行点不许报通过）；自测 **6/6**，含「命令经 T0-08 沙箱执行」与「去掉 cwd 隔离 → 仓内出现文件」反向对照 |
 
 ---
+
+### 4.1c 变异检验发现的 P0 假绿（2026-10-18，9a 只读审计）
+
+> **结论：第 0 阶段的「通过」里有假绿。** 以下必须在第 1 阶段开工前修完，
+> 每条都要「删掉修复 → 验证器必须红」。
+
+| # | 位置 | 问题 | 归属 |
+|---|---|---|---|
+| M-1 | `verify_atomic_commit.py` | 注释掉产物提升后，验证器因 C13 `FileNotFoundError` 退 **rc=2（未测）** 而非 rc=1（失败） | 6d |
+| M-2 | `base/auth_session.py:29-30` | 分隔符守卫是死分支（正则已挡），删掉仍 22/22 绿 | 6d |
+| M-3 | `artifact_store.recover()` | 多 run 共存时，已提交 run 的 blob 被判 `garbage` | 6d |
+| M-4 | `artifact_store` 三处守卫 | 仓内根拒绝 / 同 fs 断言 / manifest 指向 staging·tmp —— 删掉仍绿（无用例） | 6d |
+| M-5 | `base/sandbox.py` | macOS `RLIMIT_AS` 抛 ValueError 被吞 → 内存限制未生效且无测试；`limit_hit` 可由 stderr 字符串伪造；`_socket` 可绕过 | 6d |
+| M-6 | `base/rbac.py` | `takedown.execute/waive` 无任何角色拥有（死能力）；多角色短路；`release.revoke` SoD 未测 | 6d |
+| M-7 | `auth_session` | `invalidate_all()` 与 `create_session` 的 tenant 入参未测 | 6d |
+| M-8 | 四个 `base/*.py` | 生产函数裸露 `bad_mode` 测试后门 | 6d |
+| M-9 | `verify_redact.py` C 段 | 断言 `disabled={want}` 后 finding 类型 == want —— **数学恒真** | evidence |
+| M-10 | `redact` 负样本 B3 | URL 里是 10 位数字，不匹配手机号 → 删 `no_url` 守卫仍绿 | evidence |
+| M-11 | `redact` 第二条 `tool_call_id` 规则 | 无独立正样本，删掉仍绿 | evidence |
 
 ### 4.1b 门状态（ticket 通过 ≠ 门关闭：按下表如实记）
 

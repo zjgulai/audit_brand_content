@@ -51,19 +51,30 @@ POSITIVE = [
     ("A7 护照", "护照号 E12345678", "passport"),
     ("A8 手机号", "联系电话 13800138000", "phone_cn"),
     ("A8b 手机号 +86", "电话 +86 13800138000", "phone_cn"),
-    ("A9 国际号", "call +14155552671", "phone_e164"),
+    # ★ 国际号不能选 +1 415…：`14155552671` 同时符合 phone_cn（1 后跟 4 属 [3-9]），
+    #   禁用 phone_e164 后会被 phone_cn 兜住 —— C 段就测不出 e164 规则承重。
+    ("A9 国际号", "call +33612345678", "phone_e164"),
     ("A10 绝对路径", "/Users/lute/Project/audit_multi_content/tools/agent/config.mjs", "abs_path"),
     ("A10b 家目录凭据路径", "~/.dsh/credentials/shouheng-lark.json", "home_secret_path"),
     ("A11 tool_call_id", "tool_call_id=call_abc123def456ghi789", "tool_call_id"),
-    ("A12 栈帧（File）", '  File "/Users/lute/app/main.py", line 12, in handler\n    raise X', "stack_frame_file"),
-    ("A13 栈帧（at）", "    at Object.<anonymous> (/Users/lute/app/main.py:12:5)", "stack_frame_at"),
+    # ★ 裸 call_ 规则（RULES 里第二条 tool_call_id）必须有自己的正样本：
+    #   上面那条自带 `tool_call_id=` 前缀，只有第一条规则接得住；删掉第二条仍全绿（实测过）。
+    ("A11b 裸 call_ id", "日志里出现 call_abc123def456ghi789 ，请按 id 查", "tool_call_id"),
+    # ★ 栈帧样本刻意用**相对路径**：绝对路径会被 abs_path 规则兜住，
+    #   于是「删掉 stack_frame_* 规则」仍被另一条规则脱敏 —— C 段就测不出承重。
+    ("A12 栈帧（File）", '  File "src/main.py", line 12, in handler\n    raise X', "stack_frame_file"),
+    ("A13 栈帧（at）", "    at Object.<anonymous> (src/main.py:12:5)", "stack_frame_at"),
 ]
 
 # ── B 必放样本：普通营销文案，0 条 finding ────────────────────────────────
 NEGATIVE = [
     ("B1 价格/容量/月龄", "新品上市：售价 $199.99，容量 240ml，适合 0-6 个月宝宝。"),
     ("B2 型号/日期", "Momcozy S12 Pro 吸奶器，型号 M5，2026-09-24 发布。"),
-    ("B3 URL 商品 ID", "https://shop.example.com/item/9876543210?sku=BM04"),
+    # ★ 必须是 11 位、以 138 开头（形态与国内手机号完全相同），否则这条负样本
+    #   根本不会触发 phone_cn —— 删掉 no_url 守卫也全绿（实测过）。
+    ("B3 URL 商品 ID（11 位、形态同手机号）", "https://shop.example.com/item/13800138000?sku=BM04"),
+    # ★ 同一个守卫也挂在 phone_e164 上：只测 phone_cn 的话，删掉 e164 的 no_url 仍全绿。
+    ("B3b URL 里的国际号形态", "https://shop.example.com/call/+33612345678"),
     ("B4 订单号", "产品编号 1234567890，批次 2026-09"),
     ("B5 功效数字", "对比 28.2% Faster / 292 mmHg Strong Suction"),
     ("B6 英文文案", "Clinically proven, 18% more milk on average."),
@@ -110,12 +121,23 @@ def main() -> int:
         if safe != text:
             fails.append("%s：干净文本被改写" % sid)
 
-    # C 规则承重：禁用某类型 → 对应正样本不再命中该类型
+    # C 规则承重：禁用某类型 → **原敏感切片必须重新出现在 safe_text 里**
+    # ★ 旧写法「禁用后不再命中该类型」是恒真的：被禁规则根本不会产出 finding，
+    #   所以它证明不了这条规则在任何样本上真的干了活。现在要求阳性证据：
+    #   ① 未禁用时该类型确实切出了片段；② 禁用后至少有一个原片段原样回到输出里。
+    #   若另一个类型/同类型另一条规则把它兜住了，就说明「这条规则对这一样本不承重」。
     for sid, text, want in POSITIVE:
         checks += 1
-        _, findings = R.redact(text, disabled={want})
-        if any(f["type"] == want for f in findings):
-            fails.append("%s：禁用 %s 后仍命中 —— 该断言不承重" % (sid, want))
+        safe0, findings0 = R.redact(text)
+        want_slices = [text[f["start"]:f["end"]] for f in findings0 if f["type"] == want]
+        if not want_slices:
+            fails.append("%s：未禁用时就没命中 %s —— C 无法判定承重" % (sid, want))
+            continue
+        checks += 1
+        safe1, _ = R.redact(text, disabled={want})
+        if not any(sl in safe1 for sl in want_slices):
+            fails.append("%s：禁用 %s 后原切片仍被脱敏（被另一条规则兜住）—— 该规则对这一样本不承重"
+                         % (sid, want))
 
     for m in fails:
         print("  ❌ " + m)

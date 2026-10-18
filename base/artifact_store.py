@@ -164,13 +164,11 @@ class ArtifactStore(object):
             return os.path.join(self.reports, key + ".md")
         raise ValueError("unknown artifact kind: %s" % kind)
 
-    def commit(self, run_id, artifacts, crash_at=None, bad_mode=None,
-               hard_crash_at=None):
+    def commit(self, run_id, artifacts, crash_at=None, hard_crash_at=None):
         """提交一次运行的全部产物；返回 manifest dict。
 
         crash_at=1..5 为进程内故障注入（抛 SimulatedCrash）；
         hard_crash_at=4/5 在关键点直接 os._exit(9)（真实进程崩溃，跳过 finally）。
-        bad_mode='manifest_only' 复现第一版 bug（只 rename manifest、不提升产物）。
         """
         self._lock(run_id)
         staging_run = os.path.join(self.staging, run_id)
@@ -191,9 +189,6 @@ class ArtifactStore(object):
             for i, a in enumerate(artifacts):
                 final = self._final_path(a["kind"], a["key"], a["data"])
                 a["_final"] = final
-                if bad_mode == "manifest_only":
-                    # 故意不提升；manifest 将指向不存在的最终路径。
-                    continue
                 os.makedirs(os.path.dirname(final), exist_ok=True)
                 os.replace(a["_tmp"], final)
                 self._fsync_dir(os.path.dirname(final))
@@ -278,6 +273,25 @@ class ArtifactStore(object):
             })
         return index
 
+    def _committed_paths(self):
+        """汇总**所有**已提交 manifest 引用的相对路径（多 run）。"""
+        paths = set()
+        if not os.path.isdir(self.manifests):
+            return paths
+        for name in os.listdir(self.manifests):
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(self.manifests, name), encoding="utf-8") as f:
+                    manifest = json.load(f)
+            except Exception:  # noqa: BLE001
+                continue
+            for entry in manifest.get("entries", []):
+                rel = entry.get("path")
+                if rel:
+                    paths.add(os.path.normpath(rel))
+        return paths
+
     def recover(self, run_id):
         """返回 (state, detail)。四态：committed / orphan / uncommitted / garbage。"""
         self._clean_stale_locks()
@@ -309,7 +323,12 @@ class ArtifactStore(object):
         if os.path.exists(mtmp):
             return "uncommitted", "manifest.tmp remains"
 
-        for _dirpath, _dirnames, filenames in os.walk(self.blobs):
-            if filenames:
-                return "garbage", "unreferenced blobs"
+        # 多 run 共用 blobs/：只有**没有被任何已提交 manifest 引用**的 blob 才是垃圾。
+        # 旧实现「见到任何 blob 就 garbage」，会把别的 run 的已提交产物误判成垃圾。
+        referenced = self._committed_paths()
+        for dirpath, _dirnames, filenames in os.walk(self.blobs):
+            for fn in filenames:
+                rel = os.path.relpath(os.path.join(dirpath, fn), self.root)
+                if os.path.normpath(rel) not in referenced:
+                    return "garbage", "unreferenced blob: %s" % rel
         return "uncommitted", "nothing committed"

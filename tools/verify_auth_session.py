@@ -10,8 +10,10 @@
   C4 跨案/跨动作/错 principal/错 nonce 拒绝
   C5 step-up 过期拒绝
   C6 session DB 丢失 → 全部 session + step-up 失效
-  R1 去掉 single-use → 第二次使用必须被放行（反向对照）
-  R2 去掉 absolute → 8h 后仍有效（反向对照）
+  C7 invalidate_all → session + step-up 全部失效；之后新 session 可用
+  C8 create_session 的 tenant 写入并回读（含默认值）
+  R1 去掉 single-use → 第二次使用必须被放行（测试注入）
+  R2 去掉 absolute → 8h 后仍有效（测试注入）
   R3 cookie 塞 tenant → 必须红
 
 退出码：0 全过 / 1 有红 / 2 未测（导入失败或验收器自身异常）。
@@ -22,6 +24,7 @@ import os
 import shutil
 import sys
 import tempfile
+from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -133,19 +136,45 @@ def main():
         report(store2.consume_step_up(t4, "ou_frank", "case-9", "sign", "nonce-4", now=7001) is False,
                "C6 DB 丢失后 step-up 失效", "")
 
-        # R1 reverse: no single-use -> second use allowed
+        # C7 invalidate_all：session + step-up 全部失效
+        c6 = store2.create_session("ou_ivy", tenant="t2", now=7500)
+        t6 = store2.issue_step_up("ou_ivy", "case-10", "sign", "nonce-6", now=7500)
+        store2.invalidate_all()
+        report(store2.get_session(c6, now=7501) is None,
+               "C7 invalidate_all → session 失效", "")
+        report(store2.consume_step_up(t6, "ou_ivy", "case-10", "sign", "nonce-6",
+                                      now=7501) is False,
+               "C7 invalidate_all → step-up 失效", "")
+        c7 = store2.create_session("ou_ivy", tenant="t2", now=7502)
+        report(store2.get_session(c7, now=7503) is not None,
+               "C7 invalidate_all 之后新 session 可用", "")
+
+        # C8 create_session tenant 写入并回读
+        c8 = store2.create_session("ou_ten", tenant="t2", now=7600)
+        sess8 = store2.get_session(c8, now=7601)
+        report(sess8 is not None and sess8.get("tenant") == "t2",
+               "C8 create_session tenant=t2 回读", "got=%r" % (sess8,))
+        c9 = store2.create_session("ou_default", now=7700)
+        sess9 = store2.get_session(c9, now=7701)
+        report(sess9 is not None and sess9.get("tenant") == "t1",
+               "C8 create_session tenant 默认 t1", "got=%r" % (sess9,))
+
+        # R1 reverse: 测试注入去掉 single-use -> second use allowed
         t5 = store2.issue_step_up("ou_alice", "case-1", "sign", "nonce-5", now=8000)
         store2.consume_step_up(t5, "ou_alice", "case-1", "sign", "nonce-5", now=8001)
-        report(store2.consume_step_up(t5, "ou_alice", "case-1", "sign", "nonce-5",
-                                      now=8002, bad_mode="no_single_use"),
-               "R1 去掉 single-use → 第二次被放行（反向对照成立）", "")
+        with mock.patch("base.auth_session._single_use_violation",
+                        lambda used: False):
+            report(store2.consume_step_up(t5, "ou_alice", "case-1", "sign", "nonce-5",
+                                          now=8002),
+                   "R1 去掉 single-use → 第二次被放行（反向对照成立）", "")
 
-        # R2 reverse: no absolute -> still valid after 8h
+        # R2 reverse: 测试注入去掉 absolute -> still valid after 8h
         c5 = store2.create_session("ou_grace", tenant="t1", now=9000)
         _advance(store2, c5, 9000, 9000 + ABSOLUTE_SECONDS - 100)
-        report(store2.get_session(c5, now=9000 + ABSOLUTE_SECONDS + 1,
-                                  bad_mode="no_absolute") is not None,
-               "R2 去掉 absolute → 8h 后仍有效（反向对照成立）", "")
+        with mock.patch("base.auth_session._absolute_expired",
+                        lambda created_at, now: False):
+            report(store2.get_session(c5, now=9000 + ABSOLUTE_SECONDS + 1) is not None,
+                   "R2 去掉 absolute → 8h 后仍有效（反向对照成立）", "")
 
         # R3 reverse: cookie with tenant must fail
         report(store2.get_session("sid|tenant=t1", now=9000) is None,

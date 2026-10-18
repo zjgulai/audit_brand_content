@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -19,8 +20,10 @@ REAL_TABLE = os.path.join(
     "验收表-v3-覆盖全部判据-20261017.md")
 
 try:
+    import base.sandbox as sb
     from base.sandbox import run_untrusted
 except Exception:  # noqa: BLE001
+    sb = None
     run_untrusted = None
 
 
@@ -91,11 +94,18 @@ def main():
     if os.path.exists(probe):
         os.unlink(probe)
 
-    # R-cwd：去掉 cwd 隔离 → 仓内出现（证明隔离有效）
-    if run_untrusted is not None:
+    # R-cwd：测试注入 cwd=仓库 → 仓内出现（证明隔离有效，生产函数无 bad_mode）
+    if run_untrusted is not None and sb is not None:
         code = ("import subprocess,sys\n"
                 "sys.exit(subprocess.call(%r, shell=True))" % write_cmd)
-        r = run_untrusted(code, timeout=10, cpu_seconds=5, bad_mode="no_cwd")
+        real_run = sb.subprocess.run
+
+        def repo_cwd(*args, **kwargs):
+            kwargs["cwd"] = REPO_ROOT
+            return real_run(*args, **kwargs)
+
+        with mock.patch.object(sb.subprocess, "run", repo_cwd):
+            r = run_untrusted(code, timeout=10, cpu_seconds=5)
         report(r["ok"] and os.path.exists(probe),
                "R-cwd 去掉 cwd 隔离 → 仓内出现（反向对照成立）", repr(r))
         if os.path.exists(probe):

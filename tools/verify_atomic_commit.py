@@ -10,7 +10,13 @@
   C11   manifest 与 recovery 索引逐条对拍
   C12  孤儿 blob → garbage
   C13  manifest 指向缺失文件 → orphan
-  R1    去掉产物提升（单点提交 bug）→ orphan
+  C14  多 run：B 未提交不得因 A 的已提交 blob 判 garbage
+  C15  多 run + 真孤儿 blob → garbage
+  C16  仓内数据根必须被拒
+  C17  staging/blobs/manifests 跨文件系统必须被拒
+  C18  manifest 指向 staging/.tmp → orphan
+  R1    去掉产物提升（单点提交 bug，测试注入）→ orphan
+  M-1   源码级变异：注释掉产物提升后整份验证器必须 rc=1，不许退 rc=2
 
 退出码：
   0 = 全过
@@ -26,12 +32,19 @@ import subprocess
 import sys
 import tempfile
 import time
+import types
+from unittest import mock
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EXTRA_ROOT = os.environ.get("ATOMIC_STORE_ROOT")
 sys.path.insert(0, REPO_ROOT)
+if EXTRA_ROOT:
+    sys.path.insert(0, EXTRA_ROOT)
 
 try:
+    from base import artifact_store as _store_mod
     from base.artifact_store import ArtifactStore, SimulatedCrash
+    STORE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(_store_mod.__file__)))
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入 base.artifact_store: %s" % exc)
     sys.exit(2)
@@ -50,12 +63,12 @@ def _new_store():
     return root, ArtifactStore(root)
 
 
-def _run_case(name, crash_at=None, bad_mode=None, post=None):
+def _run_case(name, crash_at=None, post=None):
     root = None
     try:
         root, store = _new_store()
         try:
-            store.commit("run-1", _artifacts(), crash_at=crash_at, bad_mode=bad_mode)
+            store.commit("run-1", _artifacts(), crash_at=crash_at)
             outcome = None
         except SimulatedCrash as exc:
             outcome = str(exc)
@@ -145,7 +158,8 @@ def main():
             "arts = [{'kind':'blobs','key':'b','data':b'x'},"
             "{'kind':'reports','key':'r','data':b'# r'}]\n"
             "s.commit(%r, arts, hard_crash_at=%d)\n" % (root, run_id, crash_at))
-        return subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT,
+        run_cwd = EXTRA_ROOT or REPO_ROOT
+        return subprocess.run([sys.executable, "-c", code], cwd=run_cwd,
                               capture_output=True, text=True)
 
     # C9 真实进程崩溃：manifest rename 前
@@ -217,7 +231,8 @@ def main():
         store13.commit("run-miss", _artifacts())
         manifest = store13.read_manifest("run-miss")
         victim = os.path.join(root13, manifest["entries"][0]["path"])
-        os.unlink(victim)
+        if os.path.exists(victim):
+            os.unlink(victim)
         state, detail = store13.recover("run-miss")
         report(state == "orphan" and "missing entry" in str(detail),
                "C13 manifest 指向缺失文件 → orphan",
@@ -225,9 +240,138 @@ def main():
     finally:
         shutil.rmtree(root13, ignore_errors=True)
 
-    # 反向对照：只 rename manifest、不把产物提升到最终路径 → 必须 orphan
-    state, detail, _ = _run_case("manifest-only", bad_mode="manifest_only")
-    report(state == "orphan", "R1 去掉产物提升（单点提交 bug）→ orphan", "got=%s %s" % (state, detail))
+    # C14 多 run：另一个 run 的已提交 blob 不是本 run 的垃圾
+    root14 = tempfile.mkdtemp(prefix="multi-run-")
+    try:
+        store14 = ArtifactStore(root14)
+        store14.commit("run-A", _artifacts())
+        state, detail = store14.recover("run-B")
+        report(state == "uncommitted",
+               "C14 多 run：B 未提交不得因 A 的 blob 判 garbage",
+               "state=%s %s" % (state, detail))
+    finally:
+        shutil.rmtree(root14, ignore_errors=True)
+
+    # C15 多 run + 真孤儿 blob → 仍必须 garbage
+    root15 = tempfile.mkdtemp(prefix="multi-run-garbage-")
+    try:
+        store15 = ArtifactStore(root15)
+        store15.commit("run-A", _artifacts())
+        with open(os.path.join(store15.blobs, "deadbeef"), "wb") as f:
+            f.write(b"orphan")
+        state, detail = store15.recover("run-B")
+        report(state == "garbage" and "unreferenced blob" in str(detail),
+               "C15 多 run + 真孤儿 blob → garbage",
+               "state=%s %s" % (state, detail))
+    finally:
+        shutil.rmtree(root15, ignore_errors=True)
+
+    # C16 仓内数据根必须被拒（STORE_ROOT = 被导入模块自己的仓库根）
+    try:
+        ArtifactStore(STORE_ROOT)
+        ok16 = False
+        detail16 = "no exception"
+    except RuntimeError as exc:
+        ok16 = "outside the repository" in str(exc)
+        detail16 = str(exc)
+    report(ok16, "C16 仓内数据根被拒", detail16)
+
+    # C17 staging/blobs/manifests 跨文件系统必须被拒
+    root17 = tempfile.mkdtemp(prefix="same-fs-")
+    try:
+        store17 = ArtifactStore(root17)
+        real_stat = os.stat
+
+        def fake_stat(path, *args, **kwargs):
+            p = os.path.abspath(path)
+            dev = 2 if p.endswith(os.sep + "blobs") else 1
+            return types.SimpleNamespace(st_dev=dev)
+
+        with mock.patch("base.artifact_store.os.stat", fake_stat):
+            try:
+                store17._assert_same_fs()
+                ok17 = False
+                detail17 = "no exception"
+            except RuntimeError as exc:
+                ok17 = "same filesystem" in str(exc)
+                detail17 = str(exc)
+        report(ok17, "C17 跨文件系统被拒", detail17)
+    finally:
+        shutil.rmtree(root17, ignore_errors=True)
+
+    # C18 manifest 指向 staging/.tmp → orphan
+    root18 = tempfile.mkdtemp(prefix="manifest-staging-")
+    try:
+        store18 = ArtifactStore(root18)
+        with open(os.path.join(store18.manifests, "run-stale.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump({"schema_version": "atomic-manifest/1.0",
+                       "run_id": "run-stale",
+                       "entries": [{"path": "staging/run-stale/0.tmp",
+                                    "sha256": "0" * 64}]}, f)
+        state, detail = store18.recover("run-stale")
+        report(state == "orphan" and "manifest points at staging path" in str(detail),
+               "C18 manifest 指向 staging/.tmp → orphan",
+               "state=%s %s" % (state, detail))
+    finally:
+        shutil.rmtree(root18, ignore_errors=True)
+
+    # R1 测试注入（不改生产函数）：跳过产物提升，只 rename manifest
+    rootR = tempfile.mkdtemp(prefix="manifest-only-")
+    try:
+        storeR = ArtifactStore(rootR)
+        real_replace = os.replace
+
+        def fake_replace(src, dst):
+            d = os.path.abspath(os.path.dirname(dst))
+            if d in (storeR.blobs, storeR.ir, storeR.receipts, storeR.reports):
+                return None  # 故意不提升
+            return real_replace(src, dst)
+
+        with mock.patch("base.artifact_store.os.replace", fake_replace):
+            storeR.commit("run-1", _artifacts())
+        state, detail = storeR.recover("run-1")
+        report(state == "orphan", "R1 去掉产物提升（测试注入）→ orphan",
+               "got=%s %s" % (state, detail))
+    finally:
+        shutil.rmtree(rootR, ignore_errors=True)
+
+    # M-1 自测：注释掉产物提升后，验证器必须 rc=1（不是 rc=2 未测）
+    if os.environ.get("ATOMIC_SELFTEST_MUTATION") != "0":
+        mut_root = tempfile.mkdtemp(prefix="atomic-mutation-")
+        try:
+            pkg = os.path.join(mut_root, "base")
+            os.makedirs(pkg)
+            src_path = os.path.join(REPO_ROOT, "base", "artifact_store.py")
+            with open(src_path, encoding="utf-8") as f:
+                src = f.read()
+            needle = '                os.replace(a["_tmp"], final)\n'
+            mutated = src.replace(
+                needle, "                pass  # MUTATION: promotion disabled\n")
+            if mutated == src:
+                report(False, "M-1 无法构造产物提升变异", "needle not found")
+            else:
+                with open(os.path.join(pkg, "artifact_store.py"),
+                          "w", encoding="utf-8") as f:
+                    f.write(mutated)
+                with open(os.path.join(pkg, "__init__.py"),
+                          "w", encoding="utf-8") as f:
+                    f.write("")
+                env = os.environ.copy()
+                env["ATOMIC_STORE_ROOT"] = mut_root
+                env["ATOMIC_SELFTEST_MUTATION"] = "0"
+                prev = env.get("PYTHONPATH")
+                env["PYTHONPATH"] = mut_root + (
+                    (os.pathsep + prev) if prev else "")
+                proc = subprocess.run(
+                    [sys.executable, os.path.abspath(__file__)],
+                    cwd=REPO_ROOT, env=env, capture_output=True, text=True)
+                blob = (proc.stdout or "") + (proc.stderr or "")
+                report(proc.returncode == 1 and "FAIL:" in blob,
+                       "M-1 注释掉产物提升 → rc=1（不是 rc=2 未测）",
+                       "rc=%s tail=%s" % (proc.returncode, blob[-400:]))
+        finally:
+            shutil.rmtree(mut_root, ignore_errors=True)
 
     print("----------------------------------------")
     if failed == 0:

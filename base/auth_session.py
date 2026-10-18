@@ -22,6 +22,14 @@ STEP_UP_SECONDS = 5 * 60
 _OPAQUE_RE = re.compile(r"^[A-Za-z0-9_-]{20,}$")
 
 
+def _absolute_expired(created_at, now):
+    return (now - created_at) > ABSOLUTE_SECONDS
+
+
+def _single_use_violation(used):
+    return bool(used)
+
+
 def is_opaque_cookie(value):
     """cookie 只能是 opaque id；带 '=' ':' '|' 或过短都拒绝。"""
     if not isinstance(value, str):
@@ -76,7 +84,7 @@ class SessionStore(object):
         self._conn.commit()
         return sid
 
-    def get_session(self, cookie, now=None, bad_mode=None):
+    def get_session(self, cookie, now=None):
         """有效则返回 {principal, tenant} 并续 idle；否则 None。"""
         if not is_opaque_cookie(cookie):
             return None
@@ -91,7 +99,7 @@ class SessionStore(object):
         principal, tenant, created_at, last_activity, revoked = row
         if revoked:
             return None
-        if bad_mode != "no_absolute" and (now - created_at) > ABSOLUTE_SECONDS:
+        if _absolute_expired(created_at, now):
             return None
         if (now - last_activity) > IDLE_SECONDS:
             return None
@@ -118,7 +126,7 @@ class SessionStore(object):
         return token
 
     def consume_step_up(self, token, principal, case_id, action, nonce,
-                        now=None, bad_mode=None):
+                        now=None):
         """校验并消费 token；成功返回 True，任一绑定/时限/单次校验失败返回 False。"""
         if not isinstance(token, str) or not token:
             return False
@@ -133,7 +141,7 @@ class SessionStore(object):
         t_principal, t_case, t_action, t_nonce, expires_at, used = row
         if now > expires_at:
             return False
-        if bad_mode != "no_single_use" and used:
+        if _single_use_violation(used):
             return False
         if (t_principal != principal or t_case != case_id or
                 t_action != action or t_nonce != nonce):
