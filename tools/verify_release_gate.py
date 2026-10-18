@@ -178,6 +178,8 @@ def main():
             T(cid, False, "未拒")
         except exc:
             T(cid, True, "")
+        except Exception as e:  # 非预期异常也必须记 FAIL，不许 traceback 顶穿
+            T(cid, False, "非预期异常 %s: %s" % (type(e).__name__, e))
 
     g4, s4 = new_gate("c")
     c4 = case(case_id="case-4")
