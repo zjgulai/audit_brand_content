@@ -1,0 +1,870 @@
+{
+ "schema_version": "control-points-v1",
+ "table_version": "cp-2026-10-18-v2",
+ "generated_from": [
+  {
+   "file": "research/governance/skeleton/rules-v1.json",
+   "note": "20 个真码来自 26 条规则的 parent_rule；`安全词` 不是码，按 Playbook §5.3.2 退役、不入表"
+  }
+ ],
+ "status_note": "T0-01 设计关门产物。**结构已闭合**（九字段 / 20 码 / 唯一归属）；**空 4 族**（场景控制, 权利控制, 渠道控制, 品牌控制）—— 点位内容待产品+法务签署（U2）。",
+ "family_assignment_note": "⚠️ **`family` 的取值是判断，不是数据。** 逐条依据是「该码的审查动作是什么」（看 `match` 是文本关键词还是画面判断，再看 `topic_label` 的语义），不是看码的前缀、也不是看 topic 编号。盘上没有一份原始材料直接给出这 20 个码的族归属。若判错：改 `family` 并升 `table_version`，**不改 `control_code`**。★ 2026-10-18 修正：M04 / U03 / U04 原归「场景控制」，复核后确认三者的 `match` 全是**文本关键词**（`don't miss` / `NICU|hospital` / `sore nipples`），不是画面判断，已改为宣称控制。",
+ "signed_by": [],
+ "families": [
+  "宣称控制",
+  "事实控制",
+  "披露控制",
+  "场景控制",
+  "权利控制",
+  "渠道控制",
+  "品牌控制"
+ ],
+ "empty_families": [
+  {
+   "family": "场景控制",
+   "state": "无控制点",
+   "reason": "U2 点位内容未定，待产品+法务签署"
+  },
+  {
+   "family": "权利控制",
+   "state": "无控制点",
+   "reason": "U2 点位内容未定，待产品+法务签署"
+  },
+  {
+   "family": "渠道控制",
+   "state": "无控制点",
+   "reason": "U2 点位内容未定，待产品+法务签署"
+  },
+  {
+   "family": "品牌控制",
+   "state": "无控制点",
+   "reason": "U2 点位内容未定，待产品+法务签署"
+  }
+ ],
+ "known_gaps": [
+  {
+   "code": "U02",
+   "issue": "L6-4 要求每个控制点都指得出 authority_ref，规则库里 U02 的 external_ref 缺失（19/20 有）",
+   "current_handling": "标 status=deprecated",
+   "exemption_rule": "**停用码豁免口径**：`status=deprecated` 的控制点**允许 authority_ref 为空**，但必须在 `known_gaps` 里有一条记录说明「为什么停用、谁停的、何时」；且 L6-4 的检查器必须**显式区分** active（缺依据即红）与 deprecated（缺依据可豁免、但缺记录即红）。**不允许**用空 authority_ref + 没有记录的方式「静默退役」",
+   "decision_needed": "产品 + 法务"
+  }
+ ],
+ "control_points": [
+  {
+   "control_code": "H01",
+   "control_name": "疾病治疗 / 治愈",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-021",
+     "article": "S7-03",
+     "url": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+     "fingerprint": "sha256:95b0952d876dcd11"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-025",
+     "article": "S9-01",
+     "url": "https://support.google.com/adspolicy/answer/176031",
+     "fingerprint": "sha256:19f68f62126a8905"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-038",
+     "article": "S13-01",
+     "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+     "fingerprint": "sha256:eef6374350ef37c5"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-046",
+     "article": "S14-08",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:8605899f684bd932"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-051",
+     "article": "S15-05",
+     "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+     "fingerprint": "sha256:0b757c78abc192f9"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-053",
+     "article": "S16-02",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:fc8c251f23862a1f"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H02",
+   "control_name": "疾病预防",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-025",
+     "article": "S9-01",
+     "url": "https://support.google.com/adspolicy/answer/176031",
+     "fingerprint": "sha256:19f68f62126a8905"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-038",
+     "article": "S13-01",
+     "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+     "fingerprint": "sha256:eef6374350ef37c5"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-053",
+     "article": "S16-02",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:fc8c251f23862a1f"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H03",
+   "control_name": "临床 / 科学背书",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-003",
+     "article": "S1-03",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:951da5db85ac22c6"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-005",
+     "article": "S1-05",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:82b89427e61439d2"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-006",
+     "article": "S2-01",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:4b0340816636822e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-008",
+     "article": "S2-03",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:0e09267f3a198c3a"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-009",
+     "article": "S2-04",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:6ac6f0844d6c1067"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-040",
+     "article": "S14-02",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:cea4fcd7cf55666e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-041",
+     "article": "S14-03",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:3decd00fe18dff1f"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-044",
+     "article": "S14-06",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:1cc5dbcfe3cf238d"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-047",
+     "article": "S15-01",
+     "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+     "fingerprint": "sha256:93d3c9f9e9387aa5"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-052",
+     "article": "S16-01",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:d980c1672772bf83"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H04",
+   "control_name": "专家 / 个人背书",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-005",
+     "article": "S1-05",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:82b89427e61439d2"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-009",
+     "article": "S2-04",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:6ac6f0844d6c1067"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-021",
+     "article": "S7-03",
+     "url": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+     "fingerprint": "sha256:95b0952d876dcd11"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-031",
+     "article": "S10-04",
+     "url": "https://support.google.com/adspolicy/answer/6020955",
+     "fingerprint": "sha256:6ed9289d5148d203"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-042",
+     "article": "S14-04",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:0855f4ddd818a5ea"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-044",
+     "article": "S14-06",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:1cc5dbcfe3cf238d"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-047",
+     "article": "S15-01",
+     "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+     "fingerprint": "sha256:93d3c9f9e9387aa5"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-055",
+     "article": "S16-04",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:02cd20389595b84d"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H05",
+   "control_name": "无害 / 无副作用",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-027",
+     "article": "S9-03",
+     "url": "https://support.google.com/adspolicy/answer/176031",
+     "fingerprint": "sha256:6c446cd32ce66e39"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-043",
+     "article": "S14-05",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:b8f54d592c521bcf"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-049",
+     "article": "S15-03",
+     "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+     "fingerprint": "sha256:f1384b33049caf04"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-054",
+     "article": "S16-03",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:5b652f4d87018471"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-056",
+     "article": "S16-05",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:88ddc03fa25f17b4"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H06",
+   "control_name": "监管状态",
+   "family": "披露控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-001",
+     "article": "S1-01",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:f81f5107959b5081"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-006",
+     "article": "S2-01",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:4b0340816636822e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-025",
+     "article": "S9-01",
+     "url": "https://support.google.com/adspolicy/answer/176031",
+     "fingerprint": "sha256:19f68f62126a8905"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-032",
+     "article": "S11-01",
+     "url": "https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved",
+     "fingerprint": "sha256:834bc69211537818"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-033",
+     "article": "S11-02",
+     "url": "https://www.fda.gov/consumers/consumer-updates/it-really-fda-approved",
+     "fingerprint": "sha256:be4ae92bf3e541b1"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-034",
+     "article": "S12-01",
+     "url": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+     "fingerprint": "sha256:c8d62d5ee3d6972e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-038",
+     "article": "S13-01",
+     "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/general-wellness-policy-low-risk-devices",
+     "fingerprint": "sha256:eef6374350ef37c5"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-045",
+     "article": "S14-07",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:9b8eb8de17a58b27"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H07",
+   "control_name": "疼痛缓解（人体结果）",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-035",
+     "article": "S12-02",
+     "url": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+     "fingerprint": "sha256:5ea8f51b7eba3316"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H08",
+   "control_name": "与具名/可识别竞品的对比",
+   "family": "事实控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-010",
+     "article": "S2-05",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:a13ddd8ac79e8d1f"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-048",
+     "article": "S15-02",
+     "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+     "fingerprint": "sha256:fd6c180d9fec6d1e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-056",
+     "article": "S16-05",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:88ddc03fa25f17b4"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "H09",
+   "control_name": "机器性能声明 · 智能仿生",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-036",
+     "article": "S12-03",
+     "url": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+     "fingerprint": "sha256:f53ca653ad4be25b"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M01",
+   "control_name": "噪音 / 吸力",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-039",
+     "article": "S14-01",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:dd7f8f48d1beb66c"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M02",
+   "control_name": "吸力夸大",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-039",
+     "article": "S14-01",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:dd7f8f48d1beb66c"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M03",
+   "control_name": "效果数据声明（有来源）",
+   "family": "事实控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-003",
+     "article": "S1-03",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:951da5db85ac22c6"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-008",
+     "article": "S2-03",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:0e09267f3a198c3a"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-039",
+     "article": "S14-01",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:dd7f8f48d1beb66c"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-040",
+     "article": "S14-02",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:cea4fcd7cf55666e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-052",
+     "article": "S16-01",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:d980c1672772bf83"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M04",
+   "control_name": "制造焦虑 / 恐吓",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-011",
+     "article": "S3-01",
+     "url": "https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ",
+     "fingerprint": "sha256:ae4640b2d42cad83"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-020",
+     "article": "S7-02",
+     "url": "https://transparency.meta.com/policies/ad-standards/restricted-goods-services/health-wellness/",
+     "fingerprint": "sha256:62d14ddcb9c2137e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-023",
+     "article": "S8-01",
+     "url": "https://transparency.meta.com/policies/ad-standards/",
+     "fingerprint": "sha256:e4965e0e64283c9f"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-028",
+     "article": "S10-01",
+     "url": "https://support.google.com/adspolicy/answer/6020955",
+     "fingerprint": "sha256:b26634f1b8611d7e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-060",
+     "article": "S17-02",
+     "url": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+     "fingerprint": "sha256:c7262b21ad19c40a"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M05",
+   "control_name": "机构 / 等级背书",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-004",
+     "article": "S1-04",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:7c095f1dbd7775dd"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-014",
+     "article": "S4-01",
+     "url": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+     "fingerprint": "sha256:88ac8c9dfd4711f6"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-030",
+     "article": "S10-03",
+     "url": "https://support.google.com/adspolicy/answer/6020955",
+     "fingerprint": "sha256:28bffe4ed2efc35d"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-031",
+     "article": "S10-04",
+     "url": "https://support.google.com/adspolicy/answer/6020955",
+     "fingerprint": "sha256:6ed9289d5148d203"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-061",
+     "article": "S17-03",
+     "url": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+     "fingerprint": "sha256:bc7dad3e2a318bf6"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M06",
+   "control_name": "与行业基准的模糊对比",
+   "family": "事实控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-010",
+     "article": "S2-05",
+     "url": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ",
+     "fingerprint": "sha256:a13ddd8ac79e8d1f"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "M07",
+   "control_name": "排空 / 奶阵 / 奶流",
+   "family": "披露控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-039",
+     "article": "S14-01",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:dd7f8f48d1beb66c"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "U01",
+   "control_name": "专家 / 个人背书 · 头衔",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-005",
+     "article": "S1-05",
+     "url": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A",
+     "fingerprint": "sha256:82b89427e61439d2"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-044",
+     "article": "S14-06",
+     "url": "https://www.ftc.gov/business-guidance/resources/health-products-compliance-guidance",
+     "fingerprint": "sha256:1cc5dbcfe3cf238d"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-047",
+     "article": "S15-01",
+     "url": "https://www.gov.uk/guidance/advertise-your-medicines",
+     "fingerprint": "sha256:93d3c9f9e9387aa5"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-055",
+     "article": "S16-04",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:02cd20389595b84d"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "U02",
+   "control_name": "报销资质",
+   "family": "披露控制",
+   "judge_type": "literal",
+   "authority_kind": "internal",
+   "authority_ref": [],
+   "parent": null,
+   "version": "v1",
+   "status": "deprecated",
+   "authority_ref_exemption": {
+    "applies": true,
+    "rule": "L6-4 对 status=deprecated 的控制点不要求 authority_ref",
+    "must_still_have": "known_gaps 里的一条停用记录（为什么/谁/何时）",
+    "why": "停用码不参与判定，要求它指得出依据等于要求一个不再使用的码 upkeep 依据"
+   },
+   "deprecated_note": "**停用码不参与 L6-4 的 authority_ref 检查。** 退役依据：该规则在 `research/governance/skeleton/rules-v1.json` 中 `enabled=false`，`disabled_reason` 写「停用的是规则，不是主题」；库内无 external_ref（19/20 个码有）。**退役裁决人与日期尚未记录** —— 这是已知缺口（见 known_gaps.U02 的 decision_needed），在补上之前不得声称 U02 已依法退役。"
+  },
+  {
+   "control_code": "U03",
+   "control_name": "医疗场景",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-030",
+     "article": "S10-03",
+     "url": "https://support.google.com/adspolicy/answer/6020955",
+     "fingerprint": "sha256:28bffe4ed2efc35d"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-037",
+     "article": "S12-04",
+     "url": "https://www.fda.gov/medical-devices/consumer-products/breast-pumps",
+     "fingerprint": "sha256:4b8c8a4ca4bae77e"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-058",
+     "article": "S16-07",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:85e916485b696a14"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-061",
+     "article": "S17-03",
+     "url": "https://www.tiktok.com/legal/page/global/bc-policy/en",
+     "fingerprint": "sha256:bc7dad3e2a318bf6"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  },
+  {
+   "control_code": "U04",
+   "control_name": "痛点场景描述",
+   "family": "宣称控制",
+   "judge_type": "literal",
+   "authority_kind": "external",
+   "authority_ref": [
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-011",
+     "article": "S3-01",
+     "url": "https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ",
+     "fingerprint": "sha256:ae4640b2d42cad83"
+    },
+    {
+     "source": "外部标准库",
+     "entry_id": "EXT-058",
+     "article": "S16-07",
+     "url": "https://www.asa.org.uk/type/non_broadcast/code_section/12.html",
+     "fingerprint": "sha256:85e916485b696a14"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "active"
+  }
+ ],
+ "contract_impact": {
+  "why": "空族从 3 变 4（新增品牌控制）。以下位置写着「空三族」，下一次同步批必须改；本文件只登记，不改它们。",
+  "items": [
+   {
+    "file": "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+    "where": "§5.3 / §7 U2",
+    "current": "剩余三族（场景/权利/渠道）",
+    "must_become": "剩余四族（场景/权利/渠道/品牌）"
+   },
+   {
+    "file": "PRD/内容审查Agent-PRD-优化版-v2.0.md",
+    "where": "GAP-1",
+    "current": "三族未定",
+    "must_become": "四族未定"
+   },
+   {
+    "file": "PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md",
+    "where": "§0.3",
+    "current": "三族",
+    "must_become": "四族"
+   },
+   {
+    "file": "PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md",
+    "where": "覆盖说明/文案",
+    "current": "三族",
+    "must_become": "四族"
+   },
+   {
+    "file": "PMO/audit/验收表-v3-覆盖全部判据-20261017.md",
+    "where": "#79（L6-1…L6-6）",
+    "current": "未提空族数",
+    "must_become": "补一条断言：空族数与主表 empty_families 恒等"
+   }
+  ],
+  "execution_note": "同步批改完上述五处后，本节的对应条目改为 done；在此之前**任何文档不得声称空三族**。"
+ },
+ "field_set": {
+  "fields": [
+   "control_code",
+   "control_name",
+   "family",
+   "judge_type",
+   "authority_kind",
+   "authority_ref",
+   "parent",
+   "version",
+   "status"
+  ],
+  "count": 9,
+  "note": "与 Playbook §5.3.1 一致。★ 另有可选字段 authority_ref_exemption 只在停用码上出现，不计入九字段。"
+ }
+}

@@ -1,0 +1,190 @@
+{
+ "schema_version": "routing-v1",
+ "routing_version": "rt-2026-10-18-v2",
+ "status_note": "T0-01 产物。**owner 不是占位值** —— 按族映射到 Playbook §4.1 五层里的复核角色。★ 这是**按族推出的默认责任人**，具体到人待业务确认；L3-1 要求的「每个控制点映射到一个下一层负责人」已满足。",
+ "role_note": "族→角色映射依据 Playbook §4.1 五层：DP3 内容审核员复核 / DP4 法务终审。具体人名不在本表。",
+ "routes": [
+  {
+   "control_code": "H01",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H02",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H03",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H04",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H05",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H06",
+   "owner": "法务 + 品牌",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H07",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H08",
+   "owner": "产品 + 品类专家",
+   "layer": "DP3",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "H09",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M01",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M02",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M03",
+   "owner": "产品 + 品类专家",
+   "layer": "DP3",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M04",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M05",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M06",
+   "owner": "产品 + 品类专家",
+   "layer": "DP3",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "M07",
+   "owner": "法务 + 品牌",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "U01",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "U02",
+   "owner": "法务 + 品牌",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "U03",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "U04",
+   "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  }
+ ],
+ "field_set": {
+  "fields": [
+   "control_code",
+   "owner",
+   "layer",
+   "due",
+   "escalation",
+   "appeal"
+  ],
+  "count": 6,
+  "note": "★ **字段数从 A-3 写的 4 变成 6。** 原因：`layer`（DP3/DP4）与 `escalation`/`appeal` 是 L3-1/L3-2/L3-3 要求的，原来的 4 字段（owner/due/escalation/appeal）漏了 layer，导致「谁结这一层」无处可查。这是**对 A-3 的更正**，不是偷偷加字段 —— 同步批要同时改技术方案 §1ter.3 的「4 字段」表述。"
+ },
+ "contract_impact": {
+  "items": [
+   {
+    "file": "Playbook/技术解决方案-v1.md",
+    "where": "§1ter.3 A-3",
+    "current": "routing 4 字段",
+    "must_become": "routing 6 字段（+layer，并把 escalation/appeal 明确进来）"
+   }
+  ]
+ }
+}

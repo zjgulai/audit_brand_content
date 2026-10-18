@@ -1,0 +1,302 @@
+# 内容审查 Agent · /implement 阶段计划 v1（2026-10-18）
+
+> **这份文件是什么**：开发阶段计划 + ticket 拆解 + 依赖/验收/回滚/阶段门。
+> **它不是什么**：不是实现，不是验收记录。**本文件写出时，P1 代码仍为 0 行。**
+>
+> **进入条件（已满足）**：优化 PRD、Playbook、验收表、技术方案、UIUX、工作流、证据矩阵七份主文件
+> 已互相绑定并全绿（见 §1）。
+> **启动条件（未满足）**：第 0 阶段的门关闭 ticket 全部通过前，**不得开始第 1 阶段业务代码**。
+>
+> 依据：委托方 2026-10-18 决策「**剩余开发门拆成两类：设计类先定稿关闭；实现类作为第 0 阶段关门 ticket，通过后才进第 1 阶段**」。
+
+---
+
+## 1. 冻结基线（2026-10-18 定稿，逐字节核过）
+
+| 文件 | 版本 | 行数 | 字节 | sha256（短） |
+|---|---|---:|---:|---|
+| `Playbook/内容审查Agent-产品Playbook-v1.1.md` | v1.1（条件性 RATIFIED） | 1661 | 109,930 | `0218869d3096` |
+| `PMO/audit/验收表-v3-覆盖全部判据-20261017.md` | v3（136 项） | 313 | 109,575 | `7ad18cdc2cec` |
+| `Playbook/技术解决方案-v1.md` | v1 | 1,335+ | 159,509+ | 见头部（随最终绑定滚动） |
+| `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md` | v1.3.1 | 1429 | 80,317 | `3c573da18b3e` |
+| `PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md` | v1.2.1 | 981 | 52,916 | `ae14015ca66c` |
+| `PMO/audit/内容审查Agent-行业证据矩阵-v1.md` | v1.2 | 380 | 46,714 | `34fda3a04909` |
+| `PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md` | v1.1（K-01…K-52） | 132 | 77,206 | `03b8c0742bd4` |
+| `PMO/audit/内容审查Agent-决策总账-v2-20261018.md` | v2（124 决定 / 140 指针） | 219 | 63,523 | `92b2a2c5c9a4` |
+| `PRD/内容审查Agent-PRD-优化版-v2.0.md` | v2.0（本地修订，2026-10-18 终验通过） | 1745 | 105,836 | `9be0c9f7e2fb` |
+
+**机器绑定（必须全绿才允许开工）**：
+
+```bash
+python3 tools/verify_solution_meta.py        # 模块 27 / 判据 134 / 门 19（7 open / 12 closed）/ 指纹逐位
+python3 tools/verify_acceptance_index.py     # 134/134，未覆盖 0
+python3 tools/verify_depad.py                # 无 +4096 填充
+```
+
+**冻结规则**：本表任一文件改动 → 三处指纹（Playbook 自指纹、验收表、技术方案头部）必须同步重登记，
+`verify_solution_meta.py` 变红即为未同步。
+
+---
+
+## 2. 开发门：两类拆法（委托方 2026-10-18 定）
+
+| 类 | 门 | 关闭方式 | 阶段 |
+|---|---|---|---|
+| **设计类** | S-3（`fetch_error` 稳定 id） | 定稿规则文本 + 契约字段，写入技术方案 §8 | 第 0 阶段 |
+| **设计类** | U2 控制点主表（首批 20 码 + 空三族留白） | 交付 `control-points-v1.json` / `routing-v1.json` + schema；**待产品+法务签署** | 第 0 阶段 |
+| **设计类** | claim/lease/draft 模块 owner | 指派 `reviews_ledger` + `disposition_router` 边界并写入技术方案 | 第 0 阶段 |
+| **实现类** | P-1 原子提交 | 代码 + 六种崩溃点注入 + manifest 对拍 | 第 0 阶段 |
+| **实现类** | G-2 outbox | 代码 + 四条反向对照（含卡片/文本合流） | 第 0 阶段 |
+| **实现类** | G-3 durable inbox | 代码 + 重复投递/重启续传对照 | 第 0 阶段 |
+| **实现类** | G-4 认证/RBAC/session | 代码 + 401/403/409 矩阵 + step-up | 第 0 阶段 |
+| **实现类** | G-5 不可信输入 sandbox | 代码 + FS/网络/CPU/时长限制对照 | 第 0 阶段 |
+| **实现类** | G-6 外发最小化/PII | 代码 + 词表/正则对照 | 第 0 阶段 |
+
+> **口径**：第 0 阶段通过的标准是**门自己的验收命令全绿**，不是「文件写好了」。
+> 未通过前，第 1 阶段一行业务代码都不写。
+
+---
+
+## 3. 总体阶段与顺序
+
+```
+第 0 阶段  关门（设计 3 + 实现 6）           ← 现在在这里
+   ↓ 门验收全绿
+第 1 阶段  核心流水线（S0–S9）               ← 判定/覆盖/报告真正跑起来
+   ↓ 端到端可跑 + 验收子集
+第 2 阶段  工作台与放行（API/队列/申诉/签发/下线）
+   ↓ G-14 放行链验收
+第 3 阶段  多模态（容器 OCR/ASR + benchmark）
+   ↓ OB/AB 门
+第 4 阶段  部署/可观测/测试（Compose/健康/备份）
+   ↓ DC 门
+第 5 阶段  验收执行（136 动作逐条执行 + 回归集）
+```
+
+**为什么第 1 阶段先于第 2 阶段**：判定链是唯一的状态来源；工作台只呈现与触发。
+反过来会把「API 层重算状态」这条死路走成现实。
+
+---
+
+## 4. 第 0 阶段 tickets（关门）
+
+> 每个 ticket 必须给出：owner 模块、依赖、验收命令/断言、反向对照、回滚。
+> **验收列写「待建」的，表示测试文件尚未存在，必须先建测试再算通过。**
+
+### T0-01 · 控制点主表与路由表（设计关门）
+
+- **owner**：`control_point_registry`
+- **产出**：`research/governance/control-points-v1.json`（9 字段 × 首批 H01–H09 / M01–M07 / U01–U04）、
+  `research/governance/routing-v1.json`（4 字段）；空三族（场景/权利/渠道）显式 `无控制点`。
+- **验收**：`L6-1…L6-6` 逐条；`control_code` 集合恰为 20；`安全词` 不在表内；两表 `control_code` 集合恒等。
+- **反向对照**：删一个码 → 红；空族写成 `not_applicable` → 红；两表集合不等 → 红。
+- **门**：U2 的**结构部分**关闭；**点位内容待产品+法务签署**（签前不得声称 U2 已闭）。
+- **回滚**：删两份 JSON，不影响其他模块（无消费者）。
+
+### T0-02 · `fetch_error` 稳定 id 规则（S-3 设计关门）
+
+- **owner**：`normalizer` + `contract_suite`
+- **产出**：规则文本 + `content-unit-v1` 的 id 生成函数定义：
+  `unit_id = sha256(source.kind + 规范化来源地址 + 抓取时刻桶)`，**无正文也稳定**；
+  同一来源两次失败得同一 id；不同来源不碰撞。
+- **验收**：构造无正文 `fetch_error` 样本两次 → `unit_id` 相同；换来源 → 不同。
+- **反向对照**：把时刻桶去掉 → 同源两次不同 id → 红。
+- **门**：S-3 closed（消费者同步清单同时登记）。
+
+### T0-03 · claim/lease/draft 模块归属（设计关门）
+
+- **owner 决定**：`reviews_ledger` 持有 assignment/lease；`disposition_router` 只读路由；
+  draft 存储归 `reviews_ledger`。写入技术方案模块表与工作流 S7.1。
+- **验收**：技术方案 S7.1 不再出现「待定」；工作流同步。
+- **门**：claim owner 开发阻断解除。
+
+### T0-04 · P-1 原子提交实现
+
+- **owner**：`artifact_store`
+- **产出**：staging → rename → manifest.tmp → fsync → rename manifest；恢复四态。
+- **验收**：六种崩溃点注入（commit 前/中/后各两处）→ 恢复后 `committed/orphan/uncommitted/garbage` 穷举，
+  无孤儿可见、无半提交；投影重建后与 manifest 对拍一致。
+- **反向对照**：去掉 manifest 单点提交 → 崩溃后出现「文件在、manifest 无」→ 红。
+
+### T0-05 · G-2 outbox 实现
+
+- **owner**：`send_gateway`（台账 `tools/agent/outbound.mjs`）
+- **验收**：同一 `logical_delivery_id` 发两次只发一次；卡片+降级文本两个变体只发一次；
+  `reply` 崩溃 → 不重发；`proactive-*` 崩溃 → 重发；`pending` 超时标 `unknown`。
+
+### T0-06 · G-3 durable inbox
+
+- **owner**：`feishu_io`
+- **验收**：同一 `event_id` 投两次只处理一次；处理中 kill → 重启从游标续传；不重复回答。
+
+### T0-07 · G-4 认证 / RBAC / session
+
+- **owner**：`release_gate`（身份边界）+ `review-api` 装配层
+- **验收**：AU-1…AU-29 全绿；401/403/409 矩阵；step-up 5 分钟/一次性/绑定 principal+case+action；
+  生产拒绝模拟身份；session 库独立、不备份、故障全失效。
+
+### T0-08 · G-5 不可信输入 sandbox
+
+- **owner**：`media_pipeline` + `orchestrator`
+- **验收**：skill 命令/OCR/ASR/解析在受限 FS/网络/CPU/内存/时长下运行；
+  越界样本被拒；正常样本通过。
+
+### T0-09 · G-6 外发最小化 / PII
+
+- **owner**：`report_renderer` + `send_gateway`
+- **验收**：群消息/卡片不出现凭据、身份证、电话、内部路径；词表+正则双向对照；
+  误报样本（正常文本）必须不被拦。
+
+### T0-10 · 验收执行器骨架
+
+- **owner**：`contract_validator`
+- **产出**：`tests/acceptance/` runner，读取验收表 136 行的 `test_id/fixture/command`；
+  缺失即 `untested`（退 2），不伪装通过。
+- **验收**：跑一次 → 输出 `passed / failed / untested` 三态；缺 test_id 的行落 untested。
+
+**第 0 阶段退出门**：T0-01…T0-10 全部通过 + `verify_solution_meta.py`/`verify_acceptance_index.py`/`verify_depad.py` 全绿。
+
+### 4.1 进度（2026-10-18）
+
+| Ticket | 状态 | 证据 |
+|---|---|---|
+| T0-04 P-1 原子提交 | ✅ **通过** | `base/artifact_store.py`（212 行）+ `tools/verify_atomic_commit.py`（123 行）；实跑 **8/8，rc=0**，含反向对照「单点提交 bug → orphan」 |
+| T0-04 余留（记入下一轮） | ⚠️ | ① 故障注入为进程内模拟，非真实 kill/断电；② 目录 fsync 在 macOS 可能 EINVAL，未掉电验证；③ **stale lock 启动清理未实现**；④ 投影重建/manifest 对拍未接 |
+| T0-07 会话与 step-up（切片 1） | ✅ **通过** | `base/auth_session.py`（157 行）+ `tools/verify_auth_session.py`（174 行）；实跑 **22/22，rc=0**，含三条反向对照（去 single-use / 去 absolute / cookie 塞 tenant） |
+| T0-07 RBAC/ACL（切片 2） | ✅ **通过** | `base/rbac.py`（137 行）+ `tools/verify_rbac.py`（197 行）；实跑 **35/35，rc=0**，含四条反向对照（去 scope / 去 SoD / 去 IT 内容限制 / 全拒坏实现） |
+| T0-07 余留 | ⚠️ | 注入时钟非真实等待；未做并发多写者；cookie 轮换/限流/锁定未做；DB 丢失为删文件模拟；takedown 人级 allowlist 未接入；IT/机器元数据读取未按对象收敛；grant 的 tenant/product_line scope 未校验 |
+| T0-01 控制点主表 | ✅ **通过（结构）** | 20 码 / 九字段 / 两表集合恒等；族分布 宣称14/披露3/事实3；**空 4 族（场景/权利/渠道/品牌）**；routing 20 owner 已填并带 layer/due/escalation/appeal（v2）；U02 停用码有 `authority_ref_exemption` + `known_gaps` 记录；`contract_impact` 已列主合同待同步四处。**点位内容仍待产品+法务签署（U2 未闭）** |
+| T0-02 fetch_error id | ✅ **通过** | 规则已改为 `sha256(kind ‖ 0x1F ‖ normalized_locator)`，**不含时间桶**；ID-3 反转为「跨小时/跨天/重试必须同 id」；attempt 区分交给 `attempt_id` |
+| T0-03 claim owner | ✅ 内容通过 | 裁定文本已交付；同步进技术方案/工作流留到主合同同步批 |
+| T0-09 外发最小化 / PII（G-6） | ✅ **通过** | `tools/redact.py`（10,093B）+ `tools/verify_redact.py`（10,392B）；实跑 **76 项检查 / 0 红 / 正样本 17 / 负样本 8**，rc=0 |
+| T0-08 沙箱（G-5） | ✅ **通过** | `base/sandbox.py`（8,198B）+ `tools/verify_sandbox.py`（9,116B）；实跑 **11/11，rc=0**，含四条反向对照（去 CPU 限制 / 去超时 / 去 cwd 隔离 / 正常样本防全拦）；超限与普通失败可区分 |
+| T0-05 outbox | ✅ **通过** | `tools/agent/outbound.mjs` + `outbound.test.mjs`；实跑 **21/21**，含「同一 id 只发一次 / 卡片+文本只发一次 / reply 不重发 / proactive 重发 / 缺 id 拒发」，**未发真消息** |
+| T0-06 durable inbox | ✅ **通过** | `tools/agent/inbox.mjs` + `inbox.test.mjs`；实跑 **12/12**，含重复投递只处理一次、处理中崩溃续传、坏游标保守回退（宁可重放不跳过） |
+| T0-10 验收执行器 | ✅ **通过（含 T0-10b 加固）** | `tools/verify_acceptance_run.py` + 自测；实跑 **0 passed / 0 failed / 136 untested，rc=2**（正确：无执行点不许报通过）；自测 **6/6**，含「命令经 T0-08 沙箱执行」与「去掉 cwd 隔离 → 仓内出现文件」反向对照 |
+
+---
+
+### 4.1b 门状态（ticket 通过 ≠ 门关闭：按下表如实记）
+
+| 门 | 状态 | 已具备 | 仍缺（跟进 ticket） |
+|---|---|---|---|
+| P-1 原子提交 | **部分** | 原子提交 + 六崩溃点 + 恢复四态 | stale lock 清理；真实断电；投影对拍（T0-04b） |
+| G-2 outbox | **关闭** | 21/21，含四类反向对照 | — |
+| G-3 durable inbox | **关闭** | 12/12，含续传与坏游标回退 | — |
+| G-4 认证/RBAC | **部分** | session/step-up 22/22；RBAC/ACL 35/35 | takedown 人级 allowlist；IT/机器元数据按对象收敛；grant 的 scope 校验（T0-07b） |
+| G-5 沙箱 | **部分** | rlimit/超时/cwd/env/禁网(进程内) 11/11 | OS 级隔离；绝对路径读；孙进程回收（T0-08b） |
+| G-6 最小化 | **部分** | redact 76 项，含逐规则承重 | 接入 report_renderer/send_gateway 实际链路（第 1/2 阶段） |
+
+**第 1 阶段入口判据**：G-2/G-3 已关闭；P-1 组件可用（stale lock 作为 T0-04b 并行）；
+G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在**第 2 阶段（工作台）开工前**必须关闭。
+
+## 4.2 主合同同步批（S-1，第 0 阶段后、第 1 阶段前）
+
+> 第 0 阶段产出改变了若干合同事实，必须一次性同步并重登记指纹；**不做这一步就进第 1 阶段，
+> 会出现「代码按新事实、文档写旧事实」**。
+
+| 变化源 | 要改的主合同（精确位置） | 内容 |
+|---|---|---|
+| T0-01 控制点表 | **Playbook** `:616 / :620 / :1390 / :1399 / :1406 / :1409 / :1594`；**验收表** `#30 / #72 / #73 / #85 / SEC-5-10`；**工作流** `:66` | 不再写死「空三族」→ 统一为「**空族以 `control-points-v1.json` 的 `empty_families` 为准（当前四族：场景/权利/渠道/品牌）**」；`routing-v1` 字段 4→5（新增 `layer`，版本 v2）。★ **PRD 不需要改**：全文无「空族」表述（已核） |
+| T0-02 fetch id | 技术方案 §8 S-3、工作流 S2 | `fetch_error` id = kind + 规范化地址（**不含时间桶**）；重试归并同一案件；`attempt_id` 单列 |
+| T0-03 claim owner | 技术方案模块 22/15、工作流 S7.1 | assignment/lease/draft 归 `reviews_ledger`；`disposition_router` 只读 |
+| T0-04…T0-09 | 技术方案 §8 门状态 | 逐门记录「已实现 + 验收命令」与**残差**，但**不得写成已上线** |
+
+**执行纪律**：单文件 owner、按 Playbook → 验收表 → 技术方案顺序重登记，
+最后跑 `verify_solution_meta.py` 全绿。
+
+---
+
+## 5. 第 1 阶段：核心流水线（S0–S9）
+
+> 目标：**一条内容从入口到报告真的跑通**，判定只有一个来源。
+
+| Ticket | 内容 | owner | 依赖 | 验收（摘） |
+|---|---|---|---|---|
+| T1-01 | `submission_router` 四维校验 + `Attempt` | submission_router | T0-02 | L1-0/0b/0c、AT-1…3 |
+| T1-02 | `normalizer` 产 `ContentUnit v1` | normalizer | T1-01 | L1-1…L1-5、H1–H14 |
+| T1-03 | `job_dispatcher` + `run_record` | job_dispatcher | T1-01 | JQ-1…7 |
+| T1-04 | `rule_judge` + `control_point_registry` 接入 | rule_judge | T0-01 | L2-4、C1 |
+| T1-05 | `semantic_judge` 默认 candidate | semantic_judge | T1-04 | L2-9、C2/C4 |
+| T1-06 | `evidence_sync` + 冲突表 | evidence_sync | T1-04 | L2-8、KB-1…6 |
+| T1-07 | `finding_store` append-only | finding_store | T1-05/06 | L2-5、ID-1…4 |
+| T1-08 | `coverage_composer` | coverage_composer | T1-02 | L2-3、COV-1…7 |
+| T1-09 | `decision_table` 15 链 + I1–I7 | decision_table | T1-07/08 | L2-1、EQ-1、L2-1b |
+| T1-10 | `disposition_router` 五档停待放行 | disposition_router | T1-09 | L3-1/3/5、L3-4 |
+| T1-11 | `report_renderer` 六区块 + 去 AI 味 | report_renderer | T1-09 | F1/F2、L4-3、L4-7 |
+| T1-12 | `report_store` 静态报告 + 重签 | report_store | T1-11 | R1/R2/R3、L4-2 |
+| T1-13 | `send_gateway` 卡片/文本 + 兜底 | send_gateway | T1-11 | L4-4/6、MSG-1…4 |
+| T1-14 | `metrics_read_model` 四指标 | metrics_read_model | T1-12 | L5-1/2/5 |
+
+**第 1 阶段退出门**：T1-01…T1-14 通过 + 一条端到端样本产出 IR/报告/群消息；
+`coverage=partial → REVIEW` 与「五档全部待放行」两条反向对照必须红过。
+
+---
+
+## 6. 第 2 阶段：工作台与放行
+
+| Ticket | 内容 | 依赖 | 验收（摘） |
+|---|---|---|---|
+| T2-01 | `review-api`（FastAPI）读 API | T1 | BE-3/4，API 不重算状态 |
+| T2-02 | 写 API：复核/申诉/claim/unclaim | T2-01 | QC-1…35 |
+| T2-03 | `release_gate` 签发/撤回/失效 | T2-02 | RL-1…15、SB-1…11、INV-1…9 |
+| T2-04 | 下线任务 + 双人 waive | T2-03 | TD-1…21、TF-1…19 |
+| T2-05 | 通知（in-app + 飞书） | T2-03 | TS-22、RM-1…8 |
+| T2-06 | 前端工作台（React 19 + TS + Vite） | T2-01 | FE-1…7、UX-01…10 |
+
+**第 2 阶段退出门**：G-13/G-14 通过；「机器/前端直写 release_status」反向对照必须 403。
+
+---
+
+## 7. 第 3 阶段：多模态
+
+| Ticket | 内容 | 依赖 | 验收 |
+|---|---|---|---|
+| T3-01 | 容器内 OCR（PaddleOCR/Tesseract） | T0-08 | OB-1…7 |
+| T3-02 | 容器内 ASR（faster-whisper/Whisper） | T0-08 | AB-1…7 |
+| T3-03 | 抽帧/时码/bbox（LOC） | T3-01 | LOC-1…4、V1/V2 |
+| T3-04 | VLM 三类过滤（人脸/未成年人/未上市） | T3-03 | D-3、VLM-1…3 |
+
+**第 3 阶段退出门**：OB/AB benchmark 读数齐备并锁版本；旧 macOS 读数不得沿用（反向对照：引用旧读数 → 红）。
+
+---
+
+## 8. 第 4 阶段：部署 / 可观测 / 测试
+
+| Ticket | 内容 | 验收 |
+|---|---|---|
+| T4-01 | Docker Compose（review-api/scheduler/web/static） | DC-1…8 |
+| T4-02 | 数据卷 0700 / SQLite 单写者 | DC-3/4 |
+| T4-03 | 健康检查 + 重启策略 | DC-5 |
+| T4-04 | 日志轮转 + 指标 + 告警 | 可观测 |
+| T4-05 | 备份恢复（不含 session.db） | DC-7 |
+
+---
+
+## 9. 第 5 阶段：验收执行
+
+- 逐条执行验收表 136 项，产出 `passed / failed / untested` 三态；
+- **126 条 machine 动作在测试文件建好前全部记 `untested`**，不得写「通过」；
+- 冻结回归集 50–100 条 + 四条陷阱负样本；
+- 终点：`verify_acceptance_index.py` 只证明编号覆盖，**行为验收以 runner 结果为准**。
+
+---
+
+## 10. 分发与验收规则
+
+1. **单一文件 owner**：任一时刻一个文件只有一个写者；跨文件改动拆批。
+2. **每批必须先验收再发下一批**；未过退出门不发下一批。
+3. **提交政策**：未获委托方明确授权，不 `git add`/commit/push；共享工作区禁止 `git add -A`。
+4. **测试先行**：ticket 必须先有可执行断言（test_id/fixture/command），再写实现。
+5. **未测 ≠ 通过**：读不到、跑不了、依赖缺失，一律记 `untested` 并退 2。
+6. **回滚**：每阶段代码独立目录/模块；回滚 = 停用该模块入口 + 保留数据，不删历史产物。
+
+---
+
+## 11. 现在就能开始的第一批（本文件交付后）
+
+- **T0-01、T0-02、T0-03**（设计类，纯文档/JSON，不写业务代码）
+- **T0-10**（测试骨架，纯工具）
+- 其后 **T0-04…T0-09**（实现类，按 P-1 → G-2/G-3 → G-4 → G-5 → G-6 顺序）
+
+> **一句话**：先把「门」变成代码与测试，再写业务；每个门通过都有反向对照，否则不算关门。
