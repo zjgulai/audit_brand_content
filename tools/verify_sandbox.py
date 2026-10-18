@@ -21,7 +21,10 @@
 退出码：0 全过 / 1 有红 / 2 未测（导入失败或验收器自身异常）。
 """
 
+import json
 import os
+import shutil
+import subprocess
 import sys
 from unittest import mock
 
@@ -122,6 +125,79 @@ def main():
            and "network_disabled" in (r["stderr"] or ""),
            "C9 `_socket` 绕过 → 失败（network_disabled）", repr(r))
 
+    # C10 绝对路径读：/etc 拒绝；仓内 absolute / workdir absolute 放行
+    r = run_untrusted("open('/etc/passwd').read()\nprint('READ')\n",
+                      timeout=5, cpu_seconds=2)
+    report(r["ok"] is False and "sandbox_path_denied" in (r["stderr"] or "")
+           and "READ" not in (r["stdout"] or ""),
+           "C10 仓外绝对路径 /etc/passwd → 拒绝", repr(r))
+    r = run_untrusted(
+        "import os\np=os.path.join(os.getcwd(),'ok.txt')\n"
+        "open(p,'w').write('x')\nprint(open(p).read())\n",
+        timeout=5, cpu_seconds=2)
+    report(r["ok"] is True and (r["stdout"] or "").strip() == "x",
+           "C10 workdir 绝对路径读 → 放行", repr(r))
+    repo_file = os.path.join(REPO_ROOT, "README.md")
+    r = run_untrusted("print(open(%r).read(1))\n" % repo_file,
+                      timeout=5, cpu_seconds=2)
+    report(r["ok"] is True and (r["stdout"] or "").strip() != "",
+           "C10 仓内绝对路径读 → 放行", repr(r))
+
+    # C11 env 白名单：只允许登记变量，HOME 不得泄漏
+    r = run_untrusted(
+        "import json,os\nprint(json.dumps(sorted(os.environ)))\n",
+        timeout=5, cpu_seconds=2)
+    allowed = {"PATH", "PYTHONIOENCODING", "TMPDIR", "LANG",
+               "SANDBOX_MEMORY_BYTES", "SANDBOX_ALLOW_ROOTS",
+               "__CF_USER_TEXT_ENCODING"}
+    try:
+        keys = set(json.loads((r["stdout"] or "").strip() or "[]"))
+    except ValueError:
+        keys = {"<unparseable>"}
+    report(r["ok"] is True and keys <= allowed and "HOME" not in keys,
+           "C11 env 白名单（HOME 不泄漏）", repr(sorted(keys)))
+
+    # C12 内存限制：不可用必须显式报未测
+    r = run_untrusted("print('ok')", timeout=5, cpu_seconds=2,
+                      memory_bytes=64 * 1024 * 1024)
+    if r["memory_limit_mode"] == "rss_watch":
+        ok12 = (r["memory_limit_untested"] is True
+                and "未测" in (r["memory_limit_note"] or ""))
+    elif r["memory_limit_mode"] == "rlimit_as":
+        ok12 = (r["memory_limit_untested"] is False
+                and "已生效" in (r["memory_limit_note"] or ""))
+    else:
+        ok12 = False
+    report(ok12, "C12 内存限制不可用时显式报「未测」", repr(r))
+
+    # C13 孙进程回收：超时后 pgrep 不得残留（独立进程组）
+    marker = "sandbox-grandchild-marker-6d"
+    child_code = (
+        "import os,sys,time\n"
+        "child=os.fork()\n"
+        "if child==0:\n"
+        "    os.execv(sys.executable,[sys.executable,'-c',"
+        "'import time; time.sleep(60) # %s'])\n"
+        "print(child,flush=True)\n"
+        "time.sleep(60)\n" % marker)
+    r = run_untrusted(child_code, timeout=1, cpu_seconds=5)
+    pgrep = shutil.which("pgrep")
+    if pgrep:
+        found = subprocess.run([pgrep, "-f", marker],
+                               capture_output=True, text=True)
+        residual = (found.stdout or "").strip()
+        report(r["timed_out"] is True and not residual,
+               "C13 超时后孙进程无残留（进程组回收）",
+               "timed_out=%r residual=%r" % (r["timed_out"], residual))
+        # 若反向对照导致残留，清掉，避免污染本机。
+        for line in residual.splitlines():
+            try:
+                os.kill(int(line.strip()), 9)
+            except (ValueError, ProcessLookupError, PermissionError):
+                pass
+    else:
+        report(False, "C13 pgrep 不可用 → 无法断言孙进程残留", "")
+
     # R1 去掉 CPU 限制 → 死循环不 limit_hit（由墙钟超时兜底）
     real_setrlimit = sb.resource.setrlimit
 
@@ -136,24 +212,25 @@ def main():
            "R1 去掉 CPU 限制 → 不再 limit_hit（反向对照成立）", repr(r))
 
     # R2 去掉超时 → 长跑样本返回 ok
-    real_run = sb.subprocess.run
+    real_comm = sb._communicate
 
-    def no_timeout(*args, **kwargs):
-        kwargs.pop("timeout", None)
-        return real_run(*args, **kwargs)
+    def no_timeout(proc, timeout):
+        return real_comm(proc, None)
 
-    with mock.patch.object(sb.subprocess, "run", no_timeout):
+    with mock.patch.object(sb, "_communicate", no_timeout):
         r = run_untrusted("import time\ntime.sleep(1)\nprint('done')",
                           timeout=0.3, cpu_seconds=2)
     report(r["ok"] is True and r["timed_out"] is False,
            "R2 去掉超时 → 长跑返回 ok（反向对照成立）", repr(r))
 
     # R3 去掉 cwd 隔离 → cwd 落在仓库
+    real_popen = sb._popen
+
     def repo_cwd(*args, **kwargs):
         kwargs["cwd"] = REPO_ROOT
-        return real_run(*args, **kwargs)
+        return real_popen(*args, **kwargs)
 
-    with mock.patch.object(sb.subprocess, "run", repo_cwd):
+    with mock.patch.object(sb, "_popen", repo_cwd):
         r = run_untrusted("import os\nprint(os.path.abspath('.'))",
                           timeout=5, cpu_seconds=2)
     out = (r["stdout"] or "").strip()
