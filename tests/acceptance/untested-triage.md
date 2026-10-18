@@ -1,13 +1,13 @@
 # 未接验收行分类（T0-10）
 
 > 生成依据：`PMO/audit/验收表-v3-覆盖全部判据-20261017.md`（不改表）。  
-> 初始 runner：mapped=86；补 9 条核心 A 后 **mapped=95 / passed=95 / failed=0 / untested=41**，rc=2。
+> 初始 runner：mapped=86；补 10 条核心 A 后 **mapped=96 / passed=96 / failed=0 / untested=40**，rc=2。
 
 ## 分类计数
 
 | 分类 | 条数 | 含义 |
 |---|---:|---|
-| A 现在就能补 | 13 | 模块已实现，只缺 fixture/command；本批已接 9 条，余 4 条待下一批 |
+| A 现在就能补 | 13 | 模块已实现，只缺 fixture/command；本批已接 10 条，余 3 条因现有 verifier 覆盖不足留 untested |
 | B 阶段 3–5 | 22 | OCR/ASR/前端/部署/回归集/CI，保持 untested |
 | C 口径待定 | 15 | 实现或口径有歧义，需补专项验证器或委托方确认 |
 
@@ -28,18 +28,18 @@
 | 48 | STOP-3b / MC-1 / MC-2 / MC-3 | 提前停：第一阶段不启用，四条样本都必须跑完全程 | A | 模块已实现，只缺 fixture/command | 已接 `verify_orchestrator` |
 | 51 | 丙 / L3-2 / SEC-8-4 / STOP-6 | 转出后超时未回音升级项目统筹 | C | 转出后超时升级：case_watch/升级链路未落地 | 补专项验证器或先由委托方确认口径 |
 | 53 | SEC-4.1-2 | can_finalize 与 release 是两个独立字段 | A | 模块已实现，只缺 fixture/command | 已接 `verify_disposition_router` |
-| 54 | SEC-0-1 / SEC-4.3-1 | 三类产物且 IR 是唯一真相 | A | 模块已实现，只缺 fixture/command | 可接 `smoke_end_to_end`（本批未选） |
+| 54 | SEC-0-1 / SEC-4.3-1 | 三类产物且 IR 是唯一真相 | A | 模块已实现，只缺 fixture/command | 已接 `smoke_end_to_end` |
 | 55 | SEC-4.3-2 / SEC-4.3-3 | IR 长期保存、群消息不单独保存 | B | IR 保存期与群消息留存：需法务给定保存期，属阶段 5 合规验收 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 57 | SEC-4.3.1-1 / SEC-4.3.1-2 / SEC-4.3.1-3 | Markdown 渲染必跑、时点、输入输出 | A | 模块已实现，只缺 fixture/command | 已接 `verify_report_render` |
 | 59 | SEC-4.3.1-5 | md 与 IR 一致、无遗漏无多出 | C | md 与 IR 一致：无独立对拍器（report_render 只验区块/字段） | 补专项验证器或先由委托方确认口径 |
 | 65 | L3-4 | 回执禁词 | C | 回执禁词：无回执文本扫描器 | 补专项验证器或先由委托方确认口径 |
 | 66 | L4-1 / SEC-8-8 | 群里不刷屏、L4/L5 不被数量吞掉 | A | 模块已实现，只缺 fixture/command | 已接 `verify_report_render` |
-| 69 | SEC-5-1 / SEC-5-1b | 七族骨架与 12 个一级分类无遗漏归并 | A | 模块已实现，只缺 fixture/command | 可接 `verify_control_points`（本批未选） |
+| 69 | SEC-5-1 / SEC-5-1b | 七族骨架与 12 个一级分类无遗漏归并 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
 | 70 | SEC-5-2 / SEC-5-3 / SEC-5-4 | 族调整必须升版本、留痕、回执记实际版本 | C | 族调整升版本/留痕：控制点版本变更审计未实现 | 补专项验证器或先由委托方确认口径 |
-| 71 | SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24 | 首批 20 真码、安全词、历史码保留 | A | 模块已实现，只缺 fixture/command | 可接 `verify_control_points`（本批未选） |
+| 71 | SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24 | 首批 20 真码、安全词、历史码保留 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
 | 74 | SEC-5-9 | 新增控制点三条件 | C | 新增控制点三条件：规则+依据+版本联动未实现 | 补专项验证器或先由委托方确认口径 |
 | 76 | SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27 | 唯一归属、码分配登记表、跨族拆分 | C | 唯一归属/码分配登记：登记表与跨族拆分未实现 | 补专项验证器或先由委托方确认口径 |
-| 77 | SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32 | 未知桶四值强制转人工并计数 | A | 模块已实现，只缺 fixture/command | 可接 `verify_report_render`（本批未选） |
+| 77 | SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32 | 未知桶四值强制转人工并计数 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
 | 78 | SEC-5-33 | rule_code 是唯一机器键、不以 58 子类当全集 | C | rule_code 唯一机器键：58 子类口径未收敛 | 补专项验证器或先由委托方确认口径 |
 | 85 | SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4 | 冻结回归集规模、陷阱样本、覆盖、指纹与变更门 | B | 冻结回归集规模/陷阱样本/变更门：属阶段 5 回归治理 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 86 | SEC-6-GS-4 | 回归集维护归属与法务确认 | B | 回归集 owner 与法务确认：人工签署，阶段 5 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
