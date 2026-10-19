@@ -2,7 +2,7 @@
  "schema": "rules-mece-migration-v1",
  "date": "2026-10-19",
  "count": 638,
- "note": "primary_initial=逐条初判；primary_reviewed=合并 31 条对抗复核后的判定，回归基准用 primary_reviewed；rule_text/condition 来自 xlsx 原文；非枚举的复核值统一归为「待拆分」并置 needs_split=true",
+ "note": "primary_initial=逐条初判；primary_reviewed=合并 31 条对抗复核后的判定，回归基准用 primary_reviewed；rule_text/condition 来自 xlsx 原文；非枚举的复核值统一归为「待拆分」并置 needs_split=true；2026-10-19 按规范 §9.1 回写 15 条复核结论",
  "assignments": [
   {
    "rule_id": "r-27b4636b8be795e4",
@@ -40,7 +40,7 @@
    "topic": "平台政策（正文缺失，阈值词 material）",
    "confidence": "low",
    "primary_initial": "CHAN",
-   "primary_reviewed": "CHAN",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -50,7 +50,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.29"
+   "clause": "E-2.29",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-69df999ad28daa94",
@@ -3736,7 +3737,7 @@
    "topic": "夜间哺乳/同床睡眠",
    "confidence": "medium",
    "primary_initial": "SCENE",
-   "primary_reviewed": "SCENE",
+   "primary_reviewed": "FACT",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -3746,7 +3747,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.103"
+   "clause": "W-2.103",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-4314a1122bf8b6f8",
@@ -6160,7 +6162,7 @@
    "topic": "热敷安全",
    "confidence": "high",
    "primary_initial": "SCENE",
-   "primary_reviewed": "SCENE",
+   "primary_reviewed": "DISC",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -6170,7 +6172,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.320"
+   "clause": "W-2.320",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-bf6ab0d4d6e610dc",
@@ -7408,7 +7411,7 @@
    "topic": "胎动监测",
    "confidence": "high",
    "primary_initial": "DISC",
-   "primary_reviewed": "DISC",
+   "primary_reviewed": "FACT",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -7418,7 +7421,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.412"
+   "clause": "W-2.412",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-ebb85ba148b58614",
@@ -7456,7 +7460,7 @@
    "topic": "孕期运动/耻骨联合",
    "confidence": "high",
    "primary_initial": "SCENE",
-   "primary_reviewed": "SCENE",
+   "primary_reviewed": "DISC",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -7466,7 +7470,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.424"
+   "clause": "W-2.424",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-efbbe630f281f6cb",
@@ -8272,7 +8277,7 @@
    "topic": "宣称证据核对",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8282,7 +8287,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.6"
+   "clause": "E-2.6",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-0d03daa365c189fa",
@@ -8320,7 +8326,7 @@
    "topic": "证据局限限定",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "DISC",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8330,7 +8336,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.11"
+   "clause": "E-2.11",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-1942420ea6573f59",
@@ -8464,7 +8471,7 @@
    "topic": "宣称限定语",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "DISC",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8474,7 +8481,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.35"
+   "clause": "E-2.35",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-4ee707c5cbb00c56",
@@ -8512,7 +8520,7 @@
    "topic": "宣称限定语",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "DISC",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8522,7 +8530,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.41"
+   "clause": "E-2.41",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-53a0f8d5f6f1780b",
@@ -8536,7 +8545,7 @@
    "topic": "宣称限定语",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8546,7 +8555,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.43"
+   "clause": "E-2.43",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-579a5e4330cd2bb7",
@@ -8584,7 +8594,7 @@
    "topic": "宣称限定语",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8594,7 +8604,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.48"
+   "clause": "E-2.48",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-64cde165077bc5fe",
@@ -8704,7 +8715,7 @@
    "topic": "宣称限定语",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "DISC",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8714,7 +8725,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.75"
+   "clause": "E-2.75",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-b3329c8ade9dfe0e",
@@ -8728,7 +8740,7 @@
    "topic": "宣称限定语",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -8738,7 +8750,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.96"
+   "clause": "E-2.96",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-c504306123c60711",
@@ -9112,7 +9125,7 @@
    "topic": "证据量级判定",
    "confidence": "low",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -9122,7 +9135,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.70"
+   "clause": "E-2.70",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-872fb5f5ed4cd5b5",
@@ -12376,7 +12390,7 @@
    "topic": "IBCLC/泌乳顾问/专家调校触发词",
    "confidence": "medium",
    "primary_initial": "CLAIM",
-   "primary_reviewed": "CLAIM",
+   "primary_reviewed": "NOT_A_RULE",
    "review_note": "",
    "review_raw": "",
    "needs_split": false,
@@ -12386,7 +12400,8 @@
    "p_level": "P3",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.48"
+   "clause": "W-1.48",
+   "patched_from_spec": true
   },
   {
    "rule_id": "r-06b5f92f2232ec0d",
