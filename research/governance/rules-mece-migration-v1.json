@@ -2,7 +2,7 @@
  "schema": "rules-mece-migration-v1",
  "date": "2026-10-19",
  "count": 638,
- "note": "primary_initial=逐条初判；primary_reviewed=合并 31 条对抗复核后的判定，回归基准用 primary_reviewed；rule_text/condition 来自 xlsx 原文；非枚举的复核值统一归为「待拆分」并置 needs_split=true；2026-10-19 按规范 §9.1 回写 15 条复核结论",
+ "note": "primary_initial=逐条初判；primary_reviewed=合并 31 条对抗复核后的判定，回归基准用 primary_reviewed；rule_text/condition 来自 xlsx 原文；非枚举的复核值统一归为「待拆分」并置 needs_split=true；2026-10-19 按规范 §9.1 回写 15 条复核结论；2026-10-19 标注 policy_fragment（空披露模板/规则码残片/方法学条款），这 67 条不适合按原子规则判轴，应排除出主基准分母",
  "assignments": [
   {
    "rule_id": "r-27b4636b8be795e4",
@@ -26,7 +26,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.21"
+   "clause": "E-2.21",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-3542bcb8a373e596",
@@ -51,7 +52,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.29",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-69df999ad28daa94",
@@ -75,7 +77,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.55"
+   "clause": "E-2.55",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-70d707e83d9863ac",
@@ -99,7 +102,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.62"
+   "clause": "E-2.62",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7e243749e0eec06b",
@@ -123,7 +127,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.72"
+   "clause": "E-2.72",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-a5255155797254db",
@@ -147,7 +152,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.90"
+   "clause": "E-2.90",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-b30e04bc9feec43a",
@@ -171,7 +177,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.95"
+   "clause": "E-2.95",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-f4c5aed63e7f819f",
@@ -195,7 +202,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.118"
+   "clause": "E-2.118",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-f7cf08e7828f2aae",
@@ -219,7 +227,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.120"
+   "clause": "E-2.120",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-03ec44de7eb8fb64",
@@ -243,7 +252,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.1"
+   "clause": "E-2.1",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6e212146ea9a1bcf",
@@ -267,7 +277,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.58"
+   "clause": "E-2.58",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7c0d541cb506ce30",
@@ -291,7 +302,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.69"
+   "clause": "E-2.69",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b4c492f9a4b00b33",
@@ -315,7 +327,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.97"
+   "clause": "E-2.97",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b72814f279c22813",
@@ -339,7 +352,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.99"
+   "clause": "E-2.99",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e969eceb9ea05663",
@@ -363,7 +377,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.112"
+   "clause": "E-2.112",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-13fd137cd293d657",
@@ -387,7 +402,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.7"
+   "clause": "W-1.7",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9952487059dd0f41",
@@ -411,7 +427,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.83"
+   "clause": "E-2.83",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ae8a049f84b6265b",
@@ -435,7 +452,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.94"
+   "clause": "E-2.94",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0fdb19f119fce1ab",
@@ -459,7 +477,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.10"
+   "clause": "E-2.10",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3cbe7cca4fbd7b3f",
@@ -483,7 +502,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.32"
+   "clause": "E-2.32",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-04ebe7b4ad137159",
@@ -507,7 +527,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.7"
+   "clause": "W-2.7",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2c3b431a4f8981db",
@@ -531,7 +552,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.68"
+   "clause": "W-2.68",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-62ec2272a23c5930",
@@ -555,7 +577,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.170"
+   "clause": "W-2.170",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-640dfb910ee7c32b",
@@ -579,7 +602,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.175"
+   "clause": "W-2.175",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6b65398d52025490",
@@ -603,7 +627,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.190"
+   "clause": "W-2.190",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-99aa0a6cdad70618",
@@ -627,7 +652,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.266"
+   "clause": "W-2.266",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d5dcf4e36a2f693e",
@@ -651,7 +677,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.368"
+   "clause": "W-2.368",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-faa270bf40790e77",
@@ -675,7 +702,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.446"
+   "clause": "W-2.446",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-165317382e4be1d4",
@@ -699,7 +727,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.39"
+   "clause": "W-2.39",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3951383423c8bb49",
@@ -723,7 +752,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.86"
+   "clause": "W-2.86",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-65141862397d1eda",
@@ -747,7 +777,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.178"
+   "clause": "W-2.178",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-83e012b69931f9bb",
@@ -771,7 +802,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.230"
+   "clause": "W-2.230",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-aae43984328abdd7",
@@ -795,7 +827,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.288"
+   "clause": "W-2.288",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b6b84137fa2512ed",
@@ -819,7 +852,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.311"
+   "clause": "W-2.311",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fbe8e2b1583e7dfa",
@@ -843,7 +877,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.448"
+   "clause": "W-2.448",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fe0eeaa57065e7f1",
@@ -867,7 +902,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.450"
+   "clause": "W-2.450",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-726b0696a357046c",
@@ -891,7 +927,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.205"
+   "clause": "W-2.205",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-78810215b255e00c",
@@ -915,7 +952,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.214"
+   "clause": "W-2.214",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8dcfd7d5bf12e1a4",
@@ -939,7 +977,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.249"
+   "clause": "W-2.249",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9ef9c5eaf628088a",
@@ -963,7 +1002,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.275"
+   "clause": "W-2.275",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a279a5929b90276d",
@@ -987,7 +1027,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.278"
+   "clause": "W-2.278",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a32925909b9216c9",
@@ -1011,7 +1052,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.279"
+   "clause": "W-2.279",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-aee62d35ef8916a8",
@@ -1035,7 +1077,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.297"
+   "clause": "W-2.297",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-be647d3abe261ba1",
@@ -1059,7 +1102,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.327"
+   "clause": "W-2.327",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-12220c1d23e32516",
@@ -1083,7 +1127,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.35"
+   "clause": "W-2.35",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-628ff05537a84400",
@@ -1107,7 +1152,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.168"
+   "clause": "W-2.168",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-71a0e5eafa7b9f37",
@@ -1131,7 +1177,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.203"
+   "clause": "W-2.203",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9cbe7dd16653e5af",
@@ -1155,7 +1202,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.272"
+   "clause": "W-2.272",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4851b472d119df42",
@@ -1179,7 +1227,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.113"
+   "clause": "W-2.113",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ffa11cd3f49c185b",
@@ -1203,7 +1252,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.453"
+   "clause": "W-2.453",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1bd7d4b564bb8663",
@@ -1227,7 +1277,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "E-2.124"
+   "clause": "E-2.124",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0ffc53715dfa4e43",
@@ -1251,7 +1302,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.5"
+   "clause": "W-1.5",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-252ba6cf5ee92b00",
@@ -1275,7 +1327,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.12"
+   "clause": "W-1.12",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-c767bb12e6a8698d",
@@ -1299,7 +1352,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.49"
+   "clause": "W-1.49",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-ddf0f8360c7b53a7",
@@ -1323,7 +1377,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.54"
+   "clause": "W-1.54",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-332988d6aec06d58",
@@ -1347,7 +1402,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.79"
+   "clause": "W-2.79",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-435eb55384615006",
@@ -1371,7 +1427,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.107"
+   "clause": "W-2.107",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-60e847bcecfff66f",
@@ -1395,7 +1452,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.165"
+   "clause": "W-2.165",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-64efe2e19a3a1b21",
@@ -1419,7 +1477,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.177"
+   "clause": "W-2.177",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-99b67c9df2c45cce",
@@ -1443,7 +1502,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.267"
+   "clause": "W-2.267",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b6b3ce919460af47",
@@ -1467,7 +1527,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.310"
+   "clause": "W-2.310",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dd43e1afe7ec11e1",
@@ -1491,7 +1552,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.381"
+   "clause": "W-2.381",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e820dea5d6069755",
@@ -1515,7 +1577,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.409"
+   "clause": "W-2.409",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-006445396c95aa10",
@@ -1539,7 +1602,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.1"
+   "clause": "W-1.1",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-039822ed5c8e3448",
@@ -1563,7 +1627,8 @@
    "p_level": "P0",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.2"
+   "clause": "W-1.2",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7489e156a5d2c7b2",
@@ -1587,7 +1652,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.31"
+   "clause": "W-1.31",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-3b2eae0f566d32a6",
@@ -1611,7 +1677,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.94"
+   "clause": "W-2.94",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6449be54796427f3",
@@ -1635,7 +1702,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.176"
+   "clause": "W-2.176",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-790e26c27102e241",
@@ -1659,7 +1727,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.217"
+   "clause": "W-2.217",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c6fa27383935ff2f",
@@ -1683,7 +1752,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.347"
+   "clause": "W-2.347",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d827cc631a0cd70a",
@@ -1707,7 +1777,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.370"
+   "clause": "W-2.370",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-97044c3283e41aea",
@@ -1731,7 +1802,8 @@
    "p_level": "P2",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.39"
+   "clause": "W-1.39",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-15a607c4457c8b55",
@@ -1755,7 +1827,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.8"
+   "clause": "W-1.8",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-12fe094401654cb2",
@@ -1779,7 +1852,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.12"
+   "clause": "E-2.12",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-29bf2758f44d19de",
@@ -1803,7 +1877,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.22"
+   "clause": "E-2.22",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-659431b7cda22110",
@@ -1827,7 +1902,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.53"
+   "clause": "E-2.53",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8334d7fba8f6d436",
@@ -1851,7 +1927,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.73"
+   "clause": "E-2.73",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a05639d323f9cd51",
@@ -1875,7 +1952,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.86"
+   "clause": "E-2.86",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e36cb8bd701d99d7",
@@ -1899,7 +1977,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.108"
+   "clause": "E-2.108",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f28af88b8656e01c",
@@ -1923,7 +2002,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.117"
+   "clause": "E-2.117",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f86b6172f13eb9da",
@@ -1947,7 +2027,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.121"
+   "clause": "E-2.121",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cad705f629d3ed7a",
@@ -1971,7 +2052,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.352"
+   "clause": "W-2.352",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-16cac1c85580f8f7",
@@ -1995,7 +2077,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.9"
+   "clause": "W-1.9",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-b7c2b35c5a9239fe",
@@ -2019,7 +2102,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.315"
+   "clause": "W-2.315",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-37b49eadb72d7dc2",
@@ -2043,7 +2127,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.18"
+   "clause": "W-1.18",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-b8aea07e90a86b59",
@@ -2067,7 +2152,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.47"
+   "clause": "W-1.47",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-379572868aa01151",
@@ -2091,7 +2177,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.17"
+   "clause": "W-1.17",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-6773cda1135632c8",
@@ -2115,7 +2202,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.28"
+   "clause": "W-1.28",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b301be45b8cd64a9",
@@ -2139,7 +2227,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.44"
+   "clause": "W-1.44",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-04153de8e8cbce98",
@@ -2163,7 +2252,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.5"
+   "clause": "W-2.5",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4e325add60ec5d2d",
@@ -2187,7 +2277,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.123"
+   "clause": "W-2.123",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-60ad3fb21b428305",
@@ -2211,7 +2302,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.164"
+   "clause": "W-2.164",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-69aa317f4a45fd4f",
@@ -2235,7 +2327,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.185"
+   "clause": "W-2.185",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-70eeb7f38a817307",
@@ -2259,7 +2352,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.200"
+   "clause": "W-2.200",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-89dc0e2ca4ba0979",
@@ -2283,7 +2377,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.239"
+   "clause": "W-2.239",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8b3fc5cb8e0fa45b",
@@ -2307,7 +2402,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.240"
+   "clause": "W-2.240",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ba92201b5262708b",
@@ -2331,7 +2427,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.319"
+   "clause": "W-2.319",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c3a2f8f54e6d8e19",
@@ -2355,7 +2452,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.336"
+   "clause": "W-2.336",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c515e503185d5234",
@@ -2379,7 +2477,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.342"
+   "clause": "W-2.342",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e088559924e918e7",
@@ -2403,7 +2502,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.393"
+   "clause": "W-2.393",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e84e595f203a75e2",
@@ -2427,7 +2527,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.410"
+   "clause": "W-2.410",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7baf7ceb47b2e5bc",
@@ -2451,7 +2552,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.33"
+   "clause": "W-1.33",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-d7290a0ee59c58ef",
@@ -2475,7 +2577,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.53"
+   "clause": "W-1.53",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-e879231d61c9bd08",
@@ -2499,7 +2602,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.55"
+   "clause": "W-1.55",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-106e4c5b6475d0e3",
@@ -2523,7 +2627,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.6"
+   "clause": "W-1.6",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-3b6c3c82dc667295",
@@ -2547,7 +2652,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.22"
+   "clause": "W-1.22",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-e919fda20cd2f95e",
@@ -2571,7 +2677,8 @@
    "p_level": "P0",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.56"
+   "clause": "W-1.56",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-082e954afd41cf1e",
@@ -2595,7 +2702,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.17"
+   "clause": "W-2.17",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-08f116a3f7e13f8b",
@@ -2619,7 +2727,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.19"
+   "clause": "W-2.19",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ad1ad30cf52bf707",
@@ -2643,7 +2752,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.294"
+   "clause": "W-2.294",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c0cd959447738b3a",
@@ -2667,7 +2777,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.331"
+   "clause": "W-2.331",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d7f0ee1005eac657",
@@ -2691,7 +2802,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.369"
+   "clause": "W-2.369",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5c056bc02cdd770c",
@@ -2715,7 +2827,8 @@
    "p_level": "P3",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.26"
+   "clause": "W-1.26",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-b10ee2b8361c8a3d",
@@ -2739,7 +2852,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.43"
+   "clause": "W-1.43",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-30d3b9b54135fa04",
@@ -2763,7 +2877,8 @@
    "p_level": "P0",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.14"
+   "clause": "W-1.14",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-58d94a3b69c68cfa",
@@ -2787,7 +2902,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.147"
+   "clause": "W-2.147",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6fe3c7d79d8e5e42",
@@ -2811,7 +2927,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.199"
+   "clause": "W-2.199",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8cc51181aeb92daa",
@@ -2835,7 +2952,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.244"
+   "clause": "W-2.244",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3dc0665232dc63ed",
@@ -2859,7 +2977,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.33"
+   "clause": "E-2.33",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6baf24eb6b66d43f",
@@ -2883,7 +3002,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.56"
+   "clause": "E-2.56",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-21786ac5aff9be34",
@@ -2907,7 +3027,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.11"
+   "clause": "W-1.11",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-38148746d4e6516d",
@@ -2931,7 +3052,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.19"
+   "clause": "W-1.19",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-85348bba00a2b5a7",
@@ -2955,7 +3077,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.35"
+   "clause": "W-1.35",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-0384cb5e3fac494a",
@@ -2979,7 +3102,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.4"
+   "clause": "W-2.4",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-55486fca5185add6",
@@ -3003,7 +3127,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.138"
+   "clause": "W-2.138",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-99839b4c5e713fa0",
@@ -3027,7 +3152,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.263"
+   "clause": "W-2.263",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9878294c87d29582",
@@ -3051,7 +3177,8 @@
    "p_level": "P3",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.40"
+   "clause": "W-1.40",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-335f00d14cefe7f9",
@@ -3075,7 +3202,8 @@
    "p_level": "P3",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.15"
+   "clause": "W-1.15",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-00277648c524fe69",
@@ -3099,7 +3227,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.1"
+   "clause": "W-2.1",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-058b9f4c20afa0be",
@@ -3123,7 +3252,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.8"
+   "clause": "W-2.8",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0733ea66b95d7e76",
@@ -3147,7 +3277,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.12"
+   "clause": "W-2.12",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-07cf2086914b7931",
@@ -3171,7 +3302,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.14"
+   "clause": "W-2.14",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-07fce20b5afc879a",
@@ -3195,7 +3327,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.16"
+   "clause": "W-2.16",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0af9225afcf907de",
@@ -3219,7 +3352,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.25"
+   "clause": "W-2.25",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0ebdcbb7aca60084",
@@ -3243,7 +3377,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.31"
+   "clause": "W-2.31",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0f23a07001325fb8",
@@ -3267,7 +3402,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.32"
+   "clause": "W-2.32",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0fc932e8b19801f5",
@@ -3291,7 +3427,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.34"
+   "clause": "W-2.34",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-146a312c68d61ed0",
@@ -3315,7 +3452,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.37"
+   "clause": "W-2.37",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-15c1f4e4b09ef9d4",
@@ -3339,7 +3477,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.38"
+   "clause": "W-2.38",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-182ae8901d7ab5e0",
@@ -3363,7 +3502,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.43"
+   "clause": "W-2.43",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-19879d39577bd781",
@@ -3387,7 +3527,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.45"
+   "clause": "W-2.45",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1abf812c4f09f107",
@@ -3411,7 +3552,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.47"
+   "clause": "W-2.47",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1ef6b9992d59744b",
@@ -3435,7 +3577,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.51"
+   "clause": "W-2.51",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-23621e88165051fb",
@@ -3459,7 +3602,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.57"
+   "clause": "W-2.57",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-27ef7c1999ea23a4",
@@ -3483,7 +3627,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.62"
+   "clause": "W-2.62",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-294fe953bd531692",
@@ -3507,7 +3652,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.64"
+   "clause": "W-2.64",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2b63e637e6689c75",
@@ -3531,7 +3677,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.66"
+   "clause": "W-2.66",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2fd8d83bb35653f5",
@@ -3555,7 +3702,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.71"
+   "clause": "W-2.71",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-31fc1be407975cad",
@@ -3579,7 +3727,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.76"
+   "clause": "W-2.76",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-33cd728f1d7ed427",
@@ -3603,7 +3752,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.80"
+   "clause": "W-2.80",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-39b29b57103f9888",
@@ -3627,7 +3777,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.88"
+   "clause": "W-2.88",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3ac6600d94451a57",
@@ -3651,7 +3802,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.91"
+   "clause": "W-2.91",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3b1cf3a1622133a9",
@@ -3675,7 +3827,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.92"
+   "clause": "W-2.92",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3bbba4daed7cba38",
@@ -3699,7 +3852,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.97"
+   "clause": "W-2.97",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3c36e7a8e76a2206",
@@ -3723,7 +3877,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.98"
+   "clause": "W-2.98",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4244b23b0f2d3cc4",
@@ -3748,7 +3903,8 @@
    "nature_raw": "atomic",
    "status": "provisional",
    "clause": "W-2.103",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4314a1122bf8b6f8",
@@ -3772,7 +3928,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.106"
+   "clause": "W-2.106",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-45cbef67fff0141a",
@@ -3796,7 +3953,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.110"
+   "clause": "W-2.110",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-491919c142250340",
@@ -3820,7 +3978,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.115"
+   "clause": "W-2.115",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4ab470afe1babf69",
@@ -3844,7 +4003,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.118"
+   "clause": "W-2.118",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-50420ae29cf1d27d",
@@ -3868,7 +4028,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.126"
+   "clause": "W-2.126",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-537388c58afe1db6",
@@ -3892,7 +4053,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.135"
+   "clause": "W-2.135",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-56b378f28d544a46",
@@ -3916,7 +4078,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.143"
+   "clause": "W-2.143",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-572621f6d6f51ca5",
@@ -3940,7 +4103,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.144"
+   "clause": "W-2.144",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5b37a86cfddeec60",
@@ -3964,7 +4128,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.152"
+   "clause": "W-2.152",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5bb9e1fea6bbec0f",
@@ -3988,7 +4153,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.154"
+   "clause": "W-2.154",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5c0f1a1f1e1ed5df",
@@ -4012,7 +4178,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.156"
+   "clause": "W-2.156",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5c56029cde3ea5bd",
@@ -4036,7 +4203,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.158"
+   "clause": "W-2.158",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6a09f5b191de1ddd",
@@ -4060,7 +4228,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.186"
+   "clause": "W-2.186",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6a5cef517524a88c",
@@ -4084,7 +4253,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.188"
+   "clause": "W-2.188",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6caf62e49de787ae",
@@ -4108,7 +4278,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.193"
+   "clause": "W-2.193",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6f2500bc187d8fae",
@@ -4132,7 +4303,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.197"
+   "clause": "W-2.197",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-70fb8e51ef009b81",
@@ -4156,7 +4328,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.201"
+   "clause": "W-2.201",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-754797702ce415ac",
@@ -4180,7 +4353,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.208"
+   "clause": "W-2.208",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-773b5a192d129d7d",
@@ -4204,7 +4378,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.212"
+   "clause": "W-2.212",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7d275d03b1df4cd5",
@@ -4228,7 +4403,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.219"
+   "clause": "W-2.219",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7e2b362b3131b1b5",
@@ -4252,7 +4428,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.223"
+   "clause": "W-2.223",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-833206375b2c991d",
@@ -4276,7 +4453,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.227"
+   "clause": "W-2.227",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-898bb92d8028a8c3",
@@ -4300,7 +4478,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.238"
+   "clause": "W-2.238",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8d4c0a3d3b35bada",
@@ -4324,7 +4503,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.248"
+   "clause": "W-2.248",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9163183dc2f334ef",
@@ -4348,7 +4528,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.254"
+   "clause": "W-2.254",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9570bbd5b5f2d5db",
@@ -4372,7 +4553,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.258"
+   "clause": "W-2.258",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-99a8d3c3bf203083",
@@ -4396,7 +4578,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.265"
+   "clause": "W-2.265",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9cdc5af925dc9483",
@@ -4420,7 +4603,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.273"
+   "clause": "W-2.273",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9dc00849000e8b72",
@@ -4444,7 +4628,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.274"
+   "clause": "W-2.274",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a4b7f846e91120e2",
@@ -4468,7 +4653,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.280"
+   "clause": "W-2.280",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a6411e2fb30e094e",
@@ -4492,7 +4678,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.284"
+   "clause": "W-2.284",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a656b1bb2b5c3e94",
@@ -4516,7 +4703,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.285"
+   "clause": "W-2.285",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ab261a055de0ec1c",
@@ -4540,7 +4728,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.289"
+   "clause": "W-2.289",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ab4dac72300ce9ea",
@@ -4564,7 +4753,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.290"
+   "clause": "W-2.290",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b02fba41f0b26e02",
@@ -4588,7 +4778,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.301"
+   "clause": "W-2.301",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b44983db9cb74d68",
@@ -4612,7 +4803,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.304"
+   "clause": "W-2.304",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b7d8c9e322eec780",
@@ -4636,7 +4828,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.316"
+   "clause": "W-2.316",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bb68bd1d1a98626a",
@@ -4660,7 +4853,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.321"
+   "clause": "W-2.321",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bc2e1cfec178cd7a",
@@ -4684,7 +4878,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.322"
+   "clause": "W-2.322",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bc54bf1e6e42dfd1",
@@ -4708,7 +4903,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.323"
+   "clause": "W-2.323",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bda7a01a82f1a74b",
@@ -4732,7 +4928,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.325"
+   "clause": "W-2.325",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c181f732df8821f7",
@@ -4756,7 +4953,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.335"
+   "clause": "W-2.335",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ca61bf7be5b26052",
@@ -4780,7 +4978,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.350"
+   "clause": "W-2.350",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cd2fe84154366282",
@@ -4804,7 +5003,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.356"
+   "clause": "W-2.356",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cdd817707426f918",
@@ -4828,7 +5028,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.358"
+   "clause": "W-2.358",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ceb2e1fa576af45b",
@@ -4852,7 +5053,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.359"
+   "clause": "W-2.359",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d1723884170a7700",
@@ -4876,7 +5078,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.362"
+   "clause": "W-2.362",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d344696169f0731a",
@@ -4900,7 +5103,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.364"
+   "clause": "W-2.364",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d45f8dba3961e2fc",
@@ -4924,7 +5128,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.365"
+   "clause": "W-2.365",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d927c54ff0f54ef5",
@@ -4948,7 +5153,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.372"
+   "clause": "W-2.372",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d9aa349137ef8628",
@@ -4972,7 +5178,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.374"
+   "clause": "W-2.374",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-db70213f67efa6d8",
@@ -4996,7 +5203,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.376"
+   "clause": "W-2.376",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dd7be258d1ba3049",
@@ -5020,7 +5228,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.382"
+   "clause": "W-2.382",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dd807574fa901ea8",
@@ -5044,7 +5253,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.383"
+   "clause": "W-2.383",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-df02345308ee0113",
@@ -5068,7 +5278,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.388"
+   "clause": "W-2.388",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-df1b71423703c6f7",
@@ -5092,7 +5303,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.389"
+   "clause": "W-2.389",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dfcab496a5a49d3d",
@@ -5116,7 +5328,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.390"
+   "clause": "W-2.390",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e156365db2b01a21",
@@ -5140,7 +5353,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.396"
+   "clause": "W-2.396",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e4043b60b73950df",
@@ -5164,7 +5378,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.404"
+   "clause": "W-2.404",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e4c3e2611c195ce9",
@@ -5188,7 +5403,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.405"
+   "clause": "W-2.405",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e4def100fd4a428b",
@@ -5212,7 +5428,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.406"
+   "clause": "W-2.406",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e8e677658c048890",
@@ -5236,7 +5453,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.413"
+   "clause": "W-2.413",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e920e99103fd392f",
@@ -5260,7 +5478,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.414"
+   "clause": "W-2.414",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f195d1894891c168",
@@ -5284,7 +5503,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.431"
+   "clause": "W-2.431",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f2d5b592a5bf4113",
@@ -5308,7 +5528,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.434"
+   "clause": "W-2.434",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f57d7e0d4f46204d",
@@ -5332,7 +5553,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.438"
+   "clause": "W-2.438",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f80e7175c1920310",
@@ -5356,7 +5578,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.440"
+   "clause": "W-2.440",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f8dba4570c9fbf7d",
@@ -5380,7 +5603,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.441"
+   "clause": "W-2.441",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ff09a3cb894d8e0a",
@@ -5404,7 +5628,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.452"
+   "clause": "W-2.452",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-06d26975e0cb5e36",
@@ -5428,7 +5653,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.10"
+   "clause": "W-2.10",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0984959bc9a46010",
@@ -5452,7 +5678,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.21"
+   "clause": "W-2.21",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0c256e8a81d4ac52",
@@ -5476,7 +5703,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.26"
+   "clause": "W-2.26",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0c2ce93d178d3efd",
@@ -5500,7 +5728,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.27"
+   "clause": "W-2.27",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1c3bcfb153e82975",
@@ -5524,7 +5753,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.48"
+   "clause": "W-2.48",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2144caea2afdb625",
@@ -5548,7 +5778,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.54"
+   "clause": "W-2.54",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2c0a2041a1ed87aa",
@@ -5572,7 +5803,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.67"
+   "clause": "W-2.67",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-330f8f19ef82aa0e",
@@ -5596,7 +5828,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.78"
+   "clause": "W-2.78",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-38f01299f58fc6e4",
@@ -5620,7 +5853,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.85"
+   "clause": "W-2.85",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3b2c1007cc16de19",
@@ -5644,7 +5878,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.93"
+   "clause": "W-2.93",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3cdb837656c3b45b",
@@ -5668,7 +5903,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.100"
+   "clause": "W-2.100",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-42a861229c61398c",
@@ -5692,7 +5928,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.104"
+   "clause": "W-2.104",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4b937805d9521673",
@@ -5716,7 +5953,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.121"
+   "clause": "W-2.121",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5071ec2a3e142bcb",
@@ -5740,7 +5978,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.128"
+   "clause": "W-2.128",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-58b1f1efc0f35bb0",
@@ -5764,7 +6003,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.146"
+   "clause": "W-2.146",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5bf90ff7d35e7a33",
@@ -5788,7 +6028,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.155"
+   "clause": "W-2.155",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5d972f29a9761590",
@@ -5812,7 +6053,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.160"
+   "clause": "W-2.160",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5fbef400bb256c9c",
@@ -5836,7 +6078,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.161"
+   "clause": "W-2.161",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-63f95baa375fc97b",
@@ -5860,7 +6103,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.174"
+   "clause": "W-2.174",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-67e52ebca673c280",
@@ -5884,7 +6128,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.181"
+   "clause": "W-2.181",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6ee73b990e5366a2",
@@ -5908,7 +6153,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.196"
+   "clause": "W-2.196",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6fd55af6656155ff",
@@ -5932,7 +6178,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.198"
+   "clause": "W-2.198",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-74089a05a918da54",
@@ -5956,7 +6203,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.206"
+   "clause": "W-2.206",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-77d0eb267717cf15",
@@ -5980,7 +6228,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.213"
+   "clause": "W-2.213",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-81e73f48cf67cc65",
@@ -6004,7 +6253,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.224"
+   "clause": "W-2.224",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8b9869608dca6a4b",
@@ -6028,7 +6278,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.241"
+   "clause": "W-2.241",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-92e381921bfe9807",
@@ -6052,7 +6303,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.256"
+   "clause": "W-2.256",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9998a1b27fe3caab",
@@ -6076,7 +6328,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.264"
+   "clause": "W-2.264",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-af9be5ade9ccddc7",
@@ -6100,7 +6353,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.298"
+   "clause": "W-2.298",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b2530a099df678b3",
@@ -6124,7 +6378,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.302"
+   "clause": "W-2.302",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b9765382ef883eb0",
@@ -6148,7 +6403,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.317"
+   "clause": "W-2.317",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bb3f463582e1fd37",
@@ -6173,7 +6429,8 @@
    "nature_raw": "atomic",
    "status": "provisional",
    "clause": "W-2.320",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bf6ab0d4d6e610dc",
@@ -6197,7 +6454,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.330"
+   "clause": "W-2.330",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c48fb9cca3c40f48",
@@ -6221,7 +6479,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.339"
+   "clause": "W-2.339",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c6681dd0154f8824",
@@ -6245,7 +6504,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.344"
+   "clause": "W-2.344",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cc980235e4ee2853",
@@ -6269,7 +6529,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.354"
+   "clause": "W-2.354",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cd2184ddd60560fe",
@@ -6293,7 +6554,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.355"
+   "clause": "W-2.355",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d2ccb0a2ebe92b78",
@@ -6317,7 +6579,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.363"
+   "clause": "W-2.363",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dc6c374e88c98074",
@@ -6341,7 +6604,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.377"
+   "clause": "W-2.377",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dcc49585a1e6364c",
@@ -6365,7 +6629,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.379"
+   "clause": "W-2.379",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dcce7860a587f79e",
@@ -6389,7 +6654,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.380"
+   "clause": "W-2.380",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-de36b8cb137951d9",
@@ -6413,7 +6679,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.386"
+   "clause": "W-2.386",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-de573ff3260adb99",
@@ -6437,7 +6704,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.387"
+   "clause": "W-2.387",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e3e26db71f289ebc",
@@ -6461,7 +6729,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.402"
+   "clause": "W-2.402",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ecca70d86d44653c",
@@ -6485,7 +6754,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.418"
+   "clause": "W-2.418",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-edaffe219831ba0a",
@@ -6509,7 +6779,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.421"
+   "clause": "W-2.421",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ee877a8fc5d260ec",
@@ -6533,7 +6804,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.422"
+   "clause": "W-2.422",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-08dc6481589eaaed",
@@ -6557,7 +6829,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.18"
+   "clause": "W-2.18",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-09d0efc57cd12c77",
@@ -6581,7 +6854,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.22"
+   "clause": "W-2.22",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0ad91c080a52c7f3",
@@ -6605,7 +6879,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.24"
+   "clause": "W-2.24",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0c4b58fdf47bb3b4",
@@ -6629,7 +6904,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.28"
+   "clause": "W-2.28",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0c800afd634a36c1",
@@ -6653,7 +6929,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.29"
+   "clause": "W-2.29",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-18b9334b8c7d91f4",
@@ -6677,7 +6954,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.44"
+   "clause": "W-2.44",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-30c3d9dbd0f5f2a0",
@@ -6701,7 +6979,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-2.73"
+   "clause": "W-2.73",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-34b8904f72675de0",
@@ -6725,7 +7004,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.82"
+   "clause": "W-2.82",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3b8c946efdf083b5",
@@ -6749,7 +7029,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.95"
+   "clause": "W-2.95",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-40d7019b629deca0",
@@ -6773,7 +7054,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.101"
+   "clause": "W-2.101",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4f92de5ddb23ffbf",
@@ -6797,7 +7079,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.124"
+   "clause": "W-2.124",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-52673ec4607526be",
@@ -6821,7 +7104,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.132"
+   "clause": "W-2.132",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5a8a196b7081e1bb",
@@ -6845,7 +7129,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.151"
+   "clause": "W-2.151",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5b87304284483927",
@@ -6869,7 +7154,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.153"
+   "clause": "W-2.153",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6118f1ddf182b8c9",
@@ -6893,7 +7179,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.166"
+   "clause": "W-2.166",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6807472bc078bb8d",
@@ -6917,7 +7204,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.182"
+   "clause": "W-2.182",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6a35c2f74318578e",
@@ -6941,7 +7229,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.187"
+   "clause": "W-2.187",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-710b612a819e7264",
@@ -6965,7 +7254,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.202"
+   "clause": "W-2.202",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-71c439352ad464eb",
@@ -6989,7 +7279,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.204"
+   "clause": "W-2.204",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-788eb62c3facdcbf",
@@ -7013,7 +7304,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.215"
+   "clause": "W-2.215",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8cd3ef9bcfce9529",
@@ -7037,7 +7329,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.245"
+   "clause": "W-2.245",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8fbedeba32d7d788",
@@ -7061,7 +7354,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.253"
+   "clause": "W-2.253",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-976ba269427fee46",
@@ -7085,7 +7379,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.260"
+   "clause": "W-2.260",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-990aae9f4876012c",
@@ -7109,7 +7404,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.261"
+   "clause": "W-2.261",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a4bca08ac69bc2c0",
@@ -7133,7 +7429,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.281"
+   "clause": "W-2.281",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b431f1a0067a728d",
@@ -7157,7 +7454,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.303"
+   "clause": "W-2.303",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b494390dfbc77466",
@@ -7181,7 +7479,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.306"
+   "clause": "W-2.306",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b5053c79bc6a2bfe",
@@ -7205,7 +7504,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.307"
+   "clause": "W-2.307",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b51f2e000664dd84",
@@ -7229,7 +7529,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.308"
+   "clause": "W-2.308",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bda3ae3e2347d88b",
@@ -7253,7 +7554,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.324"
+   "clause": "W-2.324",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-bebb5570bc5bb55c",
@@ -7277,7 +7579,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.329"
+   "clause": "W-2.329",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c4a76f4e1a34e2cd",
@@ -7301,7 +7604,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.341"
+   "clause": "W-2.341",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c77d30c8368d107e",
@@ -7325,7 +7629,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.348"
+   "clause": "W-2.348",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d97452b05ff0d770",
@@ -7349,7 +7654,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.373"
+   "clause": "W-2.373",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e10aae2f1b889dce",
@@ -7373,7 +7679,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.395"
+   "clause": "W-2.395",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e3e99ca45c9875ad",
@@ -7397,7 +7704,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.403"
+   "clause": "W-2.403",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e8c213b735b75ddd",
@@ -7422,7 +7730,8 @@
    "nature_raw": "atomic",
    "status": "provisional",
    "clause": "W-2.412",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ebb85ba148b58614",
@@ -7446,7 +7755,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.416"
+   "clause": "W-2.416",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ef7f9432b01d3d42",
@@ -7471,7 +7781,8 @@
    "nature_raw": "atomic",
    "status": "provisional",
    "clause": "W-2.424",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": null
   },
   {
    "rule_id": "r-efbbe630f281f6cb",
@@ -7495,7 +7806,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.426"
+   "clause": "W-2.426",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f2509c6725479888",
@@ -7519,7 +7831,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.433"
+   "clause": "W-2.433",
+   "policy_fragment": "methodology"
   },
   {
    "rule_id": "r-2f333e23ced1d524",
@@ -7543,7 +7856,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "E-2.126"
+   "clause": "E-2.126",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4f309d6ebde80283",
@@ -7567,7 +7881,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.25"
+   "clause": "W-1.25",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-a16f7c8d40677bbb",
@@ -7591,7 +7906,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.87"
+   "clause": "E-2.87",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a37db2c994b08fbe",
@@ -7615,7 +7931,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.89"
+   "clause": "E-2.89",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ad80c02af1e44287",
@@ -7639,7 +7956,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.93"
+   "clause": "E-2.93",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e61c58d5be723832",
@@ -7663,7 +7981,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.110"
+   "clause": "E-2.110",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8e049d8b38a8ac31",
@@ -7687,7 +8006,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.38"
+   "clause": "W-1.38",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d00103c52a98512e",
@@ -7711,7 +8031,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.51"
+   "clause": "W-1.51",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-62ecfeb974b0a781",
@@ -7735,7 +8056,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.171"
+   "clause": "W-2.171",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3b3460eab4528002",
@@ -7759,7 +8081,8 @@
    "p_level": "P0",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.21"
+   "clause": "W-1.21",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-478f43899bcb5b8a",
@@ -7783,7 +8106,8 @@
    "p_level": "P0",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.24"
+   "clause": "W-1.24",
+   "policy_fragment": "methodology"
   },
   {
    "rule_id": "r-8dfbcdca24e18a60",
@@ -7807,7 +8131,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.37"
+   "clause": "W-1.37",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d451847b1d6b75f4",
@@ -7831,7 +8156,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.52"
+   "clause": "W-1.52",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-046b59182be4ec7a",
@@ -7855,7 +8181,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.2"
+   "clause": "E-2.2",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-05fc5c5bb2ad11c7",
@@ -7879,7 +8206,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.4"
+   "clause": "E-2.4",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2e626d2a1e0c410b",
@@ -7903,7 +8231,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.25"
+   "clause": "E-2.25",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3346ccf9dd9f872a",
@@ -7927,7 +8256,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.27"
+   "clause": "E-2.27",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-48562f605e944564",
@@ -7951,7 +8281,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.37"
+   "clause": "E-2.37",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-48f8114bc6c05385",
@@ -7975,7 +8306,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.38"
+   "clause": "E-2.38",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-58f8778c7df5e0de",
@@ -7999,7 +8331,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.46"
+   "clause": "E-2.46",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-5b9f6b066d7e5639",
@@ -8023,7 +8356,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.47"
+   "clause": "E-2.47",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6e969adf28744b44",
@@ -8047,7 +8381,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.59"
+   "clause": "E-2.59",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6fffe02830b86b2c",
@@ -8071,7 +8406,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.61"
+   "clause": "E-2.61",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-76b0de0f856badfd",
@@ -8095,7 +8431,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.66"
+   "clause": "E-2.66",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-891986ac67ba14e4",
@@ -8119,7 +8456,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.78"
+   "clause": "E-2.78",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9258a5796300346e",
@@ -8143,7 +8481,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.80"
+   "clause": "E-2.80",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a65b1e8a7c4b267c",
@@ -8167,7 +8506,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.91"
+   "clause": "E-2.91",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a8cdfc64db3cfc8e",
@@ -8191,7 +8531,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.92"
+   "clause": "E-2.92",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c05e4d0d49199fe1",
@@ -8215,7 +8556,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.100"
+   "clause": "E-2.100",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c1c859346be1dcc9",
@@ -8239,7 +8581,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.101"
+   "clause": "E-2.101",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-053cbc5270c06ee3",
@@ -8263,7 +8606,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.3"
+   "clause": "E-2.3",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0992ac3abaa12743",
@@ -8288,7 +8632,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.6",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-0d03daa365c189fa",
@@ -8312,7 +8657,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.8"
+   "clause": "E-2.8",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-10ed80ffbfb24032",
@@ -8337,7 +8683,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.11",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-1942420ea6573f59",
@@ -8361,7 +8708,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.15"
+   "clause": "E-2.15",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-1acd99e05c923d6f",
@@ -8385,7 +8733,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.16"
+   "clause": "E-2.16",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1ec2df3c627a939c",
@@ -8409,7 +8758,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.17"
+   "clause": "E-2.17",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2621039e6668bb23",
@@ -8433,7 +8783,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.20"
+   "clause": "E-2.20",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3f16262e0ce69c64",
@@ -8457,7 +8808,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.34"
+   "clause": "E-2.34",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-403f0cf4352276db",
@@ -8482,7 +8834,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.35",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-4ee707c5cbb00c56",
@@ -8506,7 +8859,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.40"
+   "clause": "E-2.40",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-4fdfb95997854147",
@@ -8531,7 +8885,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.41",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-53a0f8d5f6f1780b",
@@ -8556,7 +8911,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.43",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-579a5e4330cd2bb7",
@@ -8580,7 +8936,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.44"
+   "clause": "E-2.44",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-5db1bec0011aad9d",
@@ -8605,7 +8962,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.48",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-64cde165077bc5fe",
@@ -8629,7 +8987,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.52"
+   "clause": "E-2.52",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-67ffdb69e67ca85b",
@@ -8653,7 +9012,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.54"
+   "clause": "E-2.54",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-77563fc5131c5e86",
@@ -8677,7 +9037,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.67"
+   "clause": "E-2.67",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-7c8cc00eaeca9b7b",
@@ -8701,7 +9062,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.71"
+   "clause": "E-2.71",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-846a6e55701cc746",
@@ -8726,7 +9088,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.75",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-b3329c8ade9dfe0e",
@@ -8751,7 +9114,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.96",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-c504306123c60711",
@@ -8775,7 +9139,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.102"
+   "clause": "E-2.102",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-d9c4f7a14274935d",
@@ -8799,7 +9164,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.106"
+   "clause": "E-2.106",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-ef49dc851367df09",
@@ -8823,7 +9189,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.116"
+   "clause": "E-2.116",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fed6086dbb506d2e",
@@ -8847,7 +9214,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.123"
+   "clause": "E-2.123",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-14cd4d14b49f07a6",
@@ -8871,7 +9239,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.13"
+   "clause": "E-2.13",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-16ad781f7f015952",
@@ -8895,7 +9264,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.14"
+   "clause": "E-2.14",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-206273d8caed900a",
@@ -8919,7 +9289,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.18"
+   "clause": "E-2.18",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2cd3e9d8cfed2098",
@@ -8943,7 +9314,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.24"
+   "clause": "E-2.24",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-33fc17f39f94cd64",
@@ -8967,7 +9339,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.28"
+   "clause": "E-2.28",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3719625c0de5a474",
@@ -8991,7 +9364,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.30"
+   "clause": "E-2.30",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-394d2167758b03ee",
@@ -9015,7 +9389,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.31"
+   "clause": "E-2.31",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-46e00e697c5bb9a9",
@@ -9039,7 +9414,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.36"
+   "clause": "E-2.36",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-587dbb4cf0f67eb1",
@@ -9063,7 +9439,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.45"
+   "clause": "E-2.45",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-62e70b7bb37d5042",
@@ -9087,7 +9464,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.49"
+   "clause": "E-2.49",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-75fa18a4ef7d3c75",
@@ -9111,7 +9489,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.65"
+   "clause": "E-2.65",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7c3820d4a375028c",
@@ -9136,7 +9515,8 @@
    "nature_raw": "",
    "status": "candidate",
    "clause": "E-2.70",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": null
   },
   {
    "rule_id": "r-872fb5f5ed4cd5b5",
@@ -9160,7 +9540,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.77"
+   "clause": "E-2.77",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8b7c16edca37f645",
@@ -9184,7 +9565,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.79"
+   "clause": "E-2.79",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-99910d3c9ce42aa5",
@@ -9208,7 +9590,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.85"
+   "clause": "E-2.85",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a256d6151fe461b1",
@@ -9232,7 +9615,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.88"
+   "clause": "E-2.88",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b60da70387394094",
@@ -9256,7 +9640,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.98"
+   "clause": "E-2.98",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d76d6985901d3278",
@@ -9280,7 +9665,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.104"
+   "clause": "E-2.104",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dceacb814c5a991d",
@@ -9304,7 +9690,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.107"
+   "clause": "E-2.107",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e4159db9af7df124",
@@ -9328,7 +9715,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.109"
+   "clause": "E-2.109",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ec4e0cbe33252ef2",
@@ -9352,7 +9740,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.114"
+   "clause": "E-2.114",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ed0e2649f067d34b",
@@ -9376,7 +9765,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.115"
+   "clause": "E-2.115",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fe7d3b0e2162ab00",
@@ -9400,7 +9790,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.122"
+   "clause": "E-2.122",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-01870b675a3e2dad",
@@ -9424,7 +9815,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.2"
+   "clause": "W-2.2",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-17f5d2d2dbd05c13",
@@ -9448,7 +9840,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.41"
+   "clause": "W-2.41",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1d0563c01d83f5f6",
@@ -9472,7 +9865,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.50"
+   "clause": "W-2.50",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-24f45edaaecc9d52",
@@ -9496,7 +9890,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.58"
+   "clause": "W-2.58",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2629716cfcba4bf1",
@@ -9520,7 +9915,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.59"
+   "clause": "W-2.59",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-27a67e6aaab55c04",
@@ -9544,7 +9940,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.60"
+   "clause": "W-2.60",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2a3f238840217fdd",
@@ -9568,7 +9965,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.65"
+   "clause": "W-2.65",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-310e09a914d557bb",
@@ -9592,7 +9990,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.74"
+   "clause": "W-2.74",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-48189e2be06c1524",
@@ -9616,7 +10015,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.112"
+   "clause": "W-2.112",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-49a58aca87e2b71d",
@@ -9640,7 +10040,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-2.116"
+   "clause": "W-2.116",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-50430666754020ad",
@@ -9664,7 +10065,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.127"
+   "clause": "W-2.127",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-544ebe211678cd6e",
@@ -9688,7 +10090,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.136"
+   "clause": "W-2.136",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5551320becd930ac",
@@ -9712,7 +10115,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.139"
+   "clause": "W-2.139",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5571476ffde5bd4f",
@@ -9736,7 +10140,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.141"
+   "clause": "W-2.141",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-557bb0c3a5ae9a75",
@@ -9760,7 +10165,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.142"
+   "clause": "W-2.142",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5c7b86436c1e96c9",
@@ -9784,7 +10190,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.159"
+   "clause": "W-2.159",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-62e68b8722830074",
@@ -9808,7 +10215,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.169"
+   "clause": "W-2.169",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-62f0d4edd401a20e",
@@ -9832,7 +10240,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.172"
+   "clause": "W-2.172",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-68c6a82355851309",
@@ -9856,7 +10265,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.183"
+   "clause": "W-2.183",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ab7c1a45f83b3482",
@@ -9880,7 +10290,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.291"
+   "clause": "W-2.291",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ac05b9e4669866b4",
@@ -9904,7 +10315,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.292"
+   "clause": "W-2.292",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b00d53230757caf6",
@@ -9928,7 +10340,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.300"
+   "clause": "W-2.300",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b4660b7a28845f00",
@@ -9952,7 +10365,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.305"
+   "clause": "W-2.305",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b6e68cd5852b35af",
@@ -9976,7 +10390,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.313"
+   "clause": "W-2.313",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c0e53c3a4bc98a24",
@@ -10000,7 +10415,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.332"
+   "clause": "W-2.332",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d88e933b2140a374",
@@ -10024,7 +10440,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.371"
+   "clause": "W-2.371",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-da384742d48d8b07",
@@ -10048,7 +10465,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.375"
+   "clause": "W-2.375",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e0066bde9338357e",
@@ -10072,7 +10490,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.391"
+   "clause": "W-2.391",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e063ed601d478dd7",
@@ -10096,7 +10515,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.392"
+   "clause": "W-2.392",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e252a8cd042a83af",
@@ -10120,7 +10540,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.398"
+   "clause": "W-2.398",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e62ceee5c36f8a19",
@@ -10144,7 +10565,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.408"
+   "clause": "W-2.408",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ed3087ae36864ed4",
@@ -10168,7 +10590,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.419"
+   "clause": "W-2.419",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ed650c228f9300f7",
@@ -10192,7 +10615,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.420"
+   "clause": "W-2.420",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f46e6c23ba9824b4",
@@ -10216,7 +10640,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.435"
+   "clause": "W-2.435",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-04723763ebfd2b2b",
@@ -10240,7 +10665,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.6"
+   "clause": "W-2.6",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1ccb6e1f11e92680",
@@ -10264,7 +10690,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.49"
+   "clause": "W-2.49",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-223bba503e14a279",
@@ -10288,7 +10715,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.55"
+   "clause": "W-2.55",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2e9f373fa7ef841c",
@@ -10312,7 +10740,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.69"
+   "clause": "W-2.69",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-39c4d3cfa74f2672",
@@ -10336,7 +10765,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.89"
+   "clause": "W-2.89",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3c48f9b524a6333d",
@@ -10360,7 +10790,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.99"
+   "clause": "W-2.99",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-585150cf9fdea110",
@@ -10384,7 +10815,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.145"
+   "clause": "W-2.145",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5c147dadb4776118",
@@ -10408,7 +10840,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.157"
+   "clause": "W-2.157",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-621753fca6e19a0f",
@@ -10432,7 +10865,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.167"
+   "clause": "W-2.167",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6768699540085fd3",
@@ -10456,7 +10890,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.180"
+   "clause": "W-2.180",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7a2077c8131dc3b2",
@@ -10480,7 +10915,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.218"
+   "clause": "W-2.218",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7e167b512a26f455",
@@ -10504,7 +10940,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.222"
+   "clause": "W-2.222",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-85080eb28d7d8d01",
@@ -10528,7 +10965,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.232"
+   "clause": "W-2.232",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-855fcb180c9d8f2f",
@@ -10552,7 +10990,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.233"
+   "clause": "W-2.233",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-877e5d527965b874",
@@ -10576,7 +11015,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.236"
+   "clause": "W-2.236",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8cfdee8434350faa",
@@ -10600,7 +11040,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.246"
+   "clause": "W-2.246",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8e2d4cadfb6b0c9a",
@@ -10624,7 +11065,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.250"
+   "clause": "W-2.250",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-91a2961a5de5bbda",
@@ -10648,7 +11090,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.255"
+   "clause": "W-2.255",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-990b801ee30ae2fd",
@@ -10672,7 +11115,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.262"
+   "clause": "W-2.262",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a0b15b26f05444a0",
@@ -10696,7 +11140,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.276"
+   "clause": "W-2.276",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a5ddf19a11fdb31e",
@@ -10720,7 +11165,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.282"
+   "clause": "W-2.282",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ad1e572f9222c386",
@@ -10744,7 +11190,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.295"
+   "clause": "W-2.295",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-aff0d8aca8347b36",
@@ -10768,7 +11215,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.299"
+   "clause": "W-2.299",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cacfb1c9ad026c1b",
@@ -10792,7 +11240,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.351"
+   "clause": "W-2.351",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d576deb5c7c422ed",
@@ -10816,7 +11265,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.367"
+   "clause": "W-2.367",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-de342b7f2f5feaa5",
@@ -10840,7 +11290,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.385"
+   "clause": "W-2.385",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e1e4a3266afe9d0c",
@@ -10864,7 +11315,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.397"
+   "clause": "W-2.397",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e8bef64d33f880ac",
@@ -10888,7 +11340,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.411"
+   "clause": "W-2.411",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f071f6db5c5f7f65",
@@ -10912,7 +11365,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.428"
+   "clause": "W-2.428",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f1e4839bc0fb5265",
@@ -10936,7 +11390,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.432"
+   "clause": "W-2.432",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fee1218774e9d1d9",
@@ -10960,7 +11415,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.451"
+   "clause": "W-2.451",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-07b16b9680a49a61",
@@ -10984,7 +11440,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.13"
+   "clause": "W-2.13",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-27d7fffcd66f573e",
@@ -11008,7 +11465,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.61"
+   "clause": "W-2.61",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3609e77fee4b6cbe",
@@ -11032,7 +11490,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.83"
+   "clause": "W-2.83",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-42b33135794ac9f9",
@@ -11056,7 +11515,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.105"
+   "clause": "W-2.105",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-44b792d8a078ca6f",
@@ -11080,7 +11540,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.108"
+   "clause": "W-2.108",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5308db78b4d9628d",
@@ -11104,7 +11565,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.133"
+   "clause": "W-2.133",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5564c6b0433a7728",
@@ -11128,7 +11590,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.140"
+   "clause": "W-2.140",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-606ad8dfd6bcb607",
@@ -11152,7 +11615,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.163"
+   "clause": "W-2.163",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6b1a5d2525df56e6",
@@ -11176,7 +11640,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.189"
+   "clause": "W-2.189",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-756e75a63660618e",
@@ -11200,7 +11665,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.209"
+   "clause": "W-2.209",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7d90d01b5964022d",
@@ -11224,7 +11690,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.220"
+   "clause": "W-2.220",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8380b74f7d98d063",
@@ -11248,7 +11715,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-2.228"
+   "clause": "W-2.228",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-84927c3e6a3a06d0",
@@ -11272,7 +11740,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.231"
+   "clause": "W-2.231",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8bd71732765aa4c8",
@@ -11296,7 +11765,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.242"
+   "clause": "W-2.242",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8d1cb80faa934923",
@@ -11320,7 +11790,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.247"
+   "clause": "W-2.247",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-94ef0260d4764078",
@@ -11344,7 +11815,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.257"
+   "clause": "W-2.257",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9bb0fdd5fad10af9",
@@ -11368,7 +11840,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.271"
+   "clause": "W-2.271",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a1a9c278662bcad2",
@@ -11392,7 +11865,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-2.277"
+   "clause": "W-2.277",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a5fa71eeca24af2f",
@@ -11416,7 +11890,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.283"
+   "clause": "W-2.283",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a7b2b833ef7bb856",
@@ -11440,7 +11915,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.287"
+   "clause": "W-2.287",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b690604920484a9c",
@@ -11464,7 +11940,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.309"
+   "clause": "W-2.309",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c3fae13f5c970bef",
@@ -11488,7 +11965,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.338"
+   "clause": "W-2.338",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c4961150d20c31b2",
@@ -11512,7 +11990,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.340"
+   "clause": "W-2.340",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cdce0d7447a57105",
@@ -11536,7 +12015,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.357"
+   "clause": "W-2.357",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dcb12e3663a5674a",
@@ -11560,7 +12040,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.378"
+   "clause": "W-2.378",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e2676dd31c724d97",
@@ -11584,7 +12065,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.399"
+   "clause": "W-2.399",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f91bc51b7a5c34b7",
@@ -11608,7 +12090,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.443"
+   "clause": "W-2.443",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-06ae8f80558f9637",
@@ -11632,7 +12115,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.9"
+   "clause": "W-2.9",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-06ef1afcd242f6ef",
@@ -11656,7 +12140,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.11"
+   "clause": "W-2.11",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-07f6ea8c7ba9d05b",
@@ -11680,7 +12165,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.15"
+   "clause": "W-2.15",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0cf17d3461fc4c36",
@@ -11704,7 +12190,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.30"
+   "clause": "W-2.30",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-198ec64ae47a4df5",
@@ -11728,7 +12215,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.46"
+   "clause": "W-2.46",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3134c393ae983f75",
@@ -11752,7 +12240,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.75"
+   "clause": "W-2.75",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-341de2620214b905",
@@ -11776,7 +12265,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.81"
+   "clause": "W-2.81",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-396772209e17185d",
@@ -11800,7 +12290,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.87"
+   "clause": "W-2.87",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3b9212dc4072b59b",
@@ -11824,7 +12315,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.96"
+   "clause": "W-2.96",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-417b04d6a458ced6",
@@ -11848,7 +12340,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.102"
+   "clause": "W-2.102",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-49f6cd2dd3368fe2",
@@ -11872,7 +12365,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.117"
+   "clause": "W-2.117",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5965698f706cd145",
@@ -11896,7 +12390,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.148"
+   "clause": "W-2.148",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-60635da2a17a4831",
@@ -11920,7 +12415,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.162"
+   "clause": "W-2.162",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-62f78e0b09921fe2",
@@ -11944,7 +12440,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.173"
+   "clause": "W-2.173",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6dae14c7b18917d0",
@@ -11968,7 +12465,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.195"
+   "clause": "W-2.195",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-74f34707be0698b9",
@@ -11992,7 +12490,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.207"
+   "clause": "W-2.207",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-769cfa1751dbabc9",
@@ -12016,7 +12515,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.211"
+   "clause": "W-2.211",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-78946c32d35b9383",
@@ -12040,7 +12540,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.216"
+   "clause": "W-2.216",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8239786a7b850ba3",
@@ -12064,7 +12565,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.226"
+   "clause": "W-2.226",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9ac459a1e1841c80",
@@ -12088,7 +12590,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.270"
+   "clause": "W-2.270",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c6b6090c2db050bd",
@@ -12112,7 +12615,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.346"
+   "clause": "W-2.346",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ca215af1ebcf5f03",
@@ -12136,7 +12640,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.349"
+   "clause": "W-2.349",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cf4afecffa6cb8fa",
@@ -12160,7 +12665,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.360"
+   "clause": "W-2.360",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-dd990a83bc2dd62e",
@@ -12184,7 +12690,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.384"
+   "clause": "W-2.384",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e4faf24a7b9c9e6a",
@@ -12208,7 +12715,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.407"
+   "clause": "W-2.407",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3055901e5877f981",
@@ -12232,7 +12740,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.13"
+   "clause": "W-1.13",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-9b672eff05199974",
@@ -12256,7 +12765,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.41"
+   "clause": "W-1.41",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-83b8e3118cd67b5e",
@@ -12280,7 +12790,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.74"
+   "clause": "E-2.74",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-03fb6f7a5fe1655a",
@@ -12304,7 +12815,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.3"
+   "clause": "W-1.3",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-65198e7c3e5b833e",
@@ -12328,7 +12840,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.27"
+   "clause": "W-1.27",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-517689429e03204b",
@@ -12352,7 +12865,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.131"
+   "clause": "W-2.131",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f4fff9f83474d164",
@@ -12376,7 +12890,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.437"
+   "clause": "W-2.437",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c40ed52e71a07743",
@@ -12401,7 +12916,8 @@
    "nature_raw": "atomic",
    "status": "provisional",
    "clause": "W-1.48",
-   "patched_from_spec": true
+   "patched_from_spec": true,
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-06b5f92f2232ec0d",
@@ -12425,7 +12941,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.5"
+   "clause": "E-2.5",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-0b924fbfd4b05c53",
@@ -12449,7 +12966,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.7"
+   "clause": "E-2.7",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-2c9ee3f09c1704ba",
@@ -12473,7 +12991,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.23"
+   "clause": "E-2.23",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4c529cf3d8de64c5",
@@ -12497,7 +13016,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.39"
+   "clause": "E-2.39",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-64205773cd4ec1f2",
@@ -12521,7 +13041,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.50"
+   "clause": "E-2.50",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-6eb73fce2ce2cd6a",
@@ -12545,7 +13066,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.60"
+   "clause": "E-2.60",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-71181b6e93037a76",
@@ -12569,7 +13091,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.63"
+   "clause": "E-2.63",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-740c024aca6f288e",
@@ -12593,7 +13116,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.64"
+   "clause": "E-2.64",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-92a6b9e1abc30af5",
@@ -12617,7 +13141,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.81"
+   "clause": "E-2.81",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-94aa197c2c5d13a8",
@@ -12641,7 +13166,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.82"
+   "clause": "E-2.82",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-995d828f5ef27974",
@@ -12665,7 +13191,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.84"
+   "clause": "E-2.84",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-c69dec0ef9ab6e4e",
@@ -12689,7 +13216,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.103"
+   "clause": "E-2.103",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e94b17b91c98fa1b",
@@ -12713,7 +13241,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.111"
+   "clause": "E-2.111",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-e9b7e1915e009fa9",
@@ -12737,7 +13266,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.113"
+   "clause": "E-2.113",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-0d1e46b923cbf9f8",
@@ -12761,7 +13291,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.9"
+   "clause": "E-2.9",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-21d3c3ac51781f46",
@@ -12785,7 +13316,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.19"
+   "clause": "E-2.19",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-78a077ce5e1c2344",
@@ -12809,7 +13341,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.68"
+   "clause": "E-2.68",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-86e50ef8b8099b3c",
@@ -12833,7 +13366,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.76"
+   "clause": "E-2.76",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-f7b1aad0634595dc",
@@ -12857,7 +13391,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.119"
+   "clause": "E-2.119",
+   "policy_fragment": "empty_template"
   },
   {
    "rule_id": "r-2e706852abbe23df",
@@ -12881,7 +13416,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.26"
+   "clause": "E-2.26",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5106e7fd2f38d77c",
@@ -12905,7 +13441,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.42"
+   "clause": "E-2.42",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-64bdddb0f087300e",
@@ -12929,7 +13466,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.51"
+   "clause": "E-2.51",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6d240d56cfc3ee97",
@@ -12953,7 +13491,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.57"
+   "clause": "E-2.57",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1cf94543649842a0",
@@ -12977,7 +13516,8 @@
    "p_level": "P0",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.10"
+   "clause": "W-1.10",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9e252d15425a4179",
@@ -13001,7 +13541,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.42"
+   "clause": "W-1.42",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f0942e10a8b74228",
@@ -13025,7 +13566,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.429"
+   "clause": "W-2.429",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b8669712e27146e3",
@@ -13049,7 +13591,8 @@
    "p_level": "P2",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.46"
+   "clause": "W-1.46",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-69f4049b9cd733ea",
@@ -13073,7 +13616,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.29"
+   "clause": "W-1.29",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4142a3c2dbf3cbe5",
@@ -13097,7 +13641,8 @@
    "p_level": "P2",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.23"
+   "clause": "W-1.23",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7bed60d9dd01793a",
@@ -13121,7 +13666,8 @@
    "p_level": "P2",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.34"
+   "clause": "W-1.34",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b3d0d5f656f0df34",
@@ -13145,7 +13691,8 @@
    "p_level": "P2",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.45"
+   "clause": "W-1.45",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-75fba1336be292c5",
@@ -13169,7 +13716,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.210"
+   "clause": "W-2.210",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-755d3407cf8ce75b",
@@ -13193,7 +13741,8 @@
    "p_level": "P2",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-1.32"
+   "clause": "W-1.32",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b6d8f65597a51e88",
@@ -13217,7 +13766,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.312"
+   "clause": "W-2.312",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d0373580920ad56b",
@@ -13241,7 +13791,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.361"
+   "clause": "W-2.361",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-724b26ecb1dee9c4",
@@ -13265,7 +13816,8 @@
    "p_level": "P2",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.30"
+   "clause": "W-1.30",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-0823b2d08a7e4ec2",
@@ -13289,7 +13841,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.4"
+   "clause": "W-1.4",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-3b18c7d1af8f8d4d",
@@ -13313,7 +13866,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.20"
+   "clause": "W-1.20",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-870bf797d240b725",
@@ -13337,7 +13891,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.36"
+   "clause": "W-1.36",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-6be850e79f672fb0",
@@ -13361,7 +13916,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.191"
+   "clause": "W-2.191",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9692d3f2cc56c536",
@@ -13385,7 +13941,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.259"
+   "clause": "W-2.259",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-99e129bfc18ec018",
@@ -13409,7 +13966,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.268"
+   "clause": "W-2.268",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-be4dd0bdcdd53082",
@@ -13433,7 +13991,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.326"
+   "clause": "W-2.326",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-beba3ddaa5f32511",
@@ -13457,7 +14016,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.328"
+   "clause": "W-2.328",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-33ce99a813e0865a",
@@ -13481,7 +14041,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.16"
+   "clause": "W-1.16",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-cbfa62aa397fc6ba",
@@ -13505,7 +14066,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-1.50"
+   "clause": "W-1.50",
+   "policy_fragment": "rule_code_fragment"
   },
   {
    "rule_id": "r-ef9611bb146479c9",
@@ -13529,7 +14091,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.425"
+   "clause": "W-2.425",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-48559eb5f5c8cf1f",
@@ -13553,7 +14116,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.114"
+   "clause": "W-2.114",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-242c9de1bf755dca",
@@ -13577,7 +14141,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "E-2.125"
+   "clause": "E-2.125",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9961b7d19cdd81e6",
@@ -13601,7 +14166,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "E-2.128"
+   "clause": "E-2.128",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6430cde694cab5b7",
@@ -13625,7 +14191,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "E-2.127"
+   "clause": "E-2.127",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fbbd2396bcd0c136",
@@ -13649,7 +14216,8 @@
    "p_level": "P0",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "E-2.129"
+   "clause": "E-2.129",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d8ed24d58ff4d282",
@@ -13673,7 +14241,8 @@
    "p_level": "P1",
    "nature_raw": "",
    "status": "candidate",
-   "clause": "E-2.105"
+   "clause": "E-2.105",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-031e17f2fd4ee59c",
@@ -13697,7 +14266,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.3"
+   "clause": "W-2.3",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-08f814586df8d646",
@@ -13721,7 +14291,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.20"
+   "clause": "W-2.20",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0abf1c5f448ea6fe",
@@ -13745,7 +14316,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.23"
+   "clause": "W-2.23",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-16df6f8a4a0d597c",
@@ -13769,7 +14341,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.40"
+   "clause": "W-2.40",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-18204ac2721417ec",
@@ -13793,7 +14366,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.42"
+   "clause": "W-2.42",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4b42db866834c17a",
@@ -13817,7 +14391,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.120"
+   "clause": "W-2.120",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5129868cac83a174",
@@ -13841,7 +14416,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-2.130"
+   "clause": "W-2.130",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ad7bea5e52842702",
@@ -13865,7 +14441,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.296"
+   "clause": "W-2.296",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c149d450d7dc5775",
@@ -13889,7 +14466,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.334"
+   "clause": "W-2.334",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f8005cca476ffa7d",
@@ -13913,7 +14491,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.439"
+   "clause": "W-2.439",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fa965e984f39fc10",
@@ -13937,7 +14516,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.445"
+   "clause": "W-2.445",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-0f90d588747190c8",
@@ -13961,7 +14541,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.33"
+   "clause": "W-2.33",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-1f23037f5f7208f0",
@@ -13985,7 +14566,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.52"
+   "clause": "W-2.52",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4fb9902dbefa8db1",
@@ -14009,7 +14591,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.125"
+   "clause": "W-2.125",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-532ddf59fc811d83",
@@ -14033,7 +14616,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.134"
+   "clause": "W-2.134",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5976aa4e943b699c",
@@ -14057,7 +14641,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.149"
+   "clause": "W-2.149",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-7dac0c64407acd20",
@@ -14081,7 +14666,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.221"
+   "clause": "W-2.221",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-a6dad26affbcba24",
@@ -14105,7 +14691,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.286"
+   "clause": "W-2.286",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ac0d6a09d2ddf809",
@@ -14129,7 +14716,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.293"
+   "clause": "W-2.293",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-cc19183c56653ae2",
@@ -14153,7 +14741,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.353"
+   "clause": "W-2.353",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-d54c2484ecbdf1da",
@@ -14177,7 +14766,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.366"
+   "clause": "W-2.366",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ef33ce6f81328fb1",
@@ -14201,7 +14791,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.423"
+   "clause": "W-2.423",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-14056187c2923e38",
@@ -14225,7 +14816,8 @@
    "p_level": "P1",
    "nature_raw": "inductive",
    "status": "provisional",
-   "clause": "W-2.36"
+   "clause": "W-2.36",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-2ec08aa16c14550c",
@@ -14249,7 +14841,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.70"
+   "clause": "W-2.70",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-304676c89b541d7c",
@@ -14273,7 +14866,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.72"
+   "clause": "W-2.72",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4672dee81676fe59",
@@ -14297,7 +14891,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.111"
+   "clause": "W-2.111",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4ba0e39291ddfdae",
@@ -14321,7 +14916,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.122"
+   "clause": "W-2.122",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-55472536827bcde0",
@@ -14345,7 +14941,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.137"
+   "clause": "W-2.137",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-5984472833911239",
@@ -14369,7 +14966,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.150"
+   "clause": "W-2.150",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6628b5061755afff",
@@ -14393,7 +14991,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.179"
+   "clause": "W-2.179",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6d6d92cf498eccc7",
@@ -14417,7 +15016,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.194"
+   "clause": "W-2.194",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-821eb3505364e349",
@@ -14441,7 +15041,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.225"
+   "clause": "W-2.225",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-838ebf2c28c0f74a",
@@ -14465,7 +15066,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.229"
+   "clause": "W-2.229",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8e87721769ffa61e",
@@ -14489,7 +15091,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.251"
+   "clause": "W-2.251",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-9aaec0ac23369296",
@@ -14513,7 +15116,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.269"
+   "clause": "W-2.269",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f13d2751a45c58f8",
@@ -14537,7 +15141,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.430"
+   "clause": "W-2.430",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-207b2c7c84b5981f",
@@ -14561,7 +15166,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.53"
+   "clause": "W-2.53",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-28685ccfde9f9ae9",
@@ -14585,7 +15191,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.63"
+   "clause": "W-2.63",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3702a81cdf6455a8",
@@ -14609,7 +15216,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.84"
+   "clause": "W-2.84",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-45a701810adbab0a",
@@ -14633,7 +15241,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.109"
+   "clause": "W-2.109",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-50b250702aa0cf52",
@@ -14657,7 +15266,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.129"
+   "clause": "W-2.129",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-69199a1bda96e7c9",
@@ -14681,7 +15291,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.184"
+   "clause": "W-2.184",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-6c16496a92407285",
@@ -14705,7 +15316,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.192"
+   "clause": "W-2.192",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-856c5f79e155e198",
@@ -14729,7 +15341,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.234"
+   "clause": "W-2.234",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-857bf4cbbde83708",
@@ -14753,7 +15366,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.235"
+   "clause": "W-2.235",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-88cd4f4e23457938",
@@ -14777,7 +15391,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.237"
+   "clause": "W-2.237",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8bfa6b3ebaed7dd5",
@@ -14801,7 +15416,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.243"
+   "clause": "W-2.243",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-8ecc5a331750a443",
@@ -14825,7 +15441,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.252"
+   "clause": "W-2.252",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-b73b423ca1908487",
@@ -14849,7 +15466,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.314"
+   "clause": "W-2.314",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ba327d907c2ad828",
@@ -14873,7 +15491,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.318"
+   "clause": "W-2.318",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c3a9bb2b1f1bebcd",
@@ -14897,7 +15516,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.337"
+   "clause": "W-2.337",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e0aaee6df2424e29",
@@ -14921,7 +15541,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.394"
+   "clause": "W-2.394",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e35686066211d64d",
@@ -14945,7 +15566,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.400"
+   "clause": "W-2.400",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-e35d49f6692a8ad2",
@@ -14969,7 +15591,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.401"
+   "clause": "W-2.401",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f9763c2c2efb3494",
@@ -14993,7 +15616,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.444"
+   "clause": "W-2.444",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fcf44c4307537e1f",
@@ -15017,7 +15641,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.449"
+   "clause": "W-2.449",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-22d9b839671d54d8",
@@ -15041,7 +15666,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.56"
+   "clause": "W-2.56",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-327f3dad575a6b17",
@@ -15065,7 +15691,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.77"
+   "clause": "W-2.77",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-3a8f828fc7a8537d",
@@ -15089,7 +15716,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.90"
+   "clause": "W-2.90",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-4ad88b78e4b179aa",
@@ -15113,7 +15741,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.119"
+   "clause": "W-2.119",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c12133ccfd10080b",
@@ -15137,7 +15766,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.333"
+   "clause": "W-2.333",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c63bbc3a4555f705",
@@ -15161,7 +15791,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.343"
+   "clause": "W-2.343",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-c6a943bf027e2a80",
@@ -15185,7 +15816,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.345"
+   "clause": "W-2.345",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ea827249c4dd9ed2",
@@ -15209,7 +15841,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.415"
+   "clause": "W-2.415",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-ec280f36b2cbf2db",
@@ -15233,7 +15866,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.417"
+   "clause": "W-2.417",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f0480ee84f5ec59e",
@@ -15257,7 +15891,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.427"
+   "clause": "W-2.427",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f4e5ae3f478ab876",
@@ -15281,7 +15916,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.436"
+   "clause": "W-2.436",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-f8e1f14e3c18c3fd",
@@ -15305,7 +15941,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.442"
+   "clause": "W-2.442",
+   "policy_fragment": null
   },
   {
    "rule_id": "r-fb46d01be2dbfcb6",
@@ -15329,7 +15966,8 @@
    "p_level": "P1",
    "nature_raw": "atomic",
    "status": "provisional",
-   "clause": "W-2.447"
+   "clause": "W-2.447",
+   "policy_fragment": null
   }
  ]
 }
