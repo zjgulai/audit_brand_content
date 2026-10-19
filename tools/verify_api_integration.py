@@ -132,9 +132,11 @@ def main():
     app = create_app(
         session_store=store, repository=repo,
         principals={
-            "u_dp3": {"roles": ["coordinator"],
+            "u_dp3": {"open_id": "ou_u_dp3", "tenant_id": "t1",
+                      "roles": ["coordinator"],
                       "product_lines": ["pump"], "product_line": "pump"},
-            "u_signer": {"roles": ["signer"],
+            "u_signer": {"open_id": "ou_u_signer", "tenant_id": "t1",
+                         "roles": ["signer"],
                          "product_lines": ["pump"], "product_line": "pump",
                          "capabilities": ["release.sign", "release.revoke"]},
         })

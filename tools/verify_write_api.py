@@ -163,13 +163,17 @@ def main():
     ]
     repo = InMemoryRepository(cases=cases, reports=[], takedown_tasks=tasks)
     principals = {
-        "u_sub": {"roles": ["submitter"], "product_lines": ["pump"],
+        "u_sub": {"open_id": "ou_u_sub", "tenant_id": "t1",
+                  "roles": ["submitter"], "product_lines": ["pump"],
                   "product_line": "pump", "capabilities": ["release.sign"]},
-        "u_dp3": {"roles": ["coordinator"], "product_lines": ["pump"],
+        "u_dp3": {"open_id": "ou_u_dp3", "tenant_id": "t1",
+                  "roles": ["coordinator"], "product_lines": ["pump"],
                   "product_line": "pump"},
-        "u_it": {"roles": ["it"], "product_lines": ["pump"],
+        "u_it": {"open_id": "ou_u_it", "tenant_id": "t1",
+                 "roles": ["it"], "product_lines": ["pump"],
                  "product_line": "pump"},
-        "u_signer": {"roles": ["signer"], "product_lines": ["pump"],
+        "u_signer": {"open_id": "ou_u_signer", "tenant_id": "t1",
+                     "roles": ["signer"], "product_lines": ["pump"],
                      "product_line": "pump",
                      "capabilities": ["release.sign", "release.revoke"]},
     }

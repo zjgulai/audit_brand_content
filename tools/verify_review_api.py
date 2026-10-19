@@ -21,7 +21,9 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 import time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -150,9 +152,12 @@ def main():
         release_readiness={"case-own": {"ready": True}},
     )
     principals = {
-        "u_sub": {"roles": ["submitter"], "product_lines": ["pump"]},
-        "u_dp3": {"roles": ["coordinator"], "product_lines": ["pump"]},
-        "u_it": {"roles": ["it"], "product_lines": ["pump"]},
+        "u_sub": {"open_id": "ou_u_sub", "tenant_id": "t1",
+                  "roles": ["submitter"], "product_lines": ["pump"]},
+        "u_dp3": {"open_id": "ou_u_dp3", "tenant_id": "t1",
+                  "roles": ["coordinator"], "product_lines": ["pump"]},
+        "u_it": {"open_id": "ou_u_it", "tenant_id": "t1",
+                 "roles": ["it"], "product_lines": ["pump"]},
     }
 
     store = SessionStore(":memory:")
@@ -226,6 +231,175 @@ def main():
     other = [n.get("notification_id") for n in (body or [])]
     report(st == 200 and "n-1" not in other,
            "C6 ★ 通知负样本：别人的通知看得到 = 越权", "%s %r" % (st, body))
+
+    # ── C-103 只读入口：写请求 403 + JSONL 审计；GET 不记日志 ──────
+    audit_dir = tempfile.mkdtemp(prefix="review_api_audit_")
+    audit_path = os.path.join(audit_dir, "access.jsonl")
+
+    def audit_rows(path=audit_path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return [json.loads(line) for line in f if line.strip()]
+        except FileNotFoundError:
+            return []
+
+    guarded = create_app(session_store=store, repository=repo,
+                         principals=principals, access_log_path=audit_path)
+    st, body = call(guarded, "GET", "/api/v1/rules", cookie=coord)
+    report(st == 200 and audit_rows() == [],
+           "C7 C-103 GET 只读入口正常读取且不写审计", "%s %r" % (st, body))
+
+    readonly_paths = ("/api/v1/rules", "/api/v1/control-points",
+                      "/api/v1/routing")
+    write_methods = ("POST", "PUT", "PATCH", "DELETE")
+    rejected = []
+    for path in readonly_paths:
+        for method in write_methods:
+            st, _ = call(guarded, method, path, cookie=coord)
+            rejected.append((method, path, st))
+    report(all(st == 403 for _, _, st in rejected),
+           "C8 C-103 三个只读入口的四种写方法全部 403", repr(rejected))
+    rows = audit_rows()
+    wanted = {(m, p) for m, p, _ in rejected}
+    got = {(r.get("method"), r.get("target")) for r in rows}
+    report(len(rows) == len(wanted) and got == wanted,
+           "C9 C-103 每次写拒绝恰好一条审计", "rows=%d want=%d got=%r"
+           % (len(rows), len(wanted), sorted(got)))
+    required = {"ts", "principal", "open_id", "tenant_id", "method",
+                "target", "reason", "env"}
+    report(all(required <= set(r) for r in rows)
+           and all(r["principal"] == "u_dp3" and r["open_id"] == "ou_u_dp3"
+                   and r["tenant_id"] == "t1"
+                   and r["reason"] == "read_only_entry"
+                   and r["env"] == "production"
+                   and isinstance(r["ts"], str) and r["ts"].endswith("Z")
+                   for r in rows),
+           "C10 C-103 审计字段/身份/原因齐全", repr(rows[:1]))
+
+    # ── C-104 身份绑定 ─────────────────────────────────────────────
+    missing_path = os.path.join(audit_dir, "missing.jsonl")
+
+    def missing_provider(principal_id, tenant):
+        return {"id": principal_id, "tenant": tenant,
+                "roles": ["coordinator"], "product_lines": ["pump"]}
+
+    missing_app = create_app(
+        session_store=store, repository=repo,
+        principal_provider=missing_provider, access_log_path=missing_path)
+    st, _ = call(missing_app, "GET", "/api/v1/rules", cookie=coord)
+    mrows = audit_rows(missing_path)
+    report(st == 401 and len(mrows) == 1
+           and required <= set(mrows[0])
+           and mrows[0].get("reason") == "identity_incomplete"
+           and mrows[0].get("method") == "GET"
+           and mrows[0].get("target") == "/api/v1/rules",
+           "C11 C-104 生产模式缺 open_id/tenant_id → 401 + 审计",
+           "%s %r" % (st, mrows))
+
+    # ★ 默认 mapping 提供者也不许用 principal id 冒充 open_id。
+    mapping_path = os.path.join(audit_dir, "mapping-missing.jsonl")
+    mapping_app = create_app(
+        session_store=store, repository=repo,
+        principals={"u_dp3": {"roles": ["coordinator"],
+                              "product_lines": ["pump"]}},
+        access_log_path=mapping_path)
+    st, _ = call(mapping_app, "GET", "/api/v1/rules", cookie=coord)
+    report(st == 401 and audit_rows(mapping_path)
+           and audit_rows(mapping_path)[0].get("reason")
+           == "identity_incomplete",
+           "C11b C-104 默认 mapping 也不补/冒充 open_id/tenant_id",
+           "%s %r" % (st, audit_rows(mapping_path)))
+
+    def sim_provider(principal_id, tenant):
+        # 模拟替身刻意不带 open_id/tenant_id：生产必须仍被 403 挡下，
+        # dev+显式开关则允许它作为本地替身使用。
+        return {"id": principal_id, "tenant": tenant,
+                "simulated": True, "roles": ["coordinator"],
+                "product_lines": ["pump"]}
+
+    sim_path = os.path.join(audit_dir, "sim.jsonl")
+    sim_app = create_app(
+        session_store=store, repository=repo,
+        principal_provider=sim_provider, access_log_path=sim_path)
+    st, _ = call(sim_app, "GET", "/api/v1/rules", cookie=coord)
+    srows = audit_rows(sim_path)
+    report(st == 403 and len(srows) == 1
+           and required <= set(srows[0])
+           and srows[0].get("reason") == "simulated_identity_in_production"
+           and srows[0].get("method") == "GET"
+           and srows[0].get("target") == "/api/v1/rules",
+           "C12 C-104 生产模式模拟身份 → 403 + 审计",
+           "%s %r" % (st, srows))
+
+    startup_rejected = False
+    try:
+        create_app(session_store=store, repository=repo,
+                   app_env="production", allow_simulated_identity=True)
+    except RuntimeError:
+        startup_rejected = True
+    report(startup_rejected,
+           "C13 C-104 生产模式 + ALLOW_SIMULATED_IDENTITY 启动即拒", "")
+
+    old_env, old_allow = os.environ.get("APP_ENV"), os.environ.get(
+        "ALLOW_SIMULATED_IDENTITY")
+    startup_env_rejected = False
+    try:
+        os.environ["APP_ENV"] = "production"
+        os.environ["ALLOW_SIMULATED_IDENTITY"] = "1"
+        try:
+            create_app(session_store=store, repository=repo)
+        except RuntimeError:
+            startup_env_rejected = True
+    finally:
+        if old_env is None:
+            os.environ.pop("APP_ENV", None)
+        else:
+            os.environ["APP_ENV"] = old_env
+        if old_allow is None:
+            os.environ.pop("ALLOW_SIMULATED_IDENTITY", None)
+        else:
+            os.environ["ALLOW_SIMULATED_IDENTITY"] = old_allow
+    report(startup_env_rejected,
+           "C14 C-104 环境变量方式同样在启动时拒绝", "")
+
+    dev_path = os.path.join(audit_dir, "dev.jsonl")
+    dev_app = create_app(
+        session_store=store, repository=repo,
+        principal_provider=sim_provider, app_env="dev",
+        allow_simulated_identity=True, access_log_path=dev_path)
+    st, _ = call(dev_app, "GET", "/api/v1/rules", cookie=coord)
+    report(st == 200 and audit_rows(dev_path) == [],
+           "C15 C-104 dev + 显式开关 → 模拟身份放行且不记拒绝审计",
+           "%s %r" % (st, audit_rows(dev_path)))
+
+    dev_off_path = os.path.join(audit_dir, "dev-off.jsonl")
+    dev_off = create_app(
+        session_store=store, repository=repo,
+        principal_provider=sim_provider, app_env="dev",
+        allow_simulated_identity=False, access_log_path=dev_off_path)
+    st, _ = call(dev_off, "GET", "/api/v1/rules", cookie=coord)
+    report(st == 403 and audit_rows(dev_off_path)
+           and audit_rows(dev_off_path)[0].get("reason")
+           == "simulated_identity_not_allowed",
+           "C16 C-104 dev 但未显式开关 → 模拟身份仍拒 + 审计",
+           "%s %r" % (st, audit_rows(dev_off_path)))
+
+    def mismatched_provider(principal_id, tenant):
+        return {"id": principal_id, "tenant": tenant,
+                "open_id": "ou_" + principal_id, "tenant_id": "t2",
+                "roles": ["coordinator"], "product_lines": ["pump"]}
+
+    mm_path = os.path.join(audit_dir, "mismatch.jsonl")
+    mm_app = create_app(
+        session_store=store, repository=repo,
+        principal_provider=mismatched_provider, access_log_path=mm_path)
+    st, _ = call(mm_app, "GET", "/api/v1/rules", cookie=coord)
+    report(st == 403 and audit_rows(mm_path)
+           and audit_rows(mm_path)[0].get("reason") == "identity_tenant_mismatch",
+           "C17 C-104 tenant_id 与 session 不一致 → 403 + 审计",
+           "%s %r" % (st, audit_rows(mm_path)))
+
+    shutil.rmtree(audit_dir, ignore_errors=True)
 
     # C5 静态扫描：API 不 import/调用判定实现
     src = open(os.path.join(REPO_ROOT, "api", "review_api.py"),

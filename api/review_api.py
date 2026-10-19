@@ -6,9 +6,39 @@
 不在 API 层计算 state/layer/coverage。OpenAPI 3.1 由 FastAPI + Pydantic 生成。
 
 鉴权：base.auth_session 的 opaque session cookie + base.rbac 的对象 ACL。
+
+## C-103 只读入口审计（契约）
+
+`/api/v1/rules`、`/api/v1/control-points`、`/api/v1/routing` 是**只读入口**。
+对这三个路径发 `POST` / `PUT` / `PATCH` / `DELETE`：
+
+  - 一律返回 **403**，不落任何业务数据；
+  - 每次拒绝向 access-log **追加一行 JSONL**，字段固定为：
+    `ts` / `principal` / `open_id` / `tenant_id` / `method` / `target` /
+    `reason` / `env`；
+  - access-log 路径由 `REVIEW_API_ACCESS_LOG` 指定，默认
+    `~/.dsh/audit-data/access-log.jsonl`（仓外，文件 0600、目录 0700）；
+  - `GET` 是正常读取，**不写** access-log。
+
+## C-104 身份绑定（契约）
+
+  - 生产模式下 principal 必须同时带非空 `open_id` 与 `tenant_id`，
+    缺任一返回 **401**（身份不完整，无法建立绑定），并记一条
+    `reason=identity_incomplete` 审计；
+  - `simulated=True` 的模拟身份仅允许在 `APP_ENV=dev` 且显式设置
+    `ALLOW_SIMULATED_IDENTITY=1` 时使用；生产模式（或其他未授权组合）
+    返回 **403**，并记一条 `reason=simulated_identity_*` 审计；
+  - `ALLOW_SIMULATED_IDENTITY=1` 与 `APP_ENV != dev` 的组合在**启动时**
+    直接抛 `RuntimeError`，不允许带着这个配置跑起来；
+  - principal 的 `tenant_id` 必须与 session 的 tenant 一致，否则 403
+    （`reason=identity_tenant_mismatch`）。
+
+principal 由调用方注入（测试用 mapping，生产接真实 IdP）；本模块不为它
+补 `open_id` / `tenant_id` —— 缺字段就是缺字段，不会用 principal id 冒充。
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import threading
@@ -248,15 +278,78 @@ WRITE_PATHS = (
 )
 
 
+ACCESS_LOG_ENV = "REVIEW_API_ACCESS_LOG"
+DEFAULT_ACCESS_LOG = os.path.expanduser("~/.dsh/audit-data/access-log.jsonl")
+READONLY_WRITE_PATHS = ("/api/v1/rules", "/api/v1/control-points",
+                        "/api/v1/routing")
+
+
+class AccessLog(object):
+    """只读入口/身份拒绝的 JSONL 审计追加器（C-103/C-104）。
+
+    目录与文件都落在仓外；路径只在第一次写入时创建，import 本身没有副作用。
+    审计写失败不改变拒绝结论（拒绝已经成立），但会让调用方拿到 False。
+    """
+
+    def __init__(self, path=None):
+        self.path = path or os.environ.get(ACCESS_LOG_ENV) or DEFAULT_ACCESS_LOG
+        self._lock = threading.Lock()
+
+    def write(self, *, principal, method, target, reason, env):
+        principal = principal or {}
+        record = {
+            "ts": datetime.datetime.now(datetime.timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"),
+            "principal": principal.get("id"),
+            "open_id": principal.get("open_id"),
+            "tenant_id": principal.get("tenant_id"),
+            "method": method,
+            "target": target,
+            "reason": reason,
+            "env": env,
+        }
+        data = (json.dumps(record, ensure_ascii=False, sort_keys=True)
+                + "\n").encode("utf-8")
+        with self._lock:
+            try:
+                parent = os.path.dirname(os.path.abspath(self.path))
+                os.makedirs(parent, mode=0o700, exist_ok=True)
+                fd = os.open(self.path, os.O_CREAT | os.O_APPEND | os.O_WRONLY,
+                             0o600)
+                try:
+                    view = memoryview(data)
+                    while view:
+                        n = os.write(fd, view)
+                        view = view[n:]
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+            except OSError:
+                return False
+        return True
+
+
 def create_app(*, session_store=None, repository=None, principals=None,
                principal_provider=None, openapi_version="3.1.0",
                reviews_ledger=None, finding_store=None, appeals=None,
-               release_gate=None):
+               release_gate=None, app_env=None,
+               allow_simulated_identity=None, access_log_path=None):
     store = session_store or SessionStore(
         os.environ.get("REVIEW_API_SESSION_DB", ":memory:"))
     repo = repository or FileProjectionRepository(
         os.environ.get("REVIEW_API_DATA_ROOT",
                        os.path.expanduser("~/.dsh/audit-data/projection")))
+
+    resolved_env = (app_env if app_env is not None
+                    else os.environ.get("APP_ENV") or "production")
+    resolved_env = resolved_env.strip().lower()
+    if allow_simulated_identity is None:
+        allow_simulated_identity = (
+            os.environ.get("ALLOW_SIMULATED_IDENTITY") == "1")
+    if allow_simulated_identity and resolved_env != "dev":
+        raise RuntimeError(
+            "ALLOW_SIMULATED_IDENTITY=1 仅允许在 APP_ENV=dev 下使用"
+            "（当前 APP_ENV=%s）" % resolved_env)
 
     if principal_provider is None:
         mapping = principals or {}
@@ -286,6 +379,9 @@ def create_app(*, session_store=None, repository=None, principals=None,
     app.state.release_gate = release_gate or ReleaseGate(sessions=store)
     app.state.idempotency = {}
     app.state.idempotency_lock = threading.Lock()
+    app.state.app_env = resolved_env
+    app.state.allow_simulated_identity = allow_simulated_identity
+    app.state.access_log = AccessLog(access_log_path)
     repo_ledger = app.state.reviews_ledger
 
     @app.exception_handler(HTTPException)
@@ -307,11 +403,39 @@ def create_app(*, session_store=None, repository=None, principals=None,
             raise HTTPException(401, "缺少或无效 session")
         return session
 
+    def _audit_rejection(request, principal, reason):
+        request.app.state.access_log.write(
+            principal=principal, method=request.method,
+            target=request.url.path, reason=reason,
+            env=request.app.state.app_env)
+
     def principal_dep(request: Request, session=Depends(session_dep)):
         principal = request.app.state.principal_provider(
             session["principal"], session["tenant"])
         if not principal:
             raise HTTPException(401, "无法解析 principal")
+
+        # 模拟身份先判：生产模式一律 403（即使它没带绑定字段），
+        # dev 且显式开关时才放行 —— 它是本地替身，不要求真实 open_id。
+        if principal.get("simulated") is True:
+            if not (request.app.state.app_env == "dev"
+                    and request.app.state.allow_simulated_identity):
+                reason = ("simulated_identity_in_production"
+                          if request.app.state.app_env != "dev"
+                          else "simulated_identity_not_allowed")
+                _audit_rejection(request, principal, reason)
+                raise HTTPException(403, "模拟身份不允许在当前环境使用")
+            return principal
+
+        open_id = principal.get("open_id")
+        tenant_id = principal.get("tenant_id")
+        if (not isinstance(open_id, str) or not open_id.strip()
+                or not isinstance(tenant_id, str) or not tenant_id.strip()):
+            _audit_rejection(request, principal, "identity_incomplete")
+            raise HTTPException(401, "身份缺少 open_id/tenant_id")
+        if tenant_id != session.get("tenant"):
+            _audit_rejection(request, principal, "identity_tenant_mismatch")
+            raise HTTPException(403, "身份 tenant_id 与 session 不一致")
         return principal
 
     def internal_dep(principal=Depends(principal_dep)):
@@ -439,6 +563,25 @@ def create_app(*, session_store=None, repository=None, principals=None,
             continue
         app.add_api_route(path, placeholder, methods=["POST"],
                           response_model=ErrorResponse)
+
+    def _make_readonly_guard(path, method):
+        def readonly_guard(request: Request,
+                           principal=Depends(principal_dep)):
+            _audit_rejection(request, principal, "read_only_entry")
+            raise HTTPException(403, "只读入口不接受写请求")
+        safe_path = path.strip("/").replace("/", "_").replace("-", "_")
+        readonly_guard.__name__ = "readonly_%s_%s" % (
+            safe_path, method.lower())
+        return readonly_guard
+
+    for path in READONLY_WRITE_PATHS:
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            app.add_api_route(
+                path, _make_readonly_guard(path, method),
+                methods=[method],
+                operation_id="readonly_%s_%s" % (
+                    path.strip("/").replace("/", "_").replace("-", "_"),
+                    method.lower()))
 
     return app
 
