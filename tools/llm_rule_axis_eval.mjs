@@ -1,0 +1,449 @@
+#!/usr/bin/env node
+/**
+ * llm_rule_axis_eval.mjs —— 用 LLM 做「规则 → 七轴」归类的评测器
+ *
+ * 契约来源：`PMO/implement/规则归类-LLM提示词-v1.md`。本文件是它的**执行点**：
+ * 提示词、输入白名单、禁用字段、输出契约、门槛，四者在这里各有一行代码。
+ *
+ * 为什么要有这个文件（而不是直接跑一段临时脚本）：
+ *   纯文本分类器拆掉泄漏后真实基线是 axis_exact 22.07% / UNKNOWN 57.42%，已实测不可用。
+ *   改用 LLM 之后，「模型能不能做这件事」本身必须有个可复现的读数，
+ *   否则「改用 LLM」就只是一句打算。
+ *
+ * ── 三条纪律，各自有断言（`--selftest` 里逐条正反例）────────────────
+ *
+ * ① **输入白名单**。`primary_initial` / `primary_reviewed` / `quality_tag` /
+ *    `policy_fragment` 一律不进 prompt。这几个字段是标注结果或派生标签 ——
+ *    喂给模型等于告诉它答案，得到的 95% 会是「换了一种泄漏」。
+ *
+ * ② **`subcategory_original` 是强提示**。已实测：子类 → 多数轴 56/56 与 gold 相同。
+ *    所以 `--blind` 必须能真的把它藏掉，而**藏没藏掉**要能被反向对照证明
+ *    （盲测里出现子类名 → 红；非盲测里不出现 → 红）。只有一边的断言是恒真的。
+ *
+ * ③ **未测 ≠ 通过**。没有网络 / 模型不可用 / 一条都没跑成 → 退 2 并说「未测」，
+ *    不许把 0 条结果算成 0% 准确率（那会让「没跑」看起来像「跑砸了」，
+ *    下一轮就会有人去调提示词，而真因是没跑）。
+ *
+ * ── 用法 ─────────────────────────────────────────────────────────
+ *
+ *   node tools/llm_rule_axis_eval.mjs --selftest          # 纯函数自证，不联网
+ *   node tools/llm_rule_axis_eval.mjs --dry-run --limit 2 # 只打印将发出的 prompt
+ *   node tools/llm_rule_axis_eval.mjs --sample <path>     # 真跑（默认 65 条样本）
+ *   node tools/llm_rule_axis_eval.mjs --sample <path> --blind   # 隐藏子类名盲测
+ *
+ * 退出码：0 = 达标；1 = 未达标（有读数）；2 = 未测（没跑成 / 跑不出来）。
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DEFAULT_SAMPLE = '/tmp/llm_eval_sample.json';
+
+/** 门槛：与契约文档 §5 一致。改这里就是改门槛，会同时影响结论行。 */
+export const THRESHOLDS = Object.freeze({ axisExact: 0.95, unknownRate: 0.05 });
+
+/** 七轴，按判定顺序。顺序本身是契约的一部分（先命中先归）。 */
+export const AXES = Object.freeze(['CHAN', 'RIGHT', 'SCENE', 'DISC', 'BRAND', 'FACT', 'CLAIM']);
+
+/** 离散取值的封闭集合 —— 模型给了集合外的值一律当解析失败，不许宽松收下。 */
+export const NATURES = Object.freeze(['prohibition', 'mandate', 'disclosure', 'substantiation', 'recommendation']);
+export const JURISDICTIONS = Object.freeze(['GLOBAL', 'US', 'CA', 'EU', 'UK', 'CN', 'BR', 'AU', 'SG', 'AT', 'BH', 'PLATFORM', 'MULTI']);
+export const CONFIDENCES = Object.freeze(['high', 'medium', 'low']);
+
+/**
+ * 禁用字段 —— 单点定义，`--selftest` 会断言 prompt 构造器只读白名单。
+ * 这四个不是「不推荐」，是「不许」：它们是标注结果。
+ */
+export const FORBIDDEN_INPUT_FIELDS = Object.freeze([
+  'primary_initial', 'primary_reviewed', 'quality_tag', 'policy_fragment',
+]);
+
+/** 允许进 prompt、且**非盲测时**才给的参考字段。盲测遮掉，理由见文件头 ②。 */
+export const HINT_FIELDS = Object.freeze(['subcategory_original', 'category_original', 'nature_raw']);
+
+const SYSTEM_PROMPT = `你是一个内容合规规则的分类器。任务：判断一条规则要求的是哪一种审查动作。
+
+七轴（按判定顺序，先命中先归）：
+1 CHAN 渠道 — 这条内容能不能在这个平台/地区/版位/以这种素材投放
+2 RIGHT 权利 — 使用真人/未成年人/AI 人物/第三方标识，授权链成立吗
+3 SCENE 场景 — 内容演示的动作，受众照做会不会受伤
+4 DISC 披露 — 必须让受众看到的信息元素，说全了吗
+5 BRAND 品牌 — 事实全真、证据齐全，是否仍因调性/立场/情绪操纵/贬损竞品而不该这样说
+6 FACT 事实 — 这句话说的知识/参数/功能/场景，与可核验事实一致吗
+7 CLAIM 宣称 — 这条对外宣称，拿得出与断言强度相称、可核查、范围匹配的证据吗
+
+关键分界（最常判错的地方）：
+- 「改成 2~3 天」= FACT（改数值）；「补充一句就医提示」= DISC（加披露）。两者都出现时，
+  看规则的主动作是什么：改数值 → FACT；加一句独立的告知 → DISC。
+- **「补充说明 / 补充：X」要过一道测试再判**（规范 DSC11–DSC12 / FCT10）：
+  把 X 拿掉，原句是否变假或不可执行？
+  · 变假/不可执行 → X 是主命题缺失的事实成分 → FACT（FCT10）。
+    例：「补充说明：体重增长趋势应符合 WHO 生长曲线」→ 拿掉后「规律稳步增长」无参照 → FACT。
+  · 仍为真且可执行，只是受众少知道一件事 → DISC（DSC12）。
+    例：「补充安全提示：全程需有人守护」→ 拿掉后操作要领仍成立 → DISC。
+  「补充」这个词本身不决定轴，**拿掉 X 之后原句还成不成立**才决定轴。
+- 「研究人群 ≠ 推荐对象」= FACT（适用人群事实错误）；「没有证据支持这个断言」= CLAIM。
+- 「补充证据来源」是修订元语言，不构成 DISC；只有要求「向受众展示某条信息」才是 DISC。
+- 「画面/镜头/示范」出现但动作是「补充说明」→ 先做上面那道 X 测试；只有动作本身不安全 → SCENE。
+- 「标语/焦虑/紧迫感/贬损」→ BRAND；但「竞品对比没数据」→ CLAIM。
+- 规则正文里的「原表述：… 修订为：… 修订原因：…」是格式，不是义务类型；
+  真正的动作在「修订为」后面那句祈使句里。
+
+判定步骤：
+1. 先找「修订为 / 应 / 必须 / 需 / 建议」后面的祈使动作
+2. 问这个动作修复的是什么：换渠道(CHAN) / 拿授权(RIGHT) / 改动作(SCENE) /
+   补受众可见信息(DISC) / 改表达(BRAND) / 改与来源不符的事实(FACT) / 补证据或降断言(CLAIM)
+3. 只选一个 primary。确实同时有两个独立动作时才填 secondary（删掉前者后者仍独立成立）
+4. 判不了就返回 unknown，code 用 U3（指代不明）或 U9（七轴均不命中）
+
+输出严格 JSON，字段名必须逐字如下，不要改名、不要加字段、不要 markdown 围栏、不要解释：
+
+{"primary":"CHAN|RIGHT|SCENE|DISC|BRAND|FACT|CLAIM","secondary":null或同上,
+ "rule_nature":"prohibition|mandate|disclosure|substantiation|recommendation",
+ "jurisdiction":"GLOBAL|US|CA|EU|UK|CN|BR|AU|SG|AT|BH|PLATFORM|MULTI",
+ "confidence":"high|medium|low","reason":"一句话，按第几条判定条件命中","unknown":null}
+
+判不了时只输出：{"primary":null,"unknown":"U3","reason":"为什么判不了"}
+primary 与 unknown 不许同时非空。`;
+
+/* ───────────────────────── 纯函数（可被 --selftest 直接断言） ───────────────────────── */
+
+/**
+ * 构造用户消息。
+ *
+ * @param {object} rule  样本一条
+ * @param {{blind?: boolean}} opts  blind=true 时遮掉全部 HINT_FIELDS
+ * @returns {string}
+ */
+export function buildUserMessage(rule, { blind = false } = {}) {
+  const lines = [
+    '规则正文：',
+    String(rule.rule_text ?? ''),
+    '',
+    '结构化条件（可能为空）：',
+    String(rule.condition ?? ''),
+  ];
+  if (!blind) {
+    lines.push(
+      '',
+      '仅作参考、不得作为判定依据：',
+      `- 原一级分类：${rule.category_original ?? rule.category ?? ''}`,
+      `- 原子类名：${rule.subcategory_original ?? rule.subcategory ?? ''}`,
+      `- 原表性质：${rule.nature_raw ?? ''}`,
+    );
+  }
+  return lines.join('\n');
+}
+
+/**
+ * 解析模型输出。**只接受符合契约的 JSON**，不合契约返回 null。
+ *
+ * 不宽松收下的理由：宽容解析会把「模型没按契约答」变成「模型答了但答错」，
+ * 两者在读数上长得一样，而下一步动作完全不同（前者改提示词，后者改判据）。
+ *
+ * @returns {null | {primary:string|null, secondary:string|null, rule_nature:string|null,
+ *                  jurisdiction:string|null, confidence:string, reason:string, unknown:string|null}}
+ */
+export function parseVerdict(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  let body = raw.trim();
+  // 允许模型加围栏（契约说不要，但实测会有），剥掉再判
+  const fence = body.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) body = fence[1].trim();
+  // 仍然不是纯 JSON 时，取第一个 { 到最后一个 }
+  if (!body.startsWith('{')) {
+    const a = body.indexOf('{');
+    const b = body.lastIndexOf('}');
+    if (a < 0 || b <= a) return null;
+    body = body.slice(a, b + 1);
+  }
+
+  let obj;
+  try {
+    obj = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+
+  const pick = (v, allowed) => (typeof v === 'string' && allowed.includes(v) ? v : null);
+
+  const unknown = typeof obj.unknown === 'string' && obj.unknown.trim() ? obj.unknown.trim() : null;
+  const primary = pick(obj.primary, AXES);
+
+  // 契约：判不了就 primary=null + unknown 非空；判得了就 primary ∈ 七轴。
+  // 两者都不满足 = 不合契约（例如 primary 拼错、或既给 primary 又给 unknown）。
+  if (primary === null && unknown === null) return null;
+  if (primary !== null && unknown !== null) return null;
+
+  const secondaryRaw = obj.secondary;
+  const secondary = secondaryRaw === null || secondaryRaw === undefined ? null : pick(secondaryRaw, AXES);
+
+  return {
+    primary,
+    secondary,
+    rule_nature: pick(obj.rule_nature, NATURES),
+    jurisdiction: pick(obj.jurisdiction, JURISDICTIONS),
+    confidence: pick(obj.confidence, CONFIDENCES) ?? 'low',
+    reason: typeof obj.reason === 'string' ? obj.reason.trim() : '',
+    unknown,
+  };
+}
+
+/**
+ * 计分。**空输入返回 `tested:false`**，由调用方落「未测」，不许算成 0%。
+ *
+ * @param {Array<{gold:string, verdict:object|null, error?:string}>} rows
+ * @returns {{tested:boolean, n:number, nRun:number, nParsed:number,
+ *            axisExact:number, exact:number, unknown:number, secondaryExact:number, nSecondary:number,
+ *            pass:boolean, failures:string[]}}
+ */
+export function score(rows) {
+  const n = rows.length;
+  const parsed = rows.filter((r) => r.verdict);
+  const nParsed = parsed.length;
+  if (n === 0 || nParsed === 0) {
+    return {
+      tested: false, n, nRun: rows.filter((r) => !r.transportFailure).length, nParsed,
+      axisExact: null, exact: 0, unknown: 0, secondaryExact: null, nSecondary: 0,
+      pass: false, failures: ['一条都没解析成功 —— 未测，不是 0%'],
+    };
+  }
+
+  const exact = parsed.filter((r) => r.verdict.primary === r.gold).length;
+  const unknown = parsed.filter((r) => r.verdict.primary === null).length;
+
+  // secondary 只在**两边都给了**的时候才计 —— gold 没标次要轴的条目不该算作答错
+  const withSecondary = parsed.filter((r) => r.goldSecondary && r.verdict.secondary);
+  const nSecondary = withSecondary.length;
+  const secondaryExact = nSecondary
+    ? withSecondary.filter((r) => r.verdict.secondary === r.goldSecondary).length / nSecondary
+    : null;
+
+  const axisExact = exact / nParsed;
+  const unknownRate = unknown / nParsed;
+
+  const failures = [];
+  if (axisExact < THRESHOLDS.axisExact) failures.push(`axis_exact ${axisExact.toFixed(4)} < ${THRESHOLDS.axisExact}`);
+  if (unknownRate > THRESHOLDS.unknownRate) failures.push(`unknown_rate ${unknownRate.toFixed(4)} > ${THRESHOLDS.unknownRate}`);
+  // 解析失败的条数必须显式扣出来 —— 否则「解析失败」会被算成「答错」
+  if (nParsed < n) failures.push(`解析失败 ${n - nParsed}/${n}（未计入分母，但记在这里）`);
+
+  return {
+    tested: true, n, nRun: rows.filter((r) => !r.transportFailure).length, nParsed,
+    axisExact, exact, unknown, secondaryExact, nSecondary,
+    pass: failures.length === 0, failures,
+  };
+}
+
+/** 结论行。**「未测」必须与「未达标」「达标」三者长得不一样**（AGENTS.md §2.4.2）。 */
+export function verdictLine(s, { blind = false, model = '?' } = {}) {
+  const tag = blind ? '盲测(隐藏子类名)' : '常规(含子类名)';
+  if (!s.tested) {
+    return `⚠ 未测 · ${tag} · model=${model} · ${s.n} 条样本里一条都没跑成：${s.failures[0] ?? '原因未知'}`;
+  }
+  const head = s.pass ? '✅ 达标' : '❌ 未达标';
+  const sec = s.secondaryExact === null ? 'n/a' : `${(s.secondaryExact * 100).toFixed(2)}%（${s.nSecondary} 条）`;
+  return [
+    `${head} · ${tag} · model=${model}`,
+    `axis_exact = ${s.exact}/${s.nParsed} = ${(s.axisExact * 100).toFixed(2)}%（阈值 ≥${THRESHOLDS.axisExact * 100}%）`,
+    `unknown = ${s.unknown}/${s.nParsed} = ${((s.unknown / s.nParsed) * 100).toFixed(2)}%（阈值 ≤${THRESHOLDS.unknownRate * 100}%）`,
+    `secondary_exact = ${sec}`,
+    `解析失败 = ${s.n - s.nParsed}/${s.n}`,
+  ].join('\n');
+}
+
+/* ─────────────────────────────── 自证 ─────────────────────────────── */
+
+function selftest() {
+  const checks = [];
+  const ok = (name, cond, detail = '') => checks.push({ name, pass: !!cond, detail });
+
+  // ── 1 禁用字段：构造器读不到它们 ──
+  // 做法：把禁用字段填成**极其显眼**的值，再看 prompt 里有没有。正反各一次。
+  const poisoned = {
+    rule_text: '规则正文 A', condition: '条件 A',
+    primary_reviewed: 'ZZZ_FORBIDDEN', primary_initial: 'ZZZ_FORBIDDEN',
+    quality_tag: ['ZZZ_FORBIDDEN'], policy_fragment: 'ZZZ_FORBIDDEN',
+  };
+  const msgNormal = buildUserMessage(poisoned, { blind: false });
+  ok('禁用字段不进 prompt（含名）', !msgNormal.includes('ZZZ_FORBIDDEN') && !/primary_reviewed|policy_fragment|quality_tag/.test(msgNormal));
+  const msgBlind = buildUserMessage(poisoned, { blind: true });
+  ok('禁用字段不进 prompt（盲测）', !msgBlind.includes('ZZZ_FORBIDDEN'));
+
+  // ── 2 盲测真的遮住了子类名，且**非盲测真的给了** ──
+  // 两条必须成对：只断言「盲测里没有」的话，构造器恒返回空串也能过。
+  const hinted = { rule_text: '规则正文 B', condition: '', subcategory_original: 'QIN_子类探针', category_original: 'QIN_一级探针', nature_raw: 'atomic' };
+  ok('盲测遮住子类名', !buildUserMessage(hinted, { blind: true }).includes('QIN_子类探针'));
+  ok('非盲测给出子类名（反向对照）', buildUserMessage(hinted, { blind: false }).includes('QIN_子类探针'));
+  ok('盲测遮住一级分类', !buildUserMessage(hinted, { blind: true }).includes('QIN_一级探针'));
+
+  // ── 3 解析：合法 / 围栏 / 垃圾 / 不合契约 ──
+  const v1 = parseVerdict('{"primary":"FACT","secondary":null,"rule_nature":"disclosure","jurisdiction":"US","confidence":"high","reason":"按 CHN1","unknown":null}');
+  ok('解析：合法 JSON', v1 && v1.primary === 'FACT' && v1.rule_nature === 'disclosure');
+  const v2 = parseVerdict('```json\n{"primary":"CLAIM","unknown":null}\n```');
+  ok('解析：围栏 JSON', v2 && v2.primary === 'CLAIM');
+  const v3 = parseVerdict('{"primary":"NOT_AN_AXIS","unknown":null}');
+  ok('解析：集合外 primary → null（不宽松收下）', v3 === null);
+  ok('解析：纯文本 → null', parseVerdict('我觉得是 FACT') === null);
+  ok('解析：空串 → null', parseVerdict('') === null);
+  const v4 = parseVerdict('{"primary":null,"unknown":"U9","reason":"七轴均不命中"}');
+  ok('解析：unknown 契约', v4 && v4.primary === null && v4.unknown === 'U9');
+  const v5 = parseVerdict('{"primary":"FACT","unknown":"U9"}');
+  ok('解析：同时给 primary 与 unknown → null（契约不允许）', v5 === null);
+
+  // ── 4 计分 ──
+  const rows = [
+    { gold: 'FACT', verdict: { primary: 'FACT', secondary: null } },
+    { gold: 'CLAIM', verdict: { primary: null, unknown: 'U9' } },
+    { gold: 'DISC', verdict: { primary: 'FACT', secondary: null } },
+    { gold: 'CHAN', verdict: null, transportFailure: true },
+  ];
+  const s = score(rows);
+  ok('计分：分母只算解析成功（3 不是 4）', s.nParsed === 3);
+  ok('计分：exact=1', s.exact === 1);
+  ok('计分：unknown=1', s.unknown === 1);
+  ok('计分：未达标时 pass=false', s.pass === false);
+
+  // 空输入必须落「未测」，不是 0%
+  const s0 = score([]);
+  ok('计分：空输入 → tested=false（未测，不是 0%）', s0.tested === false && s0.axisExact === null);
+  const s1 = score([{ gold: 'FACT', verdict: null, transportFailure: true }]);
+  ok('计分：全失败 → tested=false', s1.tested === false);
+
+  // 反向对照：全对必须 pass
+  const good = score(AXES.map((a) => ({ gold: a, verdict: { primary: a, secondary: null } })));
+  ok('计分：全对 → pass=true（反向对照）', good.pass === true && Math.abs(good.axisExact - 1) < 1e-9);
+
+  // 结论行的三种形态必须互不相同
+  const lPass = verdictLine(good);
+  const lFail = verdictLine(s);
+  const lUntested = verdictLine(s0);
+  ok('结论行三态互异', new Set([lPass.slice(0, 3), lFail.slice(0, 3), lUntested.slice(0, 3)]).size === 3);
+  ok('未测文案里不许出现「达标」', !lUntested.includes('达标') && lUntested.startsWith('⚠ 未测'));
+
+  // ── 5 白名单：构造器源码不许出现禁用字段名 ──
+  // 形状同 AGENTS.md §2.4「名字出现过 ≠ 拦得住」，所以这里比的是**取值**不是名字（上面 1 已做），
+  // 这一条只是补充：构造器源码里不该出现对禁用字段的引用。
+  const src = buildUserMessage.toString();
+  ok('构造器源码不引用禁用字段', !FORBIDDEN_INPUT_FIELDS.some((f) => src.includes(f)));
+
+  const failed = checks.filter((c) => !c.pass);
+  for (const c of checks) console.log(`${c.pass ? '✓' : '✗'} ${c.name}${c.pass ? '' : ` —— ${c.detail}`}`);
+  console.log(`\n${failed.length === 0 ? '✅' : '❌'} ${checks.length - failed.length}/${checks.length} 项通过`);
+  return failed.length === 0 ? 0 : 1;
+}
+
+/* ─────────────────────────────── 主流程 ─────────────────────────────── */
+
+function parseArgs(argv) {
+  const out = { sample: DEFAULT_SAMPLE, blind: false, limit: 0, concurrency: 4, outPath: null, dryRun: false, selftest: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--selftest') out.selftest = true;
+    else if (a === '--blind') out.blind = true;
+    else if (a === '--dry-run') out.dryRun = true;
+    else if (a === '--sample') out.sample = argv[++i];
+    else if (a === '--limit') out.limit = Number(argv[++i]);
+    else if (a === '--concurrency') out.concurrency = Number(argv[++i]);
+    else if (a === '--out') out.outPath = argv[++i];
+    else if (a === '--help' || a === '-h') out.help = true;
+    else { console.error(`未知参数：${a}`); process.exit(2); }
+  }
+  return out;
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help) {
+    console.log(fs.readFileSync(fileURLToPath(import.meta.url), 'utf8').split('*/')[0]);
+    return 0;
+  }
+  if (args.selftest) return selftest();
+
+  let sample;
+  try {
+    sample = JSON.parse(fs.readFileSync(args.sample, 'utf8'));
+  } catch (e) {
+    console.error(`⚠ 未测 · 读不出样本（${args.sample}）：${e.code ?? e.message}`);
+    return 2;
+  }
+  if (!Array.isArray(sample) || sample.length === 0) {
+    console.error(`⚠ 未测 · 样本为空或不是数组（${args.sample}）`);
+    return 2;
+  }
+  const items = args.limit > 0 ? sample.slice(0, args.limit) : sample;
+
+  if (args.dryRun) {
+    console.log(`〔dry-run〕${items.length} 条，不发请求。首条 prompt：\n--- system ---\n${SYSTEM_PROMPT}\n--- user ---\n${buildUserMessage(items[0], { blind: args.blind })}\n--- end ---`);
+    return 2;   // 没测就是没测（AGENTS.md §2.4.2）
+  }
+
+  // 延迟 import：--selftest 与 --dry-run 不该因为找不到凭据而崩
+  let llm;
+  try {
+    llm = await import('./agent/llm.mjs');
+  } catch (e) {
+    console.error(`⚠ 未测 · 模型调用层加载失败：${e.message}`);
+    return 2;
+  }
+
+  const rows = new Array(items.length);
+  let cursor = 0;
+  const t0 = Date.now();
+
+  async function worker() {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= items.length) return;
+      const rule = items[idx];
+      const userMsg = buildUserMessage(rule, { blind: args.blind });
+      const r = await llm.chat(
+        [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
+        { maxTokens: 4000, temperature: 0, jsonMode: true },
+      );
+      const goldSecondary = rule.gold_secondary ?? null;
+      if (!r.ok) {
+        rows[idx] = { rule_id: rule.rule_id, gold: rule.gold, goldSecondary, verdict: null, error: r.error, transportFailure: true };
+        process.stderr.write(`· ${idx + 1}/${items.length} ${rule.rule_id} 传输失败：${r.error}\n`);
+        continue;
+      }
+      const raw = r.message?.content ?? '';
+      const verdict = parseVerdict(raw);
+      rows[idx] = {
+        rule_id: rule.rule_id, gold: rule.gold, goldSecondary, verdict,
+        raw: verdict ? undefined : raw.slice(0, 300),
+        finishReason: r.finishReason,
+      };
+      process.stderr.write(`· ${idx + 1}/${items.length} ${rule.rule_id} gold=${rule.gold} got=${verdict?.primary ?? verdict?.unknown ?? 'PARSE_FAIL'}\n`);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(args.concurrency, items.length)) }, worker));
+
+  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  const s = score(rows);
+  console.log(`\n${verdictLine(s, { blind: args.blind, model: llm.config?.llm?.model ?? '?' })}`);
+  console.log(`耗时 ${elapsed}s · 用量 calls=${llm.stats.calls} retries=${llm.stats.retries} failures=${llm.stats.failures}`);
+
+  // 逐条明细，供人工复核（`reason` 必须指得出判定条件，否则无法复核）
+  for (const r of rows) {
+    const v = r.verdict;
+    console.log(`  ${r.rule_id}  gold=${r.gold}  got=${v ? (v.primary ?? v.unknown) : 'PARSE_FAIL'}  ${v?.confidence ?? ''}  ${v?.reason ?? r.error ?? ''}`);
+  }
+
+  if (args.outPath) {
+    fs.writeFileSync(args.outPath, JSON.stringify({ blind: args.blind, sample: args.sample, summary: s, rows }, null, 2));
+    console.log(`\n明细已写入 ${args.outPath}`);
+  }
+
+  if (!s.tested) return 2;
+  return s.pass ? 0 : 1;
+}
+
+main().then((code) => process.exit(code)).catch((e) => {
+  console.error(`⚠ 未测 · 意外异常：${e?.stack ?? e}`);
+  process.exit(2);
+});
