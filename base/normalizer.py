@@ -49,6 +49,100 @@ FAILURE_KINDS = C.FAILURE_KINDS
 BANNED_REASONS = ("其他", "其他错误", "未知", "未知错误")
 REVIEW_IR_FIELDS = ("findings", "decision", "coverage_state", "ir_id")
 
+# C-21：统一 location 契约（contracts/location-v1.schema.json）
+LOCATION_KINDS = ("text_span", "image_region", "video_timecode")
+ASR_NO_TIMECODE_GAP = "ASR 无逐句时间码：字幕类位置不可用（D14）"
+
+
+def _num(v):
+    return type(v) in (int, float) and v == v and abs(v) != float("inf")
+
+
+def _bbox_problems(bbox):
+    if not isinstance(bbox, dict):
+        return ["bbox 必须是对象 {x,y,w,h}"]
+    p = []
+    for k in ("x", "y", "w", "h"):
+        if k not in bbox:
+            p.append("bbox 缺 %s" % k)
+        elif not _num(bbox[k]):
+            p.append("bbox.%s 必须是数字" % k)
+    if p:
+        return p
+    x, y, w, h = bbox["x"], bbox["y"], bbox["w"], bbox["h"]
+    if not (0 <= x <= 1 and 0 <= y <= 1):
+        p.append("bbox 原点必须在 0–1")
+    if not (w > 0 and h > 0 and w <= 1 and h <= 1):
+        p.append("bbox 宽高必须在 (0,1]")
+    if x + w > 1 + 1e-9 or y + h > 1 + 1e-9:
+        p.append("bbox 必须落在 0–1 画面内")
+    extra = set(bbox) - {"x", "y", "w", "h"}
+    if extra:
+        p.append("bbox 多出字段 %r" % sorted(extra))
+    return p
+
+
+def _location_problems(text, locations):
+    """校验 ContentUnit.locations；返回问题清单（空 = 合法）。"""
+    if locations is None:
+        return []
+    if not isinstance(locations, list):
+        return ["locations 必须是数组"]
+    p = []
+    n = len(text) if isinstance(text, str) else 0
+    for i, loc in enumerate(locations):
+        tag = "locations[%d]" % i
+        if not isinstance(loc, dict):
+            p.append("%s 不是对象" % tag)
+            continue
+        kind = loc.get("kind")
+        if kind not in LOCATION_KINDS:
+            p.append("%s.kind=%r 不在 %r" % (tag, kind, LOCATION_KINDS))
+            continue
+        allowed = {
+            "text_span": {"kind", "start", "end"},
+            "image_region": {"kind", "frame_ref", "bbox"},
+            "video_timecode": {"kind", "time_start", "time_end", "frame_no", "bbox"},
+        }[kind]
+        extra = set(loc) - allowed
+        if extra:
+            p.append("%s 多出字段 %r" % (tag, sorted(extra)))
+        if kind == "text_span":
+            st, en = loc.get("start"), loc.get("end")
+            if type(st) is not int or type(en) is not int:
+                p.append("%s start/end 必须是整数" % tag)
+            elif not (0 <= st < en <= n):
+                p.append("%s 文本区间越界/为空：%r..%r（len=%d）" % (tag, st, en, n))
+        elif kind == "image_region":
+            if "frame_ref" in loc and not isinstance(loc["frame_ref"], str):
+                p.append("%s.frame_ref 必须是字符串" % tag)
+            p.extend("%s.%s" % (tag, x) for x in _bbox_problems(loc.get("bbox")))
+        else:
+            ts, te = loc.get("time_start"), loc.get("time_end")
+            if not _num(ts) or not _num(te) or not (0 <= ts < te):
+                p.append("%s time_start/time_end 必须满足 0 <= start < end" % tag)
+            fn = loc.get("frame_no")
+            if type(fn) is not int or fn < 0:
+                p.append("%s.frame_no 必须是非负整数" % tag)
+            p.extend("%s.%s" % (tag, x) for x in _bbox_problems(loc.get("bbox")))
+    return p
+
+
+def _derive_locations(raw, unit):
+    """唯一组装点：显式 locations 原样校验；文本类无显式值时由 composition.parts 派生。"""
+    if unit.get("parse_status") == "failed":
+        return []
+    explicit = raw.get("locations")
+    if explicit is not None:
+        return [dict(x) for x in explicit] if isinstance(explicit, list) else explicit
+    kind = (unit.get("source") or {}).get("kind")
+    if kind in ("free_text", "ad_record", "landing_page", "structured_json"):
+        parts = (unit.get("composition") or {}).get("parts") or []
+        return [{"kind": "text_span", "start": p["start"], "end": p["end"]}
+                for p in parts if isinstance(p, dict)
+                and isinstance(p.get("start"), int) and isinstance(p.get("end"), int)]
+    return []
+
 
 def _coverage_problems(covers, does_not_cover):
     p = []
@@ -189,6 +283,10 @@ def validate_unit(unit):
             # 判定层必须能看见「仅已覆盖部分可判」；normalizer 只给状态，不判 PASS。
             pass
 
+    if "locations" in unit:
+        p.extend(_location_problems(text if isinstance(text, str) else "",
+                                    unit.get("locations")))
+
     textification = unit.get("textification")
     if not isinstance(textification, dict):
         p.append("textification 必须是 dict（covers/does_not_cover 的既有位置）")
@@ -266,7 +364,14 @@ def normalize(raw_input, *, covers, does_not_cover, parse_status="ok",
             raise ValueError("%s 必须有非空正文；没有正文应落 failed/empty"
                              % parse_status)
 
-    _apply_coverage(unit, covers, does_not_cover)
+    dnc = list(does_not_cover)
+    asr = raw_input.get("asr")
+    if isinstance(asr, dict) and not asr.get("timecodes"):
+        if ASR_NO_TIMECODE_GAP not in dnc:
+            dnc.append(ASR_NO_TIMECODE_GAP)
+
+    _apply_coverage(unit, covers, dnc)
+    unit["locations"] = _derive_locations(raw_input, unit)
     problems = validate_unit(unit)
     if problems:
         raise ValueError("ContentUnit 不合法：\n  - " + "\n  - ".join(problems))

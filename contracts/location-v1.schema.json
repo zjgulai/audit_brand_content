@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "location-v1.schema.json",
+  "title": "Location · location-v1（C-21 统一位置契约）",
+  "description": "ContentUnit.locations 的唯一形状。唯一生产者是 base/normalizer.py；media_pipeline 只提供派生数据，由 normalizer 组装。",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["kind", "start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "text_span" },
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["kind", "bbox"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "image_region" },
+        "frame_ref": { "type": "string" },
+        "bbox": { "$ref": "#/definitions/bbox" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["kind", "time_start", "time_end", "frame_no", "bbox"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "video_timecode" },
+        "time_start": { "type": "number", "minimum": 0 },
+        "time_end": { "type": "number", "minimum": 0 },
+        "frame_no": { "type": "integer", "minimum": 0 },
+        "bbox": { "$ref": "#/definitions/bbox" }
+      }
+    }
+  ],
+  "definitions": {
+    "bbox": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}
