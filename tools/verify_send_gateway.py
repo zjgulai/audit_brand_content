@@ -53,7 +53,7 @@ def main() -> int:
             ok(name, False, "**没有拒收** —— 这条断言是假的")
 
     # ═══════ 1. 形态决策：同一输入恒定 ═══════
-    raw_card = '[[card:verdict]]\n{"title":"通过","body":"ok"}'
+    raw_card = '[[card:verdict]]\n{"title":"已核验","body":"ok"}'
     d1 = decide_mode(raw_card)
     d2 = decide_mode(raw_card)
     ok("1a 同一输入两次 → 同一形态", d1 == d2, f"{d1['mode']} vs {d2['mode']}")
@@ -238,6 +238,35 @@ def main() -> int:
     ok("6f 负样本：10 位订单号与 URL 内数字不被误遮",
        neg_out["text"] == neg and neg_out.get("redactions") == [],
        f"text={neg_out.get('text')!r} redactions={neg_out.get('redactions')}")
+
+    # ═══════ 7. 回执禁词闸（L3-4）═══════
+    bad_text = "本次审批已通过，无需处理。"
+    bad = decide_mode(bad_text)
+    hits = ((bad.get("error") or {}).get("hits") or [])
+    report_ok = (bad.get("ok") is False and bad.get("blocked") is True
+                 and bad.get("text") is None
+                 and (bad.get("error") or {}).get("code") == "receipt_forbidden_word"
+                 and {"已通过", "无需处理"} <= {h.get("word") for h in hits}
+                 and all(isinstance(h.get("start"), int)
+                         and isinstance(h.get("end"), int) for h in hits)
+                 and "已通过" in (bad.get("error") or {}).get("message", ""))
+    results.append(("7a 回执含禁词 → 阻断并报词/位置", report_ok, repr(bad)))
+
+    bad_card = decide_mode(
+        '[[card:receipt]]\n{"title":"审批完成","body":"ok"}')
+    report_ok = (bad_card.get("ok") is False and bad_card.get("blocked") is True
+                 and bad_card.get("payload") is None
+                 and any(h.get("path", "").endswith("payload.title")
+                         and h.get("word") == "审批完成"
+                         for h in ((bad_card.get("error") or {}).get("hits") or [])))
+    results.append(("7b 卡片回执禁词 → 阻断（text/payload 置空）", report_ok, repr(bad_card)))
+
+    neg = "本周审核通过率为 98%，请查看详情。"
+    neg_out = decide_mode(neg)
+    report_ok = (neg_out.get("ok") is True and neg_out.get("blocked") is False
+                 and neg_out.get("text") == neg
+                 and neg_out.get("redactions") == [])
+    results.append(("7c 正常文案含「通过率」→ 不误拦", report_ok, repr(neg_out)))
 
     # ── 汇总 ──
     passed = sum(1 for _, p, _ in results if p)

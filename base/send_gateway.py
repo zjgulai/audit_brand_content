@@ -80,8 +80,27 @@ def _minimize_value(value, redactions):
     return value
 
 
+FORBIDDEN_RECEIPT_WORDS = re.compile(
+    r"(?:已通过(?!率)|通过(?!率)|无需处理|审批完成)")
+
+
+def _forbidden_hits(value, path, hits):
+    """回执禁词扫描；返回 [{word,start,end,path}]。"""
+    if isinstance(value, str):
+        for m in FORBIDDEN_RECEIPT_WORDS.finditer(value):
+            hits.append({"word": m.group(0), "start": m.start(),
+                         "end": m.end(), "path": path})
+    elif isinstance(value, list):
+        for i, item in enumerate(value):
+            _forbidden_hits(item, "%s[%d]" % (path, i), hits)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            _forbidden_hits(item, "%s.%s" % (path, key), hits)
+    return hits
+
+
 def _minimize_result(result):
-    """唯一外发最小化出口：正文与卡片 payload 都过 redact。"""
+    """唯一外发最小化出口：先 redact，再扫回执禁词；命中则阻断。"""
     redactions = []
     if isinstance(result, dict):
         if "text" in result:
@@ -89,6 +108,26 @@ def _minimize_result(result):
         if "payload" in result and result["payload"] is not None:
             result["payload"] = _minimize_value(result["payload"], redactions)
         result["redactions"] = redactions
+
+        hits = []
+        _forbidden_hits(result.get("text"), "text", hits)
+        _forbidden_hits(result.get("payload"), "payload", hits)
+        if hits:
+            result["text"] = None
+            result["payload"] = None
+            result["ok"] = False
+            result["blocked"] = True
+            result["error"] = {
+                "code": "receipt_forbidden_word",
+                "message": "回执含禁词：%s" % ", ".join(
+                    "%s@%s[%d:%d]" % (h["word"], h["path"],
+                                      h["start"], h["end"]) for h in hits),
+                "hits": hits,
+            }
+        else:
+            result["ok"] = True
+            result["blocked"] = False
+            result["error"] = None
     return result
 
 
