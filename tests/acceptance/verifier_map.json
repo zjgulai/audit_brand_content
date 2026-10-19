@@ -632,6 +632,12 @@
       "criteria": "SEC-5-9",
       "fixture": "{root}/tools/verify_control_points.py",
       "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
+    },
+    "77": {
+      "test_id": "acceptance-77",
+      "criteria": "SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py && {venv} {root}/tools/verify_orchestrator.py"
     }
   }
 }

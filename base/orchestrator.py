@@ -43,6 +43,8 @@ REQUIRED_RECEIPT_FIELDS = (
 )
 
 VALID_REASON = ("no_capability", "no_rule", "not_wired")
+UNKNOWN_BUCKET_KEYS = ("family", "scene_domain", "authority_source", "consequence")
+FAILURE_KIND_KEYS = ("fetch_error", "parse_error", "empty", "unsupported")
 
 
 def _iso(ts):
@@ -472,6 +474,37 @@ class Orchestrator(object):
         if ctx["request"].get("media_fingerprints") is not None:
             ir["media_fingerprints"] = ctx["request"]["media_fingerprints"]
 
+        # 报告 snapshot 的生产装配点：report_render 读的是
+        # `snapshot.unknown_bucket_counts`（而不是 decision.unknown_buckets）。
+        # 四键恒出现，零也写 0 —— 否则「未知桶为 0」与「没统计」长得一样。
+        unknown_counts = {
+            axis: int((decision.get("unknown_buckets") or {}).get(axis) or 0)
+            for axis in UNKNOWN_BUCKET_KEYS
+        }
+        failure_counts = {
+            kind: (1 if failed and u.get("failure_kind") == kind else 0)
+            for kind in FAILURE_KIND_KEYS
+        }
+        # 回执级：四键计数零也出现；handoff_reason/target_layer 由判定层给出。
+        receipt["unknown_buckets"] = unknown_counts
+        receipt["unknown_bucket_total"] = sum(unknown_counts.values())
+        receipt["handoff_reason"] = decision.get("handoff_reason")
+        receipt["target_layer"] = decision.get("target_layer")
+        report_snapshot = {
+            "ir": ir,
+            "failure_kind_counts": failure_counts,
+            "unknown_bucket_counts": unknown_counts,
+            "evidence": [],
+            "unassessed": [],
+            "receipt": {
+                "skill": receipt["skill_id"],
+                "version": receipt["skill_version"],
+                "fingerprint": receipt["skill_hash"],
+                "skipped_steps": "无",
+                "rule_snapshot": receipt["rule_snapshot"],
+            },
+        }
+
         # ── 运行期契约校验（Playbook §3.3.2 / §3.3.3 / L2-7）──────────
         # 这两个 validator 原先只有定义、没有任何调用点；接在这里是唯一
         # 执行点：每次 run 的 IR/Receipt 必须真的符合 schema 才允许返回。
@@ -493,4 +526,5 @@ class Orchestrator(object):
             "external_label": None if failed else decision.get("state"),
             "judge_invoked": bool(ctx.get("judge_invoked")),
             "steps": [s["name"] for s in steps],
+            "report_snapshot": report_snapshot,
         }

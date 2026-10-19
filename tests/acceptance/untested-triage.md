@@ -9,10 +9,10 @@
 > sandbox 内超时，与行 69/71 无关。#54 在本批运行中途由并行会话修复后已转 passed。
 > 全局读数以当次 `verify_acceptance_run.py` 输出为准。
 >
-> **2026-10-19 35 条重扫：新接 45 / 46 / 74；并行会话接 21。**
-> 当前 runner：**mapped=105 / passed=105 / failed=0 / untested=31**，rc=2。
-> 未测 31 条分布：**B 22**（阶段 3–5 / CI）、**C 7**（36/43/44/70/76/103/104）、
-> **A 2**（69/77）。行 21 的映射由并行 location 会话写入，本批原样保留。
+> **2026-10-19 35 条重扫：新接 45 / 46 / 74；并行会话接 21；随后补齐并接 77（未知桶）。**
+> 当前 runner：**mapped=106 / passed=106 / failed=0 / untested=30**，rc=2。
+> 未测 30 条分布：**B 22**（阶段 3–5 / CI）、**C 7**（36/43/44/70/76/103/104）、
+> **A 1**（69）。行 21 的映射由并行 location 会话写入，本批原样保留。
 >
 > ★ 此前有 **2 条查过之后决定不接**（21 / 78）—— 它们「看起来能接」。
 > **21 已在 2026-10-19 location 扩展批次接上**（schema/normalizer/verifier 同步补齐）；
@@ -23,7 +23,7 @@
 
 | 分类 | 条数 | 含义 |
 |---|---:|---|
-| A 现在就能补 | 20 | 模块已实现，只缺 fixture/command；已接 18 条，余 2 条（69 / 77）因清单缺失或现有 verifier 覆盖不足留 untested |
+| A 现在就能补 | 20 | 模块已实现，只缺 fixture/command；已接 19 条，余 1 条（69）因 12 项清单缺失留 untested |
 | B 阶段 3–5 | 22 | OCR/ASR/前端/部署/回归集/CI，保持 untested |
 | C 口径待定 | 8 | 实现或口径有歧义；78 已接，36/43/44/70/76/103/104 因整行仍有未覆盖部分留 untested |
 
@@ -55,7 +55,7 @@
 | 71 | SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24 | 首批 20 真码、安全词、历史码保留 | **A（已接）** | **2026-10-19 已接 `verify_control_points.py --row 71`**：B-1 断言码集**精确等于** H01–H09/M01–M07/U01–U04；B-2 断言 `安全词` 不是控制点码；B-3 断言安全词已落白名单或显式退役；B-4 对每个 active 码反查 enabled 规则且 external_ref 非空；B-5 断言 U02 存在、deprecated、无 enabled 规则；B-6 对历史每条 `codes` 快照断言首批码不消失；B-7 有 `name_by_code` 时对拍语义、没有时不冒充 | ✅ 已接 `verify_control_points --row 71` |
 | 74 | SEC-5-9 | 新增控制点三条件 | **A（已接）** | **2026-10-19 D-125 采纳 C-74 建议：校验入口放 `verify_control_points.py`。** C74-0..4 分别检查新增码缺规则/依据/版本/版本未递增；`--selftest` ⑬⑭用坏样本证明这些断言会红、⑪好样本会绿 | ✅ 已接 `verify_control_points`（默认 + `--selftest`） |
 | 76 | SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27 | 唯一归属、码分配登记表、跨族拆分 | C | **2026-10-19 复核：** C76-1/2/3 已覆盖 family 单值且在族清单内、跨族拆分必须带批准、同码跨族；但行 76 还要求「首字母与族不一致时按 family 走」并跑路由/报告，验证器没有该行为样本 | 补前缀不一致的路由/报告样本；当前保持 untested |
-| 77 | SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32 | 未知桶四值强制转人工并计数 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
+| 77 | SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32 | 未知桶四值强制转人工并计数 | **A（已接）** | **2026-10-19 已接 `verify_decision_table.py + verify_orchestrator.py`**：决策层四类未知桶分别 REVIEW/DP3 或 DP4、四键计数、`handoff_reason`/`target_layer`、obligations；已知值不误转；全 0 仍出现；BLOCK+未知桶仍 BLOCK；coverage/parse 失败优先落未审查。回执层断言四键/总数/原因/目标层；报告 snapshot 装配 `unknown_bucket_counts`，并由真实 `report_render.mjs` 断言四个计数出现在报告 markdown | ✅ 已接 `verify_decision_table + verify_orchestrator` |
 | 78 | SEC-5-33 | rule_code 是唯一机器键、不以 58 子类当全集 | C | **2026-10-19 二次复核（D-126 之后）：术语障碍已消除，但仍有两条验法没有执行点，仍不能接。**<br>**已解决**：Playbook `0b26bbc6…` / 验收表 `ed26e413…` 已统一为 `rule_key`（`rule_code` 在两者中均 0 处），V61 段的键名现在与判据一致。<br>**仍然对不上的部分** —— 行 78 的「怎么验」有三条，V61 只覆盖第一条的一半：<br>① 「所有机器连接与报告生成都以 rule_key（或 control_code）为键」→ V61e 只查了 `reject.hits` **一个样本**的键，没有全仓扫描；`tools/audit/report_render.mjs` 用的是 `control_code`（符合「或」），但同样没有断言钉住。<br>② 「控制点数量口径来自主表而不是 58」→ **全仓无任何断言**（`verify_control_points.py` 的 CP-2 查的是码重复，不是数量口径）。<br>③ 「构造一份只按 58 子类统计的报告，断言与主表口径不一致时报警」→ **全仓无实现**：`base/` 下 `subclass` 出现 0 次，无报警路径。<br>**若现在接上，runner 会把「键名唯一」记成「整条 SEC-5-33 已验证」—— 那是把 1/3 的覆盖说成 3/3。** | 补 ②③ 的执行点后可接：② 在 `verify_control_points.py` 加「控制点数量以主表行数为准、与 58 子类计数不等价」；③ 加「构造纯 58 口径报告 → 与主表口径比较 → 不一致必须报警」的正反样本。这两条补完后 V61 + 它们一起接行 78 |
 | 85 | SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4 | 冻结回归集规模、陷阱样本、覆盖、指纹与变更门 | B | 冻结回归集规模/陷阱样本/变更门：属阶段 5 回归治理 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 86 | SEC-6-GS-4 | 回归集维护归属与法务确认 | B | 回归集 owner 与法务确认：人工签署，阶段 5 | 阶段 3–5 环境/模块落地后接；当前保持 untested |

@@ -10,6 +10,7 @@
   C4  parse_status=failed → judge 0 次、findings=[]、无 judge 标签、控制点未跑
   C5  回执记实际 control_points_version
   C6  高严重度命中也不提前停：五步全跑
+  C9  未知桶：回执四键计数/原因/目标层 + report snapshot 装配 + 渲染可见
   R1  调换两步顺序 → 红
   R2  判定被调用两次 → 红
   R3  跳步 → 红
@@ -22,7 +23,9 @@
 
 import json
 import os
+import subprocess
 import sys
+import tempfile
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -275,6 +278,62 @@ def main():
     finally:
         O.validate_ir = orig_ir
     report(raised, "C8b validator 报问题 → run 抛 ValueError（fail-closed）", "")
+
+    # C9 未知桶：回执四键计数 + 转人原因/目标层 + report snapshot 装配。
+    buckets = {"family": 1, "scene_domain": 1,
+               "authority_source": 1, "consequence": 1}
+    unknown_decision = dict(decision, state="REVIEW", layer="DP4",
+                            unknown_buckets=buckets,
+                            unknown_bucket_total=4,
+                            handoff_reason="unknown_bucket",
+                            target_layer="DP4")
+    r9 = build(Counter(), dec=unknown_decision).run(request(unit=None))
+    rc9 = r9["receipt"]
+    report(rc9.get("unknown_buckets") == buckets
+           and rc9.get("unknown_bucket_total") == 4
+           and rc9.get("handoff_reason") == "unknown_bucket"
+           and rc9.get("target_layer") == "DP4",
+           "C9 receipt 带 unknown_buckets 四键/总数/原因/目标层",
+           repr({k: rc9.get(k) for k in ("unknown_buckets",
+                                          "unknown_bucket_total",
+                                          "handoff_reason", "target_layer")}))
+    snap = r9.get("report_snapshot") or {}
+    report(snap.get("unknown_bucket_counts") == buckets
+           and snap.get("ir", {}).get("receipt_ref") == rc9.get("receipt_id"),
+           "C9b report_snapshot.unknown_bucket_counts 四键齐全",
+           repr(snap.get("unknown_bucket_counts")))
+    report(r["receipt"].get("unknown_buckets") ==
+           {k: 0 for k in O.UNKNOWN_BUCKET_KEYS}
+           and r["receipt"].get("unknown_bucket_total") == 0
+           and r["report_snapshot"].get("unknown_bucket_counts") ==
+           {k: 0 for k in O.UNKNOWN_BUCKET_KEYS},
+           "C9c 无未知桶时四键仍为 0（不省略）", repr(r["receipt"].get("unknown_buckets")))
+
+    # C9d 报告侧：让真实 report_render.mjs 读 snapshot，四个计数必须出现。
+    runner = tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False)
+    try:
+        runner.write(
+            "import { renderReport } from %r;\n"
+            "let input = '';\n"
+            "for await (const c of process.stdin) input += c;\n"
+            "process.stdout.write(JSON.stringify(renderReport(JSON.parse(input))));\n"
+            % ("file://" + os.path.join(REPO_ROOT, "tools", "audit",
+                                        "report_render.mjs")))
+        runner.close()
+        proc = subprocess.run(["node", runner.name], input=json.dumps(
+            snap, ensure_ascii=False), text=True, capture_output=True)
+        rendered = json.loads(proc.stdout) if proc.returncode == 0 and proc.stdout else {}
+        markdown = rendered.get("markdown") or ""
+        report(rendered.get("ok") is True
+               and all(("%s=1" % k) in markdown for k in buckets),
+               "C9d report_render 读到四个未知桶计数",
+               "rc=%r errors=%r" % (proc.returncode,
+                                    rendered.get("errors")))
+    finally:
+        try:
+            os.unlink(runner.name)
+        except OSError:
+            pass
 
     print("----------------------------------------")
     if failed == 0:

@@ -30,7 +30,8 @@ decide({
 `run_state` / `state` / `external_label` / `layer` / `obligations` / `max_sev` /
 `max_sev_authority` / `any_authority_conflict` / `all_evidence_gaps` /
 `has_candidate` / `coverage_incomplete` / `release_status` / `chain` /
-`invariant_violation`。
+`invariant_violation` / `unknown_buckets` / `unknown_bucket_total` /
+`handoff_reason` / `target_layer`。
 
 五标签全部 `release_status="待放行"`；`run_state=ERROR` 时
 `state` / `external_label` / `layer` / `release_status` 均为 null，
@@ -42,6 +43,10 @@ decide({
   - `L0` 不是最低严重度：confirmed 的 L0 触发 I4 → ERROR（它表示「不知道」）。
   - 链序按 Playbook §3.3.8.1 **严格短路**；partial 永不 PASS。
   - 输入读不出 / 派生值与 findings 不一致 → ERROR，**不得默认 PASS/BLOCK**。
+  - 未知桶（Playbook §5.3.3）是**扩展链 16**：`family=未归类` / `scene_domain=其他`
+    转 REVIEW/DP3；`authority_source=依据待定` / `consequence=后果未知` 转
+    REVIEW/DP4；四类同现取 DP4。未知桶**不得降级已确认 BLOCK**，
+    coverage/parse 失败仍先落未审查。四个桶计数每次输出都出现（零也为 0）。
 """
 from __future__ import annotations
 
@@ -51,6 +56,16 @@ COVERAGE_STATES = ("missing", "partial", "full")
 STATUSES = ("confirmed", "candidate", "rejected", "superseded")
 SEVERITIES = ("L0", "L1", "L2", "L3", "L4", "L5")
 AUTHORITY_STATES = ("ok", "missing", "expired", "conflict")
+
+# Playbook §5.3.3：四类未知桶。出现即强制转人工，不得静默落进已知值。
+UNKNOWN_BUCKETS = {
+    "family": "未归类",
+    "scene_domain": "其他",
+    "authority_source": "依据待定",
+    "consequence": "后果未知",
+}
+# 依据/后果两轴由法务接手（DP4）；分类/场景缺口由内容审核员接手（DP3）。
+UNKNOWN_DP4_AXES = ("authority_source", "consequence")
 
 _SEV_RANK = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4, "L5": 5}
 _AUTH_RANK = {"ok": 0, "missing": 1, "expired": 2, "conflict": 3}
@@ -74,6 +89,10 @@ def _error(code, detail, base=None):
         "coverage_incomplete": b.get("coverage_incomplete"),
         "release_status": None,
         "chain": None,
+        "unknown_buckets": _empty_unknown_buckets(),
+        "unknown_bucket_total": 0,
+        "handoff_reason": None,
+        "target_layer": None,
     }
 
 
@@ -107,6 +126,24 @@ def _derive(findings):
         "all_evidence_gaps": gaps,
         "has_candidate": bool(candidates),
     }
+
+
+def _empty_unknown_buckets():
+    return {axis: 0 for axis in UNKNOWN_BUCKETS}
+
+
+def _collect_unknown_buckets(inp, findings):
+    """统计四类未知桶；只认精确值，不做任何归一/猜测。"""
+    counts = _empty_unknown_buckets()
+    values = []
+    for axis in UNKNOWN_BUCKETS:
+        values.append(inp.get(axis))
+    for f in findings:
+        for axis in UNKNOWN_BUCKETS:
+            values.append(f.get(axis))
+    counts = {axis: sum(1 for v in values if v == unknown)
+              for axis, unknown in UNKNOWN_BUCKETS.items()}
+    return counts, sum(counts.values())
 
 
 def _validate(inp):
@@ -183,6 +220,7 @@ def decide(inp):
         return _error("INPUT", bad)
     parse, fk, cov = norm["parse"], norm["fk"], norm["coverage"]
     findings = norm["findings"]
+    unknown_counts, unknown_total = _collect_unknown_buckets(inp, findings)
     derived = _derive(findings)
 
     supplied = {}
@@ -260,6 +298,18 @@ def decide(inp):
         # 合法输入域上 15 条链应覆盖全部组合；走到这里说明表漏了一条。
         return _error("NO_CHAIN", "no chain matched", derived)
 
+    # 未知桶只提升「待人工」信号，不降级已确认 BLOCK。
+    # 1) parse/coverage 失败已落未审查；2) BLOCK 保持 BLOCK；
+    # 3) 其余状态在未知桶出现时转 REVIEW + DP3/DP4。
+    handoff_reason = None
+    target_layer = None
+    if unknown_total and state not in ("BLOCK", "未审查"):
+        target_layer = ("DP4" if
+                        any(unknown_counts[a] for a in UNKNOWN_DP4_AXES)
+                        or layer == "DP4" else "DP3")
+        state, layer, chain = "REVIEW", target_layer, 16
+        handoff_reason = "unknown_bucket"
+
     obligations = []
     if state == "BLOCK" and has_cand:
         obligations.append("pending_candidate")
@@ -267,6 +317,9 @@ def decide(inp):
         obligations.append("partial_coverage")
     if gaps:
         obligations.append("evidence_gap")
+    for axis, count in unknown_counts.items():
+        if count:
+            obligations.append("unknown_bucket:%s" % axis)
 
     return {
         "run_state": "OK",
@@ -283,4 +336,8 @@ def decide(inp):
         "coverage_incomplete": cov != "full",
         "release_status": "待放行",
         "chain": chain,
+        "unknown_buckets": unknown_counts,
+        "unknown_bucket_total": unknown_total,
+        "handoff_reason": handoff_reason,
+        "target_layer": target_layer,
     }

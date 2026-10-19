@@ -48,6 +48,7 @@ except Exception as e:  # noqa: BLE001
 
 FIVE_STATES = {"BLOCK", "REVIEW", "未审查", "待自决", "PASS"}
 LAYERS = {"DP0", "DP1", "DP2", "DP3", "DP4"}
+UNKNOWN_AXES = ("family", "scene_domain", "authority_source", "consequence")
 
 # ── C-46 / L2-1a：判定逻辑唯一性全仓扫描 ───────────────────────────────
 # 扫描范围刻意是产品运行时代码（base/api/tools），不含 skill/ 知识库技能、
@@ -370,6 +371,64 @@ def main():
     T("H3e ★ 输出必须带 chain 字段（契约漏项探针）",
       all(r.get("chain") is not None for r in got_rows),
       repr([r.get("chain") for r in got_rows]))
+
+    # ── K 未知桶（Playbook §5.3.3 / 验收行 77）──────────────────────
+    unknown_cases = [
+        ("family", "未归类", "DP3"),
+        ("scene_domain", "其他", "DP3"),
+        ("authority_source", "依据待定", "DP4"),
+        ("consequence", "后果未知", "DP4"),
+    ]
+    for axis, value, layer in unknown_cases:
+        r = decide(inp(**{axis: value}))
+        T("K1 %s=未知桶 → REVIEW/%s + 计数 + 转人原因" % (axis, layer),
+          r.get("state") == "REVIEW" and r.get("layer") == layer
+          and r.get("chain") == 16
+          and r.get("handoff_reason") == "unknown_bucket"
+          and r.get("target_layer") == layer
+          and r.get("unknown_buckets", {}).get(axis) == 1
+          and r.get("unknown_bucket_total") == 1
+          and ("unknown_bucket:%s" % axis) in (r.get("obligations") or []),
+          str(r))
+    r_known = decide(inp(family="宣称控制", scene_domain="车内",
+                         authority_source="external", consequence="低"))
+    T("K2 已知值不得误转人工",
+      r_known.get("state") == "PASS" and r_known.get("layer") == "DP1"
+      and r_known.get("unknown_bucket_total") == 0
+      and r_known.get("handoff_reason") is None, str(r_known))
+    r_zero = decide(inp())
+    T("K3 全为 0 时四个计数仍出现",
+      set(r_zero.get("unknown_buckets") or {}) == set(UNKNOWN_AXES)
+      and all(r_zero["unknown_buckets"][a] == 0 for a in UNKNOWN_AXES)
+      and r_zero.get("unknown_bucket_total") == 0, str(r_zero.get("unknown_buckets")))
+    r_batch = decide(inp(family="未归类", scene_domain="其他",
+                         authority_source="依据待定", consequence="后果未知"))
+    T("K4 四类同批 → 各计 1、总数 4、DP4",
+      r_batch.get("unknown_bucket_total") == 4
+      and all(r_batch["unknown_buckets"][a] == 1 for a in UNKNOWN_AXES)
+      and r_batch.get("layer") == "DP4", str(r_batch.get("unknown_buckets")))
+    f_unknown = F(sev="L2", auth="ok")
+    f_unknown["family"] = "未归类"
+    r_finding = decide(inp(findings=[f_unknown]))
+    T("K5 finding 上的未知桶同样生效",
+      r_finding.get("state") == "REVIEW" and r_finding.get("layer") == "DP3"
+      and r_finding.get("unknown_buckets", {}).get("family") == 1, str(r_finding))
+    r_block = decide(inp(findings=[F(sev="L4", auth="ok")], family="未归类"))
+    T("K6 ★ BLOCK + 未知桶 → 仍必须 BLOCK（不得降级）",
+      r_block.get("state") == "BLOCK" and r_block.get("layer") == "DP2"
+      and r_block.get("chain") == 7 and r_block.get("unknown_bucket_total") == 1
+      and r_block.get("handoff_reason") is None, str(r_block))
+    r_cov_missing = decide(inp(coverage_state="missing", family="未归类"))
+    T("K7 coverage missing 优先于未知桶 → 未审查/DP0",
+      r_cov_missing.get("state") == "未审查"
+      and r_cov_missing.get("layer") == "DP0"
+      and r_cov_missing.get("unknown_bucket_total") == 1, str(r_cov_missing))
+    r_parse_failed = decide(inp(parse_status="failed", failure_kind="empty",
+                                family="未归类"))
+    T("K8 parse failed 优先于未知桶 → 未审查/DP0",
+      r_parse_failed.get("state") == "未审查"
+      and r_parse_failed.get("layer") == "DP0"
+      and r_parse_failed.get("unknown_bucket_total") == 1, str(r_parse_failed))
 
     # ── J 判定逻辑唯一性：全仓静态扫描（C-46 / L2-1a） ──────────────
     scanned, hits = scan_decision_logic()
