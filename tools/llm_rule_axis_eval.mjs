@@ -44,6 +44,9 @@ const DEFAULT_SAMPLE = '/tmp/llm_eval_sample.json';
 /** 门槛：与契约文档 §5 一致。改这里就是改门槛，会同时影响结论行。 */
 export const THRESHOLDS = Object.freeze({ axisExact: 0.95, unknownRate: 0.05 });
 
+/** 复跑稳定性门槛：unstable 超过 2% 时，即使 stable_correct 达标也不能判「达标」。 */
+export const UNSTABLE_MAX = 0.02;
+
 /** 七轴，按判定顺序。顺序本身是契约的一部分（先命中先归）。 */
 export const AXES = Object.freeze(['CHAN', 'RIGHT', 'SCENE', 'DISC', 'BRAND', 'FACT', 'CLAIM']);
 
@@ -255,6 +258,130 @@ export function verdictLine(s, { blind = false, model = '?' } = {}) {
   ].join('\n');
 }
 
+/**
+ * 复跑聚合：按 rule_id 汇总 N 次答案。
+ *
+ * 三档必须互斥且穷尽：
+ *   stable_correct   N 次全是 gold
+ *   stable_wrong     N 次全错，且每次答案完全相同（同一个错轴/同一个 UNKNOWN code）
+ *   unstable         其余：至少出现两种答案（含「全错但错法不同」）
+ *
+ * 注意：stable_wrong 不是「全错」的同义词 —— 全错但每次错在不同轴，属于 unstable。
+ */
+export function aggregateRepeat(runs) {
+  const validRuns = (runs || []).filter(Array.isArray);
+  if (validRuns.length === 0) {
+    return {
+      tested: false, nRuns: 0, nRules: 0, nParsed: 0,
+      stableCorrect: 0, stableWrong: 0, unstable: 0, stableUnknown: 0,
+      stableCorrectRate: null, stableWrongRate: null, unstableRate: null,
+      stableWrongDirections: {}, pass: false,
+    };
+  }
+  const byRule = new Map();
+  let nParsed = 0;
+  for (const run of validRuns) {
+    for (const row of run) {
+      const rid = row?.rule_id;
+      if (!rid) continue;
+      if (row?.verdict) nParsed += 1;
+      if (!byRule.has(rid)) byRule.set(rid, { gold: row.gold, answers: [] });
+      byRule.get(rid).answers.push(answerKey(row));
+    }
+  }
+  if (nParsed === 0) {
+    return {
+      tested: false, nRuns: validRuns.length, nRules: byRule.size, nParsed: 0,
+      stableCorrect: 0, stableWrong: 0, unstable: 0, stableUnknown: 0,
+      stableCorrectRate: null, stableWrongRate: null, unstableRate: null,
+      stableWrongDirections: {}, pass: false,
+    };
+  }
+  let stableCorrect = 0;
+  let stableWrong = 0;
+  let unstable = 0;
+  let stableUnknown = 0;
+  const stableWrongDirections = {};
+  for (const { gold, answers } of byRule.values()) {
+    // 少跑了一轮也按不稳定处理 —— 不把缺失当稳定。
+    if (answers.length < validRuns.length) {
+      unstable += 1;
+      continue;
+    }
+    const unique = new Set(answers);
+    const correctKey = `AXIS:${gold}`;
+    if (unique.size === 1 && answers[0] === correctKey) {
+      stableCorrect += 1;
+    } else if (unique.size === 1) {
+      stableWrong += 1;
+      const answer = answers[0];
+      const got = answer.startsWith('AXIS:') ? answer.slice(5)
+        : answer.startsWith('UNKNOWN:') ? answer.slice(8)
+          : answer;
+      const dir = `${gold}→${got}`;
+      stableWrongDirections[dir] = (stableWrongDirections[dir] ?? 0) + 1;
+      if (answer.startsWith('UNKNOWN:')) stableUnknown += 1;
+    } else {
+      unstable += 1;
+    }
+  }
+  const nRules = byRule.size;
+  const rate = (n) => (nRules ? n / nRules : null);
+  const stableCorrectRate = rate(stableCorrect);
+  const stableWrongRate = rate(stableWrong);
+  const unstableRate = rate(unstable);
+  const pass = stableCorrectRate !== null
+    && stableCorrectRate >= THRESHOLDS.axisExact
+    && unstableRate <= UNSTABLE_MAX;
+  return {
+    tested: true, nRuns: validRuns.length, nRules, nParsed,
+    stableCorrect, stableWrong, unstable, stableUnknown,
+    stableCorrectRate, stableWrongRate, unstableRate,
+    stableWrongDirections, pass,
+  };
+}
+
+/** 单条答案的稳定键：轴 / UNKNOWN code / 解析失败 / 传输失败。 */
+function answerKey(row) {
+  if (!row) return 'MISSING';
+  if (row.transportFailure) return 'TRANSPORT_FAIL';
+  if (!row.verdict) return 'PARSE_FAIL';
+  return row.verdict.primary
+    ? `AXIS:${row.verdict.primary}`
+    : `UNKNOWN:${row.verdict.unknown ?? '?'}`;
+}
+
+/**
+ * 复跑结论行：四态。
+ * 只要 unstable 超过门槛，即使 stable_correct ≥95% 也**不许**输出「达标」。
+ */
+export function verdictLineRepeat(a, { blind = false, model = '?' } = {}) {
+  const tag = blind ? '盲测(隐藏子类名)' : '常规(含子类名)';
+  if (!a.tested) {
+    return `⚠ 未测 · ${tag} · model=${model} · 没有完整轮次`;
+  }
+  const pct = (x) => (x === null ? 'n/a' : `${(x * 100).toFixed(2)}%`);
+  let head;
+  if (a.unstableRate > UNSTABLE_MAX) {
+    head = '⚠ 不稳定';
+  } else if (a.pass) {
+    head = '✅ 达标';
+  } else {
+    head = '❌ 未达标';
+  }
+  const dirs = Object.entries(a.stableWrongDirections)
+    .sort((x, y) => y[1] - x[1])
+    .map(([k, v]) => `${k} × ${v}`)
+    .join('；') || '无';
+  return [
+    `${head} · ${tag} · model=${model} · repeat=${a.nRuns}`,
+    `stable_correct = ${a.stableCorrect}/${a.nRules} = ${pct(a.stableCorrectRate)}（阈值 ≥${THRESHOLDS.axisExact * 100}%）`,
+    `stable_wrong = ${a.stableWrong}/${a.nRules} = ${pct(a.stableWrongRate)}（方向：${dirs}）`,
+    `unstable = ${a.unstable}/${a.nRules} = ${pct(a.unstableRate)}（阈值 ≤${(UNSTABLE_MAX * 100).toFixed(0)}%；超过时不得判达标）`,
+    `stable_unknown = ${a.stableUnknown}/${a.nRules}`,
+  ].join('\n');
+}
+
 /* ─────────────────────────────── 自证 ─────────────────────────────── */
 
 function selftest() {
@@ -330,6 +457,47 @@ function selftest() {
   const src = buildUserMessage.toString();
   ok('构造器源码不引用禁用字段', !FORBIDDEN_INPUT_FIELDS.some((f) => src.includes(f)));
 
+  // ── 6 复跑稳定性分档（正反例成对） ──
+  const row = (gold, primary, rid = 'r1') => ({
+    rule_id: rid, gold,
+    verdict: primary ? { primary, secondary: null } : null,
+  });
+  const five = (answers) => answers.map((a) => [row('FACT', a)]);
+  const aCorrect = aggregateRepeat(five(['FACT', 'FACT', 'FACT', 'FACT', 'FACT']));
+  ok('复跑：5 次全对 → stable_correct',
+     aCorrect.stableCorrect === 1 && aCorrect.stableWrong === 0 && aCorrect.unstable === 0,
+     JSON.stringify(aCorrect));
+  const aMixed = aggregateRepeat(five(['FACT', 'FACT', 'FACT', 'DISC', 'CLAIM']));
+  ok('复跑：3 对 2 错 → unstable',
+     aMixed.stableCorrect === 0 && aMixed.stableWrong === 0 && aMixed.unstable === 1,
+     JSON.stringify(aMixed));
+  const aWrongSame = aggregateRepeat(five(['DISC', 'DISC', 'DISC', 'DISC', 'DISC']));
+  ok('复跑：5 次全错且同答案 → stable_wrong + 方向',
+     aWrongSame.stableWrong === 1 && aWrongSame.stableWrongDirections['FACT→DISC'] === 1,
+     JSON.stringify(aWrongSame));
+  const aWrongDiff = aggregateRepeat(five(['DISC', 'CLAIM', 'SCENE', 'BRAND', 'CHAN']));
+  ok('复跑：5 次全错但错法不同 → unstable（不是 stable_wrong）',
+     aWrongDiff.stableWrong === 0 && aWrongDiff.unstable === 1,
+     JSON.stringify(aWrongDiff));
+  const aEmpty = aggregateRepeat([]);
+  ok('复跑：空轮次 → tested=false（未测，不是 0%）', aEmpty.tested === false, '');
+
+  // 100 条：97 条 5 次全对，3 条每次翻转 → stable_correct 97% ≥95%，unstable 3% >2%。
+  const bigRuns = Array.from({ length: 5 }, (_, ri) =>
+    Array.from({ length: 100 }, (_, i) => {
+      const rid = `r${i}`;
+      if (i < 97) return row('FACT', 'FACT', rid);
+      return row('FACT', ri % 2 === 0 ? 'DISC' : 'CLAIM', rid);
+    }));
+  const aHighButWobbly = aggregateRepeat(bigRuns);
+  const lWobbly = verdictLineRepeat(aHighButWobbly);
+  ok('结论：unstable 超阈值时即使 stable_correct ≥95% 也不得判达标',
+     aHighButWobbly.stableCorrectRate >= THRESHOLDS.axisExact
+     && aHighButWobbly.unstableRate > UNSTABLE_MAX
+     && lWobbly.startsWith('⚠ 不稳定')
+     && !lWobbly.split('\n').some((line) => line.startsWith('✅ 达标')),
+     lWobbly);
+
   const failed = checks.filter((c) => !c.pass);
   for (const c of checks) console.log(`${c.pass ? '✓' : '✗'} ${c.name}${c.pass ? '' : ` —— ${c.detail}`}`);
   console.log(`\n${failed.length === 0 ? '✅' : '❌'} ${checks.length - failed.length}/${checks.length} 项通过`);
@@ -339,7 +507,7 @@ function selftest() {
 /* ─────────────────────────────── 主流程 ─────────────────────────────── */
 
 function parseArgs(argv) {
-  const out = { sample: DEFAULT_SAMPLE, blind: false, limit: 0, concurrency: 4, outPath: null, dryRun: false, selftest: false };
+  const out = { sample: DEFAULT_SAMPLE, blind: false, limit: 0, concurrency: 4, repeat: 1, outPath: null, dryRun: false, selftest: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--selftest') out.selftest = true;
@@ -348,11 +516,148 @@ function parseArgs(argv) {
     else if (a === '--sample') out.sample = argv[++i];
     else if (a === '--limit') out.limit = Number(argv[++i]);
     else if (a === '--concurrency') out.concurrency = Number(argv[++i]);
+    else if (a === '--repeat') out.repeat = Number(argv[++i]);
     else if (a === '--out') out.outPath = argv[++i];
     else if (a === '--help' || a === '-h') out.help = true;
     else { console.error(`未知参数：${a}`); process.exit(2); }
   }
   return out;
+}
+
+/** 跑一轮：每轮都是一次完整、无状态的 items 遍历。 */
+async function runRound(items, args, llm, label = '') {
+  const rows = new Array(items.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= items.length) return;
+      const rule = items[idx];
+      const userMsg = buildUserMessage(rule, { blind: args.blind });
+      const r = await llm.chat(
+        [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
+        { maxTokens: 4000, temperature: 0, jsonMode: true },
+      );
+      const goldSecondary = rule.gold_secondary ?? null;
+      if (!r.ok) {
+        rows[idx] = { rule_id: rule.rule_id, gold: rule.gold, goldSecondary, verdict: null, error: r.error, transportFailure: true };
+        process.stderr.write(`· ${label}${idx + 1}/${items.length} ${rule.rule_id} 传输失败：${r.error}\n`);
+        continue;
+      }
+      const raw = r.message?.content ?? '';
+      const verdict = parseVerdict(raw);
+      rows[idx] = {
+        rule_id: rule.rule_id, gold: rule.gold, goldSecondary, verdict,
+        raw: verdict ? undefined : raw.slice(0, 300),
+        finishReason: r.finishReason,
+      };
+      process.stderr.write(`· ${label}${idx + 1}/${items.length} ${rule.rule_id} gold=${rule.gold} got=${verdict?.primary ?? verdict?.unknown ?? 'PARSE_FAIL'}\n`);
+    }
+  }
+
+  await Promise.all(Array.from(
+    { length: Math.max(1, Math.min(args.concurrency, items.length)) }, worker));
+  return rows;
+}
+
+/** 原子写：先写临时文件再 rename，进程被杀不会留下半个 JSON。 */
+function writeJsonAtomic(p, obj) {
+  const tmp = `${p}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
+  fs.renameSync(tmp, p);
+}
+
+/**
+ * 复跑主流程。每完成一轮就落盘，第 3 轮挂了前 3 轮仍在文件里。
+ * 续跑只接受 sample/blind/repeat/rule_ids 完全一致的旧文件。
+ */
+async function runRepeat(items, args, llm) {
+  const n = Math.floor(args.repeat);
+  if (!Number.isFinite(n) || n < 2) {
+    console.error(`⚠ 未测 · --repeat 必须是 ≥2 的整数，收到 ${args.repeat}`);
+    return 2;
+  }
+  const outPath = args.outPath
+    ?? `${args.sample.replace(/\.json$/i, '')}.repeat${n}.json`;
+  const ruleIds = items.map((r) => r.rule_id);
+  let runs = [];
+  let priorCost = null;
+  if (fs.existsSync(outPath)) {
+    try {
+      const old = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+      const same = old.sample === args.sample && old.blind === args.blind
+        && old.repeat === n
+        && JSON.stringify(old.rule_ids) === JSON.stringify(ruleIds);
+      if (same && Array.isArray(old.runs)) {
+        runs = old.runs;
+        priorCost = old.cost ?? null;
+        console.log(`↻ 续跑：已有 ${runs.length}/${n} 轮，从第 ${runs.length + 1} 轮开始（${outPath}）`);
+      }
+    } catch {
+      // 坏文件不阻塞新跑；下一轮写完会覆盖。
+    }
+  }
+  const initialRuns = runs.length;
+
+  const t0 = Date.now();
+  const runningCost = (elapsed) => {
+    const stats = llm.stats ?? {};
+    return {
+      elapsedSeconds: Number(((priorCost?.elapsedSeconds ?? 0) + elapsed).toFixed(1)),
+      calls: (priorCost?.calls ?? 0) + (stats.calls ?? 0),
+      promptTokens: (priorCost?.promptTokens ?? 0) + (stats.promptTokens ?? 0),
+      completionTokens: (priorCost?.completionTokens ?? 0) + (stats.completionTokens ?? 0),
+    };
+  };
+  for (let round = runs.length; round < n; round++) {
+    console.log(`\n=== repeat ${round + 1}/${n} ===`);
+    const rows = await runRound(items, args, llm, `[${round + 1}/${n}] `);
+    runs.push(rows);
+    writeJsonAtomic(outPath, {
+      schema: 'llm-rule-axis-repeat/v1',
+      sample: args.sample, blind: args.blind, repeat: n,
+      rule_ids: ruleIds, completedRuns: runs.length, complete: false,
+      updatedAt: new Date().toISOString(),
+      cost: runningCost((Date.now() - t0) / 1000), runs,
+    });
+    console.log(`  ↳ 已落盘 ${runs.length}/${n} 轮到 ${outPath}`);
+  }
+
+  const elapsed = ((Date.now() - t0) / 1000);
+  const agg = aggregateRepeat(runs);
+  console.log(`\n${verdictLineRepeat(agg, { blind: args.blind, model: llm.config?.llm?.model ?? '?' })}`);
+
+  const stats = llm.stats ?? {};
+  const cost = runningCost(elapsed);
+  const newRuns = runs.length - initialRuns;
+  const perRunSec = newRuns ? elapsed / newRuns : null;
+  const newPrompt = stats.promptTokens ?? 0;
+  const newCompletion = stats.completionTokens ?? 0;
+  const perRunPrompt = newRuns ? newPrompt / newRuns : null;
+  const perRunCompletion = newRuns ? newCompletion / newRuns : null;
+  console.log(`本次耗时 ${elapsed.toFixed(1)}s · calls=${stats.calls ?? 0} retries=${stats.retries ?? 0} failures=${stats.failures ?? 0}`);
+  console.log(`累计成本：耗时 ${cost.elapsedSeconds}s · calls=${cost.calls} · prompt=${cost.promptTokens} completion=${cost.completionTokens}`);
+  if (perRunSec !== null) {
+    console.log(`本次单轮：${perRunSec.toFixed(1)}s · prompt≈${Math.round(perRunPrompt)} · completion≈${Math.round(perRunCompletion)}`);
+    console.log(`外推：N=5 ≈ ${(perRunSec * 5 / 60).toFixed(1)} 分钟 / prompt≈${Math.round(perRunPrompt * 5)}；`
+      + `N=50 ≈ ${(perRunSec * 50 / 60).toFixed(1)} 分钟 / prompt≈${Math.round(perRunPrompt * 50)}`);
+  } else {
+    console.log('本次无新调用（全部轮次来自续跑文件），沿用累计成本。');
+  }
+
+  writeJsonAtomic(outPath, {
+    schema: 'llm-rule-axis-repeat/v1',
+    sample: args.sample, blind: args.blind, repeat: n,
+    rule_ids: ruleIds, completedRuns: runs.length, complete: true,
+    updatedAt: new Date().toISOString(), aggregate: agg,
+    cost,
+    runs,
+  });
+  console.log(`\n明细已写入 ${outPath}（complete=true）`);
+
+  if (!agg.tested) return 2;
+  return agg.pass ? 0 : 1;
 }
 
 async function main() {
@@ -390,39 +695,12 @@ async function main() {
     return 2;
   }
 
-  const rows = new Array(items.length);
-  let cursor = 0;
-  const t0 = Date.now();
-
-  async function worker() {
-    while (true) {
-      const idx = cursor++;
-      if (idx >= items.length) return;
-      const rule = items[idx];
-      const userMsg = buildUserMessage(rule, { blind: args.blind });
-      const r = await llm.chat(
-        [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userMsg }],
-        { maxTokens: 4000, temperature: 0, jsonMode: true },
-      );
-      const goldSecondary = rule.gold_secondary ?? null;
-      if (!r.ok) {
-        rows[idx] = { rule_id: rule.rule_id, gold: rule.gold, goldSecondary, verdict: null, error: r.error, transportFailure: true };
-        process.stderr.write(`· ${idx + 1}/${items.length} ${rule.rule_id} 传输失败：${r.error}\n`);
-        continue;
-      }
-      const raw = r.message?.content ?? '';
-      const verdict = parseVerdict(raw);
-      rows[idx] = {
-        rule_id: rule.rule_id, gold: rule.gold, goldSecondary, verdict,
-        raw: verdict ? undefined : raw.slice(0, 300),
-        finishReason: r.finishReason,
-      };
-      process.stderr.write(`· ${idx + 1}/${items.length} ${rule.rule_id} gold=${rule.gold} got=${verdict?.primary ?? verdict?.unknown ?? 'PARSE_FAIL'}\n`);
-    }
+  if (args.repeat > 1) {
+    return await runRepeat(items, args, llm);
   }
 
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(args.concurrency, items.length)) }, worker));
-
+  const t0 = Date.now();
+  const rows = await runRound(items, args, llm);
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   const s = score(rows);
   console.log(`\n${verdictLine(s, { blind: args.blind, model: llm.config?.llm?.model ?? '?' })}`);
