@@ -32,11 +32,15 @@ SESSION_DB = os.environ.get("REVIEW_API_SESSION_DB", ":memory:")
 
 PRINCIPALS = {
     "u_dp3": {
+        "open_id": "ou_dev_u_dp3",
+        "tenant_id": "t1",
         "roles": ["coordinator"],
         "product_lines": ["pump"],
         "product_line": "pump",
     },
     "u_signer": {
+        "open_id": "ou_dev_u_signer",
+        "tenant_id": "t1",
         "roles": ["signer"],
         "product_lines": ["pump"],
         "product_line": "pump",

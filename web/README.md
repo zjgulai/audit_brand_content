@@ -65,7 +65,7 @@ VITE_REVIEW_API_BASE=https://example.com/review-api npm run build
 1. 用 `tools/smoke_end_to_end.py` 的 `SMOKE_DUMP_IR` 在**临时目录**生成投影（`cases.json`，含 `case-smoke`）；
 2. 用 `scripts/seed_projection.py` 给临时投影补一条 `report-smoke`（仍只写临时目录）；
 3. `npm run build`；
-4. 建本地 session（`u_dp3` / `t1`），启动真实 `api/review_api.py`（经 `scripts/review_api_dev.py` 装配临时投影 + session store）；
+4. 建本地 session（`u_dp3` / `t1`），启动真实 `api/review_api.py`（经 `scripts/review_api_dev.py` 装配临时投影 + session store）；`review_api_dev.py` 里的 `u_dp3` / `u_signer` 是**本地替身 principal**（固定 `open_id` / `tenant_id`），仅供 dev 联调，不是生产 IdP 身份；
 5. 启动 Vite dev，`/review-api` 反向代理到后端；
 6. `curl /review-api/queue` 断言 200 且含 `case-smoke`；
 7. 用本机 Chrome（CDP）走 **队列 → 案件详情 → 报告查看** 三段：
