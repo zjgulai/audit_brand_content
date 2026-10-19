@@ -1,127 +1,474 @@
 {
-  "meta": {
-    "version": "draft-0",
-    "status": "awaiting_spec",
-    "source": null,
-    "note": "页面骨架数据。规范文档落盘后替换本文件；在拿到规范前不填写任何未确认的轴定义、判定条件或 rule_id 归属。"
+ "meta": {
+  "version": "v1",
+  "status": "published",
+  "source": "PMO/implement/内容审查分类规范-v1.md",
+  "note": "由规范 v1 解析生成；轴定义/判定条件/分界测试/复核人/证据要求/反例均取自规范原文。"
+ },
+ "axes": [
+  {
+   "code": "CHAN",
+   "name": "CHAN 渠道控制",
+   "one_line": "CHAN 审查“这条内容能不能在这个平台/渠道、目标地区、版位与形式、提交字段、平台授权素材下投放”。判定只依赖渠道元数据和可引用的平台政策/法律原文，不评价文案真假、证据强弱、语气或消费者是否被充分告知。判别式：**同一文案换一个平台/地区/版位/提交方式就从合规变违规，且原因来自渠道规则 → CHAN**。",
+   "criteria": [
+    "CHN1：`rule.regulated_object ∈ {channel_access, placement, ad_format, submission_field, platform_asset}` 且规则文本点名至少一个 {品类, 地区, 版位, 形式, 提交字段, 平台自有素材} → 命中 CHAN",
+    "CHN2：`ad.product_category` 属于规则在 `target_region/platform` 明确禁止投放的品类（如 Austria 全渠道婴配粉、Singapore 口香糖、UK HFSS 非 STV 例外、临床试验招募、注射器/专业用医疗器械） → 命中 CHAN",
+    "CHN3：`ad.placement` 属于规则禁止的版位（如 sponsorship/takeover）或 `ad.format` 缺少规则要求的字段（如 headless API 的 description） → 命中 CHAN",
+    "CHN4：`ad.asset` 未经授权使用**平台自有**标识/榜单/logo（Amazon's Choice、Best Seller 排名、篡改的 Amazon logo） → 命中 CHAN",
+    "CHN5：同一文案在渠道 A 合规、渠道 B 违规，差异仅来自 platform/region/placement/format 规则 → 离线规则库一致性检查；单条审查不单独求值",
+    "CHN6：规则只有“必须遵守所有适用法律/平台政策”或等价泛化条款，无法定位到具体品类/版位/地区/字段/授权素材 → 不命中 CHAN；返回 NOT_A_RULE 或挂起",
+    "不属于本轴：文案内部事实是否属实（FACT）；例如“Austria 是否真的禁止婴配粉广告”这一陈述本身是否准确。",
+    "不属于本轴：对外断言是否有测试/来源支撑（CLAIM）。",
+    "不属于本轴：消费者必须看到的披露/标注/免责（DISC）。",
+    "不属于本轴：人格/肖像/AI 生成合法性（RIGHT）。",
+    "与 DISC 分界：删掉全部消费者可见文字后义务仍存在（版位/字段/品类/授权素材）→ CHAN；义务随之消失（要展示给消费者的披露）→ DISC",
+    "与 FACT 分界：同一事实用于决定投放准入 → CHAN；用于核查文章陈述是否准确 → FACT",
+    "与 BRAND 分界：结论是“平台拒登/下架”且由渠道元数据驱动 → CHAN；结论是“品牌不该这么说” → BRAND",
+    "与 RIGHT 分界：平台自有标识/榜单/平台 logo → CHAN；平台外第三方商标/标识 → RIGHT"
+   ],
+   "reviewer": "渠道运营（平台政策负责人）复核；分地区禁令由合规法务二次复核；平台标识/授权素材由对应平台账号管理员复核。",
+   "evidence_required": [
+    "必须给出：① 平台政策或法律条款原文（文档名 + 条款号 + 版本/生效日期）",
+    "② 本次广告的渠道元数据（platform、placement/format、target_region、product_category、asset_type、submission_field）",
+    "③ 品类禁令还需产品品类与目标地区的对应关系。缺①或②不得判 CHAN，落 UNKNOWN U7",
+    "泛化条款落 NOT_A_RULE。"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-3cbe7cca4fbd7b3f",
+    "why": "- 正文：Advertisers must not use unauthorized content that uses \"Amazon's Choice,\" \"Best Seller\" rankings, or altered Amazon logos. - 归属：CHAN primary。Amazon's Choice / Best Seller / Amazon logo 是**平台自有**标识/榜单/素材，使用许可由平台渠道政策决定；RIGHT RGT4 只收平台外第三方商标/标识。不得把同一条同时当 RIGHT 反例。 - 转轴条件：若是竞品 logo 改色做对比 → RIGHT RGT4；若排名/销量本身虚假 → CLAIM CLM3/FACT；若只是版位/格式限制 → CHAN CHN3。"
+   }
   },
-  "axes": [
-    {
-      "code": "CHAN",
-      "name": "渠道控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    },
-    {
-      "code": "RIGHT",
-      "name": "权利控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    },
-    {
-      "code": "SCENE",
-      "name": "场景控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    },
-    {
-      "code": "DISC",
-      "name": "披露控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    },
-    {
-      "code": "BRAND",
-      "name": "品牌控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    },
-    {
-      "code": "FACT",
-      "name": "事实控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    },
-    {
-      "code": "CLAIM",
-      "name": "宣称控制",
-      "one_line": null,
-      "criteria": [],
-      "reviewer": null,
-      "evidence_required": [],
-      "boundary_counterexample": {
-        "rule_id": null,
-        "why": null
-      }
-    }
-  ],
-  "decision_tree": [
-    { "step": 1, "axis": "CHAN", "hit_condition": null, "route_to": null },
-    { "step": 2, "axis": "RIGHT", "hit_condition": null, "route_to": null },
-    { "step": 3, "axis": "SCENE", "hit_condition": null, "route_to": null },
-    { "step": 4, "axis": "DISC", "hit_condition": null, "route_to": null },
-    { "step": 5, "axis": "BRAND", "hit_condition": null, "route_to": null },
-    { "step": 6, "axis": "FACT", "hit_condition": null, "route_to": null },
-    { "step": 7, "axis": "CLAIM", "hit_condition": null, "route_to": null }
-  ],
-  "orthogonal_fields": {
-    "rule_nature": {
-      "label": "rule_nature",
-      "values": [],
-      "expected_count": 5,
-      "note": null
-    },
-    "jurisdiction": {
-      "label": "jurisdiction",
-      "values": [],
-      "note": null
-    },
-    "severity": {
-      "label": "severity",
-      "derivation": null,
-      "note": null
-    },
-    "quality_tag": {
-      "label": "quality_tag",
-      "positioning": null,
-      "note": null
-    }
+  {
+   "code": "RIGHT",
+   "name": "RIGHT 权利控制",
+   "one_line": "RIGHT 审查“内容使用可识别真人、未成年人形象、AI 合成人物/事件、第三方商标/标识、自然人隐私信息时，授权链是否成立”。判定单元是（可识别主体、使用方式、授权/标识证据）三元组。RIGHT 只判授权链；不判推荐内容是否真实（CLAIM）、披露是否显著（DISC）、平台是否允许（CHAN）、动作是否安全（SCENE）。AI 标识的**存在性/显著性/位置**归 DISC；只有合成的是可识别真人/真实事件且未授权时，RIGHT 才作 primary。",
+   "criteria": [
+    "RGT1：内容使用可识别真人的姓名、肖像、声音或形象（专家、医生、用户、员工、达人）明示或暗示其推荐、使用或合作，且按证据要求完成核查后仍无可核验的授权证据 → 命中 RIGHT",
+    "RGT2：内容出现未成年人的可识别面部、身体、姓名、学校、住址、病历或联系方式（出镜或隐私暴露）；监护人同意不默认豁免，是否可豁免按适用法域与平台规则确认 → 命中 RIGHT",
+    "RGT3：内容含 AI 生成/深度合成的人像、声音或真实事件（换脸、声音克隆、虚拟人、生成式人物），可能使受众误认为真实人物/真实事件，且未按适用法域取得授权/标识；若合成对象不是可识别真人/真实事件，不命中 RIGHT，转 DISC DSC5 → 命中 RIGHT",
+    "RGT4：内容使用**平台外第三方**商标、logo、认证标志，存在未授权、篡改、仿冒或暗示背书。三类可判：① 相同/混淆性相似商标使用；② 对标识的篡改/去除；③ 明示或可逐字引用的背书陈述。暗示只保留可列举场景（并列展示 + 推荐语；竞品 logo + 本品胜出文案） → 命中 RIGHT",
+    "RGT5：内容披露自然人的隐私信息（联系方式、住址、身份证号、病历、健康数据、精确位置）且无本人或监护人同意 → 命中 RIGHT",
+    "RGT6：内容把 AI 合成人物当作真实用户/真实专家作证（虚拟人冒充真人证言），无论是否标识 → 命中 RIGHT",
+    "RGT7：授权状态查不到，但已向宣称方发起核验请求并留痕；请求未到期 → 不命中 RIGHT，返回 UNKNOWN（带 P0 标记）；请求到期仍无授权且规则为 P0 → 命中 RIGHT",
+    "RGT8：仅出现公开文献作者、政府机构名称、虚构角色、无署名的群体称谓（如“100+ experts”但无姓名/面部/声音） → 不命中 RIGHT；转 CLAIM CLM4",
+    "不属于本轴：泛指“医生推荐/专家推荐”但没有可识别真人 → CLAIM。",
+    "不属于本轴：推荐内容是否真实、是否有依据 → CLAIM。",
+    "不属于本轴：披露是否清晰、显著、及时 → DISC。",
+    "不属于本轴：平台准入、版位、素材规格、平台站内榜单标识 → CHAN。",
+    "与 CHAN 分界：平台站内使用平台榜单/标识 → CHAN；平台外未授权使用他人商标/标识 → RIGHT",
+    "与 SCENE 分界：争点是“使用这个孩子的形象要不要监护人同意/是否属于未成年人出镜” → RIGHT；争点是“孩子所处动作/环境是否安全” → SCENE；同时成立 RIGHT 先、SCENE 记 secondary",
+    "与 DISC 分界：合成的是可识别真人身份/事件 → RIGHT（标识是补救措施）；纯示意图/动画无可识别真人 → DISC（AI 标识义务）",
+    "与 CLAIM 分界：争“有没有授权用这个人的姓名/肖像” → RIGHT；争“推荐是否真实、有无依据” → CLAIM"
+   ],
+   "reviewer": "内容合规审查员初判；肖像、隐私、AI、未成年人条目必须由法务复核；P0 红线由合规负责人签字。",
+   "evidence_required": [
+    "判 RIGHT 必须给出：① 可识别主体（姓名/面部/声音/商标的具体位置与指向）",
+    "② 授权或同意证据（肖像/姓名使用授权书、监护人同意、AI 生成记录与工具链、商标授权）",
+    "③ 若判“无授权/未标识”，必须附核查记录（向谁核、何时核、核了什么）。②无法取得 → UNKNOWN，不是“默认无授权”",
+    "但 P0 规则在核验请求到期后仍无授权 → 判 RIGHT，不是 UNKNOWN。"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-f4fff9f83474d164",
+    "why": "- 正文：Recommended by IBCLCs and OB-GYNs / Recommended by 100+ experts；修订为：Every order includes free 1-on-1 IBCLC support—a service for your questions, not a product endorsement. Named experts need consent and COI disclosure. - 归属：CLAIM primary（CLM4：推荐是否存在、参与深度是否一致），DISC secondary（DSC3：COI/身份披露）。原文只有角色名，没有姓名/面部/声音，RGT1 不命中；RIGHT must_not 明确“泛指医生推荐 → CLAIM”。当前 JSON secondary=RIGHT，需回写为 DISC；只有出现具名专家/"
+   }
   },
-  "rule_examples": []
+  {
+   "code": "SCENE",
+   "name": "SCENE 场景控制",
+   "one_line": "SCENE 审查“内容所呈现（画面/视频/图文步骤）、演示或教导的物理动作与场景，按内容照做是否会伤害人”。判定单元是动作四元组（谁做、对谁做、在什么环境、用什么参数与约束）。只判动作及其参数是否越界，不判文字是否符合文献、也不判是否加了免责声明。可执行判据：**把内容里的数字与表述全部改对之后，动作仍然会造成或纵容身体伤害 → SCENE；改对数字或补一句警示即可消除风险 → FACT 或 DISC。**",
+   "criteria": [
+    "SCN1：内容以教程、示范、挑战或使用步骤的形式呈现一个可被模仿的物理动作，该动作可导致跌落、烫伤、窒息、溺水、中毒、触电、感染、碾压或交通事故之一；按伤害类型缺少标准约束清单中的任一项；且补齐标准约束后动作本身仍越界 → 命中 SCENE",
+    "SCN2：画面、视频或分步图示把未成年人/婴幼儿置于可预见的危险布置：独留车内、未使用安全座椅、无人看护的高处/成人胸前/床边、不安全睡姿、可触及热水/药品/小件/电器 → 命中 SCENE",
+    "SCN3：内容给出的产品使用参数确定越出安全边界（直接冰敷、明火或高温加热、超时/超档使用、尖锐部件未固定），而不是仅仅缺少参数说明 → 命中 SCENE",
+    "SCN4：内容把一个仅对特定人群禁忌的动作作为**无人群限定的普适推荐**，且修复必须改变推荐/删除动作（不是只补一句禁忌提示） → 命中 SCENE",
+    "SCN5：画面或步骤图示的场景布置本身构成风险（门栏未固定、婴儿与成人同床侧躺、安全座椅未约束、热源紧邻婴儿床） → 命中 SCENE",
+    "SCN6：内容以第一人称/近距离镜头演示危险动作，并配明确鼓励语（你也可以试试/一起来/挑战），且无警示标注 → 命中 SCENE；提高 severity",
+    "SCN7：规则是 P0 类别名规则（危险行为示范、儿童乘车安全/安全座椅/独留车内），即使规则正文没有具体动作/参数 → 命中 SCENE；无媒体 → NOT_APPLICABLE + 人工 P0 复核，不落 UNKNOWN",
+    "SCN8：动作保留，只增加温度/时长/部位/人群限制/警示/免责 → 不命中 SCENE；转 DISC DSC6",
+    "不属于本轴：文字、数字或指南立场与文献不符，但动作本身不危险 → FACT。",
+    "不属于本轴：动作本身合规，只缺警示语、参数说明、免责声明或风险提示 → DISC。",
+    "不属于本轴：平台对素材形式、版位、文件规格的限制 → CHAN。",
+    "不属于本轴：宣称有无依据、效果是否可证明 → CLAIM。",
+    "与 FACT 分界：把数字/表述改对后动作还危险吗？还危险 → SCENE；改对即解决 → FACT",
+    "与 DISC 分界：要改/删动作本身 → SCENE；动作保留、只补警示/参数/免责 → DISC",
+    "与 RIGHT 分界：争点是使用未成年人形象要不要同意 → RIGHT；争点是孩子所处动作/环境是否安全 → SCENE"
+   ],
+   "reviewer": "内容合规审查员初判；母婴/婴幼儿安全、产品使用类条目由产品安全负责人 + 医学顾问复核；P0 红线由合规负责人签字。",
+   "evidence_required": [
+    "判 SCENE 必须给出：① 具体动作/场景原文或素材时间点（谁、对谁、在什么环境、什么参数）",
+    "② 越界判断所依据的安全边界来源（产品说明书、AAP/ACOG/CPSC/EN 标准等，带版本或日期）",
+    "③ 伤害类型与触发条件。判“安全”同样要给边界依据",
+    "给不出 → UNKNOWN，不是通过。"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-4244b23b0f2d3cc4",
+    "why": "- 正文：侧躺喂奶，减少夜间起身；修订为：将侧躺喂奶（C 字形）调整为首要推荐，并补充“母乳喂养同床睡眠不会增加新生儿猝死综合征风险”。 - 归属：FACT primary（FCT1）。文本中的“同床睡眠不增加 SIDS 风险”是可核验事实命题，AAP 安全睡眠立场明确否定；没有画面演示时，SCENE 不成立。只有在素材实际演示婴儿与成人同床侧躺时，才 SCENE SCN5 primary。当前 JSON primary=SCENE，需回写为 FACT。 - 转轴条件：若有同床侧躺画面 → SCENE；若把 SIDS 句子删掉、只保留侧躺操作步骤 → SCENE SCN4/SCN5；若只改“侧躺”为“坐姿” → SCENE。"
+   }
+  },
+  {
+   "code": "DISC",
+   "name": "DISC 披露控制",
+   "one_line": "DISC 审查“必须出现的受众可见信息元素 X 是否出现、是否完整、是否以规定形式出现”。不审查 X 背后的主张是否真实、是否有依据，也不审查行为指导是否安全。判定分三步：① 指认 X（免责声明/限定条件/重大风险/利益关系/身份资质/法定标识），且 X 能被逐字写出；② 在最终受众可见载体（正文、图片、音频、视频、包装、落地页）上检查存在性与完整性；③ 若规则同时规定模态/位置/时长/字号/音量，再检查形式合规。",
+   "criteria": [
+    "DSC1：规则谓词是 include / disclose / accompany / label / mark / state / communicate（中文：需明确/应说明/必须标注/加注/提示/披露/告知），且宾语 X 是受众可见、可逐字写出的信息串；显式排除 RIGHT 已接管的 AI 深度合成标识/未成年人身份标识 → 命中 DISC",
+    "DSC2：规则允许 claim C 保留，但要求限定 Q 同时出现（Q = 免责声明、适用条件、地区差异、证据局限、个体差异），且 Q 可逐字写出；Q 的最小完整性 = 对象/条件/期限/风险/证据局限至少一项，且与 C 同载体、同语言、同显著度 → 命中 DISC；C 的证据问题记 secondary=CLAIM",
+    "DSC3：规则要求披露说话人与品牌之间的关系或身份：付费/赞助/雇佣/职务/股权/专家资质/利益冲突（COI） → 命中 DISC；关系真实性存疑时 secondary=CLAIM",
+    "DSC4：规则规定某个已被要求披露的信息的模态/位置/停留时长/字号/对比度/音量/语速；存在性与形式分开检查 → 命中 DISC；缺渲染素材 → NOT_APPLICABLE + 请求素材",
+    "DSC5：法规要求包装或素材上出现法定标识、logo、认证标记，且该品类在该渠道允许销售 → 命中 DISC",
+    "DSC6：内容作出明示或暗示的安全/健康表述，规则要求同时说明重大风险或局限，而规则并不禁止该表述本身 → 命中 DISC",
+    "DSC7：规则只要求向监管机构申报/备案（notify FDA、登记、提交材料），不产生任何受众可见信息元素 → 不命中 DISC；NOT_A_RULE/运营义务",
+    "DSC8：无法指认任何必须出现的受众信息元素 X，或去掉 X 后基础事实、行为指导、证据、语气、渠道问题仍然独立成立 → 不命中 DISC；按顺序落到下一轴",
+    "DSC9：DISC 与 BRAND/FACT/CLAIM 同时可命中，且 CHAN/RIGHT/SCENE 均未命中 → 归 DISC primary，其余轴记 secondary",
+    "DSC10：规则纠正的是临床行动阈值/就医时点（如“疼痛超过两周”→“持续不缓解”、“胎动 2 小时少于 6 次”） → 不命中 DISC；转 FACT FCT3 或 SCENE",
+    "不属于本轴：基础陈述本身不准确、不完整或过时（就医指征、剂量、时间窗、产检频率、胎动阈值）→ FACT。",
+    "不属于本轴：行为或操作指导本身不安全（热敷温度、深蹲禁忌、竖抱月龄、危险动作示范）→ SCENE。",
+    "不属于本轴：主张缺少 competent and reliable scientific evidence、效果百分比/销量/评分无出处 → CLAIM。",
+    "不属于本轴：单纯为证明数据真实性而要求标注参考文献 → CLAIM 的 substantiation；只有规则明确要求向受众说明证据局限或来源时才归 DISC。",
+    "与 SCENE 分界：去掉这条要求后，读者照做是否仍然安全、准确？否 → SCENE；是，只是少了一句法定/政策要求的告知 → DISC",
+    "与 BRAND 分界：补一条事实性披露（付费合作/利益关系/限定语）即可合规 → DISC；必须改写语气、情绪框架或品牌立场才合规 → BRAND",
+    "与 FACT 分界：缺陷是命题本身真假或是否适用于该地区 → FACT；命题为真但规则额外要求限定/免责/风险告知 → DISC",
+    "与 CHAN 分界：该品类/版位在该市场是否被允许 → CHAN；允许但素材必须带标识/免责/披露 → DISC",
+    "与 CLAIM 分界：问题是“主张有没有依据” → CLAIM；问题是“关系/身份/利益有没有告诉受众” → DISC；证据缺口触发 → CLAIM primary、DISC secondary"
+   ],
+   "reviewer": "规则治理 Owner 复核本轴归属与词表；US/FTC、EU、BR、CN 等辖区条款由对应法务/合规复核；DISC 与 SCENE/BRAND/CLAIM 的边界样本由两名标注员背靠背判定，不一致交 Owner 仲裁。",
+   "evidence_required": [
+    "判定成立至少要有四类证据：① 规则证据：rule_id、jurisdiction、rule_nature=disclosure/mandate，以及被触发条款的逐字原文",
+    "② 触发证据：内容中触发披露义务的原文/画面/音频（含时间码或坐标）",
+    "③ 缺失或形式证据：对 X 的存在性检查结果——未找到时须列出已检索的全部受众可见表面（正文全文、图片 OCR、音频转写、视频音轨与画面、包装/落地页）及检索串",
+    "形式不合格时须给出字号、对比度、停留时长、音量/语速等可复核读数",
+    "④ 关系/标识证据：付费合同、雇佣或职务记录、专家资质与 COI 声明、包装设计稿。否定结论必须满足“所有通道都采过且各自自证活着”：只查正文没查图片或音频，不得判“未披露”，只能落 UNKNOWN",
+    "肯定结论须给出披露文本在载体中的具体位置。"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-3055901e5877f981",
+    "why": "- 正文：命中「ibclc-recommended, recommended by 100+ experts；ob-gyn recommended」判定为违规；处理：核验身份、参与方式、程序设计依据与 COI 披露后再保留。 - 归属：拆两条。① 推荐是否存在、参与深度是否与表述一致 → CLAIM CLM4；② COI/身份披露 → DISC DSC3。原文只有角色名，没有可识别真人，RGT1 不命中，不记 RIGHT。 - 转轴条件：若出现具名专家/肖像/声音且无授权 → RIGHT RGT1；若推荐为真、只是 COI 未披露 → DISC；若推荐为假 → CLAIM。"
+   }
+  },
+  {
+   "code": "BRAND",
+   "name": "BRAND 品牌控制",
+   "one_line": "BRAND 管表达层：口号与价值主张、情绪与压力话术、品牌立场/口吻、竞品贬低是否损害品牌调性与品牌关系。判别式：**把文案中每个事实都改为真、每个对外断言都补足证据后，问题仍然存在（仍在制造焦虑、操纵紧迫、立场错位或贬损竞品）→ BRAND。** BRAND 不裁决事实真假（FACT）、证据是否充分（CLAIM）、法定披露是否齐全（DISC）、渠道/版位是否允许（CHAN）；竞品对比若缺陷是“没有数据/没有口径”，归 CLAIM，不因出现“碾压/秒杀”字样就归 BRAND；贬损措辞本身归 BRAND，缺数据记 CLAIM secondary。",
+   "criteria": [
+    "BRD0：纯口号/价值主张，不承载任何可核查的产品利益（comfort、care、love、your pace 等），且无产品属性指涉 → 命中 BRAND；若口号同时承载可核查产品利益（more milk、7 minutes、22% slimmer），拆出 CLAIM 原子",
+    "BRD1：把文案中每个事实改为真、每个对外断言补足证据后，内容仍制造/放大焦虑、羞耻、内疚或挫败感以驱动行为 → 命中 BRAND",
+    "BRD2：文案含紧迫/压力触发词（last chance、limited time、final hours、don't miss、act now、hurry、限时、最后机会、手慢无、不买后悔），且促销本身真实存在；缺陷是倒计时/最后机会的话术，不是条款缺失或价格虚假 → 命中 BRAND；缺条款 → DISC primary、BRAND secondary",
+    "BRD3：内容结尾或段落反复进行情绪安抚/负面渲染，超出事实陈述所需，反而强化读者焦虑 → 命中 BRAND",
+    "BRD4：文案事实成立，但立场/框架与品牌声明的价值主张或目标市场公共卫生立场冲突（如把配方奶与母乳并列为等价选项、使用奶粉公司营销口吻） → 命中 BRAND",
+    "BRD5：竞品对比使用贬损性/绝对化语言（碾压、秒杀、垃圾、完胜）；不要求“事实与证据层成立”作为前件 → 命中 BRAND；缺数据/缺口径 → CLAIM secondary",
+    "BRD6：唯一缺陷是错别字、语病、章节结构、术语规范、参考文献或配图，不改变语气/立场/情绪效果 → 不命中 BRAND；只打 quality_tag=EDITORIAL",
+    "BRD7：一条规则同时含品牌话术与功效承诺/事实错误，且两部分各有独立谓词 → 预处理阶段拆原子；每个原子只留一个 primary；≥2 个独立 secondaries → SPLIT_REQUIRED",
+    "BRD8：情绪强度/煽情度超出品牌语调基线（情绪词密度、感叹号、第二人称抒情句超过版本化 rubric 阈值） → 命中 BRAND；无 rubric → UNKNOWN 或仅 quality_tag",
+    "BRD9：既没有品牌语调规范，也没有同一内容线的既有审核基线/修订样例 → 不命中 BRAND；UNKNOWN（治理阻塞，不逐条硬判）",
+    "不属于本轴：事实是否属实/参数是否准确/知识是否正确 → FACT。",
+    "不属于本轴：对外断言是否有依据 → CLAIM。",
+    "不属于本轴：竞品对比缺数据/缺口径 → CLAIM（可记 secondary=BRAND）。",
+    "不属于本轴：法定披露/标注/免责/广告标识/活动条款/风险提示 → DISC。",
+    "与 FACT 分界：先做真实性替换：把每个事实改成真的，问题还在吗？还在（仍制造焦虑/立场错位/贬损）→ BRAND；不在（问题正是事实为假）→ FACT",
+    "与 CLAIM 分界：看缺陷是“没有证据/没有口径”还是“有证据但说法伤人/操纵”：前者 CLAIM；后者 BRAND",
+    "与 DISC 分界：缺活动条款/日期/免责/广告标识 → DISC；条款齐全但用倒计时制造压力 → BRAND"
+   ],
+   "reviewer": "品牌市场负责人 + 内容主编复核；母乳喂养/配方奶立场类加公共卫生或医学顾问；促销话术类由投放运营确认活动真实性（仅用于区分 BRAND/DISC/FACT，不改变主轴）。",
+   "evidence_required": [
+    "必须给出：① 品牌语调/价值主张规范（版本号）或目标市场公共卫生立场文件",
+    "若两者都没有，则至少要有同一内容线的既有审核基线/修订样例",
+    "② 完整上下文（至少前后段或整篇结尾，不能只取一句）",
+    "③ 促销类需活动真实条款（日期、折扣、库存）以区分真实紧迫与虚构紧迫",
+    "④ 竞品类需指明竞品与完整对比语境。①的规范与替代基线都缺时只能落 UNKNOWN 或 quality_tag=EDITORIAL，不得判 BRAND。"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-0823b2d08a7e4ec2",
+    "why": "- 正文：边界：无数据支撑的违法对比 / 贬低竞品；触发词：10x better, beats medela, 完胜, 秒杀, 碾压。 - 归属：拆两条。① 贬损性措辞（完胜/秒杀/碾压）→ BRAND BRD5，不要求“证据成立”前件；② 缺对比对象/条件/来源（10x better）→ CLAIM CLM2。若暂不拆，primary=BRAND、secondary=CLAIM；当前 secondary=BRAND 自指，需回写。 - 转轴条件：若有完整对比数据且措辞中性 → 通过；若数据齐全但仍用贬损词 → BRAND；若只缺数据、措辞中性 → CLAIM。"
+   }
+  },
+  {
+   "code": "FACT",
+   "name": "FACT 事实控制",
+   "one_line": "FACT 审查“内容中的事实性命题与可核验事实是否一致”，回答三个问题：这条知识是否正确、这个参数/功能是否与产品实际一致、这个使用场景是否有文件支持。只覆盖三类对象：(a) 母婴/健康/护理知识命题（生理、解剖、时间节点、剂量、操作步骤、发育里程碑、储存条件、用药安全等）；(b) 产品客观参数、功能与部件配置（是否具备某功能、mmHg、dB、档位、容量、续航、材质牌号/标准、部件数量、适配结构）；(c) 产品的实际使用场景事实（是否在医院/NICU 使用、有无临床使用文件）。认证/注册/等级/专家背书等资质宣称不在此列，归 CLAIM。判定算法固定四步：① 域判定（知识命题/产品客观事实/使用场景）→ ② 命题抽取（能否写成可判真假的谓词）→ ③ 来源比对（相反来源、规格不符、数值/单位/口径错误、分类/术语错误）→ ④ 先命中先归（与 CLAIM 同时命中时 FACT 优先，但 FACT 侧必须指得出具体矛盾来源或规格；指不出则让位 CLAIM 或落 UNKNOWN）。",
+   "criteria": [
+    "FCT1：命题 p 属于母婴/健康/护理知识域，且权威来源 s 明确满足以下三类之一：① s 给出相反数值区间（区间比较）；② s 逐字写出相反推荐/禁止；③ s 的适用人群/场景与 p 的适用人群/场景字段不同 → 命中 FACT；必须引用 s 的原文与版本/页码",
+    "FCT2：命题 p 描述产品客观配置（是否具备某功能、模式/档位、吸力 mmHg、噪声 dB、容量、续航、材质牌号/标准、部件数量、适配结构、是否有某部件），且 p 与目标型号最新规格书/说明书/实测记录/版本清单不一致；只判数值/布尔配置，不判“medical-grade/ultra-quiet/silent”等等级/形容词 → 命中 FACT；按规格书事实改写或删除功能表述",
+    "FCT3：p 含数值、单位、时间窗、频率、剂量、月龄或温度，且与权威来源的可接受区间不一致，或单位/分母/计时口径写错（mg vs mcg、ml vs oz、小时 vs 分钟；per-feed vs per-24h；rinse-off vs leave-on 的暴露时间）；临床行动阈值/就医时点也归本条件 → 命中 FACT；按正确数值与口径改写",
+    "FCT4：p 用错术语或把对象归入错误类别/场景（泌乳 vs 排乳、嗜睡 vs 睡眠、冰袋 vs 蓝冰、爽肤水归为冲洗型、FDA approved vs cleared/registered），且该混淆会改变某个可判真假谓词的真值；若只是命名习惯/可读性，不命中 FACT，转 EDITORIAL → 命中 FACT；统一术语或补适用边界",
+    "FCT5：p 断言产品在医院/NICU/临床场景被实际使用或被采用；需要正面反证：说明书/注册文件明确限定“仅限家庭使用、不用于临床”，或注册范围明确排除医院；仅“查无临床使用文件”不构成违规 → 命中 FACT；删除场景表述或补临床使用文件",
+    "FCT6：p 属于**非产品**知识域，以确定语气陈述因果关系/效果/机制；证据集中没有任何一级来源支持 p，且至少一篇同级来源明确否定 p → 命中 FACT（substantiation 子型）；补直接文献、降级为限定语或删除",
+    "FCT7：p 声称某具名指南作出某推荐/不推荐，而对照该指南原文（指南名、版本、条款/页码）并不存在该推荐；来源沉默不等于相反结论 → 命中 FACT（指南归属误引）；引用原文或删除归属",
+    "FCT8：知识指令缺少必要步骤/适用条件，导致读者无法执行或会误用；且权威指南把非产品处置 Z 列为一线，内容未提 Z → 命中 FACT（知识完整性/处置缺口）；必须指得出指南与 Z",
+    "FCT9：同一命题有两份同等级来源冲突，规则没有要求披露冲突，且审查员必须替读者选一个真相 → 不命中 FACT；UNKNOWN U1；若规则要求披露冲突/局限 → DISC DSC2",
+    "不属于本轴：广告绝对化与最高级用语（maximum/strongest/ultra-quiet/最静音/零噪音等）→ CLAIM，即使事实上不成立也不先用 FACT 处理。",
+    "不属于本轴：产品功效、效果、优越性、零风险、认证/注册/等级/专家背书等对外说服性断言 → CLAIM。",
+    "不属于本轴：品牌调性、口号、情感话术、促销紧迫感、竞品贬损语气 → BRAND。",
+    "不属于本轴：必须披露而未披露、免责/限定/证据局限缺失 → DISC。",
+    "与 BRAND 分界：先做真实性替换：把原句改成完全真实、可举证且中性的同义表述后，违规消失 → FACT/CLAIM；违规仍在（调性/情绪施压/紧迫感/口号框架/竞品贬损）→ BRAND",
+    "与 CLAIM 分界：问“修这句话要改事实，还是补证据？”只需对照权威指南/规格表/公开事实就能判对错 → FACT；命题本身可成立但拿不出相称证据 → CLAIM",
+    "与 DISC 分界：缺陷是命题本身真假/是否适用该地区 → FACT；命题为真但规则额外要求限定/免责/风险告知 → DISC",
+    "与 SCENE 分界：改数字/来源/事实表述 → FACT；改动作/人群限制/操作参数 → SCENE；两者都要改 → 拆条"
+   ],
+   "reviewer": "知识命题：IBCLC 或产科/儿科医师双人复核（涉及用药/成分时加药学审校）；产品参数、功能与使用场景：产品/工程负责人按目标型号规格书与临床使用文件复核；最终归属与签发：内容合规审查负责人。复核不一致即落 UNKNOWN，不硬判。",
+   "evidence_required": [
+    "判 FACT 违规必须同时给出四件套：(1) 被质疑的原句与所在位置（文档/段落/字段）",
+    "(2) 可援引来源原文摘录 + 版本/日期/页码或 URL——知识命题用指南/系统综述/权威教科书/监管文件，产品事实用目标型号最新规格书/说明书/实测记录/临床使用文件",
+    "(3) 一条显式比对，说明原句与来源如何矛盾或不符（数值、单位、时间窗、分类、功能配置、适用场景至少一项对得上）",
+    "(4) 受影响对象与范围（产品型号、市场/辖区、人群、版本）。缺 (2) 或 (3) 不得判 FACT",
+    "只有“我觉得不对”不构成证据。市场泛化表述（如档位/主流配置）需附抽样清单与日期",
+    "同一命题有两份同等级来源冲突时，降级为 UNKNOWN。"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-1ef6b9992d59744b",
+    "why": "- 正文：乳汁的出口在乳晕下方的输乳管；修订为：乳汁的出口在乳头。 - 归属：FACT primary。解剖学知识命题；权威解剖结论是乳汁出口在乳头，原句与可核验事实直接矛盾，与语气、商业动机无关。 - 转轴条件：若改成“W1 能模拟自然泌乳”而产品并无此功能 → FACT FCT2；若改成“W1 能提高奶量” → CLAIM CLM1；若只是“温柔呵护妈妈” → BRAND BRD0。"
+   }
+  },
+  {
+   "code": "CLAIM",
+   "name": "CLAIM 宣称控制",
+   "one_line": "CLAIM 审查对外宣称的证明责任而非内容真假：句子以品牌/产品/服务为主语，向消费者断言或暗示效果、性能、比较优势、资质等级、排名、专家背书或绝对化地位，且合规判定必须调取证据材料（测试报告、临床研究、认证文件、对比数据、授权与利益关系声明）才能完成时，归 CLAIM。判定固定三步：① 抽取断言强度（普通/强/绝对）与断言对象（本品/竞品/行业/人群）；② 核证据四匹配——存在性、主体匹配（本品/本型号/该人群）、口径匹配（终点/对照/样本/显著性/使用条件）、范围匹配（时间/市场/SKU/认证范围）；③ 任一不匹配即 CLAIM 违规，四项全匹配才通过。若缺陷无需调取任何证据材料、只需对照规格表/公开事实/科学共识即可判定，则按判定顺序先归 FACT（可在 secondary 记 CLAIM），不归 CLAIM。",
+   "criteria": [
+    "CLM1：句中（含标题、按钮、图片文字、口播）出现“本品/本成分/本服务能产生某生理、健康、行为或性能结果”的断言或等价暗示（more milk、reduce leakage、sleep better、7 minutes、pain-free、提升/改善/预防/促进）；结果本身未被一级来源明确否定；只接受可测量终点（数字、对照、量表、可复核测试），主观体验/情绪利益转 BRAND 除非给出可测量终点 → 命中 CLAIM",
+    "CLM2：句中出现与竞品、行业基线或自家旧款的比较（better than、vs、10x、22% slimmer、优于、完胜、秒杀、比同类），判定点是“对比对象 + 测试条件 + 数据来源是否写明且同口径” → 命中 CLAIM",
+    "CLM3：句中援引外部资质、等级、认证、奖项或排名（FDA approved/cleared、hospital grade、medical grade、获奖、#1、bestseller、top rated、销量第一），判定点是“该资质/排名对本品是否真实存在、范围与有效期是否覆盖”；**名称准确性（approved vs cleared/registered）不在本条件，归 FACT FCT4** → 命中 CLAIM",
+    "CLM4：句中出现专家、医生、IBCLC、机构、KOL 或“100+ experts”的推荐、调校或参与（recommended by、expert-tuned、ob-gyn recommended、专家推荐），判定点是“身份真实、确有推荐行为、参与深度与表述一致”；**COI 披露不在本条件，归 DISC DSC3**；没有可识别真人的泛称 → 仍归 CLM4，不归 RIGHT → 命中 CLAIM",
+    "CLM5：句中对本品使用 maximum、strongest、best、#1、唯一、100%、零风险、完全无声、never、every、fits all、永久等全称/最高级词描述产品利益、安全或适配，判定点是“是否有覆盖该词全部范围的证据”；该词必须指涉产品属性；无产品指涉的口号修辞 → BRAND BRD0 → 命中 CLAIM",
+    "CLM6：句子引用研究、文献、测试、百分比、样本量或统计显著性来支撑另一个断言（clinically proven、studies show、28% faster、statistically significant、A/B 测试），判定点是“研究能否外推到本品/该人群/真实使用条件、终点是否有临床意义、限定语是否保留”；直接证据 = 同产品、同人群、同终点、同使用条件的对照研究 → 命中 CLAIM",
+    "CLM7：句子把尚无直接证据、仅来自相关性/小样本/相邻产品/动物实验的结果写成已成立结论，或把“可能”写成产品终点；判定点是“证据强度是否匹配断言强度”；若规则只要求把局限写给受众 → DISC DSC2/DSC6 → 命中 CLAIM",
+    "CLM8：兜底，仅当以下全部成立：规则对象是面向消费者的品牌/产品宣称；规则要求取得/保留证据；FACT/DISC/RIGHT/CHAN 的条件均不命中；规则点名具体消费者断言对象；规则要求 {测试来源/对比口径/资质/专家证据} 之一 → 命中 CLAIM",
+    "CLM9：规则触发条件本身是“某宣称缺少 competent and reliable scientific evidence”，且规则义务是补证据/删除/降级断言 → 命中 CLAIM；若义务只是把证据缺口告诉受众，DISC 记 secondary（DSC2）",
+    "不属于本轴：只在陈述通用知识/指南结论，缺陷是内容过时、机制描述错误或与科学共识不符 → FACT。",
+    "不属于本轴：只是产品客观规格、材质牌号/标准、尺寸、容量、适用年龄写错，可对照规格表直接核实 → FACT。",
+    "不属于本轴：合规点是必须配免责声明、限定信息或显著披露 → DISC；免责声明不能反过来治愈无依据宣称。",
+    "不属于本轴：只是口号、情绪话术、价值主张，或对竞品作无可核查维度的贬损形容（puffery）→ BRAND。",
+    "与 FACT 分界：问“修这句话要改事实，还是补证据？”只需对照权威指南/规格表/公开事实就能判对错 → FACT；命题可成立但拿不出相称且范围匹配的证据 → CLAIM；同一句同时构成事实错误与证据不足 → FACT 先",
+    "与 BRAND 分界：用“是否有可测量终点/对照/数字/认证”判：点名了 → CLAIM；只有形容词/感受且无测量终点 → BRAND",
+    "与 DISC 分界：看规则要求的是“加披露”还是“有证据/降断言”：必须把免责声明、限定信息或结构/功能声明显著展示 → DISC；必须补证据、删除断言或降低断言强度 → CLAIM；证据缺口触发 → CLAIM primary、DISC secondary"
+   ],
+   "reviewer": "CLAIM 复核员（广告/法规合规背景）人工一审；CLM1/CLM6/CLM7（功效、研究引用、待验证宣称）另加医学或注册法规复核。证据原件由宣称方（品牌/客户）提供并在工单留档，审查员只核验存在性与匹配性，不代拟、不补写证据。`confidence=low` 的规则与所有 UNKNOWN 必须人工终审。",
+   "evidence_required": [
+    "分类判定先固定三样输入：规则原文、被审句、断言强度与对象标注",
+    "判违规须能指认一份可核验的证据材料并完成四匹配（存在/主体/口径/范围）。按宣称类型：① 功效与性能——competent and reliable scientific evidence，健康类须人体/受试者数据，对照或自身对照设计，统计显著且临床有意义的终点，完整报告（摘要不算），测试条件与真实使用一致",
+    "② 比较——对比对象、型号、测试条件、样本、数据来源与日期、同口径",
+    "③ 资质/等级——认证或注册文件（编号、签发机构、有效期、覆盖型号/SKU），名称准确（FDA cleared ≠ approved）",
+    "④ 排名/销量/评分——平台、类目、市场、时间窗、SKU 范围与统计方法",
+    "⑤ 专家/机构背书——身份与资质证明、实际推荐/参与证据、授权、参与深度与表述一致、利益关系披露"
+   ],
+   "boundary_counterexample": {
+    "rule_id": "r-039822ed5c8e3448",
+    "why": "- 正文：（禁用）自动识别最佳节奏、降低奶量焦虑、模拟宝宝饱腹反馈。 - 归属：拆两条。① 自动识别/模拟饱腹反馈是产品功能配置断言，W1 实为用户主动调节 + 保存程序 → FACT FCT2；② 降低奶量焦虑是产品带来的行为/心理结果 → CLAIM CLM1。当前 JSON primary=FACT、secondary=None，需补 secondary=CLAIM。 - 转轴条件：若 W1 真有闭环识别功能，缺的是“降低奶量焦虑”的效果证据 → CLAIM 主、FACT 次；若只做情绪安抚“更懂妈妈” → BRAND BRD1。"
+   }
+  }
+ ],
+ "decision_tree": [
+  {
+   "step": 1,
+   "axis": "CHAN",
+   "hit_condition": "渠道控制",
+   "route_to": "这条内容能不能在这个平台/地区/版位、以这种素材与提交形式投放？"
+  },
+  {
+   "step": 2,
+   "axis": "RIGHT",
+   "hit_condition": "权利控制",
+   "route_to": "使用这个真人、未成年人、AI 合成人物或第三方标识，授权链成立吗？"
+  },
+  {
+   "step": 3,
+   "axis": "SCENE",
+   "hit_condition": "场景控制",
+   "route_to": "内容演示/教导的动作与场景，受众照做会不会造成身体伤害？"
+  },
+  {
+   "step": 4,
+   "axis": "DISC",
+   "hit_condition": "披露控制",
+   "route_to": "必须让受众看到/听到的信息元素 X，说全了吗？以规定形式出现了吗？"
+  },
+  {
+   "step": 5,
+   "axis": "BRAND",
+   "hit_condition": "品牌控制",
+   "route_to": "即使事实全真、证据齐全，是否仍因调性、立场、情绪操纵或贬损竞品而不该这样说？"
+  },
+  {
+   "step": 6,
+   "axis": "FACT",
+   "hit_condition": "事实控制",
+   "route_to": "这句话说的知识、参数、功能、使用场景，与可核验事实一致吗？"
+  },
+  {
+   "step": 7,
+   "axis": "CLAIM",
+   "hit_condition": "宣称控制",
+   "route_to": "这条对外宣称，拿得出与断言强度相称、可核查且范围匹配的证据吗？"
+  }
+ ],
+ "orthogonal_fields": {
+  "rule_nature": {
+   "label": "rule_nature",
+   "values": [
+    "prohibition",
+    "mandate",
+    "disclosure",
+    "substantiation",
+    "recommendation"
+   ],
+   "expected_count": 5,
+   "positioning": "义务形态；正交字段，不决定主轴",
+   "note": "不可用 form 或 rule_kind 替代（仅 15.0% 重合）。"
+  },
+  "jurisdiction": {
+   "label": "jurisdiction",
+   "values": [
+    "GLOBAL",
+    "US",
+    "CA",
+    "EU",
+    "UK",
+    "CN",
+    "BR",
+    "AU",
+    "SG",
+    "AT",
+    "BH",
+    "PLATFORM",
+    "MULTI"
+   ],
+   "positioning": "适用法域/平台；决定用哪套标准",
+   "note": "源字段不可直接用：515 条空、123 条标 US 中 20 条实际不是 US。"
+  },
+  "severity": {
+   "label": "severity",
+   "values": [
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "L5"
+   ],
+   "positioning": "违反影响程度",
+   "derivation": "由 主轴 + rule_nature + 影响面推导",
+   "note": "不沿用 severity_raw；unknown 不得当低风险。"
+  },
+  "quality_tag": {
+   "label": "quality_tag",
+   "values": [
+    "TYPO",
+    "GRAMMAR",
+    "STRUCTURE",
+    "TERMINOLOGY",
+    "REFERENCE",
+    "IMAGE",
+    "FORMAT",
+    "READABILITY",
+    "LOCALIZATION"
+   ],
+   "positioning": "编辑质量标记；永不占 primary",
+   "note": "原表 27 条编辑规范由此承接。"
+  },
+  "topic": {
+   "label": "topic",
+   "values": [],
+   "positioning": "内容主题；只用于检索",
+   "note": "主题不是审查动作。"
+  }
+ },
+ "rule_examples": [
+  {
+   "rule_id": "r-1ef6b9992d59744b",
+   "axis": "FACT",
+   "reason": "FACT（FCT1） — - 正文：乳汁的出口在乳晕下方的输乳管；修订为：乳汁的出口在乳头。 - 归属：FACT primary。解剖学知识命题；权威解剖结论是乳汁出口在乳头，原句与可核验事实直接矛盾，与语气、商业动机无关。 - 转轴条件：若改成“W1 能模拟自然泌乳”而产品并无此功能 → FACT FCT2；若改成“W1 能提高奶量” → CLAIM CLM1；若只是“温柔呵护妈妈” → BRAND BRD0。"
+  },
+  {
+   "rule_id": "r-0f23a07001325fb8",
+   "axis": "FACT",
+   "reason": "FACT（FCT3） — - 正文：产后 6–8 周：建立稳定奶量的关键期；修订为：产后 2 周起。 - 归属：FACT primary。时间节点是可核验的量化知识；原文与权威口径不符。 - 转轴条件：若写成产品承诺“6–8 周见效”且无对照数据 → CLAIM CLM1；若只是“抓住黄金期”口号 → BRAND BRD0；若活动起止日期写错 → 仍是 FACT FCT3。"
+  },
+  {
+   "rule_id": "r-38f01299f58fc6e4",
+   "axis": "FACT",
+   "reason": "FACT（FCT2） — - 正文：部分吸奶器会在奶阵出现后自动切换模式；修订为：吸奶器均按固定时间切换模式。 - 归属：FACT primary。产品功能/设备配置命题；现有产品均按固定时间切换，没有能检测奶阵后切换的吸奶器。 - 转轴条件：若某型号确有该功能，但宣称“因此排空效率更高”而无自身对照数据 → CLAIM CLM1/CLM6；若只说“智能科技，懂你所需” → BRAND BRD0。"
+  },
+  {
+   "rule_id": "r-039822ed5c8e3448",
+   "axis": "FACT",
+   "reason": "FACT + CLAIM（拆分） — - 正文：（禁用）自动识别最佳节奏、降低奶量焦虑、模拟宝宝饱腹反馈。 - 归属：拆两条。① 自动识别/模拟饱腹反馈是产品功能配置断言，W1 实为用户主动调节 + 保存程序 → FACT FCT2；② 降低奶量焦虑是产品带来的行为/心理结果 → CLAIM CLM1。当前 JSON primary=FACT、secondary=None，需补 secondary=CLAIM。 - 转轴条件：若 W1 真有闭环识别功能，缺的是“降低奶量焦虑”的效果证据 → CLAIM 主、FACT 次；若只做情绪安抚“更懂妈妈” → BRAND BRD1。"
+  },
+  {
+   "rule_id": "r-c515e503185d5234",
+   "axis": "FACT",
+   "reason": "FACT + CLAIM（拆分） — - 正文：（替换含 more milk / mimics baby / faster letdown 的 W1 主文案）；修订为：Meet W1: 360° warmth and SoftPulse massage…up to 295 mmHg… - 归属：拆两条。① “mimics baby”是产品机制/配置断言 → FACT FCT2；② “more milk / faster letdown”是效果承诺，需 W1 自身对照数据 → CLAIM CLM1/CLM6。当前 JSON primary=FACT、secondary=FACT（自指），需改为 secondary=CLAIM。 - "
+  },
+  {
+   "rule_id": "r-99839b4c5e713fa0",
+   "axis": "FACT",
+   "reason": "CLAIM + FACT（拆分） — - 正文：Hospital-grade pump used in NICU / trusted in hospitals；修订为：无临床使用文件则删除医院/NICU 表述，改客观参数。 - 归属：拆两条。① “used in NICU / trusted in hospitals”是使用场景事实，需该型号临床使用文件 → FACT FCT5；② “hospital-grade”是等级/资质断言，需认证文件 → CLAIM CLM3。规则记录若必须保留一条，primary=CLAIM、secondary=FACT（不得写成 secondary=CLAIM 自指）。 - 转轴条件：若临床使用文件存"
+  },
+  {
+   "rule_id": "r-3055901e5877f981",
+   "axis": "DISC",
+   "reason": "CLAIM + DISC（拆分） — - 正文：命中「ibclc-recommended, recommended by 100+ experts；ob-gyn recommended」判定为违规；处理：核验身份、参与方式、程序设计依据与 COI 披露后再保留。 - 归属：拆两条。① 推荐是否存在、参与深度是否与表述一致 → CLAIM CLM4；② COI/身份披露 → DISC DSC3。原文只有角色名，没有可识别真人，RGT1 不命中，不记 RIGHT。 - 转轴条件：若出现具名专家/肖像/声音且无授权 → RIGHT RGT1；若推荐为真、只是 COI 未披露 → DISC；若推荐为假 → CLAIM。"
+  },
+  {
+   "rule_id": "r-206273d8caed900a",
+   "axis": "DISC",
+   "reason": "CLAIM + DISC（证据缺口触发） — - 正文：A claim that suggests a health-related benefit for which there isn't competent and reliable scientific evidence must clearly communicate the lack of scientific evidence. - 归属：CLAIM primary（断言缺 CRSE），DISC secondary（把证据缺口告知受众的形式，DSC2）。当前 JSON primary=DISC、secondary=CLAIM，需回写。 - 转轴条件：若规则要求的是取得证据/删"
+  },
+  {
+   "rule_id": "r-15a607c4457c8b55",
+   "axis": "FACT",
+   "reason": "FACT（FCT4） — - 正文：边界：FDA 表述错误（吸奶器为 cleared/registered，非 approved/certified）；触发词：FDA approved, FDA certified, FDA 认证, FDA 批准… - 归属：FACT primary。FDA approved vs cleared/registered 是名称/监管状态准确性，对照公开事实即可判定，符合 FCT4。CLM3 只判资质存在性/覆盖范围/有效期，不判名称准确性。当前 JSON primary=CLAIM，需回写。 - 转轴条件：若争议是“该认证对本品是否真实存在、覆盖哪些型号” → CLAIM CLM3；若"
+  },
+  {
+   "rule_id": "r-0823b2d08a7e4ec2",
+   "axis": "BRAND",
+   "reason": "BRAND + CLAIM（拆分） — - 正文：边界：无数据支撑的违法对比 / 贬低竞品；触发词：10x better, beats medela, 完胜, 秒杀, 碾压。 - 归属：拆两条。① 贬损性措辞（完胜/秒杀/碾压）→ BRAND BRD5，不要求“证据成立”前件；② 缺对比对象/条件/来源（10x better）→ CLAIM CLM2。若暂不拆，primary=BRAND、secondary=CLAIM；当前 secondary=BRAND 自指，需回写。 - 转轴条件：若有完整对比数据且措辞中性 → 通过；若数据齐全但仍用贬损词 → BRAND；若只缺数据、措辞中性 → CLAIM。"
+  },
+  {
+   "rule_id": "r-cbfa62aa397fc6ba",
+   "axis": "BRAND",
+   "reason": "BRAND + CLAIM（拆分） — - 正文：命中「don't miss；limited time」；处理：删除 more milk/增产催奶/催产素/长期奶量/裸奶阵排空承诺；faster let-down 在拿到 W1 自身对照数据前禁用；静音改客观参数；效果百分比/销量/评分需附来源与口径。 - 归属：按谓词拆：① 紧迫话术 → BRAND BRD2；② 奶量/奶阵/排空效果 → CLAIM CLM1/CLM6；③ 静音绝对化（whisper/silent/ultra-quiet）→ CLAIM CLM5；④ 百分比/销量/评分 → CLAIM CLM6；若规则要求活动日期/条款 → DISC DSC2。primary=B"
+  },
+  {
+   "rule_id": "r-4244b23b0f2d3cc4",
+   "axis": "SCENE",
+   "reason": "FACT（文本）/ SCENE（有画面） — - 正文：侧躺喂奶，减少夜间起身；修订为：将侧躺喂奶（C 字形）调整为首要推荐，并补充“母乳喂养同床睡眠不会增加新生儿猝死综合征风险”。 - 归属：FACT primary（FCT1）。文本中的“同床睡眠不增加 SIDS 风险”是可核验事实命题，AAP 安全睡眠立场明确否定；没有画面演示时，SCENE 不成立。只有在素材实际演示婴儿与成人同床侧躺时，才 SCENE SCN5 primary。当前 JSON primary=SCENE，需回写为 FACT。 - 转轴条件：若有同床侧躺画面 → SCENE；若把 SIDS 句子删掉、只保留侧躺操作步骤 → SCENE SCN4/SCN5；若只改“侧"
+  },
+  {
+   "rule_id": "r-bb3f463582e1fd37",
+   "axis": "DISC",
+   "reason": "DISC（DSC6） — - 正文：吸奶前可用温热毛巾或加热垫覆盖乳房约 5 分钟；修订为：补温度不可过高、避开乳头乳晕、疑似乳腺炎不要自行热敷。 - 归属：DISC primary。动作保留，只补温度/部位/禁忌；SCENE SCN8 明确排除“仅补参数/警示”。当前 JSON primary=SCENE，需回写为 DISC。 - 转轴条件：若判定“直接冰袋/高温加热”这个动作本身不可做、必须换方式 → SCENE SCN3；若温度数值写错 → FACT FCT3；若只缺一句“注意安全”且无具体参数 → DISC。"
+  },
+  {
+   "rule_id": "r-3cbe7cca4fbd7b3f",
+   "axis": "CHAN",
+   "reason": "CHAN（CHN4） — - 正文：Advertisers must not use unauthorized content that uses \"Amazon's Choice,\" \"Best Seller\" rankings, or altered Amazon logos. - 归属：CHAN primary。Amazon's Choice / Best Seller / Amazon logo 是**平台自有**标识/榜单/素材，使用许可由平台渠道政策决定；RIGHT RGT4 只收平台外第三方商标/标识。不得把同一条同时当 RIGHT 反例。 - 转轴条件：若是竞品 logo 改色做对比 → RIGHT R"
+  },
+  {
+   "rule_id": "r-6e212146ea9a1bcf",
+   "axis": "BRAND",
+   "reason": "BRAND（BRD4） — - 正文：Ad content must not discourage breastfeeding or encourage formula use as a substitution for breastfeeding. - 归属：BRAND primary。判定点是内容立场/框架（不得贬低母乳、不得把配方奶作为替代），即使来源是平台政策，也不改变主轴；平台来源只改 `jurisdiction=PLATFORM`。CHAN 只按渠道元数据判定，不纳入内容禁令。当前 JSON primary=CHAN，需回写为 BRAND。 - 转轴条件：若平台明确禁止婴配粉品类投放 → CHAN CHN2；"
+  },
+  {
+   "rule_id": "r-99e129bfc18ec018",
+   "axis": "BRAND",
+   "reason": "BRAND + CLAIM — - 正文：More Milk, Less Stress — pump more with Momcozy；修订为：Your body sets the pace…relaxation supports your natural let-down… - 归属：BRAND primary（BRD0 纯口号/价值主张），但 “More Milk / pump more” 承载可核查的奶量产出利益，记 CLAIM secondary（CLM1）。当前 JSON primary=BRAND、secondary=None，需补 secondary=CLAIM；同句的 `r-be4dd0bdcdd53082"
+  },
+  {
+   "rule_id": "r-48559eb5f5c8cf1f",
+   "axis": "DISC",
+   "reason": "DISC + BRAND — - 正文：Hurry, act now, don't miss this week's deal before it's gone；修订为：Member Days are live: 20% off sitewide with code BDMS20 through [dates]—the details, no countdown. - 归属：DISC primary（DSC2：活动条款/日期/折扣码缺失），BRAND secondary（BRD2：倒计时/最后机会话术）。当前 JSON secondary=DISC 自指，需回写为 BRAND。 - 转轴条件：若条款齐全、只剩倒计时话术 →"
+  },
+  {
+   "rule_id": "r-724b26ecb1dee9c4",
+   "axis": "FACT",
+   "reason": "NOT_A_RULE — - 正文：边界：客观功能/真实认证关键词（正面提示，不参与降级）；触发词：suction level, adjustable suction, BPA-free, FDA cleared, quiet mode… - 归属：NOT_A_RULE。这是白名单/触发词表，没有要求、禁令或处理动作；七轴没有可判违规的谓词。它只能作为词表配置，不能占 primary。当前 JSON primary=NOT_A_RULE、secondary=CLAIM，需将 secondary 置空。 - 转轴条件：若某个具体词被用于虚假宣称 → 按该宣称判 FACT/CLAIM；若词表被平台政策禁止 → CHAN；若"
+  },
+  {
+   "rule_id": "r-f4fff9f83474d164",
+   "axis": "RIGHT",
+   "reason": "CLAIM + DISC（不记 RIGHT） — - 正文：Recommended by IBCLCs and OB-GYNs / Recommended by 100+ experts；修订为：Every order includes free 1-on-1 IBCLC support—a service for your questions, not a product endorsement. Named experts need consent and COI disclosure. - 归属：CLAIM primary（CLM4：推荐是否存在、参与深度是否一致），DISC secondary（DSC3：COI/身份披露）。原文只有角"
+  },
+  {
+   "rule_id": "r-6430cde694cab5b7",
+   "axis": "RIGHT",
+   "reason": "RIGHT + DISC — - 正文：AI 深度合成内容未标识（PRD §7.3 一票否决项，命中即 BLOCK）。 - 归属：若合成的是可识别真人/真实事件 → RIGHT primary（RGT3），DISC secondary（DSC5：AI 标识的存在性/显著性）。若只是无可识别真人的 AI 动画/示意图 → DISC primary（AI 标识），RIGHT 不命中。 - 转轴条件：若合成人物冒充真实用户/专家证言 → RIGHT RGT6；若 AI 内容虚构产品功效 → CLAIM/FACT；若只是平台要求标注 AI → DISC/CHAN。 ---"
+  }
+ ]
 }
