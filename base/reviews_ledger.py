@@ -67,9 +67,14 @@ def _nonempty(value, name):
 
 
 class ReviewsLedger(object):
-    def __init__(self, lease_seconds=LEASE_SECONDS, clock=None):
+    def __init__(self, lease_seconds=LEASE_SECONDS, clock=None, outbox=None):
         self.lease_seconds = int(lease_seconds)
         self.clock = clock or time.time
+        # ★ 通知出口。默认 None = 不产生通知（现有断言一条不受影响）。
+        #   非 None 时必须是一个有 emit(event_id=, kind=, subject=) 的对象
+        #   （base/notifications.py 的 NotificationOutbox）。
+        #   ★ 这个模块里**只有 _event() 一处**会调它 —— 唯一出口，不许再散落。
+        self.outbox = outbox
         self._lock = threading.RLock()
         self._cases = {}
         self._drafts = {}
@@ -108,11 +113,22 @@ class ReviewsLedger(object):
             "primary_draft_id": case["primary_draft_id"],
         }
 
+    # 哪些事件会产生通知。**封闭集合** —— 不在表里的动作不通知（不是忘了）。
+    # 这张表与 notifications.EVENT_TYPE 的键必须一致，由 verify 断言。
+    NOTIFYING_KINDS = frozenset({"lease_released", "formal_submit"})
+
     def _event(self, kind, case, actor, now, **extra):
         rec = {"kind": kind, "case_id": case["case_id"], "actor": actor,
                "at": _iso(now), "version": case["version"]}
         rec.update(extra)
         self._events.append(rec)
+        # ★ 通知的唯一出口。所有 9 种 kind 都流经这里，
+        #   要加通知只改这张表，不许在别处再插一次（§2.5 同一个纪律）。
+        if self.outbox is not None and kind in self.NOTIFYING_KINDS:
+            # 去重键必须**稳定且唯一**：事件序号在追加前取，天然单调。
+            self.outbox.emit(
+                event_id="ledger:%s:%s:%d" % (kind, case["case_id"], len(self._events)),
+                kind=kind, subject=dict(rec), now=now)
 
     def get_case(self, case_id):
         with self._lock:
@@ -162,13 +178,19 @@ class ReviewsLedger(object):
             if case["lease_expires"] is None or now < case["lease_expires"]:
                 continue
             draft_id = self._save_lease_draft(case, now)
+            # ★ 先捕获原领取人，**再**置空 —— 否则通知就找不到"谁被释放了"。
+            #   这个顺序是被 verify 的 N-series 反向对照钉住的：
+            #   把这两行换回来，`released_assignee` 会变成 None，
+            #   outbox 解析不出收件人 → 未测，而不是静默少发一条。
+            released_assignee = case["assignee"]
             case["status"] = "released"
             case["assignee"] = None
             case["released_at"] = _iso(now)
             case["released_draft_id"] = draft_id
             case["version"] += 1
             self._event("lease_released", case, None, now,
-                        released_draft_id=draft_id)
+                        released_draft_id=draft_id,
+                        released_assignee=released_assignee)
             released.append(self._case_view(case))
         return released
 

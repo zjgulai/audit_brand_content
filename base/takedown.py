@@ -69,6 +69,14 @@ FAILED_ACTIONS = frozenset({"retry", "reassign", "waive"})
 # 回填必填
 EVIDENCE_REQUIRED = ("platform", "executed_by", "executed_at")
 
+# ★ 状态迁移 → 通知动作名。**封闭集合**：不在表里的迁移不产生通知。
+#   键必须同时出现在 notifications.EVENT_TYPE 里，由 verify_notifications 断言
+#   —— 两处各写一遍就会各自漂移，所以要有一条断言钉住它们相等。
+STATE_EVENT = {
+    "completed": "takedown_completed",
+    "failed": "takedown_failed",
+}
+
 # 取证方式：三选一（前两个是首选，截图是兜底）
 EVIDENCE_KINDS = frozenset({"receipt_id", "result_url", "screenshot"})
 
@@ -367,20 +375,49 @@ def new_task(*, task_id: str, case_id: str, platform: str, tenant: str,
 
 
 def transition(task: dict, new_state: str, *, action: str | None = None,
-               at: str | None = None) -> dict:
-    """迁移并留痕。返回新任务副本（不改入参）。"""
+               at: str | None = None, outbox=None) -> dict:
+    """迁移并留痕。返回新任务副本（不改入参）。
+
+    ★ `outbox` 可选：给了就在**迁移成功之后**报一次事件。
+      必须是事后 —— 迁移失败（非法迁移）时不产生通知，
+      否则群里会先收到「任务失败了」，然后才收到「其实没失败」。
+    """
     import copy
     t = copy.deepcopy(task)
     check_transition(t.get("state"), new_state, action=action)
     t["history"].append({"from": t["state"], "to": new_state, "action": action, "at": at})
+    old_state = t["state"]
     t["state"] = new_state
+    if outbox is not None:
+        kind = STATE_EVENT.get(new_state)
+        if kind is not None:
+            # ★ 去重键：任务 id + 迁移序号 + 新状态。
+            #   同一个任务可以 failed 多次（retry 后再 fail），
+            #   只拿 task_id 当键会把第二次失败吞掉。
+            outbox.emit(event_id="takedown:%s:%d:%s" % (
+                            t.get("task_id"), len(t["history"]), new_state),
+                        kind=kind, subject=dict(t), now=at)
     return t
 
 
 def complete(task: dict, evidence: dict, *, at: str | None = None,
-             repo_root: str | None = None) -> dict:
+             repo_root: str | None = None, outbox=None) -> dict:
     """完成任务。**证据不合格就不许完成** —— 这是 RL-9 的唯一执行点。"""
     ev = check_evidence(evidence, repo_root=repo_root)   # 先校验，再迁移
-    t = transition(task, "completed", at=at)
+    t = transition(task, "completed", at=at, outbox=outbox)
     t["evidence"] = ev
     return t
+
+
+def notify_created(task: dict, *, outbox, at: str | None = None) -> dict:
+    """
+    建任务时通知。**单独一个函数，不塞进 `new_task()`。**
+
+    ★ 为什么：`new_task()` 是纯构造函数，验证器拿它造样本用了几十次。
+      往里塞通知会让「造一个样本」变成「发一次通知」——
+      这正是 §2.4.4 那个病（跑一次自检，改掉了它要保护的东西）。
+    """
+    if outbox is not None:
+        outbox.emit(event_id="takedown:%s:created" % task.get("task_id"),
+                    kind="takedown_created", subject=dict(task), now=at)
+    return task

@@ -142,7 +142,8 @@ def main():
         rules=[{"rule_id": "R-1", "version": "rules-v1"}],
         control_points=[{"control_code": "H01", "judge_type": "literal"}],
         routing=[{"control_code": "H01", "owner": "dp3"}],
-        notifications=[{"notification_id": "n-1", "principal": "u_sub"}],
+        notifications=[{"notification_id": "n-1", "recipient": "u_sub",
+                        "type": "formal_submit", "unread": True}],
         metrics={"cases": 2},
         appeals=[], release_pending=[], takedown_tasks=[],
         signer_grants=[], takedown_grants=[], sessions=[],
@@ -209,6 +210,22 @@ def main():
                     cookie=sub, body=b"{}")
     report(st in (422, 501), "C4 /unclaim 写端点存在（实现后 422/占位 501）",
            "%s %r" % (st, body))
+
+
+    # C6 通知可见性：只能看到发给自己的（P0 回归 —— 曾经任何人都能拿到全部）
+    #
+    # ★ 这条断言的由来：过滤字段曾写成 `principal`，而记录里叫 `recipient`。
+    #   该字段恒不存在 → `None in (None, uid)` 恒真 → 全员可见。
+    #   正样本（自己拿得到）与负样本（别人拿不到）必须成对，
+    #   只有负样本的话，一个「全返回空」的实现也能过。
+    st, body = call(app, "GET", "/api/v1/notifications", cookie=sub)
+    mine = [n.get("notification_id") for n in (body or [])]
+    report(st == 200 and "n-1" in mine,
+           "C6 通知正样本：自己发的通知自己看得到", "%s %r" % (st, body))
+    st, body = call(app, "GET", "/api/v1/notifications", cookie=coord)
+    other = [n.get("notification_id") for n in (body or [])]
+    report(st == 200 and "n-1" not in other,
+           "C6 ★ 通知负样本：别人的通知看得到 = 越权", "%s %r" % (st, body))
 
     # C5 静态扫描：API 不 import/调用判定实现
     src = open(os.path.join(REPO_ROOT, "api", "review_api.py"),

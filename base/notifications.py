@@ -51,10 +51,14 @@ from typing import Any, Iterable, Sequence
 BJT = timezone(timedelta(hours=8))
 
 # ── 通知类型 ────────────────────────────────────────────
-TYPES = frozenset({"invalidation", "auto_rereview", "takedown"})
+TYPES = frozenset({"invalidation", "auto_rereview", "takedown",
+                   "lease_released", "formal_submit",
+                   "release_signed", "release_revoked"})
 
 # 只进 Web inbox、不许发飞书的类型
-INBOX_ONLY = frozenset({"invalidation", "auto_rereview"})
+INBOX_ONLY = frozenset({"invalidation", "auto_rereview",
+                        "lease_released", "formal_submit",
+                        "release_signed", "release_revoked"})
 
 # 走飞书的类型（下线任务催办）
 FEISHU_TYPES = frozenset({"takedown"})
@@ -328,3 +332,204 @@ def mark_acked(n: dict, at: str) -> dict:
     x["acked_at"] = at
     x["unread"] = False
     return x
+
+
+# ═══════════════════ ⑥ 事件出口（唯一的一处）═══════════════════
+#
+# ★ 这一节存在的理由，是「通知散落在各处」这个失败模式。
+#
+#   动作（claim 超时释放、复核提交、签发、下线任务流转）分散在三个模块里，
+#   如果每个动作自己拼通知对象、自己决定类型、自己去重，就会出现：
+#     · 同一件事在 A 处叫 invalidation、在 B 处叫 auto_rereview；
+#     · A 处去重了、B 处没有，于是重启后重复通知；
+#     · 新加一个动作时忘了通知，而没有任何东西会红。
+#
+#   所以：**动作只报告「发生了什么」，由这里决定「通知什么、发给谁、发几次」。**
+
+# 动作 → 通知类型。**纯映射，不查任何状态**，所以可以被直接断言。
+# 不在表里的动作 = 不该产生通知（不是「忘了」）。
+EVENT_TYPE = {
+    "lease_released": "lease_released",
+    "formal_submit": "formal_submit",
+    "release_signed": "release_signed",
+    "release_revoked": "release_revoked",
+    "takedown_created": "takedown",
+    "takedown_completed": "takedown",
+    "takedown_failed": "takedown",
+}
+
+
+def notification_for(kind: str) -> dict:
+    """
+    动作 → 通知类型 + 通道。**纯函数，可被断言，不碰任何状态。**
+
+    ★ 为什么单独拆出来：§2.4.7 的教训 —— 判据盖不住的那一跳，就是事故所在的那一跳。
+      映射写在 `emit()` 里面，就只能靠「跑一次动作看产生了什么」来验，
+      那验不了「表里每一条都映射正确」。
+    """
+    ntype = EVENT_TYPE.get(kind)
+    if ntype is None:
+        raise NotificationError(
+            "E_EVENT", f"动作 {kind!r} 没有对应的通知类型（不在 EVENT_TYPE 表里）")
+    return {"type": ntype, "channel": channel_for(ntype)}
+
+
+class NotificationOutbox:
+    """
+    **通知的唯一出口。** 动作发生 → 调用 `emit()` → 记录产生或明确拒绝。
+
+    三件事在这里一次做掉，调用点不再重复：
+
+      ① 类型映射（`notification_for`）
+      ② 去重（复用 `DedupLedger` 的 `claim_event`，键 = `event_id`）
+      ③ 落记录（内存列表；`path` 给了就一并持久化）
+
+    ★ `sender` 默认是 `None` —— **阶段一不真发飞书**。
+      只有 `takedown` 类型在给了 sender 时才会调用它；inbox 类型永远不会。
+      （这条由 `dispatch()` 保证，不是本类自己再实现一遍。）
+
+    ★ `resolve_recipients` 解析不出人时返回空列表 + `untested=True`。
+      **不许把「我不知道该发给谁」静默成「没有人需要知道」。**
+      两者的区别只有在这里记录才看得出来 —— 都没发出时，日志一模一样。
+    """
+
+    def __init__(self, *, dedup=None, sender=None, resolve_recipients=None,
+                 record_path=None):
+        self.dedup = dedup if dedup is not None else DedupLedger()
+        self.sender = sender
+        self.resolve = resolve_recipients or default_recipients
+        self.record_path = Path(record_path) if record_path else None
+        self.records: list[dict] = []
+        self.untested = False
+        self.untested_reason = ""
+        self._seq = 0
+
+    # ── 唯一入口 ──
+    def emit(self, *, event_id: str, kind: str, subject: dict | None = None,
+             now=None, **payload) -> dict:
+        """
+        产出一次通知。返回：
+
+          {"emitted": [...], "duplicate": bool, "untested": bool, "reason": str}
+
+        ★ `event_id` 是去重键，**必须由动作方给出且稳定** ——
+          拿 `time.time()` 或随机串当键，去重就是假的。
+        """
+        out = {"emitted": [], "duplicate": False,
+               "untested": False, "reason": ""}
+
+        # ① 类型映射：不认识的动作直接抛，不许静默跳过
+        spec = notification_for(kind)
+
+        # ② 去重
+        claim = self.dedup.claim_event(event_id)
+        if claim.get("untested"):
+            out["untested"] = True
+            out["reason"] = claim.get("reason", "")
+            self.untested = True
+            self.untested_reason = out["reason"]
+            return out
+        if not claim.get("send"):
+            out["duplicate"] = True
+            out["reason"] = claim.get("reason", "")
+            return out
+
+        # ③ 收件人
+        recipients = list(self.resolve(kind, subject or {}) or [])
+        if not recipients:
+            # ★ 事件已经认领（去重账本里记下了），但没发出去。
+            #   这是**未测**，不是「不需要发」。记账后返回，让调用方上报。
+            out["untested"] = True
+            out["reason"] = f"{kind}: 解析不出收件人（不是「没人需要知道」）"
+            self.untested = True
+            self.untested_reason = out["reason"]
+            return out
+
+        # ④ 建记录
+        for recipient in recipients:
+            self._seq += 1
+            n = new_notification(
+                notification_id=f"ntf-{event_id}-{self._seq}",
+                recipient=recipient,
+                ntype=spec["type"],
+                payload={"event_id": event_id, "kind": kind, **payload},
+                created_at=_iso(now),
+            )
+            self.records.append(n)
+            out["emitted"].append(n)
+
+        # ⑤ 通道：只有飞书类型会碰 sender，且 sender 为 None 时不当作错误
+        if spec["channel"] == "feishu" and self.sender is not None:
+            out["sent"] = self.sender(event_id, kind)
+
+        self._save()
+        return out
+
+    # ── 持久化（可选）──
+    def _save(self) -> None:
+        if self.record_path is None:
+            return
+        self.record_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.record_path.with_suffix(self.record_path.suffix + ".tmp")
+        tmp.write_text(json.dumps(self.records, ensure_ascii=False, indent=1),
+                       encoding="utf-8")
+        os.replace(tmp, self.record_path)
+
+    def snapshot(self) -> dict:
+        """读回现场。**未测要能报出来**，不能静默。"""
+        return {"count": len(self.records),
+                "untested": self.untested,
+                "untested_reason": self.untested_reason,
+                "records": list(self.records)}
+
+
+def _iso(ts) -> str | None:
+    if ts is None:
+        return None
+    if isinstance(ts, str):
+        return ts
+    if isinstance(ts, (int, float)):
+        return datetime.fromtimestamp(ts, BJT).isoformat()
+    return ts.isoformat()
+
+
+# ── 默认收件人解析 ─────────────────────────────────────
+#
+# ★ 只处理「手里真的有」的那几个。解析不出来的**返回空** ——
+#   由 emit() 记成未测。不要在这里猜一个默认收件人：
+#   猜错比空着坏，因为空着会被报出来，猜错不会。
+def default_recipients(kind: str, subject: dict) -> list[str]:
+    """
+    默认的收件人解析。**宁可返回空，不许猜。**
+
+    `subject` 是动作方给出的事实（案件/任务对象），不是查来的。
+    """
+    subj = subject or {}
+
+    if kind == "lease_released":
+        # 超时释放：通知**被释放的原领取人**。subject 必须带 released_assignee。
+        who = subj.get("released_assignee")
+        return [who] if isinstance(who, str) and who else []
+
+    if kind == "formal_submit":
+        # 复核提交：通知最终复核人。subject 必须带 final_reviewer_id。
+        who = subj.get("final_reviewer_id")
+        return [who] if isinstance(who, str) and who else []
+
+    if kind in ("release_signed", "release_revoked"):
+        # 签发/撤回：通知提交人（他知道结果）。
+        who = subj.get("submitter_id")
+        return [who] if isinstance(who, str) and who else []
+
+    if kind.startswith("takedown_"):
+        # 下线任务：负责人 + 复核人，去重保序。
+        out = []
+        for k in ("assignee", "reviewers"):
+            v = subj.get(k)
+            if isinstance(v, str) and v:
+                out.append(v)
+            elif isinstance(v, (list, tuple)):
+                out.extend(x for x in v if isinstance(x, str) and x)
+        return list(dict.fromkeys(out))
+
+    return []

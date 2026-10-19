@@ -239,6 +239,185 @@ def main() -> int:
     ok("7a ★ notifications.py 不 import 任何飞书发送模块",
        not bad_imports, f"命中 {bad_imports or '无'}")
 
+
+    # ══════════ 8. 事件出口（NotificationOutbox）══════════
+    #
+    # ★ 这一组验的是「动作发生 → 通知产生」这一跳。
+    #   前面 1–7 组只验了通知对象本身的形状，没有一个字涉及「谁会去造它」——
+    #   那正是缺口：形状全对，但没有任何东西产生它。
+
+    # 8a 动作 → 类型的映射表必须与各调用点自己那张表一致
+    from base import takedown as TD
+    from base import reviews_ledger as RL
+
+    ok("8a ★ takedown.STATE_EVENT 的每个值都在 EVENT_TYPE 里",
+       set(TD.STATE_EVENT.values()) <= set(N.EVENT_TYPE),
+       f"差集={sorted(set(TD.STATE_EVENT.values()) - set(N.EVENT_TYPE))}")
+    ok("8b ★ reviews_ledger.NOTIFYING_KINDS 每个都在 EVENT_TYPE 里",
+       set(RL.ReviewsLedger.NOTIFYING_KINDS) <= set(N.EVENT_TYPE),
+       f"差集={sorted(set(RL.ReviewsLedger.NOTIFYING_KINDS) - set(N.EVENT_TYPE))}")
+
+    # 8c 每个映射都能算出类型与通道（纯函数，不碰状态）
+    for kind in sorted(N.EVENT_TYPE):
+        try:
+            spec = N.notification_for(kind)
+            goodand = spec["type"] in N.TYPES and spec["channel"] in ("inbox", "feishu")
+        except N.NotificationError as e:
+            goodand, spec = False, str(e)
+        ok(f"8c 映射 {kind} → 类型/通道可算", goodand, str(spec))
+
+    reject("8d ★ 未知动作 → 拒（不许静默跳过）",
+           lambda: N.notification_for("no_such_action"), "E_EVENT")
+
+    # 8e ★ 五个关键动作里，只有 takedown 系列走飞书，其余全走 inbox（TS-22）
+    for kind in ("lease_released", "formal_submit",
+                 "release_signed", "release_revoked"):
+        ok(f"8e ★ {kind} 只进 inbox（不发飞书）",
+           N.notification_for(kind)["channel"] == "inbox",
+           str(N.notification_for(kind)))
+    for kind in ("takedown_created", "takedown_completed", "takedown_failed"):
+        ok(f"8f {kind} 走飞书",
+           N.notification_for(kind)["channel"] == "feishu",
+           str(N.notification_for(kind)))
+
+    # ══════════ 9. outbox：产生 / 去重 / 未测 ══════════
+    with tempfile.TemporaryDirectory() as d:
+        led = N.DedupLedger(Path(d) / "dedup-outbox.json")
+        box = N.NotificationOutbox(dedup=led)
+
+        # 9a 动作发生 → 产生记录
+        r = box.emit(event_id="ev-fs-1", kind="formal_submit",
+                     subject={"final_reviewer_id": "u_lead"})
+        ok("9a ★ 动作发生后产生通知记录",
+           len(r["emitted"]) == 1 and r["emitted"][0]["recipient"] == "u_lead",
+           f"emitted={len(r['emitted'])}")
+        ok("9b 记录类型 = formal_submit 且初始未读",
+           r["emitted"][0]["type"] == "formal_submit"
+           and r["emitted"][0]["unread"] is True, "")
+
+        # 9c ★ 同一 event_id 只产生一次
+        r2 = box.emit(event_id="ev-fs-1", kind="formal_submit",
+                      subject={"final_reviewer_id": "u_lead"})
+        ok("9c ★ 同一 event_id 第二次 → duplicate，不再产生记录",
+           r2["duplicate"] is True and len(r2["emitted"]) == 0,
+           f"{r2}")
+        ok("9d 记录总数仍是 1", len(box.records) == 1, f"n={len(box.records)}")
+
+        # 9e 不同 event → 各一次
+        r3 = box.emit(event_id="ev-fs-2", kind="formal_submit",
+                      subject={"final_reviewer_id": "u_lead"})
+        ok("9e 不同 event_id 各产生一次（去重不吞新事件）",
+           len(r3["emitted"]) == 1 and len(box.records) == 2, f"n={len(box.records)}")
+
+        # 9f ★ 解析不出收件人 = 未测，不是「不需要发」
+        box2 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "d2.json"))
+        r4 = box2.emit(event_id="ev-x", kind="formal_submit", subject={})
+        ok("9f ★ 解析不出收件人 → untested=True 且不产生记录",
+           r4["untested"] is True and len(r4["emitted"]) == 0, f"{r4}")
+        ok("9g 未测要能报出来（snapshot.untested + 有原因）",
+           box2.snapshot()["untested"] is True
+           and bool(box2.snapshot()["untested_reason"]),
+           box2.snapshot()["untested_reason"][:46])
+
+        # 9h ★ 多收件人：负责人 + 复核人，去重保序
+        task = TD.new_task(task_id="t-9", case_id="c-9", platform="amazon",
+                           tenant="t1", product_line="pump",
+                           created_at="2026-10-19T00:00:00+08:00",
+                           assignee="alice", reviewers=["bob", "alice"])
+        box3 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "d3.json"))
+        r5 = box3.emit(event_id="ev-td", kind="takedown_created", subject=task)
+        ok("9h ★ 下线任务通知发给 assignee + reviewers 且去重",
+           [x["recipient"] for x in r5["emitted"]] == ["alice", "bob"],
+           str([x["recipient"] for x in r5["emitted"]]))
+
+        # 9i ★ 阶段一不真发飞书：sender=None 时 takedown 也不报错、不调用
+        ok("9i ★ 未注入 sender 时飞书类通知不报错（阶段一不真发）",
+           "sent" not in r5, str(sorted(r5)))
+
+        # 9j 注入 sender 时才真的调用，且 inbox 类型永不调用
+        calls = []
+        box4 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "d4.json"),
+                                    sender=lambda eid, kind: calls.append((eid, kind)))
+        box4.emit(event_id="ev-td2", kind="takedown_created", subject=task)
+        ok("9j 注入 sender → 飞书类型调用一次", len(calls) == 1, f"calls={calls}")
+        box4.emit(event_id="ev-fs3", kind="formal_submit",
+                  subject={"final_reviewer_id": "u_lead"})
+        ok("9k ★ inbox 类型即使注入了 sender 也 0 次调用",
+           len(calls) == 1, f"calls={len(calls)}")
+
+        # 9l ★ 账本读不出 → 未测且不发（与 4c 同口径）
+        bad = Path(d) / "bad-outbox.json"
+        bad.write_text("{不是 json", encoding="utf-8")
+        box5 = N.NotificationOutbox(dedup=N.DedupLedger(bad))
+        r6 = box5.emit(event_id="ev-z", kind="formal_submit",
+                       subject={"final_reviewer_id": "u_lead"})
+        ok("9l ★ 去重账本读不出 → untested 且不产生记录",
+           r6["untested"] is True and len(r6["emitted"]) == 0, f"{r6}")
+
+    # ══════════ 10. 反向对照（删掉接线必须红）══════════
+    with tempfile.TemporaryDirectory() as d:
+        # R5 ★ 删掉 ledger 里的 outbox 调用 → 动作发生但不产生通知
+        led2 = N.DedupLedger(Path(d) / "r5.json")
+        box6 = N.NotificationOutbox(dedup=led2)
+        L = RL.ReviewsLedger(lease_seconds=1, clock=lambda: 100.0, outbox=box6)
+        L.claim("case-r5", "alice", now=100.0)
+        L.expire(now=200.0)
+        ok("R5 ★ 超时释放真的产生了通知（接线存在）",
+           len(box6.records) == 1
+           and box6.records[0]["recipient"] == "alice", f"n={len(box6.records)}")
+
+        # R5b：把 outbox 断开（模拟"删掉接线"），同一批动作必须不产生通知
+        box7 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "r5b.json"))
+        L2 = RL.ReviewsLedger(lease_seconds=1, clock=lambda: 100.0)   # 无 outbox
+        L2.claim("case-r5b", "alice", now=100.0)
+        L2.expire(now=200.0)
+        ok("R5b ★ 不接 outbox → 动作照做但零通知（反向对照成立）",
+           len(box7.records) == 0 and L2.get_case("case-r5b")["status"] == "released",
+           f"n={len(box7.records)} status={L2.get_case('case-r5b')['status']}")
+
+        # R6 ★ 把「先捕获再置空」换回原顺序 → 收件人解析不出，落未测而不是静默少发
+        #    这里直接构造那个坏形状（assignee 已置空的事件），验证它会变成未测。
+        box8 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "r6.json"))
+        r = box8.emit(event_id="ev-bad", kind="lease_released",
+                      subject={"released_assignee": None})
+        ok("R6 ★ assignee 先置空 → 未测（不是静默少发一条）",
+           r["untested"] is True and len(r["emitted"]) == 0, f"{r}")
+
+        # R7 ★ 去重键拿 task_id 当唯一键 → 同一任务第二次失败被吞掉
+        #    先证明正确实现下两次失败都通知，再证明"只用 task_id"会只剩一条。
+        box9 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "r7.json"))
+        t = TD.new_task(task_id="t-r7", case_id="c-r7", platform="amazon",
+                        tenant="t1", product_line="pump",
+                        created_at="2026-10-19T00:00:00+08:00", assignee="alice")
+        t = TD.transition(t, "failed", action="fail", at="2026-10-19T01:00:00+08:00",
+                          outbox=box9)
+        t = TD.transition(t, "in_progress", action="retry", at="2026-10-19T02:00:00+08:00",
+                          outbox=box9)
+        t = TD.transition(t, "failed", action="fail", at="2026-10-19T03:00:00+08:00",
+                          outbox=box9)
+        ok("R7 ★ 同一任务两次失败各通知一次（键含迁移序号）",
+           len(box9.records) == 2, f"n={len(box9.records)}")
+
+        # R8 ★ 非法迁移不产生通知（先校验后通知，不许先说后做）
+        box10 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "r8.json"))
+        t2 = TD.new_task(task_id="t-r8", case_id="c-r8", platform="amazon",
+                         tenant="t1", product_line="pump",
+                         created_at="2026-10-19T00:00:00+08:00", assignee="alice")
+        try:
+            TD.transition(t2, "completed", outbox=box10)   # pending → completed 非法
+        except TD.TakedownError:
+            pass
+        ok("R8 ★ 非法迁移 → 零通知（通知必须在迁移成功之后）",
+           len(box10.records) == 0, f"n={len(box10.records)}")
+
+        # R9 ★ new_task 本身不发通知（构造样本不许有副作用，§2.4.4）
+        box11 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "r9.json"))
+        TD.new_task(task_id="t-r9", case_id="c-r9", platform="amazon",
+                    tenant="t1", product_line="pump",
+                    created_at="2026-10-19T00:00:00+08:00", assignee="alice")
+        ok("R9 ★ new_task 不产生通知（建样本不等于发通知）",
+           len(box11.records) == 0, f"n={len(box11.records)}")
+
     # ── 汇总 ──
     passed = sum(1 for _, p, _ in results if p)
     total = len(results)

@@ -382,8 +382,13 @@ def create_app(*, session_store=None, repository=None, principals=None,
 
     @app.get("/api/v1/notifications")
     def notifications(principal=Depends(principal_dep)):
+        # ★ 字段名必须是 `recipient` —— `base/notifications.py` 产出的就是它。
+        #   这里曾经写成 `n.get("principal")`，而该字段**根本不存在**，
+        #   于是 `None in (None, uid)` 恒真：任何人登录都能拿到全部通知。
+        #   code=0、字段读得出、没有任何东西会红 —— 这正是 K-02 的形状。
+        #   回归断言在 tools/verify_review_api.py 的 C6。
         return [n for n in repo.notifications
-                if n.get("principal") in (None, principal.get("id"))]
+                if n.get("recipient") in (None, principal.get("id"))]
 
     @app.get("/api/v1/appeals")
     def appeals(principal=Depends(principal_dep)):
