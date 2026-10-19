@@ -576,6 +576,24 @@
       "criteria": "SEC-0-1 / SEC-4.3-1",
       "fixture": "{root}/tools/smoke_end_to_end.py",
       "command": "{venv} {root}/tools/smoke_end_to_end.py"
+    },
+    "51": {
+      "test_id": "acceptance-51",
+      "criteria": "丙 / L3-2 / SEC-8-4 / STOP-6",
+      "fixture": "{root}/tools/verify_case_watch.py",
+      "command": "{venv} {root}/tools/verify_case_watch.py"
+    },
+    "59": {
+      "test_id": "acceptance-59",
+      "criteria": "SEC-4.3.1-5",
+      "fixture": "{root}/tools/verify_report_consistency.py",
+      "command": "{venv} {root}/tools/verify_report_consistency.py"
+    },
+    "65": {
+      "test_id": "acceptance-65",
+      "criteria": "L3-4",
+      "fixture": "{root}/tools/verify_send_gateway.py",
+      "command": "{venv} {root}/tools/verify_send_gateway.py"
     }
   }
 }
