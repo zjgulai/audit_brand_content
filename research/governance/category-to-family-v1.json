@@ -1,0 +1,74 @@
+{
+ "schema_version": "category-to-family/v1",
+ "count": 11,
+ "source": "规则清单-P0-P3-按等级-20261016.xlsx / 所属类别（638 条规则）",
+ "note": "11 个一级分类逐条映射到七族；category 唯一、family ∈ 七族、无未归类；未改动 rules-v1.json。",
+ "categories": [
+  {
+   "category": "母婴知识内容准确性",
+   "family": "事实控制",
+   "rule_count": 401,
+   "reason": "判断母婴知识内容是否真实、准确；审查动作是核事实，不是核宣称措辞"
+  },
+  {
+   "category": "合规与受监管宣称",
+   "family": "宣称控制",
+   "rule_count": 78,
+   "reason": "判断这句话能不能说（医疗/绝对化/认证等受监管宣称）"
+  },
+  {
+   "category": "证据与实质证明",
+   "family": "事实控制",
+   "rule_count": 78,
+   "reason": "判断效果、数据、研究是否有证据支撑（这件事是不是真的）"
+  },
+  {
+   "category": "背书与披露透明",
+   "family": "披露控制",
+   "rule_count": 31,
+   "reason": "判断该披露的背书、利益关系、免责信息有没有说（该说的说了没有）"
+  },
+  {
+   "category": "平台与渠道政策",
+   "family": "渠道控制",
+   "rule_count": 20,
+   "reason": "判断平台或渠道是否允许该内容/形式（这个平台允许吗）"
+  },
+  {
+   "category": "商品信息与Listing准确性",
+   "family": "事实控制",
+   "rule_count": 13,
+   "reason": "判断商品参数、适配、功能描述是否准确"
+  },
+  {
+   "category": "品牌信任与声誉",
+   "family": "品牌控制",
+   "rule_count": 8,
+   "reason": "判断品牌调性与表达是否合适（这个调性对不对）"
+  },
+  {
+   "category": "推广与价格透明",
+   "family": "品牌控制",
+   "rule_count": 4,
+   "reason": "判断促销、折扣与价格表达是否透明；Playbook v0 将「推广与价格透明」归入品牌控制"
+  },
+  {
+   "category": "产品安全与高危使用场景",
+   "family": "场景控制",
+   "rule_count": 2,
+   "reason": "判断画面或使用场景这样做是否安全（画面这样做安不安全）"
+  },
+  {
+   "category": "权利、肖像、隐私与AI",
+   "family": "权利控制",
+   "rule_count": 2,
+   "reason": "判断能不能用这个人/这张脸/这类素材（授权与隐私）"
+  },
+  {
+   "category": "北美本地化与标签要求",
+   "family": "事实控制",
+   "rule_count": 1,
+   "reason": "判断标签与本地化法定要求是否满足；Playbook v0 将「北美本地化与标签要求」归入事实控制"
+  }
+ ]
+}

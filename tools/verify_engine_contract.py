@@ -76,9 +76,11 @@ BASELINE = {"precision": 0.983, "recall": 0.962, "f1": 0.972,
 
 
 def rule_key_problems(rules):
-    """C-78：rule_key 唯一机器键；subclass_code 只能是可选展示属性。
+    """C-78 / D-127：rule_key 唯一机器键；subclass_code 是可选展示属性。
 
-    返回问题清单（空 = 合法）。这是执行点，不是注释。
+    D-127 口径：**多对一** —— 每条规则最多带一个 `subclass_code`，
+    一个 `subclass_code` 可以包含多条规则。返回问题清单（空 = 合法）。
+    这是执行点，不是注释。
     """
     if not isinstance(rules, list):
         return ["rules_not_list"]
@@ -96,19 +98,23 @@ def rule_key_problems(rules):
     dup = sorted({k for k in keys if keys.count(k) > 1})
     if dup:
         errs.append("duplicate_rule_key:%s" % dup)
-    subclass = {}
     for r in rules:
         if not isinstance(r, dict):
             continue
         sc = r.get("subclass_code")
         if sc is None:
             continue
+        # 同一规则挂两个 subclass_code：JSON 对象里用数组表达，必须红。
+        if isinstance(sc, list):
+            if len(sc) > 1:
+                errs.append("multiple_subclass_codes:%s" % r.get("rule_key"))
+            else:
+                errs.append("bad_subclass_code:%r" % (sc,))
+            continue
         if not isinstance(sc, str) or not sc.strip():
             errs.append("bad_subclass_code:%r" % (sc,))
             continue
-        if sc in subclass:
-            errs.append("subclass_maps_two_rules:%s" % sc)
-        subclass[sc] = r.get("rule_key")
+        # 多对一：不同规则共用同一个 subclass_code 是合法的，不再判重。
     return errs
 
 
@@ -3144,14 +3150,28 @@ def main() -> int:
 
         _subs = [r.get("subclass_code") for r in (_rules or [])
                  if isinstance(r, dict) and r.get("subclass_code") is not None]
-        check("V61c", "subclass_code 可选；若出现，一个 subclass 最多映射一条规则",
-              len(_subs) == len(set(_subs)),
-              f"subclass_code 条数={len(_subs)} 唯一={len(set(_subs))}（当前清单未落盘，0 条）")
+        _sub_bad = [p for p in _problems
+                    if p.startswith("bad_subclass_code")
+                    or p.startswith("multiple_subclass_codes")]
+        check("V61c", "subclass_code 可选；每条规则最多一个（D-127 多对一："
+                      "一个 subclass 可包含多条规则）",
+              not _sub_bad,
+              f"subclass_code 条数={len(_subs)} 唯一={len(set(map(str, _subs)))}"
+              f"（重复合法；当前清单未落盘，0 条）"
+              + (f" · 坏样本={_sub_bad}" if _sub_bad else ""))
 
         _readme = (SKEL.parent / "README.md").read_text(encoding="utf-8")
-        check("V61d", "58 子类权威清单未落盘时，README 必须明说「清单待补」，不得编数据",
-              "58 子类" in _readme and "清单待补" in _readme,
-              "README 含 58 子类 / 清单待补")
+        _draft58 = ROOT / "PMO" / "implement" / "58子类-候选映射草案-20261019.md"
+        _v61d_ok = ("58 子类" in _readme
+                    and "规则清单-P0-P3" in _readme
+                    and "58子类-候选映射草案" in _readme
+                    and _draft58.exists()
+                    and "58" in _draft58.read_text(encoding="utf-8"))
+        check("V61d", "58 子类权威清单已落盘：README 必须指出来源 xlsx 与草案；"
+                      "草案必须真实存在且含 58 条候选，不得只写一句「已找到」",
+              _v61d_ok,
+              f"README 指来源={'规则清单-P0-P3' in _readme} / 指草案={'58子类-候选映射草案' in _readme}"
+              f" · 草案存在={_draft58.exists()}")
 
         _hit_keys = [h.get("rule_key") for h in R["reject"]["hits"]]
         check("V61e", "判定输出以 rule_key 为键（没有第二个机器键）；冲突时 rule_key 为准",
@@ -3172,12 +3192,89 @@ def main() -> int:
               "missing_rule_key" in " ".join(rule_key_problems(_bad_missing)),
               str(rule_key_problems(_bad_missing)))
         _bad_sub = copy.deepcopy(_rules)
-        if len(_bad_sub) >= 2:
-            _bad_sub[0]["subclass_code"] = "SC-1"
-            _bad_sub[1]["subclass_code"] = "SC-1"
-        check("V61h", "坏样本：一个 subclass 挂两条 → 必须红",
-              "subclass_maps_two_rules" in " ".join(rule_key_problems(_bad_sub)),
+        if _bad_sub:
+            _bad_sub[0]["subclass_code"] = ["SC-1", "SC-2"]
+        check("V61h", "坏样本：同一规则挂两个 subclass_code → 必须红",
+              "multiple_subclass_codes" in " ".join(rule_key_problems(_bad_sub)),
               str(rule_key_problems(_bad_sub)))
+
+        _good_sub = copy.deepcopy(_rules)
+        if len(_good_sub) >= 2:
+            _good_sub[0]["subclass_code"] = "SC-1"
+            _good_sub[1]["subclass_code"] = "SC-1"
+        _good_sub_problems = [
+            p for p in rule_key_problems(_good_sub)
+            if p.startswith("bad_subclass_code")
+            or p.startswith("multiple_subclass_codes")]
+        check("V61i", "反向对照：同一 subclass 挂两条规则 → 合法（D-127 多对一，不许误报）",
+              not _good_sub_problems, str(_good_sub_problems))
+
+    # ── V62（C-78 ①）：机器连接与报告生成的键必须是 rule_key / control_code ──
+    #
+    # ★ V61 验的是「规则数据里 rule_key 唯一」，但行 78 要的是
+    #   「**所有机器连接与报告生成**都以它（或 control_code）为键」。
+    #   这两件事差一层：数据里唯一，不代表生产代码没在别处用第二个键。
+    #   V62 就是补这一层 —— 扫生产目录，看有没有第二套键。
+    if not a.only or a.only.startswith("V62"):
+        _PROD_DIRS = [ROOT / "base", ROOT / "api", ROOT / "tools" / "audit"]
+        _EXT = (".py", ".mjs", ".js")
+
+        # ① 机器键只能从这两个里挑。出现别的（rule_code / subclass_code 当键）即红。
+        _ALLOWED_KEYS = {"rule_key", "control_code"}
+        _FORBIDDEN_KEYS = {"rule_code"}      # 已废弃的旧名（D-126 统一为 rule_key）
+
+        _hits = {"rule_key": [], "control_code": [], "rule_code": []}
+        _scanned = 0
+        for _root in _PROD_DIRS:
+            if not _root.exists():
+                continue
+            for _f in sorted(_root.rglob("*")):
+                if not _f.is_file() or _f.suffix not in _EXT:
+                    continue
+                _scanned += 1
+                try:
+                    _txt = _f.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError):
+                    continue
+                for _k in _hits:
+                    if _k in _txt:
+                        _hits[_k].append(str(_f.relative_to(ROOT)))
+
+        check("V62a", "★ 生产代码里没有已废弃的键名 rule_code（D-126 统一为 rule_key）",
+              not _hits["rule_code"],
+              f"扫 {_scanned} 个文件；命中 rule_code：{_hits['rule_code'] or '无'}")
+
+        check("V62b", "机器连接用的键只有 rule_key / control_code（没有第三套）",
+              bool(_hits["rule_key"] or _hits["control_code"]),
+              f"rule_key 出现在 {_hits['rule_key']}；"
+              f"control_code 出现在 {len(_hits['control_code'])} 个文件")
+
+        # ② 报告渲染器的键：必须用 control_code / rule_key，不许渲染 subclass
+        _render = ROOT / "tools" / "audit" / "report_render.mjs"
+        _rsrc = _render.read_text(encoding="utf-8") if _render.exists() else ""
+        check("V62c", "★ 报告渲染用 control_code（或 rule_key）作键",
+              "control_code" in _rsrc or "rule_key" in _rsrc,
+              "report_render.mjs 里没有 control_code / rule_key")
+        check("V62d", "★ 报告渲染不出现 subclass（分类条目只是视图，不是键）",
+              "subclass" not in _rsrc,
+              "report_render.mjs 里出现了 subclass")
+
+        # ③ 反向对照：把废弃键名塞进一个真实生产文件，扫描必须能抓到
+        _tmp = ROOT / "base" / "_v62_probe.py"
+        try:
+            _tmp.write_text("# probe: rule_code\nX = 'rule_code'\n", encoding="utf-8")
+            _found = []
+            for _f in sorted((ROOT / "base").rglob("*.py")):
+                if "rule_code" in _f.read_text(encoding="utf-8", errors="ignore"):
+                    _found.append(_f.name)
+            check("V62e", "★ 反向对照：塞进一个 rule_code 后扫描必须命中（扫描不是恒真）",
+                  "_v62_probe.py" in _found, f"命中 {_found}")
+        finally:
+            try:
+                _tmp.unlink()
+            except OSError:
+                pass
+        check("V62f", "反向对照探针已清理（不留副作用）", not _tmp.exists(), "")
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

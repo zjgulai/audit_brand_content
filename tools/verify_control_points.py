@@ -44,11 +44,13 @@ ROUTING = ROOT / "research" / "governance" / "routing-v1.json"
 HISTORY = ROOT / "research" / "governance" / "control-points-history.json"
 RULES = ROOT / "research" / "governance" / "skeleton" / "rules-v1.json"
 WHITELIST = ROOT / "research" / "governance" / "skeleton" / "whitelist-v1.json"
-#: 行 69 的 12 项一级分类 → 七族映射。**盘上当前没有这份清单，所以不创建空壳**。
+#: 行 69 的 11 项一级分类 → 七族映射（D-128：权威来源为
+#: `规则清单-P0-P3-按等级-20261016.xlsx` 的「所属类别」，11 个唯一值）。
 #: 文件存在时按下面的格式校验；不存在时 `--row 69` 退 2（未测），默认检查不把它当红。
 #: 格式：
-#:   {"schema_version": "category-to-family/v1", "count": 12,
-#:    "categories": [{"category": "<一级分类>", "family": "<cp.families 之一>"}, ...]}
+#:   {"schema_version": "category-to-family/v1", "count": 11,
+#:    "categories": [{"category": "<一级分类>", "family": "<cp.families 之一>",
+#:                    "reason": "<映射理由>"}, ...]}
 CATEGORY_MAP = ROOT / "research" / "governance" / "category-to-family-v1.json"
 
 #: 行 71 的首批真码：H01–H09 / M01–M07 / U01–U04。**由区间算出，不写 20 这个数字。**
@@ -57,7 +59,7 @@ FIRST_BATCH_CODES = tuple(
     + [f"M{i:02d}" for i in range(1, 8)]
     + [f"U{i:02d}" for i in range(1, 5)]
 )
-EXPECTED_CATEGORY_COUNT = 12
+EXPECTED_CATEGORY_COUNT = 11
 
 # Playbook §5.3.1 的九个字段（parent 允许为空值，但**字段必须存在**）
 REQUIRED_CP_FIELDS = (
@@ -528,7 +530,7 @@ def check_new_codes(cp, history, rules):
     return out
 
 
-# ───────── 行 69：七族骨架 / 12 项一级分类映射 ─────────
+# ───────── 行 69：七族骨架 / 11 项一级分类映射 ─────────
 
 def check_family_skeleton(cp):
     """行 69 的主表侧：七族存在、唯一、非空；空族也在族清单里。"""
@@ -570,7 +572,8 @@ def check_category_mapping(cp, mapping):
         return [_check("CAT-1", False,
                        "映射表必须是对象且含 categories 数组")]
     cats = mapping["categories"]
-    bad_struct, dup, bad_family = [], [], []
+    bad_struct, dup, bad_family, bad_reason = [], [], [], []
+    unclassified = []
     seen = set()
     for i, e in enumerate(cats):
         if not isinstance(e, dict):
@@ -585,8 +588,13 @@ def check_category_mapping(cp, mapping):
             seen.add(cat)
         if not isinstance(fam, str) or not fam.strip():
             bad_struct.append(f"#{i} family 为空")
+        elif fam in ("未归类", "其他"):
+            unclassified.append(f"{cat or i}->{fam}")
+            bad_family.append(f"{cat or i}->{fam}")
         elif fam not in families:
             bad_family.append(f"{cat or i}->{fam}")
+        if _blank(e.get("reason")):
+            bad_reason.append(cat or f"#{i}")
 
     declared = mapping.get("count")
     count_ok = (len(cats) == EXPECTED_CATEGORY_COUNT
@@ -602,6 +610,9 @@ def check_category_mapping(cp, mapping):
                "一级分类必须是 %d 项，且 count 字段若存在必须等于实际项数；"
                "实际 %d 项 / count=%r"
                % (EXPECTED_CATEGORY_COUNT, len(cats), declared)),
+        _check("CAT-5", not (unclassified or bad_reason),
+               f"不允许「未归类/其他」；每条必须写 reason。"
+               f"未归类 {unclassified or '无'}；缺理由 {bad_reason or '无'}"),
     ]
     return out
 
@@ -749,7 +760,7 @@ def check_first_batch(cp, rules, history, whitelist):
 # ─────────────────────────── 汇总 ───────────────────────────
 
 def evaluate(cp, rt, history=None, rules=None, require_history=False,
-             report=None, rows=(), category_map=None,
+             report=None, rows=(), category_map=None, category_map2=None,
              whitelist=None) -> dict:
     checks = []
     checks += check_control_points(cp)
@@ -763,6 +774,10 @@ def evaluate(cp, rt, history=None, rules=None, require_history=False,
     if 69 in rows:
         checks += check_family_skeleton(cp)
         checks += check_category_mapping(cp, category_map)
+        if category_map2 is not None:
+            checks.append(_check(
+                "CAT-6", category_map == category_map2,
+                "同一映射表连跑两次结果必须一致"))
     if 71 in rows:
         checks += check_first_batch(cp, rules, history, whitelist)
     reds = [c for c in checks if not c["ok"]]
@@ -1005,7 +1020,65 @@ def selftest(verbose: bool = False) -> int:
         "who": "产品+法务", "why": "跨族拆分批准", "evidence": ["README.md"]}
     expect("跨族拆分有批准", cp, rt, True, hist, rules)
 
-    # ⑱ 行 69/71 的纯函数断言（不依赖盘上是否存在 12 项清单）
+    # ⑰c C-70 正样本：改族 + 升版本 + 追加显式历史 → 绿；旧值仍可查。
+    cp, rt = _deep(cp0), _deep(rt0)
+    hist_new = _deep(hist)
+    cp["table_version"] = "test-v2"
+    cp["control_points"][0]["family"] = "F2"
+    cp["empty_families"] = [
+        {"family": f, "state": "无控制点", "reason": "test"}
+        for f in ("F1", "F3")
+    ]
+    hist_new["entries"].append({
+        "version": "test-v2", "at": "2026-10-19",
+        "who": "产品+法务", "why": "改族",
+        "evidence": ["README.md"],
+        "codes": [r["control_code"] for r in cp["control_points"]],
+        "family_by_code": {r["control_code"]: r["family"]
+                           for r in cp["control_points"]},
+    })
+    r_pos = evaluate(cp, rt, hist_new, rules)
+    results.append((
+        "改族+升版本+追加历史 → 绿",
+        r_pos["verdict"] == "ok",
+        f"红项={[c['id'] for c in r_pos['reds']]}"))
+    results.append((
+        "旧 history 仍保留旧 family 值",
+        hist_new["entries"][0]["family_by_code"].get("X01") == "F1",
+        repr(hist_new["entries"][0].get("family_by_code"))))
+    # 只升版本、不追加历史 → H-3 红（反向对照）
+    cp_v, rt_v = _deep(cp0), _deep(rt0)
+    cp_v["table_version"] = "test-v2"
+    r_v = evaluate(cp_v, rt_v, hist, rules)
+    results.append((
+        "只升版本不追加历史 → 红",
+        "H-3" in {c["id"] for c in r_v["reds"]},
+        f"红项={[c['id'] for c in r_v['reds']]}"))
+
+    # ⑰d C-76：U 前缀挂 F1 时按 family 字段走，不按首字母推断。
+    cp_p, rt_p = _deep(cp0), _deep(rt0)
+    hist_p, rules_p = _deep(hist), _deep(rules)
+    pref = dict(_deep(cp0["control_points"][0]))
+    pref.update({"control_code": "U99", "control_name": "prefix-u",
+                 "family": "F1", "status": "active", "version": "v1"})
+    cp_p["control_points"].append(pref)
+    rt_p["routes"].append({"control_code": "U99", "owner": "法务",
+                           "layer": "DP4", "due": "2d",
+                           "escalation": "项目统筹", "appeal": "receipt_id"})
+    rules_p["rules"].append({"parent_rule": "U99"})
+    cp_p["table_version"] = "test-v2"
+    hist_p["entries"].append({
+        "version": "test-v2", "at": "2026-10-19",
+        "who": "产品+法务", "why": "新增 U99",
+        "evidence": ["README.md"],
+        "codes": sorted(r["control_code"] for r in cp_p["control_points"]),
+        "family_by_code": {r["control_code"]: r["family"]
+                           for r in cp_p["control_points"]},
+    })
+    expect("U 前缀按 family=F1 走，不按首字母推断",
+           cp_p, rt_p, True, hist_p, rules_p)
+
+    # ⑱ 行 69/71 的纯函数断言（不依赖盘上是否存在 11 项清单）
     def red_ids(checks):
         return {c["id"] for c in checks if not c["ok"]}
 
@@ -1042,7 +1115,8 @@ def selftest(verbose: bool = False) -> int:
     good_cat = {"count": EXPECTED_CATEGORY_COUNT,
                 "categories": [
                     {"category": "C%02d" % i,
-                     "family": families7[i % len(families7)]}
+                     "family": families7[i % len(families7)],
+                     "reason": "test"}
                     for i in range(EXPECTED_CATEGORY_COUNT)
                 ]}
 
@@ -1064,12 +1138,16 @@ def selftest(verbose: bool = False) -> int:
     results.append(("行69 重复 category → CAT-2 红",
                     "CAT-2" in red_ids(check_category_mapping(batch_cp, dupcat)), ""))
     badfam = _deep(good_cat); badfam["categories"][0]["family"] = "未归类"
-    results.append(("行69 未归类族 → CAT-3 红",
-                    "CAT-3" in red_ids(check_category_mapping(batch_cp, badfam)), ""))
-    shortcat = _deep(good_cat); shortcat["categories"] = shortcat["categories"][:11]
-    shortcat["count"] = 12
-    results.append(("行69 只有 11 项 → CAT-4 红",
+    shortcat = _deep(good_cat); shortcat["categories"] = shortcat["categories"][:10]
+    shortcat["count"] = 11
+    results.append(("行69 只有 10 项 → CAT-4 红",
                     "CAT-4" in red_ids(check_category_mapping(batch_cp, shortcat)), ""))
+    noreason = _deep(good_cat); noreason["categories"][0].pop("reason")
+    results.append(("行69 缺 reason → CAT-5 红",
+                    "CAT-5" in red_ids(check_category_mapping(batch_cp, noreason)), ""))
+    unclassified = _deep(good_cat); unclassified["categories"][0]["family"] = "未归类"
+    results.append(("行69 未归类 → CAT-5 红",
+                    "CAT-5" in red_ids(check_category_mapping(batch_cp, unclassified)), ""))
 
     results.append(("行71 好样本",
                     red_ids(check_first_batch(batch_cp, batch_rules,
@@ -1172,17 +1250,20 @@ def main() -> int:
     if cp is None or rt is None:
         return untested("；".join(e for e in (err1, err2) if e))
 
-    category_map = None
+    category_map = category_map2 = None
     if args.row == 69:
         category_map, err6 = load(Path(args.category_map))
-        if category_map is None:
+        category_map2, err6b = load(Path(args.category_map))
+        if category_map is None or category_map2 is None:
             return untested(
-                "12 项一级分类清单未提供（%s 不存在或读不出：%s）；"
-                "本条保持 untested，不编造映射" % (args.category_map, err6))
+                "11 项一级分类清单未提供或读不出（%s：%s / %s）；"
+                "本条保持 untested，不编造映射"
+                % (args.category_map, err6, err6b))
     else:
         # 默认主检查：映射表存在就校验；不存在不造假，也不影响其它断言。
         if Path(args.category_map).exists():
             category_map, _err6 = load(Path(args.category_map))
+            category_map2, _err6b = load(Path(args.category_map))
     if args.row == 71:
         missing = []
         if hist is None:
@@ -1197,7 +1278,7 @@ def main() -> int:
     rows = (args.row,) if args.row else (69, 71)
     r = evaluate(cp, rt, hist, rules, require_history=True,
                  rows=rows, category_map=category_map,
-                 whitelist=whitelist)
+                 category_map2=category_map2, whitelist=whitelist)
 
     if args.json:
         print(json.dumps(r, ensure_ascii=False, indent=1))
@@ -1211,7 +1292,7 @@ def main() -> int:
     if args.row:
         print(f"  验收行 {args.row}")
     if args.row is None and category_map is None:
-        print("  ℹ 行 69：12 项一级分类清单未提供 —— 该行保持 untested（不造假）")
+        print("  ℹ 行 69：11 项一级分类清单未提供 —— 该行保持 untested（不造假）")
     print()
     for c in r["checks"]:
         print(f"  {'✓' if c['ok'] else '✗'} {c['id']:<7} {c['detail']}")
