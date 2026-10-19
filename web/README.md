@@ -75,6 +75,10 @@ VITE_REVIEW_API_BASE=https://example.com/review-api npm run build
 端口默认自动选空闲端口；也可用 `REVIEW_API_PORT` / `WEB_PORT` 指定。
 脚本只读：不调用任何写端点，不写仓库内文件。
 
+只想单独断言队列页是否渲染出某个案件时，可直接用
+`node scripts/check_queue_page.mjs --url http://127.0.0.1:5173/queue --cookie "$COOKIE" --expect case-smoke`；
+它用本机 Chrome CDP，不依赖 Playwright，失败退 1、Chrome 起不来退 2。
+
 开发代理：`vite.config.ts` 把 `/review-api` 代理到 `REVIEW_API_PROXY`（默认 `http://127.0.0.1:8010`），dev-up 会注入实际后端端口。
 重写规则：`/review-api/queue` 保持原样（后端联调别名），其余 `/review-api/*` 重写到 `/api/v1/*`（cases / reports 只读端点）。
 

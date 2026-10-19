@@ -64,6 +64,14 @@
 > 对 openai-whisper 先检查本地模型文件。工具缺失退 **2（未测）**，不是通过。
 > 样本与 gold 的交付要求见 [`PMO/implement/阶段3-gold样本需求.md`](../PMO/implement/阶段3-gold样本需求.md)。
 
+## 五、任务与联调入口
+
+| 工具 | 什么时候用它 | 产物 / 退出 |
+|---|---|---|
+| [`case_watch_tick.py`](./case_watch_tick.py) | C-51 转出后超时升级的执行点；scheduler 每次触发调一次。默认 **dry-run**，只有 `--apply` 才发通知/写台账；它自己不定时 | 台账/去重文件由参数指定；`--self-test` 自证；退 3 表示没跑起来 |
+| [`test_verify_acceptance_run.py`](./test_verify_acceptance_run.py) | 验收执行器 `verify_acceptance_run.py` 的自测（只读真实验收表，反向对照用临时表） | stdout；0 全过 / 1 有红 |
+| [`verify_api_integration.py`](./verify_api_integration.py) | API ↔ 落盘 IR 联调：smoke 链路产 IR，TestClient 挂 review-api，断言 decision/coverage/release_status 逐字段一致且 API 不重算 | 0 全过 / 1 有红 / 2 未测（缺 `httpx`/TestClient 时） |
+
 ---
 
 ## 这份索引自己也有执行点

@@ -58,6 +58,15 @@
    ]
   },
   {
+   "verifier": "tools/verify_api_integration.py",
+   "asserts": "API↔落盘 IR 联调：/review-api/queue 列出 smoke 案；GET /cases/{id} 的 decision/coverage/release_status 与落盘 IR 逐字段一致；IR 改哨兵值后 API 原样返回，证明 API 不重算",
+   "subjects": [
+    "api/review_api.py",
+    "tools/smoke_end_to_end.py",
+    "base/auth_session.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_assets_baseline.py",
    "asserts": "momcozy-assets 基线恒等：manifest 可解析 / files_count / 每条 entry 目标存在 / 内容 sha256 对得上",
    "subjects": [
@@ -96,6 +105,13 @@
     "tools/reply-cards/contract.md",
     "tools/reply-cards/README.md",
     "PMO/守衡-回复卡片模版与语域规程.md"
+   ]
+  },
+  {
+   "verifier": "tools/verify_case_watch.py",
+   "asserts": "C-51 转出后超时升级：空表报 weekends_only / 假日历跨假期；未到期·到期·超期三态；缺 due_at 且缺 transferred_at → 未测而非 not_due；终态不升级；同 due_at 去重只发一条通知与台账；NotificationOutbox 唯一出口；删守卫必红",
+   "subjects": [
+    "base/case_watch.py"
    ]
   },
   {
@@ -266,6 +282,13 @@
    ]
   },
   {
+   "verifier": "tools/verify_notifications.py",
+   "asserts": "TS-22/RL-13 通知契约：invalidation/auto_rereview → inbox、takedown → 飞书；文案只许「已投递/已读」；每日键与状态键独立；去重持久化重启不重复；四条反向对照必红",
+   "subjects": [
+    "base/notifications.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_open_items.py",
    "asserts": "未决项「等了多久、在等谁、沉默会发生什么」：每条 open 项带合法且非未来的 raised_at、带 owner 与 default_if_unanswered；未决项数 ≤ 棘轮",
    "subjects": [
@@ -330,12 +353,27 @@
    ]
   },
   {
+   "verifier": "tools/verify_release_gate.py",
+   "asserts": "T2-03/RL-1…RL-15 release_gate：pending_release→signed/rejected、signed→revoked/invalidated 状态机；签名绑定全字段；SoD；step-up 单次消费；五类失效与未使用 ref 不触发；重审 job 合并/继任/幂等；机器不可写 release_status；签名不可变",
+   "subjects": [
+    "base/release_gate.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_reply_context.py",
    "asserts": "回复上文：话题回复的 parent_id 有没有被真的读进来（A 纯函数 / B 接线含 feishu 取形状 / C 反向对照 / D 拿 2026-09-22 那次误答的真实事件做回归）",
    "subjects": [
     "tools/agent/thread.mjs",
     "tools/agent/agent.mjs",
     "tools/agent/feishu.mjs"
+   ]
+  },
+  {
+   "verifier": "tools/verify_report_consistency.py",
+   "asserts": "C-59 报告↔ReviewIR 独立对拍：真实 report_render 生成 md；验证器自己解析 finding_id/control_code/decision.state；三类错配必红；空文本/删 finding 行 → unparsable；ReportStore.publish 不一致时物理阻断（不落盘、不追加索引、不给 URL）",
+   "subjects": [
+    "base/report_store.py",
+    "tools/audit/report_render.mjs"
    ]
   },
   {
@@ -350,6 +388,22 @@
    "asserts": "report_store：report_id 内容寻址 / 静态对象 / 索引只追加 / ACL 无权限不给 URL / R1 / 从 IR 重建",
    "subjects": [
     "base/report_store.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_review_api.py",
+   "asserts": "T2-01 只读 API：OpenAPI 3.1；UIUX Appendix B 端点全覆盖；Pydantic 响应模型与 ReviewIR schema 对齐；无 session→401、越权→403、IT 读内容→403；/metrics 仅内部；状态只读落盘 IR 不计算；四条反向对照",
+   "subjects": [
+    "api/review_api.py",
+    "contracts/review-ir-v1.schema.json",
+    "PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md"
+   ]
+  },
+  {
+   "verifier": "tools/verify_reviews_ledger.py",
+   "asserts": "T2-02a 复核台账：claim 原子独占与重复拒绝；30 分钟 lease/心跳/版本冲突；draft 全字段快照且 autosave 不产 formal；adopt 派生且原稿不变；PASS/待自决/REVIEW/未审查四层抽样 + BLOCK 全量；五条反向对照",
+   "subjects": [
+    "base/reviews_ledger.py"
    ]
   },
   {
@@ -372,13 +426,6 @@
   {
    "verifier": "tools/verify_semantic_judge.py",
    "asserts": "semantic_judge：默认 candidate / C1–C4 与开关 / 5 类变异必须红（适配 449 行 semantic_settle）",
-   "subjects": [
-    "base/semantic_judge.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_semantic_judge_6d.py",
-   "asserts": "semantic_judge 的 6d 变体验收器：同一生产模块，保留与主检查器对照",
    "subjects": [
     "base/semantic_judge.py"
    ]
@@ -425,11 +472,29 @@
    ]
   },
   {
+   "verifier": "tools/verify_takedown.py",
+   "asserts": "RL-7/RL-8/RL-9/RL-13 下线任务：状态机与失败三处置；已发布才建/未发布 not_applicable；回填三必填+三选一+截图三项；waive 双人·scope·不自批·原签发人；每日键与事件键不许混；结构无 deadline 且指标无正常/未超时",
+   "subjects": [
+    "base/takedown.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_vocab_lark.py",
    "asserts": "词表飞书 ↔ 本地逐词一致（回读值，不是写入返回码）",
    "subjects": [
     "research/governance/skeleton/context-guards-v1.json",
     "research/governance/skeleton/whitelist-v1.json"
+   ]
+  },
+  {
+   "verifier": "tools/verify_write_api.py",
+   "asserts": "T2-02 写端点：claim/unclaim/reassign 接 reviews_ledger（409/403/Idempotency-Key）；actions 走 finding_store + derived_from；appeals 迁移权限；takedown 接 base/takedown；release-decision/revoke 501 占位不假成功；静态扫描不 import 判定实现；四条反向对照",
+   "subjects": [
+    "api/review_api.py",
+    "api/write_api.py",
+    "base/reviews_ledger.py",
+    "base/finding_store.py",
+    "base/takedown.py"
    ]
   }
  ]
