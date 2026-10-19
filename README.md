@@ -191,6 +191,8 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 - `PMO/implement/内容审查Agent-implement-阶段计划-v1.md`
 - `PMO/implement/阶段3-准备评估.md`
 - `PMO/implement/阶段3-gold样本需求.md`
+- `PMO/implement/58子类-候选映射草案-20261019.md`
+- `PMO/implement/阶段3-审查结论gold-评测说明-20261019.md`
 - `PMO/事故登记-ENV-001-4096污染-20261017.md`
 - `PMO/回话草稿-外部标准库-20260922.txt`
 - `PMO/守衡-四事闭环-归因优化验收-20260922.md`
