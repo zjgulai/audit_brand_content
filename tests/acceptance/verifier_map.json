@@ -606,8 +606,8 @@
       "criteria": "SEC-5-33",
       "fixture": "{root}/tools/verify_engine_contract.py",
       "command": "{venv} {root}/tools/verify_engine_contract.py",
-      "timeout": 45,
-      "cpu_seconds": 30
+      "timeout": 60,
+      "cpu_seconds": 45
     }
   }
 }

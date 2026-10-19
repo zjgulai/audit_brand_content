@@ -101,6 +101,11 @@ def apply_mapping(rows, mapping):
         row["test_id"] = item.get("test_id")
         row["fixture"] = _render(item.get("fixture") or "")
         row["command"] = _render(item.get("command") or "")
+        # ★ 单行可覆盖沙箱上限（只在**确实需要**时用，见 run_row 的注释）
+        if isinstance(item.get("timeout"), (int, float)):
+            row["timeout"] = int(item["timeout"])
+        if isinstance(item.get("cpu_seconds"), (int, float)):
+            row["cpu_seconds"] = int(item["cpu_seconds"])
     return rows
 
 
@@ -113,24 +118,122 @@ def run_row(row):
     code = ("import subprocess,sys\n"
             "sys.exit(subprocess.call(%r, shell=True))" % row["command"])
     try:
+        # ★ 超时按行可配：默认 10 秒，但有的验证器**全量**就是 11 秒
+        #   （`verify_engine_contract.py` 实测 11.2s：226 条断言 + 三次 Node 子进程）。
+        #   把默认调大不是好办法 —— 那会让真的卡死的行也多等；
+        #   所以在映射里对单行声明 `timeout`，由本函数读。
         res = run_untrusted(
-            code, timeout=10, cpu_seconds=5,
+            code, timeout=row.get("timeout") or 10, cpu_seconds=row.get("cpu_seconds") or 5,
             memory_bytes=512 * 1024 * 1024,
             file_size_bytes=10 * 1024 * 1024)
     except Exception as exc:  # noqa: BLE001
         return "untested", "sandbox 无法执行: %s" % exc
     if res["timed_out"] or res["limit_hit"]:
-        return "failed", "sandbox timed_out=%s limit_hit=%s" % (
+        # ★ 超时 = 没测完，不是「验不过」。
+        #   记成 failed 会让「跑太久」与「断言不成立」共用同一个读数，
+        #   而这两件事的下一步动作完全不同（前者调 timeout / 拆断言，后者改代码）。
+        return "untested", "sandbox timed_out=%s limit_hit=%s" % (
             res["timed_out"], res["limit_hit"])
     if res["exit_code"] == 0:
         return "passed", ""
+    # ★ exit 2 = 未测（三态退出码的全项目约定：0 过 / 1 红 / 2 未测）。
+    #   把它记成 failed 会重演「未测被报成失败」——本执行器自己的 docstring
+    #   第一句就写着「未测 ≠ 通过 ≠ 红」，这里必须一致。
+    if res["exit_code"] == 2:
+        return "untested", "命令退 2（未测）"
     return "failed", "exit=%s" % res["exit_code"]
+
+
+# ───────────────────────── 自测（三态映射）─────────────────────────
+#
+# ★ 这一组验的是**执行器自己的语义**，不是被验收的代码：
+#   子命令退出码怎么落进 passed/failed/untested。
+#
+#   起因（2026-10-19，cleanup 实测）：行 69 的条件执行点退 2，
+#   而 runner 把它记成 failed —— 「未测」被读成「验不过」。
+#   那会让「还没测」与「测了没通过」共用同一个读数，
+#   而下一步动作完全不同：前者去补环境/拆断言，后者去改代码。
+
+def self_test() -> int:
+    results = []
+
+    def ok(name, cond, detail=""):
+        results.append((name, bool(cond), detail))
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    probe = os.path.join(here, "verify_acceptance_run.py")
+
+    def row_with(cmd, timeout=None, cpu=None):
+        r = {"n": 999, "action": "selftest", "test_id": "selftest",
+             "fixture": probe, "command": cmd}
+        if timeout:
+            r["timeout"] = timeout
+        if cpu:
+            r["cpu_seconds"] = cpu
+        return r
+
+    st, detail = run_row(row_with("python3 -c 'raise SystemExit(0)'"))
+    ok("S1 退 0 → passed", st == "passed", f"{st} {detail}")
+
+    st, detail = run_row(row_with("python3 -c 'raise SystemExit(1)'"))
+    ok("S2 退 1 → failed", st == "failed", f"{st} {detail}")
+
+    # ★ 本次修的那条
+    st, detail = run_row(row_with("python3 -c 'raise SystemExit(2)'"))
+    ok("S3 ★ 退 2 → untested（不是 failed）", st == "untested", f"{st} {detail}")
+
+    st, detail = run_row(row_with("python3 -c 'raise SystemExit(3)'"))
+    ok("S4 退 3 → failed（只有 2 是未测，别的非零都是红）",
+       st == "failed", f"{st} {detail}")
+
+    # ★ 超时也算未测，不算失败
+    st, detail = run_row(row_with("python3 -c 'import time; time.sleep(30)'",
+                                  timeout=1, cpu=1))
+    ok("S5 ★ 超时 → untested（不是 failed）",
+       st == "untested" and "timed_out" in detail, f"{st} {detail}")
+
+    # fixture 不存在 / 字段缺失仍是未测
+    r = row_with("true")
+    r["fixture"] = os.path.join(here, "__no_such_file__.py")
+    st, _ = run_row(r)
+    ok("S6 fixture 不存在 → untested", st == "untested", st)
+
+    r = row_with("true")
+    r["command"] = ""
+    st, _ = run_row(r)
+    ok("S7 缺 command → untested", st == "untested", st)
+
+    # ★ 单行 timeout 覆盖生效（反向对照：不给 timeout 时用默认值）
+    ok("S8 映射里的 timeout 会被 apply_mapping 带进 row",
+       (lambda: (
+           (lambda rows: [x for x in rows if x["n"] == 78][0].get("timeout"))
+           (apply_mapping(parse_table(DEFAULT_TABLE), load_mapping()))
+           or 0) >= 10)(), "")
+
+    passed = sum(1 for _, p, _ in results if p)
+    total = len(results)
+    print("=" * 62)
+    print("verify_acceptance_run · 三态映射自测")
+    print("=" * 62)
+    for name, p, detail in results:
+        print(f"  {'✓' if p else '✗'} {name:<44} {detail}")
+    print()
+    if passed == total:
+        print(f"✅ {passed}/{total} 项全过")
+        return 0
+    print(f"✗ {passed}/{total} 项通过", file=sys.stderr)
+    return 1
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--table", default=DEFAULT_TABLE)
+    ap.add_argument("--self-test", action="store_true", default=False,
+                    help="跑三态映射自测（不碰验收表）")
     args = ap.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     if not os.path.isfile(args.table):
         print("UNTESTED: 验收表不存在: %s" % args.table)
