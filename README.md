@@ -189,6 +189,8 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 - `PMO/implement/T0-02-fetch-error-id-rule.md`
 - `PMO/implement/T0-03-claim-owner.md`
 - `PMO/implement/内容审查Agent-implement-阶段计划-v1.md`
+- `PMO/implement/阶段3-准备评估.md`
+- `PMO/implement/阶段3-gold样本需求.md`
 - `PMO/事故登记-ENV-001-4096污染-20261017.md`
 - `PMO/回话草稿-外部标准库-20260922.txt`
 - `PMO/守衡-四事闭环-归因优化验收-20260922.md`
@@ -198,6 +200,10 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 
 - `research/governance/control-points-README.md`
 - `research/topo/README.md`
+
+**Web 工作台**
+
+- `web/README.md`
 
 **资产包入口**
 

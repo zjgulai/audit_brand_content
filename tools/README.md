@@ -54,6 +54,16 @@
 | `agent/` | 守衡（飞书机器人）的运行时。**改这个目录要先读 `AGENTS.md` §2.5 / §2.7** | [`PMO/守衡-架构说明.md`](../PMO/守衡-架构说明.md) |
 | `reply-cards/` | 飞书卡片的模版、登记表与信封 | [`reply-cards/README.md`](./reply-cards/README.md) |
 
+## 四、benchmark / 评测
+
+| 工具 | 什么时候用它 | 需要什么 | 产物 |
+|---|---|---|---|
+| [`benchmark_media.py`](./benchmark_media.py) | 阶段 3 要跑 OCR/ASR 准确率，或先确认样本配对/gold 是否齐全时 | 样本按 `<id>.<媒体扩展名>` + `<id>.gold.txt` 命名；真实工具缺失时整模态记 untested | `--out` 指定 JSON（不指定则 stdout）；`--self-test` 不依赖任何真实工具 |
+
+> 这条工具**不安装、不下载**：ASR 侧对 faster-whisper 用 `local_files_only=True`，
+> 对 openai-whisper 先检查本地模型文件。工具缺失退 **2（未测）**，不是通过。
+> 样本与 gold 的交付要求见 [`PMO/implement/阶段3-gold样本需求.md`](../PMO/implement/阶段3-gold样本需求.md)。
+
 ---
 
 ## 这份索引自己也有执行点
