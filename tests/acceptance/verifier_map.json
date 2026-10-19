@@ -608,6 +608,30 @@
       "command": "{venv} {root}/tools/verify_engine_contract.py",
       "timeout": 60,
       "cpu_seconds": 45
+    },
+    "21": {
+      "test_id": "acceptance-21",
+      "criteria": "SEC-3.3.4-5 / SEC-3.3.4.4-1 / SEC-3.3.4.4-2 / SEC-3.3.4.4-3 / LOC-1 / LOC-2 / LOC-3 / LOC-4 / SEC-3.3.4.4-4 / L1-3",
+      "fixture": "{root}/tools/verify_normalizer.py",
+      "command": "{venv} {root}/tools/verify_normalizer.py"
+    },
+    "45": {
+      "test_id": "acceptance-45",
+      "criteria": "EQ-1",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py"
+    },
+    "46": {
+      "test_id": "acceptance-46",
+      "criteria": "L2-1a",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py"
+    },
+    "74": {
+      "test_id": "acceptance-74",
+      "criteria": "SEC-5-9",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
     }
   }
 }
