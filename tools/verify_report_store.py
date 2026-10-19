@@ -74,6 +74,16 @@ def render_bad_fp(x):
             % (x["ir_version"], "0" * 64))
 
 
+def render_forbidden(x):
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n"
+            "本次审批已通过，无需处理。\n" % (x["ir_version"], fp(x)))
+
+
+def render_ratio(x):
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n"
+            "本周审核通过率为 98%%。\n" % (x["ir_version"], fp(x)))
+
+
 def main():
     fails = []
     checks = 0
@@ -155,6 +165,27 @@ def main():
                     ("D2 指纹不符", render_bad_fp)):
         r = store.publish(ir(9, "Z"), fn, ACL)
         T(cid + " → 拒发布", r.get("ok") is False and r.get("url") is None, str(r))
+
+    # ── D3–D5 回执禁词闸：拒发布/拒重建，且不落盘、不进 index ─────
+    fs = ReportStore(os.path.join(TMP, "forbidden"), base_url)
+    files_before = os.listdir(os.path.join(fs.root, "reports"))
+    rf = fs.publish(ir(20, "F"), render_forbidden, ACL)
+    T("D3 回执禁词 → 拒发布 + code/detail/hits",
+      rf.get("ok") is False and rf.get("url") is None
+      and rf.get("code") == "receipt_forbidden_word"
+      and "receipt_forbidden_word" in (rf.get("detail") or "")
+      and {"已通过", "无需处理"} <= {h.get("word") for h in (rf.get("hits") or [])},
+      str(rf))
+    T("D4 禁词拒绝 → 无文件落盘、index 为空",
+      os.listdir(os.path.join(fs.root, "reports")) == files_before
+      and fs.read_index()["records"] == [], str(fs.read_index()))
+    rbf = fs.rebuild(ir(20, "F"), render_forbidden)
+    T("D5 rebuild 同样拒禁词",
+      rbf.get("ok") is False and rbf.get("code") == "receipt_forbidden_word", str(rbf))
+    rn = fs.publish(ir(21, "R"), render_ratio, ACL)
+    T("D6 负样本「通过率」正常发布",
+      rn.get("ok") is True and "通过率" in open(
+          os.path.join(fs.root, rn.get("path", "")), encoding="utf-8").read(), str(rn))
 
     # ── E ACL 回读 ─────────────────────────────────────────────────
     allowed = [("E1 提交人本人", P_SUB_OWN), ("E2 DP3 已指派同品线", P_DP3),

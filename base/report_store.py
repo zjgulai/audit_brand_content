@@ -36,9 +36,17 @@ import datetime
 import hashlib
 import json
 import os
+import sys
 import urllib.parse
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+try:
+    from base.send_gateway import FORBIDDEN_RECEIPT_WORDS
+except Exception:  # noqa: BLE001
+    from send_gateway import FORBIDDEN_RECEIPT_WORDS
 
 
 def _canonical(obj):
@@ -54,6 +62,24 @@ def _iso_now(now):
     if now is not None:
         return now
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _receipt_hits(text):
+    """回执禁词：与 send_gateway 共用同一编译正则，不复制词表。"""
+    hits = []
+    for m in FORBIDDEN_RECEIPT_WORDS.finditer(text):
+        hits.append({"word": m.group(0), "start": m.start(), "end": m.end()})
+    return hits
+
+
+def _receipt_error(hits):
+    return {
+        "ok": False, "url": None,
+        "detail": "receipt_forbidden_word: %s" % ", ".join(
+            "%s@[%d:%d]" % (h["word"], h["start"], h["end"]) for h in hits),
+        "code": "receipt_forbidden_word",
+        "hits": hits,
+    }
 
 
 def _ir_identity(ir):
@@ -208,6 +234,10 @@ class ReportStore(object):
             text = render_fn(ir)
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "url": None, "detail": "render_failed:%s" % type(e).__name__}
+        # 回执禁词闸：命中即拒，不写盘、不进 index。
+        hits = _receipt_hits(text)
+        if hits:
+            return _receipt_error(hits)
         # ★ R1 里的 `source_ir_version` 指的是报告里那一行；优先用 IR 的
         #   `source_ir_version` 字段（渲染器就是打印它），缺省才退回 ir_version。
         source_version = ir.get("source_ir_version") or version
@@ -289,6 +319,11 @@ class ReportStore(object):
             text = render_fn(ir)
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "detail": "render_failed:%s" % type(e).__name__}
+        hits = _receipt_hits(text)
+        if hits:
+            err = _receipt_error(hits)
+            return {"ok": False, "detail": err["detail"],
+                    "code": err["code"], "hits": err["hits"]}
         source_version = ir.get("source_ir_version") or version
         r1 = self._check_r1(text, source_version, fp)
         if r1 is not None:
