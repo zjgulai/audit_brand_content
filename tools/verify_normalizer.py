@@ -21,13 +21,16 @@
 退出码：0 全过 / 1 有红 / 2 未测（导入失败或验收器自身异常）。
 """
 
-import json
+import base64
 import copy
+import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
@@ -42,6 +45,48 @@ except Exception as exc:  # noqa: BLE001
 # ★ 独立字面量，不从 contract/normalizer 取值：后者可能互为别名（自比）。
 EXPECTED_PARSE_STATUSES = ("ok", "partial", "failed")
 EXPECTED_FAILURE_KINDS = ("fetch_error", "parse_error", "empty", "unsupported")
+
+
+def tiny_png() -> bytes:
+    """生成一张 1×1 RGBA PNG，供 frame_thumb 的「可解码」断言使用。"""
+    def chunk(tag, data):
+        return (struct.pack(">I", len(data)) + tag + data
+                + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+    raw = b"\x00\x00\x00\x00\x00"  # filter + 1 个 RGBA 像素
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+            + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
+
+
+def thumb_problems(ref: str) -> list:
+    """读取 frame_thumb 并检查图片魔数/结构；返回问题清单。"""
+    if not isinstance(ref, str) or not ref.strip():
+        return ["frame_thumb 不是非空字符串"]
+    try:
+        if ref.startswith("data:image/png;base64,"):
+            data = base64.b64decode(ref.split(",", 1)[1], validate=True)
+        else:
+            path = ref[5:] if ref.startswith("file:") else ref
+            if not os.path.isabs(path):
+                path = os.path.join(REPO_ROOT, path)
+            with open(path, "rb") as f:
+                data = f.read()
+    except Exception as exc:  # noqa: BLE001
+        return ["frame_thumb 读不到：%s" % exc]
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        if len(data) < 33 or data[12:16] != b"IHDR":
+            return ["frame_thumb PNG 缺 IHDR"]
+        w, h = struct.unpack(">II", data[16:24])
+        if w <= 0 or h <= 0:
+            return ["frame_thumb PNG 尺寸非法"]
+        if b"IEND" not in data[-32:]:
+            return ["frame_thumb PNG 缺 IEND"]
+        return []
+    if data.startswith(b"\xff\xd8") and data.rstrip().endswith(b"\xff\xd9"):
+        return []
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return []
+    return ["frame_thumb 不是可解码的 PNG/JPEG/WebP"]
 
 
 def free_raw(text="FDA approved wearable breast pump", uri="inline:test"):
@@ -71,8 +116,8 @@ def landing_raw(label="html"):
 
 def failed_modal_raws():
     """failed 空正文分支：每种模态都要真的走到 _build_empty。"""
-    loc = [{"kind": "image_region",
-            "bbox": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}}]
+    loc = [{"kind": "image_region", "image_id": "img-1",
+            "bbox": [0.1, 0.1, 0.3, 0.3]}]
     return {
         "ad_record": {"kind": "ad_record", "uri": "file:ad",
                       "record": {"Primary Text": "A", "Headline": "B"},
@@ -89,6 +134,11 @@ def failed_modal_raws():
 def main():
     passed = 0
     failed = 0
+    thumb_dir = tempfile.mkdtemp(prefix="normalizer-thumb-")
+    thumb_path = os.path.join(thumb_dir, "frame.png")
+    with open(thumb_path, "wb") as f:
+        f.write(tiny_png())
+    thumb_ref = "file:" + thumb_path
 
     def report(ok, name, detail=""):
         nonlocal passed, failed
@@ -164,6 +214,7 @@ def main():
             x.get("kind") == "text_span"
             and type(x.get("start")) is int and type(x.get("end")) is int
             and 0 <= x["start"] < x["end"] <= len(text)
+            and x.get("quote") == text[x["start"]:x["end"]]
             for x in unit["locations"])
 
     report(has_valid_text_spans(u_ad),
@@ -194,17 +245,39 @@ def main():
            "C2b-0b location schema 每个分支都有 required", "")
     report(all(b.get("properties", {}).get("kind", {}).get("const") for b in branches),
            "C2b-0c location schema 每个分支都声明 kind", "")
+    by_kind = {
+        b.get("properties", {}).get("kind", {}).get("const"): set(b.get("required") or [])
+        for b in branches
+    }
+    report(by_kind.get("text_span") == {"kind", "start", "end", "quote"},
+           "C2b-0d text_span required = kind/start/end/quote",
+           repr(by_kind.get("text_span")))
+    report(by_kind.get("image_region") == {"kind", "image_id", "bbox"},
+           "C2b-0e image_region required = kind/image_id/bbox",
+           repr(by_kind.get("image_region")))
+    report(by_kind.get("video_timecode") == {
+               "kind", "video_id", "time_start", "time_end",
+               "frame_no", "frame_thumb"},
+           "C2b-0f video_timecode required = 五字段 + video_id/frame_thumb（bbox 可缺省）",
+           repr(by_kind.get("video_timecode")))
+    bbox_def = (loc_schema.get("definitions") or {}).get("bbox") or {}
+    report(bbox_def.get("type") == "array" and bbox_def.get("minItems") == 4
+           and bbox_def.get("maxItems") == 4,
+           "C2b-0g bbox 定义为长度 4 的数组", repr(bbox_def))
 
     # 文本类：由 composition.parts 派生 text_span
     report(u.get("locations") and all(
                x["kind"] == "text_span"
                and isinstance(x.get("start"), int) and isinstance(x.get("end"), int)
                and 0 <= x["start"] < x["end"] <= len(u["text"])
+               and x.get("quote") == u["text"][x["start"]:x["end"]]
                for x in u["locations"]),
-           "C2b-1 文本 ContentUnit 自动派生 text_span（区间合法）", repr(u.get("locations")))
+           "C2b-1 文本 ContentUnit 自动派生 text_span（区间合法 + quote 等于切片）",
+           repr(u.get("locations")))
     # 图片：显式 image_region 原样进入 unit.locations
-    loc_img = [{"kind": "image_region", "frame_ref": "file:img",
-                "bbox": {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}}]
+    loc_img = [{"kind": "image_region", "image_id": "img-2",
+                "frame_ref": "file:img",
+                "bbox": [0.1, 0.2, 0.4, 0.6]}]
     u_img2 = N.normalize({
         "kind": "image", "raw": b"image-bytes", "text_from_media": "OCR 正文",
         "uri": "file:img2", "extractor": "ocr-v1", "locations": loc_img,
@@ -212,8 +285,9 @@ def main():
     report(u_img2.get("locations") == loc_img,
            "C2b-2 image_region 正样本原样落 ContentUnit.locations", repr(u_img2.get("locations")))
     # 视频：显式 video_timecode
-    loc_vid = [{"kind": "video_timecode", "time_start": 1.0, "time_end": 2.0,
-                "frame_no": 12, "bbox": {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}}]
+    loc_vid = [{"kind": "video_timecode", "video_id": "vid-1",
+                "time_start": 1.0, "time_end": 2.0, "frame_no": 12,
+                "frame_thumb": thumb_ref, "bbox": [0.0, 0.0, 1.0, 1.0]}]
     u_vid = N.normalize({
         "kind": "video", "raw": b"video-bytes", "text_from_media": "ASR 正文",
         "uri": "file:vid", "extractor": "asr-v1", "locations": loc_vid,
@@ -224,21 +298,40 @@ def main():
 
     # 负样本：缺字段 / 越界 / 未知 kind 必须拒
     bad_locations = [
-        ("text_span 缺 end", {"kind": "text_span", "start": 0}),
-        ("text_span 越界", {"kind": "text_span", "start": 0, "end": 99999}),
-        ("text_span 空区间", {"kind": "text_span", "start": 2, "end": 2}),
-        ("image bbox 缺 h", {"kind": "image_region", "bbox": {"x": 0, "y": 0, "w": 1}}),
-        ("image bbox 宽为 0", {"kind": "image_region", "bbox": {"x": 0, "y": 0, "w": 0, "h": 1}}),
-        ("video 缺 time_end", {"kind": "video_timecode", "time_start": 0,
-                               "frame_no": 1, "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}),
-        ("video start>=end", {"kind": "video_timecode", "time_start": 2, "time_end": 2,
-                              "frame_no": 1, "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}),
-        ("video 缺 frame_no", {"kind": "video_timecode", "time_start": 0, "time_end": 1,
-                               "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}),
-        ("video 缺 bbox", {"kind": "video_timecode", "time_start": 0, "time_end": 1,
-                           "frame_no": 1}),
+        ("text_span 缺 end", {"kind": "text_span", "start": 0, "quote": "a"}),
+        ("text_span quote 与切片不等",
+         {"kind": "text_span", "start": 0, "end": 1, "quote": "z"}),
+        ("text_span 越界", {"kind": "text_span", "start": 0, "end": 99999,
+                            "quote": "a"}),
+        ("text_span 空区间", {"kind": "text_span", "start": 2, "end": 2,
+                              "quote": "x"}),
+        ("image 缺 image_id", {"kind": "image_region", "bbox": [0, 0, 1, 1]}),
+        ("image bbox 长度 3", {"kind": "image_region", "image_id": "img",
+                               "bbox": [0, 0, 1]}),
+        ("image bbox 宽为 0", {"kind": "image_region", "image_id": "img",
+                               "bbox": [0, 0, 0, 1]}),
+        ("image bbox 绝对像素", {"kind": "image_region", "image_id": "img",
+                                 "bbox": [0, 0, 1280, 720]}),
+        ("video 缺 video_id", {"kind": "video_timecode", "time_start": 0,
+                               "time_end": 1, "frame_no": 1,
+                               "frame_thumb": thumb_ref}),
+        ("video 缺 frame_thumb", {"kind": "video_timecode", "video_id": "v",
+                                  "time_start": 0, "time_end": 1, "frame_no": 1}),
+        ("video 缺 time_end", {"kind": "video_timecode", "video_id": "v",
+                               "time_start": 0, "frame_no": 1,
+                               "frame_thumb": thumb_ref}),
+        ("video start>end", {"kind": "video_timecode", "video_id": "v",
+                             "time_start": 2, "time_end": 1, "frame_no": 1,
+                             "frame_thumb": thumb_ref}),
+        ("video 时间超精度", {"kind": "video_timecode", "video_id": "v",
+                              "time_start": 1.23, "time_end": 2.0, "frame_no": 12,
+                              "frame_thumb": thumb_ref}),
+        ("video 缺 frame_no", {"kind": "video_timecode", "video_id": "v",
+                               "time_start": 0, "time_end": 1,
+                               "frame_thumb": thumb_ref}),
         ("未知 kind", {"kind": "natural_language", "text": "约第 12 秒"}),
-        ("text_span 多字段", {"kind": "text_span", "start": 0, "end": 1, "extra": 1}),
+        ("text_span 多字段", {"kind": "text_span", "start": 0, "end": 1,
+                              "quote": "a", "extra": 1}),
     ]
     for name, loc in bad_locations:
         try:
@@ -278,32 +371,173 @@ def main():
            "C2b-8 validate_unit 对坏 location 返回错误", repr(N.validate_unit(bad_unit)))
 
     # C2b-9 直接调用 _location_problems：不依赖 normalize/contract 的前置拦截。
-    valid_loc = [{"kind": "text_span", "start": 0, "end": 1}]
+    valid_loc = [{"kind": "text_span", "start": 0, "end": 1, "quote": "a"}]
     report(N._location_problems("abc", valid_loc) == [],
            "C2b-9 直接调用 _location_problems：合法样本返回空",
            repr(N._location_problems("abc", valid_loc)))
     direct_bad_locations = [
         ("locations 非数组", "abc", "not-a-list"),
         ("元素非对象", "abc", ["x"]),
+        ("自然语言位置串", "abc", ["约第 12 秒，宝宝坐在副驾"]),
         ("未知 kind", "abc", [{"kind": "natural_language"}]),
-        ("text 越界", "abc", [{"kind": "text_span", "start": 0, "end": 99}]),
-        ("text 空区间", "abc", [{"kind": "text_span", "start": 2, "end": 2}]),
-        ("image bbox 缺 h", "", [
-            {"kind": "image_region", "bbox": {"x": 0, "y": 0, "w": 1}}]),
-        ("video start>=end", "", [
-            {"kind": "video_timecode", "time_start": 2, "time_end": 2,
-             "frame_no": 1, "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}]),
+        ("text 缺 quote", "abc", [{"kind": "text_span", "start": 0, "end": 1}]),
+        ("text quote 不等于切片", "abc", [
+            {"kind": "text_span", "start": 0, "end": 1, "quote": "z"}]),
+        ("text 越界", "abc", [
+            {"kind": "text_span", "start": 0, "end": 99, "quote": "a"}]),
+        ("text 空区间", "abc", [
+            {"kind": "text_span", "start": 2, "end": 2, "quote": "x"}]),
+        ("image bbox 长度 3", "", [
+            {"kind": "image_region", "image_id": "img", "bbox": [0, 0, 1]}]),
+        ("image bbox 旧对象", "", [
+            {"kind": "image_region", "image_id": "img",
+             "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}]),
+        ("video start>end", "", [
+            {"kind": "video_timecode", "video_id": "v", "time_start": 2,
+             "time_end": 1, "frame_no": 1, "frame_thumb": thumb_ref}]),
         ("video frame_no 负", "", [
-            {"kind": "video_timecode", "time_start": 0, "time_end": 1,
-             "frame_no": -1, "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}]),
+            {"kind": "video_timecode", "video_id": "v", "time_start": 0,
+             "time_end": 1, "frame_no": -1, "frame_thumb": thumb_ref}]),
+        ("video 缺 frame_thumb", "", [
+            {"kind": "video_timecode", "video_id": "v", "time_start": 0,
+             "time_end": 1, "frame_no": 1}]),
         ("text_span 多字段", "abc", [
-            {"kind": "text_span", "start": 0, "end": 1, "extra": 1}]),
+            {"kind": "text_span", "start": 0, "end": 1, "quote": "a",
+             "extra": 1}]),
     ]
     for name, text, locations in direct_bad_locations:
         problems = N._location_problems(text, locations)
         report(bool(problems),
                "C2b-9 直接调用 _location_problems：%s → 有问题" % name,
                repr(problems))
+
+    # C2c 验收行 21：三形态全字段、bbox 数组、frame_no 独立复算、thumb 可读
+    def video_raw(loc, sampling=None):
+        raw = {"kind": "video", "raw": b"video-bytes",
+               "text_from_media": "ASR 正文", "uri": "file:vid",
+               "extractor": "asr-v1", "locations": [loc],
+               "asr": {"text": "ASR 正文", "timecodes": [1.0, 2.0]}}
+        if sampling is not None:
+            raw["frame_sampling"] = sampling
+        return raw
+
+    def image_raw(loc):
+        return {"kind": "image", "raw": b"image-bytes",
+                "text_from_media": "正文", "uri": "file:img",
+                "extractor": "ocr-v1", "locations": [loc]}
+
+    # 文本：quote 必填且等于 origin[start:end]；缺 quote 由 normalizer 从切片补齐
+    text_auto = N.normalize(image_raw(
+        {"kind": "text_span", "start": 0, "end": 1}),
+        covers=["正文"], does_not_cover=["画面语义"])
+    report(text_auto["locations"] == [
+               {"kind": "text_span", "start": 0, "end": 1, "quote": "正"}],
+           "C2c-1 text_span 缺 quote → normalizer 按 start/end 补切片",
+           repr(text_auto["locations"]))
+
+    # 图片：image_id + bbox 数组；旧对象输入规范化成数组
+    img_legacy = N.normalize(image_raw(
+        {"kind": "image_region", "image_id": "img-3",
+         "bbox": {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}}),
+        covers=["正文"], does_not_cover=["画面语义"])
+    report(img_legacy["locations"] == [
+               {"kind": "image_region", "image_id": "img-3",
+                "bbox": [0.1, 0.2, 0.4, 0.6]}],
+           "C2c-2 image_region 旧对象 bbox → 规范数组 [x1,y1,x2,y2]",
+           repr(img_legacy["locations"]))
+    report(bool(N._location_problems("", [
+               {"kind": "image_region", "image_id": "img",
+                "bbox": [0.4, 0.2, 0.1, 0.6]}])),
+           "C2c-3 bbox 倒置（x1>=x2）→ 拒绝", "")
+
+    # 视频：五个必填字段；全画面允许 bbox 缺省
+    vid_full = N.normalize(video_raw(
+        {"kind": "video_timecode", "video_id": "v-1",
+         "time_start": 1.0, "time_end": 2.0, "frame_no": 12,
+         "frame_thumb": thumb_ref}),
+        covers=["字幕"], does_not_cover=["画面语义"])
+    report(vid_full["locations"][0].get("bbox") is None
+           and vid_full["locations"][0]["video_id"] == "v-1"
+           and vid_full["locations"][0]["frame_thumb"] == thumb_ref,
+           "C2c-4 video 全画面断言允许 bbox 缺省，五必填字段齐全",
+           repr(vid_full["locations"]))
+    vid_equal = N.normalize(video_raw(
+        {"kind": "video_timecode", "video_id": "v-2",
+         "time_start": 1.0, "time_end": 1.0, "frame_no": 0,
+         "frame_thumb": thumb_ref}),
+        covers=["字幕"], does_not_cover=["画面语义"])
+    report(vid_equal["locations"][0]["time_end"] == 1.0,
+           "C2c-5 time_end == time_start 允许（判据是 ≥）",
+           repr(vid_equal["locations"]))
+
+    # frame_no 独立复算：本地公式与 production helper 对拍，换参数读数同步变化
+    sampling = {"interval_seconds": 0.5, "offset_seconds": 0.0}
+    frame_ok = N.normalize(video_raw(
+        {"kind": "video_timecode", "video_id": "v-3",
+         "time_start": 12.0, "time_end": 12.5, "frame_no": 24,
+         "frame_thumb": thumb_ref}, sampling),
+        covers=["字幕"], does_not_cover=["画面语义"])
+    expected = int(round((12.0 - 0.0) / 0.5))
+    report(expected == 24 and N.frame_no_for(12.0, 0.0, 0.5) == expected
+           and frame_ok["locations"][0]["frame_no"] == expected,
+           "C2c-6 frame_no 独立复算 = round((time_start-offset)/interval)",
+           repr(frame_ok["locations"]))
+    try:
+        N.normalize(video_raw(
+            {"kind": "video_timecode", "video_id": "v-4",
+             "time_start": 12.0, "time_end": 12.5, "frame_no": 23,
+             "frame_thumb": thumb_ref}, sampling),
+            covers=["字幕"], does_not_cover=["画面语义"])
+        frame_mismatch = False
+    except ValueError:
+        frame_mismatch = True
+    report(frame_mismatch,
+           "C2c-7 frame_no 与抽帧参数不一致 → 拒绝", "")
+    sampling2 = {"interval_seconds": 0.25, "offset_seconds": 0.0}
+    frame_ok2 = N.normalize(video_raw(
+        {"kind": "video_timecode", "video_id": "v-5",
+         "time_start": 12.0, "time_end": 12.5, "frame_no": 48,
+         "frame_thumb": thumb_ref}, sampling2),
+        covers=["字幕"], does_not_cover=["画面语义"])
+    report(frame_ok2["locations"][0]["frame_no"] == 48,
+           "C2c-8 换抽帧间隔 → frame_no 同步变化（24→48）",
+           repr(frame_ok2["locations"]))
+    try:
+        N.normalize(video_raw(
+            {"kind": "video_timecode", "video_id": "v-6",
+             "time_start": 1.0, "time_end": 2.0, "frame_no": 1,
+             "frame_thumb": thumb_ref}, "bad-sampling"),
+            covers=["字幕"], does_not_cover=["画面语义"])
+        bad_sampling = False
+    except ValueError:
+        bad_sampling = True
+    report(bad_sampling, "C2c-8b frame_sampling 非对象 → 拒绝", "")
+
+    # frame_thumb：实际读取并检查可解码
+    report(thumb_problems(thumb_ref) == [],
+           "C2c-9 frame_thumb file: 路径可读且 PNG 可解码",
+           repr(thumb_problems(thumb_ref)))
+    data_ref = "data:image/png;base64," + base64.b64encode(tiny_png()).decode()
+    report(thumb_problems(data_ref) == [],
+           "C2c-10 frame_thumb data: bytes 引用可解码",
+           repr(thumb_problems(data_ref)))
+    bad_thumb = os.path.join(thumb_dir, "not-image.txt")
+    with open(bad_thumb, "w", encoding="utf-8") as f:
+        f.write("not an image")
+    report(bool(thumb_problems("file:" + bad_thumb)),
+           "C2c-11 frame_thumb 非图片 → 拒绝", "")
+
+    # validate_unit 本身也不接受旧对象 bbox（只有 normalizer 入口做兼容转换）
+    bad_unit_obj = copy.deepcopy(u_img2)
+    bad_unit_obj["locations"] = [{
+        "kind": "image_region", "image_id": "img-2",
+        "bbox": {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4}}]
+    report(bool(N.validate_unit(bad_unit_obj)),
+           "C2c-12 validate_unit 对旧对象 bbox 返回错误", "")
+    print("NOTE: C2c 的「image bbox 裁剪后与 finding 描述一致」与"
+          "「frame_thumb 重抽帧做感知哈希/人工比对」未纳入本验证器"
+          "（当前没有媒体管道/裁图器/抽帧器）；本验证器只验几何契约、"
+          "frame_thumb 可读可解码与 frame_no 可复算。")
 
     # C3 partial：可进判定，永不 PASS
     u_part = norm(free_raw("partially parsed text"),
@@ -452,6 +686,7 @@ def main():
     report(bool(N.validate_unit(bad2)),
            "C9 ContentUnit 带 findings → 拒绝", repr(N.validate_unit(bad2)))
 
+    shutil.rmtree(thumb_dir, ignore_errors=True)
     print("----------------------------------------")
     if failed == 0:
         print("✅ %d/%d 全过" % (passed, passed + failed))

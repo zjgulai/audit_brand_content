@@ -98,6 +98,31 @@ H14 routing 的键 ⊆ judge() 的形参名（在 to_judge_kwargs() 里查）
 **H11 是这套里最有用的一条。** 它让「拼装没吃掉、也没掺入任何字符」在**不持有原件**时也能验 ——
 每个 part 带着自己那段的 `value_sha256`，所以一个 unit 离开它的来源之后仍然自证（ADR-0008 §四）。
 
+### `locations`（C-21 / 验收行 21）
+
+唯一形状在 [`contracts/location-v1.schema.json`](../contracts/location-v1.schema.json)；
+**唯一生产者是 `base/normalizer.py`**，`media_pipeline` 只提供派生数据，由 normalizer 组装。
+三种形态：
+
+| kind | 必填 | 可选 | 说明 |
+|---|---|---|---|
+| `text_span` | `start`、`end`、`quote` | — | `quote` 必填且必须等于 `text[start:end]`。判据里的 `char_start` / `char_end` **等价于这里的 `start` / `end`**，不新增同义字段 |
+| `image_region` | `image_id`、`bbox` | `frame_ref`、`frame_thumb` | `bbox` 是归一化数组 **`[x1,y1,x2,y2]`**；`0 ≤ x1 < x2 ≤ 1`、`0 ≤ y1 < y2 ≤ 1` |
+| `video_timecode` | `video_id`、`time_start`、`time_end`、`frame_no`、`frame_thumb` | `bbox` | 全画面断言可省略 `bbox`；区域断言必须给 bbox。`time_end ≥ time_start`，精度到 0.1 秒 |
+
+- 旧的对象形 `bbox={x,y,w,h}` 仍可作为 **normalizer 的输入**，会被规范化为
+  `[x, y, x+w, y+h]`；`validate_unit()` 只接受规范数组，不接受旧对象。
+- `frame_thumb` 是「可解码缩略图」的字符串引用：`file:<仓内/绝对路径>` 或
+  `data:image/png;base64,<...>`。验证器会实际读取并检查图片可解码。
+- 视频的抽帧参数（从回执来）放在 raw_input 的
+  `frame_sampling={"interval_seconds": >0, "offset_seconds": >=0}`；
+  normalizer 用它复算 `frame_no = round((time_start - offset_seconds) / interval_seconds)`。
+  没有这段参数时只校验 `frame_no` 为非负整数，**不假装复算过**。
+- 已知未测：`image_region` 的「按 bbox 在原图裁剪、与 finding 描述一致」以及
+  `frame_thumb` 与 `frame_no` 重抽帧的**感知哈希/人工比对**不在
+  `verify_normalizer.py` 内（当前没有媒体管道/裁图器/抽帧器）；该验证器只覆盖
+  「字段齐全 + quote 切片相等 + bbox 归一化与边界 + frame_no 可复算 + thumb 可读可解码」。
+
 ---
 
 ## 三件在写它的过程中被实测逼出来的事

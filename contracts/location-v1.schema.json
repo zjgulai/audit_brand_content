@@ -2,52 +2,59 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "location-v1.schema.json",
   "title": "Location · location-v1（C-21 统一位置契约）",
-  "description": "ContentUnit.locations 的唯一形状。唯一生产者是 base/normalizer.py；media_pipeline 只提供派生数据，由 normalizer 组装。",
+  "description": "ContentUnit.locations 的唯一形状。唯一生产者是 base/normalizer.py；media_pipeline 只提供派生数据，由 normalizer 组装。bbox 统一为归一化数组 [x1,y1,x2,y2]；文本 start/end 与判据里的 char_start/char_end 等价，不新增同义字段。",
   "oneOf": [
     {
       "type": "object",
-      "required": ["kind", "start", "end"],
+      "required": ["kind", "start", "end", "quote"],
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "text_span" },
         "start": { "type": "integer", "minimum": 0 },
-        "end": { "type": "integer", "minimum": 0 }
+        "end": { "type": "integer", "minimum": 0 },
+        "quote": { "type": "string", "minLength": 1 }
       }
     },
     {
       "type": "object",
-      "required": ["kind", "bbox"],
+      "required": ["kind", "image_id", "bbox"],
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "image_region" },
+        "image_id": { "type": "string", "minLength": 1 },
         "frame_ref": { "type": "string" },
+        "frame_thumb": { "type": "string", "minLength": 1 },
         "bbox": { "$ref": "#/definitions/bbox" }
       }
     },
     {
       "type": "object",
-      "required": ["kind", "time_start", "time_end", "frame_no", "bbox"],
+      "required": ["kind", "video_id", "time_start", "time_end", "frame_no", "frame_thumb"],
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "video_timecode" },
+        "video_id": { "type": "string", "minLength": 1 },
         "time_start": { "type": "number", "minimum": 0 },
         "time_end": { "type": "number", "minimum": 0 },
         "frame_no": { "type": "integer", "minimum": 0 },
+        "frame_thumb": { "type": "string", "minLength": 1 },
         "bbox": { "$ref": "#/definitions/bbox" }
       }
     }
   ],
   "definitions": {
     "bbox": {
-      "type": "object",
-      "required": ["x", "y", "w", "h"],
-      "additionalProperties": false,
-      "properties": {
-        "x": { "type": "number", "minimum": 0, "maximum": 1 },
-        "y": { "type": "number", "minimum": 0, "maximum": 1 },
-        "w": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "h": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
-      }
+      "description": "归一化坐标数组 [x1,y1,x2,y2]；0 ≤ x1 < x2 ≤ 1，0 ≤ y1 < y2 ≤ 1。",
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "additionalItems": false,
+      "items": [
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ]
     }
   }
 }
