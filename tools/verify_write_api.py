@@ -21,7 +21,9 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import sys
+import tempfile
 import time
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -146,6 +148,8 @@ def main():
          "assignee_id": "u_dp3", "actionable": True, "ir": ir("ir-3")},
         release_case("case-release"),
         release_case("case-release2"),
+        release_case("case-release3"),
+        release_case("case-release4"),
     ]
     tasks = [
         TD.new_task(task_id="t-1", case_id="case-1", platform="amazon",
@@ -378,6 +382,73 @@ def main():
            and (rejected or {}).get("release", {}).get("status") == "rejected"
            and (rejected or {}).get("release", {}).get("release_status") == "已拒绝",
            "C4 reject 真实成功（rejected/已拒绝）", "%s %r" % (st, rejected))
+
+    # C6 TS-1：每个写操作类别的身份矩阵（a 无 principal / b 缺字段 /
+    # 模拟身份 / 跨租户）。完整 principal 的成功路径已由 C0–C4 各自覆盖：
+    # claim / actions / appeal / sign / revoke / waive。
+    tmp_audit = tempfile.mkdtemp(prefix="write_identity_")
+
+    def missing_provider(pid, tenant):
+        return {"id": pid, "tenant": tenant, "roles": ["coordinator"],
+                "product_lines": ["pump"], "product_line": "pump"}
+
+    def sim_provider(pid, tenant):
+        return {"id": pid, "tenant": tenant, "open_id": "ou_" + pid,
+                "tenant_id": tenant, "simulated": True,
+                "roles": ["coordinator"], "product_lines": ["pump"],
+                "product_line": "pump"}
+
+    def cross_provider(pid, tenant):
+        return {"id": pid, "tenant": "t2", "open_id": "ou_" + pid,
+                "tenant_id": tenant, "roles": ["coordinator"],
+                "product_lines": ["pump"], "product_line": "pump"}
+
+    def matrix_app(provider):
+        return create_app(
+            session_store=store, repository=repo,
+            principal_provider=provider, reviews_ledger=ledger,
+            finding_store=fs, appeals=appeals,
+            release_gate=app.state.release_gate,
+            access_log_path=os.path.join(tmp_audit, "access.jsonl"))
+
+    missing_app = matrix_app(missing_provider)
+    sim_app = matrix_app(sim_provider)
+    cross_app = matrix_app(cross_provider)
+    # 给 revoke 矩阵准备一个已签发、尚未撤回的案件。
+    p_signer = dict(principals["u_signer"])
+    p_signer.update({"id": "u_signer", "tenant": "t1",
+                     "open_id": "ou_u_signer", "tenant_id": "t1"})
+    token = store.issue_step_up("u_signer", "case-release4", "sign",
+                                "n-matrix-sign", now=time.time())
+    app.state.release_gate.sign(
+        repo.get_case("case-release4"), p_signer, token, "n-matrix-sign",
+        reason="matrix setup", now=time.time())
+    matrix = [
+        ("claim", "/api/v1/cases/case-1/claim", {}, coord),
+        ("actions", "/api/v1/cases/case-2/actions",
+         {"version": 1, "action": "save_draft", "draft": {}}, coord),
+        ("appeal", "/api/v1/appeals", {"case_id": "case-1", "reason": "x"}, sub),
+        ("sign", "/api/v1/cases/case-release3/release-decision",
+         {"decision": "sign", "version": 1, "reason": "x"}, signer),
+        ("revoke", "/api/v1/cases/case-release4/release-revoke",
+         {"version": 1, "reason": "x"}, signer),
+        ("waive", "/api/v1/takedown-tasks/t-3/waive",
+         {"approvers": [], "reason": "x", "evidence": {}}, coord),
+    ]
+    for name, path, body, cookie in matrix:
+        st, _ = call(app, "POST", path, None, "K-id-a-%s" % name, body)
+        report(st == 401, "C6 %s a：无 principal → 401" % name, str(st))
+        st, _ = call(missing_app, "POST", path, cookie,
+                     "K-id-b-%s" % name, body)
+        report(st == 401, "C6 %s b：缺 open_id/tenant_id → 401" % name, str(st))
+        st, _ = call(sim_app, "POST", path, cookie,
+                     "K-id-sim-%s" % name, body)
+        report(st == 403, "C6 %s 生产模拟身份 → 403" % name, str(st))
+        st, _ = call(cross_app, "POST", path, cookie,
+                     "K-id-x-%s" % name, body)
+        report(st == 403, "C6 %s principal tenant≠案件 tenant → 403" % name,
+               str(st))
+    shutil.rmtree(tmp_audit, ignore_errors=True)
 
     # C5 静态扫描
     sources = [open(os.path.join(REPO_ROOT, "api", name),

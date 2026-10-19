@@ -3,16 +3,17 @@
 > 生成依据：`PMO/audit/验收表-v3-覆盖全部判据-20261017.md`（不改表）。  
 > 初始 runner：mapped=86；补 10 条核心 A 后 **mapped=96 / passed=96 / failed=0 / untested=40**，rc=2。  
 > **2026-10-19 第二批：新接 3 条（51 / 59 / 65）→ mapped=99 / passed=99 / failed=0 / untested=37**，rc=2。
-> **2026-10-19 行 69/71 批次：71 已接（`verify_control_points.py --row 71`）；69 因 12 项清单缺失保持 untested。**
+> **2026-10-19 行 69/71 批次：71 已接（`verify_control_points.py --row 71`）；69 当时因清单缺失保持 untested（后由 D-128 接上）。**
 > 本批最终 runner 读数为 **mapped=101 / passed=100 / failed=1 / untested=35**，rc=1；
 > 唯一 failed 是 **#78**：并行会话新接的 `verify_engine_contract.py` 映射在 10s
 > sandbox 内超时，与行 69/71 无关。#54 在本批运行中途由并行会话修复后已转 passed。
 > 全局读数以当次 `verify_acceptance_run.py` 输出为准。
 >
-> **2026-10-19 35 条重扫：新接 45 / 46 / 74；并行会话接 21；随后补齐并接 77（未知桶）。**
-> 当前 runner：**mapped=106 / passed=106 / failed=0 / untested=30**，rc=2。
-> 未测 30 条分布：**B 22**（阶段 3–5 / CI）、**C 7**（36/43/44/70/76/103/104）、
-> **A 1**（69）。行 21 的映射由并行 location 会话写入，本批原样保留。
+> **2026-10-19 35 条重扫：新接 45 / 46 / 74；并行会话接 21；随后补齐并接 77（未知桶）；再接 70 / 103 / 104（C 类执行点）。**
+> **2026-10-19 D-128（11 类 / 58 子类）：新接 69；** 当前 runner：
+> **mapped=110 / passed=110 / failed=0 / untested=26**，rc=2。
+> 未测 26 条分布：**B 22**（阶段 3–5 / CI）、**C 4**（36/43/44/76）、**A 0**。
+> 行 21 的映射由并行 location 会话写入，本批原样保留。
 >
 > ★ 此前有 **2 条查过之后决定不接**（21 / 78）—— 它们「看起来能接」。
 > **21 已在 2026-10-19 location 扩展批次接上**（schema/normalizer/verifier 同步补齐）；
@@ -23,9 +24,9 @@
 
 | 分类 | 条数 | 含义 |
 |---|---:|---|
-| A 现在就能补 | 20 | 模块已实现，只缺 fixture/command；已接 19 条，余 1 条（69）因 12 项清单缺失留 untested |
+| A 现在就能补 | 20 | 模块已实现，只缺 fixture/command；已接 20 条，余 0 条 |
 | B 阶段 3–5 | 22 | OCR/ASR/前端/部署/回归集/CI，保持 untested |
-| C 口径待定 | 8 | 实现或口径有歧义；78 已接，36/43/44/70/76/103/104 因整行仍有未覆盖部分留 untested |
+| C 口径待定 | 8 | 实现或口径有歧义；70/78/103/104 已接，36/43/44/76 因整行仍有未覆盖部分留 untested |
 
 ## 逐行
 
@@ -50,19 +51,19 @@
 | 59 | SEC-4.3.1-5 | md 与 IR 一致、无遗漏无多出 | **A（已接）** | **2026-10-19 已接 `verify_report_consistency.py`**：用真实渲染器生成报告、验证器**自己解析** finding_id / control_code / decision.state 与 IR 对拍（不在渲染器里自证），并断言 `ReportStore.publish` 对不一致文本**物理阻断**（不落盘、不给 URL） | ✅ 已接 `verify_report_consistency` |
 | 65 | L3-4 | 回执禁词 | **A（已接）** | **2026-10-19 已接 `verify_send_gateway.py` 第 7 段（7a/7b/7c）**：四个禁词（通过 / 已通过 / 无需处理 / 审批完成）扫回执文本与卡片 payload；注入 `"本次审批已通过，无需处理。"` 断言**阻断并报出命中词**（证明扫描不是恒真）；反向对照 `"本周审核通过率为 98%"` 不误拦（`(?!率)` 负向断言） | ✅ 已接 `verify_send_gateway` |
 | 66 | L4-1 / SEC-8-8 | 群里不刷屏、L4/L5 不被数量吞掉 | A | 模块已实现，只缺 fixture/command | 已接 `verify_report_render` |
-| 69 | SEC-5-1 / SEC-5-1b | 七族骨架与 12 个一级分类无遗漏归并 | A | **2026-10-19 已加条件执行点**：`verify_control_points.py --row 69` 校验七族骨架；若 `research/governance/category-to-family-v1.json` 存在，则校验 12 项、category 唯一、family ∈ 七族、count 一致。**盘上当前没有 12 项一级分类清单，不编造** → 该命令退 2，行 69 保持 untested | 待产品提供 12 项清单后落上述 JSON，**再把行 69 接到 `--row 69`**（命令已就绪）；在此之前保持 untested，不接为 passed |
-| 70 | SEC-5-2 / SEC-5-3 / SEC-5-4 | 族调整必须升版本、留痕、回执记实际版本 | C | **2026-10-19 复核：** `verify_control_points.py` 的 H-2..H-5 已检查历史字段/最后版本/码集合/族归属一致，`--selftest` ⑫ 证明「改族未升版本」会红；但「改族→版本号加一且追加显式历史条目」的正样本、以及回执记实际使用版本仍未落在同一执行点（后者见 `verify_orchestrator` C5，且是注入值） | 补正样本 + 回执实际版本串联；当前保持 untested |
+| 69 | SEC-5-1 / SEC-5-1b | 七族骨架与 11 个一级分类无遗漏归并 | **A（已接）** | **2026-10-19 D-128 已接 `verify_control_points.py --row 69`**：权威来源 `规则清单-P0-P3-按等级-20261016.xlsx` 的「所属类别」共 **11** 个唯一值，已落 `research/governance/category-to-family-v1.json`；断言 11 项、category 唯一、family ∈ 七族、无「未归类/其他」、每条有 reason、count=11，并连跑两次结果一致（CAT-6）。 | ✅ 已接 `verify_control_points --row 69` |
+| 70 | SEC-5-2 / SEC-5-3 / SEC-5-4 | 族调整必须升版本、留痕、回执记实际版本 | **C（已接）** | **2026-10-19 已接 `verify_control_points.py --selftest + verify_orchestrator.py`**：正样本「改族 + 升版本 + 追加显式历史」绿、旧 history 仍保留旧 family；⑫「改族未升版本」红、⑰c「只升版本不追加历史」H-3 红；orchestrator C5/C5b 断言回执/IR 使用实际 `control_points_version`，换版本号跟着变 | ✅ 已接 `verify_control_points --selftest + verify_orchestrator` |
 | 71 | SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24 | 首批 20 真码、安全词、历史码保留 | **A（已接）** | **2026-10-19 已接 `verify_control_points.py --row 71`**：B-1 断言码集**精确等于** H01–H09/M01–M07/U01–U04；B-2 断言 `安全词` 不是控制点码；B-3 断言安全词已落白名单或显式退役；B-4 对每个 active 码反查 enabled 规则且 external_ref 非空；B-5 断言 U02 存在、deprecated、无 enabled 规则；B-6 对历史每条 `codes` 快照断言首批码不消失；B-7 有 `name_by_code` 时对拍语义、没有时不冒充 | ✅ 已接 `verify_control_points --row 71` |
 | 74 | SEC-5-9 | 新增控制点三条件 | **A（已接）** | **2026-10-19 D-125 采纳 C-74 建议：校验入口放 `verify_control_points.py`。** C74-0..4 分别检查新增码缺规则/依据/版本/版本未递增；`--selftest` ⑬⑭用坏样本证明这些断言会红、⑪好样本会绿 | ✅ 已接 `verify_control_points`（默认 + `--selftest`） |
-| 76 | SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27 | 唯一归属、码分配登记表、跨族拆分 | C | **2026-10-19 复核：** C76-1/2/3 已覆盖 family 单值且在族清单内、跨族拆分必须带批准、同码跨族；但行 76 还要求「首字母与族不一致时按 family 走」并跑路由/报告，验证器没有该行为样本 | 补前缀不一致的路由/报告样本；当前保持 untested |
+| 76 | SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27 | 唯一归属、码分配登记表、跨族拆分 | C | **2026-10-19 复核：** C76-1/2/3 已覆盖 family 单值、跨族批准、同码跨族；selftest 已加「U99 挂 F1 不按首字母推断」正样本；但行 76 还要求「跑路由与报告按 family 走」以及跨族拆分后各自独立 `control_code`/`authority_ref`/规则，验证器没有这些行为样本 | 补路由/报告与拆分后独立依据的断言；当前保持 untested |
 | 77 | SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32 | 未知桶四值强制转人工并计数 | **A（已接）** | **2026-10-19 已接 `verify_decision_table.py + verify_orchestrator.py`**：决策层四类未知桶分别 REVIEW/DP3 或 DP4、四键计数、`handoff_reason`/`target_layer`、obligations；已知值不误转；全 0 仍出现；BLOCK+未知桶仍 BLOCK；coverage/parse 失败优先落未审查。回执层断言四键/总数/原因/目标层；报告 snapshot 装配 `unknown_bucket_counts`，并由真实 `report_render.mjs` 断言四个计数出现在报告 markdown | ✅ 已接 `verify_decision_table + verify_orchestrator` |
 | 78 | SEC-5-33 | rule_code 是唯一机器键、不以 58 子类当全集 | C | **2026-10-19 二次复核（D-126 之后）：术语障碍已消除，但仍有两条验法没有执行点，仍不能接。**<br>**已解决**：Playbook `0b26bbc6…` / 验收表 `ed26e413…` 已统一为 `rule_key`（`rule_code` 在两者中均 0 处），V61 段的键名现在与判据一致。<br>**仍然对不上的部分** —— 行 78 的「怎么验」有三条，V61 只覆盖第一条的一半：<br>① 「所有机器连接与报告生成都以 rule_key（或 control_code）为键」→ V61e 只查了 `reject.hits` **一个样本**的键，没有全仓扫描；`tools/audit/report_render.mjs` 用的是 `control_code`（符合「或」），但同样没有断言钉住。<br>② 「控制点数量口径来自主表而不是 58」→ **全仓无任何断言**（`verify_control_points.py` 的 CP-2 查的是码重复，不是数量口径）。<br>③ 「构造一份只按 58 子类统计的报告，断言与主表口径不一致时报警」→ **全仓无实现**：`base/` 下 `subclass` 出现 0 次，无报警路径。<br>**若现在接上，runner 会把「键名唯一」记成「整条 SEC-5-33 已验证」—— 那是把 1/3 的覆盖说成 3/3。** | 补 ②③ 的执行点后可接：② 在 `verify_control_points.py` 加「控制点数量以主表行数为准、与 58 子类计数不等价」；③ 加「构造纯 58 口径报告 → 与主表口径比较 → 不一致必须报警」的正反样本。这两条补完后 V61 + 它们一起接行 78 |
 | 85 | SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4 | 冻结回归集规模、陷阱样本、覆盖、指纹与变更门 | B | 冻结回归集规模/陷阱样本/变更门：属阶段 5 回归治理 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 86 | SEC-6-GS-4 | 回归集维护归属与法务确认 | B | 回归集 owner 与法务确认：人工签署，阶段 5 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 87 | 戊 / SEC-6-GS-5 / SEC-8-6 | 规则变更前后对比读数 | B | 规则变更前后对比读数：依赖冻结回归集，阶段 5 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 100 | RL-12 | 失效时申诉自动暂停，重审后由原申诉人决定是否迁移 | A | 模块已实现，只缺 fixture/command | 已接 `verify_write_api` |
-| 103 | RL-15 | 规则变更入口：Web 只读，权威源在别处 | C | **2026-10-19 复核：** C-103 已落地并接 `verify_review_api.py` C7–C10：三个只读入口的 POST/PUT/PATCH/DELETE 全部 403、每次写拒绝恰好一行 JSONL 审计、GET 不记日志；但行 103 后半「从既有权威源同步拉取、变更后自动触发重审（对照行 94 失效链路）」仍无执行点 | 补权威源同步→重审链路；当前保持 untested |
-| 104 | TS-1 | 身份绑定 tenant+open_id，开发身份不得进生产 | C | **2026-10-19 复核：** C-104 已落地并接 `verify_review_api.py` C11–C17：生产缺 `tenant_id/open_id` → 401 + 审计、生产模拟身份 → 403 + 审计、dev 显式开关放行、启动校验、principal tenant 与 session 不一致 → 403；但行 104 要求对提交/复核/申诉/签发/撤回/豁免每个写操作各跑 a/b/c 三样本，并校验 principal tenant 与**案件** tenant 不一致 —— 跨写矩阵尚未覆盖 | 按写操作矩阵补断言；当前保持 untested |
+| 103 | RL-15 | 规则变更入口：Web 只读，权威源在别处 | **C（已接）** | **2026-10-19 已接 `verify_review_api.py + verify_authority_change.py`**：只读入口 403+JSONL 审计（C7–C10）；`on_authority_changed()` 对 rules/control_points/routing 三类事件各生成 queued 重审 job，同一事件重复送达 duplicate、不重复入队，新版本产生新事件；非法事件拒 | ✅ 已接 `verify_review_api + verify_authority_change` |
+| 104 | TS-1 | 身份绑定 tenant+open_id，开发身份不得进生产 | **C（已接）** | **2026-10-19 已接 `verify_write_api.py + verify_review_api.py`**：C11–C17 覆盖缺字段 401、生产模拟 403、启动校验、session tenant 绑定；C6 矩阵对 claim/actions/appeal/sign/revoke/waive 六类写操作各验无 principal 401、缺字段 401、生产模拟 403、principal tenant≠案件 tenant 403；完整 principal 成功由 C0–C4 覆盖。写端点补齐租户闸门（appeal/takedown） | ✅ 已接 `verify_write_api + verify_review_api` |
 | 105 | TS-2 | 后端运行时 3.12 下全部既有 verifier 全绿 | B | Python 3.12 全量 verifier 对照：CI/阶段 5 环境门 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 106 | TS-3 | 依赖锁定安装：没有锁就装不上 | B | 依赖锁定安装失败语义：CI/阶段 5 环境门 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 107 | TS-4 | 投影库只是视图：删掉它必须能从文件重建 | A | 模块已实现，只缺 fixture/command | 已接 `verify_atomic_commit` |

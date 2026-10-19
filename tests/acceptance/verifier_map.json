@@ -638,6 +638,30 @@
       "criteria": "SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32",
       "fixture": "{root}/tools/verify_decision_table.py",
       "command": "{venv} {root}/tools/verify_decision_table.py && {venv} {root}/tools/verify_orchestrator.py"
+    },
+    "70": {
+      "test_id": "acceptance-70",
+      "criteria": "SEC-5-2 / SEC-5-3 / SEC-5-4",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py --selftest && {venv} {root}/tools/verify_orchestrator.py"
+    },
+    "103": {
+      "test_id": "acceptance-103",
+      "criteria": "RL-15",
+      "fixture": "{root}/tools/verify_review_api.py",
+      "command": "{venv} {root}/tools/verify_review_api.py && {venv} {root}/tools/verify_authority_change.py"
+    },
+    "104": {
+      "test_id": "acceptance-104",
+      "criteria": "TS-1",
+      "fixture": "{root}/tools/verify_write_api.py",
+      "command": "{venv} {root}/tools/verify_write_api.py && {venv} {root}/tools/verify_review_api.py"
+    },
+    "69": {
+      "test_id": "acceptance-69",
+      "criteria": "SEC-5-1 / SEC-5-1b",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py --row 69"
     }
   }
 }

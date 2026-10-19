@@ -266,6 +266,11 @@ def register_write_routes(app, *, principal_dep):
         if not can_act(principal, "case.review", case):
             raise HTTPException(403, "无权执行复核动作")
 
+    def require_tenant(principal, obj, what="case"):
+        """写操作的对象必须与 principal 同租户（TS-1）。"""
+        if principal.get("tenant") != obj.get("tenant"):
+            raise HTTPException(403, "跨租户：principal 与 %s tenant 不一致" % what)
+
     def task_or_404(task_id):
         task = next((t for t in repo.takedown_tasks
                      if t.get("task_id") == task_id), None)
@@ -361,6 +366,7 @@ def register_write_routes(app, *, principal_dep):
     def create_appeal(request: Request, body: AppealCreate,
                       principal=Depends(principal_dep),
                       idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_tenant(principal, case_or_404(body.case_id))
         return _idempotent(
             request, idempotency_key,
             lambda: appeals.open(body.case_id, principal["id"], body.reason))
@@ -369,6 +375,12 @@ def register_write_routes(app, *, principal_dep):
     def migrate_appeal(id: str, request: Request,
                        principal=Depends(principal_dep),
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        try:
+            appeal = appeals.get(id)
+        except AppealError as exc:
+            raise HTTPException(exc.status, "%s: %s" % (exc.code, exc.detail))
+        require_tenant(principal, case_or_404(appeal["case_id"]))
+
         def run():
             try:
                 return appeals.migrate(id, principal["id"])
@@ -380,6 +392,12 @@ def register_write_routes(app, *, principal_dep):
     def withdraw_appeal(id: str, request: Request, body: AppealWithdraw,
                         principal=Depends(principal_dep),
                         idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        try:
+            appeal = appeals.get(id)
+        except AppealError as exc:
+            raise HTTPException(exc.status, "%s: %s" % (exc.code, exc.detail))
+        require_tenant(principal, case_or_404(appeal["case_id"]))
+
         def run():
             try:
                 return appeals.withdraw(id, principal["id"], body.reason)
@@ -392,6 +410,7 @@ def register_write_routes(app, *, principal_dep):
                     principal=Depends(principal_dep),
                     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
             task = task_or_404(id)
+            require_tenant(principal, task, "takedown task")
 
             def run():
                 try:
@@ -420,6 +439,7 @@ def register_write_routes(app, *, principal_dep):
                           principal=Depends(principal_dep),
                           idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         task = task_or_404(id)
+        require_tenant(principal, task, "takedown task")
 
         def run():
             try:
@@ -436,6 +456,7 @@ def register_write_routes(app, *, principal_dep):
                           principal=Depends(principal_dep),
                           idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         task = task_or_404(id)
+        require_tenant(principal, task, "takedown task")
 
         def run():
             if body.version is not None and body.version != int(task.get("version") or 0):
@@ -452,6 +473,7 @@ def register_write_routes(app, *, principal_dep):
                        principal=Depends(principal_dep),
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         task = task_or_404(id)
+        require_tenant(principal, task, "takedown task")
 
         def run():
             try:
