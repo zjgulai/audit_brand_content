@@ -28,9 +28,12 @@
 """
 from __future__ import annotations
 
+import ast
 import os
 import re
+import shutil
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "base"))
@@ -42,6 +45,24 @@ except Exception as e:  # noqa: BLE001
     sys.exit(1)
 
 FIVE_STATES = {"BLOCK", "REVIEW", "未审查", "待自决", "PASS"}
+LAYERS = {"DP0", "DP1", "DP2", "DP3", "DP4"}
+
+# ── C-46 / L2-1a：判定逻辑唯一性全仓扫描 ───────────────────────────────
+# 扫描范围刻意是产品运行时代码（base/api/tools），不含 skill/ 知识库技能、
+# tests/、verifiers 自身与临时/诊断脚本 —— 后者本来就可以写标签样例。
+SCAN_ROOTS = ("base", "api", "tools")
+SCAN_SKIP_DIRS = {".git", ".venv", ".venv-r4", "node_modules", "__pycache__",
+                  "skills", ".vendor", ".playwright-mcp"}
+SCAN_SKIP_BASENAMES = ("verify_", "test_", "smoke_", "probe_")
+SCAN_WHITELIST = {
+    # 目前唯一命中：parse_status=failed 的契约回退。
+    "base/orchestrator.py": (
+        "parse_status=failed 时 judge 不被调用，按 Playbook 链 3 把 "
+        "decision/disposition 固定为 未审查/DP0；这是编排器契约回退，"
+        "不是第二套 15 链判定。若后续把该回退收进 decision_table，本白名单应删除。"
+    ),
+}
+DECISION_FIELDS = {"state", "external_label", "layer"}
 
 
 def F(fid="f1", status="confirmed", sev="L4", auth="ok", rc=False):
@@ -59,6 +80,96 @@ def inp(**over):
     }
     x.update(over)
     return x
+
+
+def _scan_excluded(rel):
+    if rel == "base/decision_table.py":
+        return True
+    parts = rel.split("/")
+    if any(p in SCAN_SKIP_DIRS for p in parts):
+        return True
+    base = os.path.basename(rel)
+    if base.startswith(SCAN_SKIP_BASENAMES) or base.endswith("_test.py"):
+        return True
+    if rel.startswith("tests/"):
+        return True
+    return False
+
+
+def _allowed(field, node):
+    values = LAYERS if field == "layer" else FIVE_STATES
+    return isinstance(node, ast.Constant) and isinstance(node.value, str) \
+        and node.value in values
+
+
+def decision_writes_in_text(text):
+    """返回 [(lineno, field)]：命中「状态/层/对外标签被写成五标签或 DP 值」。"""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as e:
+        return [("syntax", e.lineno or 0)]
+    hits = []
+
+    class V(ast.NodeVisitor):
+        def visit_Assign(self, node):
+            for target in node.targets:
+                name = None
+                if isinstance(target, ast.Name):
+                    name = target.id
+                elif isinstance(target, ast.Subscript) and isinstance(target.slice, ast.Constant):
+                    name = target.slice.value
+                if name in DECISION_FIELDS:
+                    v = node.value
+                    if _allowed(name, v) or (isinstance(v, ast.IfExp)
+                                             and (_allowed(name, v.body)
+                                                  or _allowed(name, v.orelse))):
+                        hits.append((node.lineno, name))
+            self.generic_visit(node)
+
+        def visit_AnnAssign(self, node):
+            if isinstance(node.target, ast.Name) and node.target.id in DECISION_FIELDS \
+                    and node.value is not None and _allowed(node.target.id, node.value):
+                hits.append((node.lineno, node.target.id))
+            self.generic_visit(node)
+
+        def visit_Dict(self, node):
+            for k, v in zip(node.keys, node.values):
+                if isinstance(k, ast.Constant) and k.value in DECISION_FIELDS:
+                    if _allowed(k.value, v) or (isinstance(v, ast.IfExp)
+                                                and (_allowed(k.value, v.body)
+                                                     or _allowed(k.value, v.orelse))):
+                        hits.append((node.lineno, k.value))
+            self.generic_visit(node)
+
+    V().visit(tree)
+    return hits
+
+
+def decision_writes_in_file(path):
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return decision_writes_in_text(f.read())
+    except OSError:
+        return [("unreadable", 0)]
+
+
+def scan_decision_logic():
+    scanned = []
+    hits = {}
+    for root in SCAN_ROOTS:
+        for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, root)):
+            dirnames[:] = [d for d in dirnames if d not in SCAN_SKIP_DIRS]
+            for name in filenames:
+                if not name.endswith(".py"):
+                    continue
+                rel = os.path.relpath(os.path.join(dirpath, name), ROOT)
+                if _scan_excluded(rel):
+                    continue
+                scanned.append(rel)
+                found = decision_writes_in_file(os.path.join(ROOT, rel))
+                if found:
+                    hits[rel] = found
+    return scanned, hits
 
 
 def main():
@@ -232,10 +343,44 @@ def main():
     T("H3 同一输入连跑两次结果一致",
       decide(inp(findings=[F(sev="L4", auth="ok")])) == decide(inp(findings=[F(sev="L4", auth="ok")])), "")
 
+    # ── J 判定逻辑唯一性：全仓静态扫描（C-46 / L2-1a） ──────────────
+    scanned, hits = scan_decision_logic()
+    T("J0 扫描范围非空（不是空集恒真）", len(scanned) > 0, "scanned=%d" % len(scanned))
+    unwhitelisted = {p: h for p, h in hits.items() if p not in SCAN_WHITELIST}
+    T("J1 除白名单外没有任何模块写状态/层/对外标签",
+      unwhitelisted == {}, str({p: h[:3] for p, h in unwhitelisted.items()}))
+    T("J2 白名单条目都必须有非空理由",
+      all(isinstance(r, str) and r.strip() for r in SCAN_WHITELIST.values()),
+      str({p: repr(r) for p, r in SCAN_WHITELIST.items()}))
+    T("J3 白名单路径都存在", all(os.path.exists(os.path.join(ROOT, p)) for p in SCAN_WHITELIST),
+      str([p for p in SCAN_WHITELIST if not os.path.exists(os.path.join(ROOT, p))]))
+    stale = [p for p in SCAN_WHITELIST if p not in hits]
+    T("J4 白名单不许过期（登记了却已无命中）", stale == [], str(stale))
+    # 反向对照：临时副本塞一段 if/else 标签计算 → 必须命中；删掉 → 不命中
+    api_rel = "api/review_api.py"
+    api_path = os.path.join(ROOT, api_rel)
+    original = open(api_path, encoding="utf-8").read()
+    tmp = tempfile.mkdtemp(prefix="decision-scan-")
+    try:
+        rogue = original + '\nstate = "BLOCK" if True else "REVIEW"\n'
+        rogue_path = os.path.join(tmp, "review_api.py")
+        with open(rogue_path, "w", encoding="utf-8") as f:
+            f.write(rogue)
+        T("J5 临时副本塞入 state=BLOCK if ... → 扫描必须命中",
+          decision_writes_in_file(rogue_path) != [], str(decision_writes_in_file(rogue_path)))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    T("J6 原文件删掉变异后不命中（反向对照不是恒红）",
+      decision_writes_in_file(api_path) == [], str(decision_writes_in_file(api_path)))
+    T("J7 只读字段不误报（item.get(\"state\")）",
+      decision_writes_in_text('value = item.get("state")\n') == [], "")
+
     for f in fails:
         print("  ❌ " + f)
     verdict = "❌" if fails else "✅"
     print("\n%s verify_decision_table %d 项检查 · %d 项红" % (verdict, checks, len(fails)))
+    print("  扫描 %d 个 .py · 命中 %d 个文件 · 白名单 %d 条"
+          % (len(scanned), len(hits), len(SCAN_WHITELIST)))
     return 1 if fails else 0
 
 
