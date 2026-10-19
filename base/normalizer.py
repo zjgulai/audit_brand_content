@@ -136,7 +136,10 @@ def _derive_locations(raw, unit):
     if explicit is not None:
         return [dict(x) for x in explicit] if isinstance(explicit, list) else explicit
     kind = (unit.get("source") or {}).get("kind")
-    if kind in ("free_text", "ad_record", "landing_page", "structured_json"):
+    # ★ contract.from_ad_record 的 source.kind 是 `ad_text`（见 base/contract.py:459），
+    #   不是 raw_input 的 `ad_record`。原先这里写 `ad_record`，ad 记录的
+    #   locations 永远派生不出来 —— 文本类判据默默漏掉了一个模态。
+    if kind in ("free_text", "ad_text", "landing_page", "structured_json"):
         parts = (unit.get("composition") or {}).get("parts") or []
         return [{"kind": "text_span", "start": p["start"], "end": p["end"]}
                 for p in parts if isinstance(p, dict)

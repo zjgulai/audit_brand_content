@@ -472,6 +472,17 @@ class Orchestrator(object):
         if ctx["request"].get("media_fingerprints") is not None:
             ir["media_fingerprints"] = ctx["request"]["media_fingerprints"]
 
+        # ── 运行期契约校验（Playbook §3.3.2 / §3.3.3 / L2-7）──────────
+        # 这两个 validator 原先只有定义、没有任何调用点；接在这里是唯一
+        # 执行点：每次 run 的 IR/Receipt 必须真的符合 schema 才允许返回。
+        # 失败 fail-closed —— 宁可让调用方看到异常，也不安静发出坏回执。
+        ir_problems = validate_ir(ir)
+        receipt_problems = validate_receipt(receipt)
+        if ir_problems or receipt_problems:
+            raise ValueError(
+                "运行期契约校验失败：IR=%r；Receipt=%r"
+                % (ir_problems, receipt_problems))
+
         return {
             "run_state": "ERROR" if run_state == "ERROR" else decision.get("run_state", "OK"),
             "ir": ir,

@@ -24,8 +24,12 @@ from __future__ import annotations
 
 import ast
 import datetime
+import json
 import os
+import re
+import shutil
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "base"))
@@ -52,6 +56,28 @@ def dec(state="BLOCK", layer="DP2", obligations=None, **over):
     }
     d.update(over)
     return d
+
+
+def decision_for_layer(layer):
+    return {
+        "DP0": dec("未审查", "DP0"),
+        "DP1": dec("待自决", "DP1"),
+        "DP2": dec("BLOCK", "DP2"),
+        "DP3": dec("REVIEW", "DP3"),
+        "DP4": dec("REVIEW", "DP4", any_authority_conflict=True),
+    }[layer]
+
+
+def expected_due(now, due_text):
+    """独立复算 business-day due_at，不 import 被测模块的私有函数。"""
+    dt = datetime.datetime.fromisoformat(now.replace("Z", "+00:00"))
+    n = int(re.search(r"(\d+)\s*个工作日", due_text or "").group(1))
+    added = 0
+    while added < n:
+        dt = dt + datetime.timedelta(days=1)
+        if dt.weekday() < 5:
+            added += 1
+    return dt.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def main():
@@ -110,11 +136,65 @@ def main():
 
     # ── C 补齐字段 ──────────────────────────────────────────────────
     for k in ("owner", "finalizer", "can_finalize", "release_status",
-              "appeal_channel", "due_at", "case_id"):
+              "appeal_channel", "due_at", "case_id", "escalation",
+              "routing_version"):
         T("C1 输出字段 %s 存在且非空" % k,
           k in r_b and r_b[k] not in (None, ""), str(r_b.get(k)))
     T("C2 五档 release_status 全部待放行",
       all(router.route(d, RECEIPT)["release_status"] == "待放行" for _, d, _, _ in cases), "")
+
+    # ── P routing-v1 逐条一致：owner / due_at / escalation ──────────
+    NOW = "2026-10-19T02:00:00Z"
+    routing = json.load(open(router.path, encoding="utf-8"))
+    rows = routing.get("routes") or []
+    T("P0 routing 表非空且每条含 owner/due/escalation",
+      bool(rows) and all(
+          isinstance(r.get("owner"), str) and r.get("owner")
+          and isinstance(r.get("due"), str) and r.get("due")
+          and isinstance(r.get("escalation"), str) and r.get("escalation")
+          for r in rows), "rows=%d" % len(rows))
+    for row in rows:
+        code = row.get("control_code")
+        r = router.route(decision_for_layer(row.get("layer")), RECEIPT,
+                         control_code=code, now=NOW)
+        T("P1 %s owner/due_at/escalation 与 routing-v1 一致" % code,
+          r.get("owner") == row.get("owner")
+          and r.get("escalation") == row.get("escalation")
+          and r.get("due_at") == expected_due(NOW, row.get("due"))
+          and r.get("routing_version") == routing.get("routing_version"),
+          "got owner=%r due=%r escalation=%r version=%r; want owner=%r due=%r escalation=%r"
+          % (r.get("owner"), r.get("due_at"), r.get("escalation"),
+             r.get("routing_version"), row.get("owner"),
+             expected_due(NOW, row.get("due")), row.get("escalation")))
+
+    # 临时 routing 表：row 的 owner/due/escalation 必须真的覆盖默认值。
+    tmpdir = tempfile.mkdtemp(prefix="disposition_routing_")
+    try:
+        custom_path = os.path.join(tmpdir, "routing.json")
+        with open(custom_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "routing_version": "routing-custom-v1",
+                "routes": [{
+                    "control_code": "X1", "layer": "DP4",
+                    "owner": "自定义 owner", "due": "5 个工作日",
+                    "escalation": "自定义升级",
+                }],
+            }, f, ensure_ascii=False)
+        custom = DispositionRouter(custom_path)
+        rc = custom.route(dec("REVIEW", "DP4", any_authority_conflict=True),
+                          RECEIPT, control_code="X1", now=NOW)
+        T("P2 临时 routing 表 owner 覆盖默认角色",
+          rc.get("owner") == "自定义 owner", repr(rc.get("owner")))
+        T("P2 临时 routing 表 due 覆盖默认期限",
+          rc.get("due_at") == expected_due(NOW, "5 个工作日"),
+          "%r vs %r" % (rc.get("due_at"), expected_due(NOW, "5 个工作日")))
+        T("P2 临时 routing 表 escalation 覆盖默认升级",
+          rc.get("escalation") == "自定义升级", repr(rc.get("escalation")))
+        T("P2 临时 routing 表 routing_version 透传",
+          rc.get("routing_version") == "routing-custom-v1",
+          repr(rc.get("routing_version")))
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
     # ── D 一致性守卫 ────────────────────────────────────────────────
     def must_raise(cid, fn):

@@ -240,6 +240,42 @@ def main():
            json.dumps({"run_state": r7["run_state"], "steps": r7["steps"],
                        "state": r7["ir"]["decision"]["state"]}, ensure_ascii=False))
 
+    # C8 运行路径必须真的调用 validate_ir / validate_receipt。
+    # 只测两个函数本身不够：它们可以在模块里好好的，而 run 从不调用。
+    orig_ir, orig_receipt = O.validate_ir, O.validate_receipt
+    calls = {"ir": 0, "receipt": 0}
+
+    def counting_ir(value):
+        calls["ir"] += 1
+        return orig_ir(value)
+
+    def counting_receipt(value):
+        calls["receipt"] += 1
+        return orig_receipt(value)
+
+    O.validate_ir, O.validate_receipt = counting_ir, counting_receipt
+    try:
+        r8 = build(Counter()).run(request(unit=None))
+    finally:
+        O.validate_ir, O.validate_receipt = orig_ir, orig_receipt
+    report(calls == {"ir": 1, "receipt": 1} and r8["run_state"] == "OK",
+           "C8 run 路径调用 validate_ir/validate_receipt 各一次",
+           "calls=%r run_state=%r" % (calls, r8.get("run_state")))
+
+    # C8b validator 报问题时 run 必须 fail-closed（不是安静发出坏对象）。
+    def bad_ir(_value):
+        return ["forced_contract_problem"]
+
+    O.validate_ir = bad_ir
+    raised = False
+    try:
+        build(Counter()).run(request(unit=None))
+    except ValueError:
+        raised = True
+    finally:
+        O.validate_ir = orig_ir
+    report(raised, "C8b validator 报问题 → run 抛 ValueError（fail-closed）", "")
+
     print("----------------------------------------")
     if failed == 0:
         print("✅ %d/%d 全过" % (passed, passed + failed))

@@ -39,9 +39,51 @@ except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入 base.contract / base.normalizer: %s" % exc)
     sys.exit(2)
 
+# ★ 独立字面量，不从 contract/normalizer 取值：后者可能互为别名（自比）。
+EXPECTED_PARSE_STATUSES = ("ok", "partial", "failed")
+EXPECTED_FAILURE_KINDS = ("fetch_error", "parse_error", "empty", "unsupported")
+
 
 def free_raw(text="FDA approved wearable breast pump", uri="inline:test"):
     return {"kind": "free_text", "text": text, "uri": uri}
+
+
+def landing_raw(label="html"):
+    attempt_label = "structured" if label == "structured" else "html"
+    kind = "structured_json" if label == "structured" else "landing_page"
+    return {
+        "kind": kind,
+        "fetch": {
+            "url_key": "lp-test-1",
+            "url": "https://example.test/page",
+            "attempts": [{
+                "label": attempt_label, "sha256": "a" * 64,
+                "bytes": 10, "target": "https://example.test/page",
+                "status": 200,
+            }],
+        },
+        "extract": ({"structured": {"title": "标题", "description_text": "描述"}}
+                    if label == "structured"
+                    else {"html": {"body_text": "页面正文"}}),
+        "uri": "file:lp-test",
+    }
+
+
+def failed_modal_raws():
+    """failed 空正文分支：每种模态都要真的走到 _build_empty。"""
+    loc = [{"kind": "image_region",
+            "bbox": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}}]
+    return {
+        "ad_record": {"kind": "ad_record", "uri": "file:ad",
+                      "record": {"Primary Text": "A", "Headline": "B"},
+                      "locations": loc},
+        "landing_page": dict(landing_raw("html"), locations=loc),
+        "structured_json": dict(landing_raw("structured"), locations=loc),
+        "image": {"kind": "image", "raw": b"img", "uri": "file:img",
+                  "locations": loc},
+        "video": {"kind": "video", "raw": b"vid", "uri": "file:vid",
+                  "locations": loc},
+    }
 
 
 def main():
@@ -70,9 +112,10 @@ def main():
            and set(required) == set(N.REQUIRED_UNIT_FIELDS)
            and len(N.REQUIRED_UNIT_FIELDS) == 12,
            "C0 ContentUnit 12 个 required 字段", repr(N.REQUIRED_UNIT_FIELDS))
-    report(tuple(N.PARSE_STATUSES) == ("ok", "partial", "failed")
-           and tuple(N.FAILURE_KINDS) == tuple(C.FAILURE_KINDS),
-           "C0 parse_status / failure_kind 取值域",
+    report(tuple(N.PARSE_STATUSES) == EXPECTED_PARSE_STATUSES
+           and set(N.FAILURE_KINDS) == set(EXPECTED_FAILURE_KINDS)
+           and len(N.FAILURE_KINDS) == len(EXPECTED_FAILURE_KINDS),
+           "C0 parse_status / failure_kind 取值域（独立字面量对拍）",
            "%r %r" % (N.PARSE_STATUSES, N.FAILURE_KINDS))
 
     # C1 free_text ok
@@ -113,6 +156,26 @@ def main():
         covers=["图内文字"], does_not_cover=["画面语义"])
     report(u_img["unit_id"] == exp_img["unit_id"],
            "C2 image 复用 builder", "%s vs %s" % (u_img["unit_id"], exp_img["unit_id"]))
+
+    # C2a 文本类三种模态都必须从 composition.parts 派生 text_span。
+    def has_valid_text_spans(unit):
+        text = unit.get("text") or ""
+        return bool(unit.get("locations")) and all(
+            x.get("kind") == "text_span"
+            and type(x.get("start")) is int and type(x.get("end")) is int
+            and 0 <= x["start"] < x["end"] <= len(text)
+            for x in unit["locations"])
+
+    report(has_valid_text_spans(u_ad),
+           "C2a ad_record 派生 text_span", repr(u_ad.get("locations")))
+    u_lp = N.normalize(landing_raw("html"), covers=["页面正文"],
+                        does_not_cover=["图内文字"])
+    report(has_valid_text_spans(u_lp),
+           "C2a landing_page 派生 text_span", repr(u_lp.get("locations")))
+    u_sj = N.normalize(landing_raw("structured"), covers=["商品标题与描述"],
+                        does_not_cover=[])
+    report(has_valid_text_spans(u_sj),
+           "C2a structured_json 派生 text_span", repr(u_sj.get("locations")))
     src = open(os.path.join(REPO_ROOT, "base", "normalizer.py"),
                encoding="utf-8").read()
     report("def _unit_id" not in src and "hashlib" not in src,
@@ -181,7 +244,7 @@ def main():
         try:
             N.normalize({"kind": "image", "raw": b"x", "text_from_media": "正文",
                          "uri": "file:x", "locations": [loc]},
-                        covers=["正文"], does_not_cover=[])
+                        covers=["正文"], does_not_cover=["画面语义"])
             ok = False
         except Exception:  # noqa: BLE001
             ok = True
@@ -214,6 +277,34 @@ def main():
     report(bool(N.validate_unit(bad_unit)),
            "C2b-8 validate_unit 对坏 location 返回错误", repr(N.validate_unit(bad_unit)))
 
+    # C2b-9 直接调用 _location_problems：不依赖 normalize/contract 的前置拦截。
+    valid_loc = [{"kind": "text_span", "start": 0, "end": 1}]
+    report(N._location_problems("abc", valid_loc) == [],
+           "C2b-9 直接调用 _location_problems：合法样本返回空",
+           repr(N._location_problems("abc", valid_loc)))
+    direct_bad_locations = [
+        ("locations 非数组", "abc", "not-a-list"),
+        ("元素非对象", "abc", ["x"]),
+        ("未知 kind", "abc", [{"kind": "natural_language"}]),
+        ("text 越界", "abc", [{"kind": "text_span", "start": 0, "end": 99}]),
+        ("text 空区间", "abc", [{"kind": "text_span", "start": 2, "end": 2}]),
+        ("image bbox 缺 h", "", [
+            {"kind": "image_region", "bbox": {"x": 0, "y": 0, "w": 1}}]),
+        ("video start>=end", "", [
+            {"kind": "video_timecode", "time_start": 2, "time_end": 2,
+             "frame_no": 1, "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}]),
+        ("video frame_no 负", "", [
+            {"kind": "video_timecode", "time_start": 0, "time_end": 1,
+             "frame_no": -1, "bbox": {"x": 0, "y": 0, "w": 1, "h": 1}}]),
+        ("text_span 多字段", "abc", [
+            {"kind": "text_span", "start": 0, "end": 1, "extra": 1}]),
+    ]
+    for name, text, locations in direct_bad_locations:
+        problems = N._location_problems(text, locations)
+        report(bool(problems),
+               "C2b-9 直接调用 _location_problems：%s → 有问题" % name,
+               repr(problems))
+
     # C3 partial：可进判定，永不 PASS
     u_part = norm(free_raw("partially parsed text"),
                   covers=["部分正文"], dnc=["未覆盖部分"], status="partial")
@@ -224,10 +315,15 @@ def main():
            "C3 partial 可进判定但永不 PASS", repr(gate))
 
     # C4 failed 四种 failure_kind：无正文、不进判定、无 ir_id
-    for fk in C.FAILURE_KINDS:
-        uf = norm(free_raw("这段正文必须在 failed 时被丢弃"),
-                  covers=["未审"], dnc=["全部"], status="failed",
-                  fk=fk, reason="upstream %s" % fk)
+    for fk in EXPECTED_FAILURE_KINDS:
+        try:
+            uf = norm(free_raw("这段正文必须在 failed 时被丢弃"),
+                      covers=["未审"], dnc=["全部"], status="failed",
+                      fk=fk, reason="upstream %s" % fk)
+        except Exception as exc:  # noqa: BLE001
+            report(False, "R2 failed(%s)：无正文、不进判定、无 ir_id" % fk,
+                   "normalize 抛异常：%s: %s" % (type(exc).__name__, exc))
+            continue
         gate = N.judgment_gate(uf)
         report(uf["parse_status"] == "failed"
                and uf.get("failure_kind") == fk
@@ -246,6 +342,28 @@ def main():
                and hint.get("failure_kind") == fk
                and hint.get("reason") == "upstream %s" % fk,
                "C4 failed(%s) → Attempt 语义（只读视图）" % fk, repr(hint))
+
+    # C4b failed 的各模态空正文分支：真的走 _build_empty，且
+    # _derive_locations 的 failed 分支必须丢弃显式 locations（返回 []）。
+    for kind, raw in failed_modal_raws().items():
+        try:
+            uf = N.normalize(
+                raw, covers=["已覆盖"], does_not_cover=["未覆盖"],
+                parse_status="failed", failure_kind="parse_error",
+                reason="upstream parse_error")
+        except Exception as exc:  # noqa: BLE001
+            report(False, "C4b failed(%s) 空正文分支 + failed locations=[]" % kind,
+                   "normalize 抛异常：%s: %s" % (type(exc).__name__, exc))
+            continue
+        report(uf.get("parse_status") == "failed"
+               and uf.get("failure_kind") == "parse_error"
+               and uf.get("text") == "" and uf.get("has_text") is False
+               and uf.get("locations") == []
+               and not N.validate_unit(uf),
+               "C4b failed(%s) 空正文分支 + failed locations=[]" % kind,
+               "text=%r locations=%r problems=%r"
+               % (uf.get("text"), uf.get("locations"),
+                  N.validate_unit(uf)))
 
     # C5 covers / does_not_cover 必填且无默认值
     cases = [
