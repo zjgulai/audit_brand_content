@@ -211,7 +211,7 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 | P-1 原子提交 | **部分（组件关闭，真实断电未测）** | 原子提交 + 六崩溃点 + 恢复四态 + **stale lock 清理 + 投影重建/manifest 对拍（27/27，C19–C24）** | 真实断电只能记未测，不冒充 |
 | G-2 outbox | **关闭** | 21/21，含四类反向对照 | — |
 | G-3 durable inbox | **关闭** | 12/12，含续传与坏游标回退 | — |
-| G-4 认证/RBAC | **部分** | session/step-up 22/22；RBAC/ACL 35/35 | takedown 人级 allowlist；IT/机器元数据按对象收敛；grant 的 scope 校验（T0-07b，0e 在办） |
+| G-4 认证/RBAC | **关闭** | session/step-up 22/22；RBAC/ACL **73/73**（含 takedown 人级 allowlist 两本、元数据按对象收敛、grant 三方 scope 校验）；通知按 recipient 隔离（P0 修复） | — |
 | G-5 沙箱 | **关闭（组件）** | **20/20**：绝对路径放行/拒绝、孙进程 killpg 回收、env 白名单、RLIMIT_AS 不可用时显式记未测 | — |
 | G-6 最小化 | **关闭（链路接入）** | redact 99 项 + **send_gateway 唯一出口接入（31/31，正样本遮蔽/负样本不误遮/删调用 6 条红）** | — |
 
