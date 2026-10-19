@@ -3,6 +3,11 @@
 > 生成依据：`PMO/audit/验收表-v3-覆盖全部判据-20261017.md`（不改表）。  
 > 初始 runner：mapped=86；补 10 条核心 A 后 **mapped=96 / passed=96 / failed=0 / untested=40**，rc=2。  
 > **2026-10-19 第二批：新接 3 条（51 / 59 / 65）→ mapped=99 / passed=99 / failed=0 / untested=37**，rc=2。
+> **2026-10-19 行 69/71 批次：71 已接（`verify_control_points.py --row 71`）；69 因 12 项清单缺失保持 untested。**
+> 本批最终 runner 读数为 **mapped=101 / passed=100 / failed=1 / untested=35**，rc=1；
+> 唯一 failed 是 **#78**：并行会话新接的 `verify_engine_contract.py` 映射在 10s
+> sandbox 内超时，与行 69/71 无关。#54 在本批运行中途由并行会话修复后已转 passed。
+> 全局读数以当次 `verify_acceptance_run.py` 输出为准。
 >
 > ★ 本批有 **2 条查过之后决定不接**（21 / 78）—— 它们「看起来能接」：
 > 21 有 `verify_normalizer.py` 的 C2b 段，78 有 `verify_engine_contract.py` 的 V61 段。
@@ -14,7 +19,7 @@
 
 | 分类 | 条数 | 含义 |
 |---|---:|---|
-| A 现在就能补 | 16 | 模块已实现，只缺 fixture/command；已接 13 条，余 3 条因现有 verifier 覆盖不足留 untested |
+| A 现在就能补 | 16 | 模块已实现，只缺 fixture/command；已接 14 条，余 2 条（69 / 77）因清单缺失或现有 verifier 覆盖不足留 untested |
 | B 阶段 3–5 | 22 | OCR/ASR/前端/部署/回归集/CI，保持 untested |
 | C 口径待定 | 12 | 实现或口径有歧义，需补专项验证器或委托方确认 |
 
@@ -41,13 +46,13 @@
 | 59 | SEC-4.3.1-5 | md 与 IR 一致、无遗漏无多出 | **A（已接）** | **2026-10-19 已接 `verify_report_consistency.py`**：用真实渲染器生成报告、验证器**自己解析** finding_id / control_code / decision.state 与 IR 对拍（不在渲染器里自证），并断言 `ReportStore.publish` 对不一致文本**物理阻断**（不落盘、不给 URL） | ✅ 已接 `verify_report_consistency` |
 | 65 | L3-4 | 回执禁词 | **A（已接）** | **2026-10-19 已接 `verify_send_gateway.py` 第 7 段（7a/7b/7c）**：四个禁词（通过 / 已通过 / 无需处理 / 审批完成）扫回执文本与卡片 payload；注入 `"本次审批已通过，无需处理。"` 断言**阻断并报出命中词**（证明扫描不是恒真）；反向对照 `"本周审核通过率为 98%"` 不误拦（`(?!率)` 负向断言） | ✅ 已接 `verify_send_gateway` |
 | 66 | L4-1 / SEC-8-8 | 群里不刷屏、L4/L5 不被数量吞掉 | A | 模块已实现，只缺 fixture/command | 已接 `verify_report_render` |
-| 69 | SEC-5-1 / SEC-5-1b | 七族骨架与 12 个一级分类无遗漏归并 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
+| 69 | SEC-5-1 / SEC-5-1b | 七族骨架与 12 个一级分类无遗漏归并 | A | **2026-10-19 已加条件执行点**：`verify_control_points.py --row 69` 校验七族骨架；若 `research/governance/category-to-family-v1.json` 存在，则校验 12 项、category 唯一、family ∈ 七族、count 一致。**盘上当前没有 12 项一级分类清单，不编造** → 该命令退 2，行 69 保持 untested | 待产品提供 12 项清单后落上述 JSON，**再把行 69 接到 `--row 69`**（命令已就绪）；在此之前保持 untested，不接为 passed |
 | 70 | SEC-5-2 / SEC-5-3 / SEC-5-4 | 族调整必须升版本、留痕、回执记实际版本 | C | 族调整升版本/留痕：控制点版本变更审计未实现 | 补专项验证器或先由委托方确认口径 |
-| 71 | SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24 | 首批 20 真码、安全词、历史码保留 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
+| 71 | SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24 | 首批 20 真码、安全词、历史码保留 | **A（已接）** | **2026-10-19 已接 `verify_control_points.py --row 71`**：B-1 断言码集**精确等于** H01–H09/M01–M07/U01–U04；B-2 断言 `安全词` 不是控制点码；B-3 断言安全词已落白名单或显式退役；B-4 对每个 active 码反查 enabled 规则且 external_ref 非空；B-5 断言 U02 存在、deprecated、无 enabled 规则；B-6 对历史每条 `codes` 快照断言首批码不消失；B-7 有 `name_by_code` 时对拍语义、没有时不冒充 | ✅ 已接 `verify_control_points --row 71` |
 | 74 | SEC-5-9 | 新增控制点三条件 | C | 新增控制点三条件：规则+依据+版本联动未实现 | 补专项验证器或先由委托方确认口径 |
 | 76 | SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27 | 唯一归属、码分配登记表、跨族拆分 | C | 唯一归属/码分配登记：登记表与跨族拆分未实现 | 补专项验证器或先由委托方确认口径 |
 | 77 | SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32 | 未知桶四值强制转人工并计数 | A | 模块已实现，只缺 fixture/command | 现有 verifier 覆盖不足，留 untested；需补专项 fixture |
-| 78 | SEC-5-33 | rule_code 是唯一机器键、不以 58 子类当全集 | C | **2026-10-19 复核：键名对不上，不能接。** `verify_engine_contract.py` 的 V61 段（8 条：唯一键 / 一条 subclass 至多映射一条 / 三个坏样本必红）验的是 **`rule_key`**，而本行与 Playbook §5 写的是 **`rule_code`**。实测 `research/governance/skeleton/rules-v1.json` 26 条规则全部用 `rule_key`，`rule_code` 出现 **0 次**。<br>V61 的断言本身是好的，但它钉的键名与判据写的不是同一个 —— **接上去等于用 A 字段的验证冒充 B 字段已验证**。 | 先定口径：判据的 `rule_code` 改 `rule_key`（跟随实现），还是规则数据改名 `rule_code`（跟随 Playbook）。定了之后 V61 可直接接，无需改验证器 |
+| 78 | SEC-5-33 | rule_code 是唯一机器键、不以 58 子类当全集 | C | **2026-10-19 二次复核（D-126 之后）：术语障碍已消除，但仍有两条验法没有执行点，仍不能接。**<br>**已解决**：Playbook `0b26bbc6…` / 验收表 `ed26e413…` 已统一为 `rule_key`（`rule_code` 在两者中均 0 处），V61 段的键名现在与判据一致。<br>**仍然对不上的部分** —— 行 78 的「怎么验」有三条，V61 只覆盖第一条的一半：<br>① 「所有机器连接与报告生成都以 rule_key（或 control_code）为键」→ V61e 只查了 `reject.hits` **一个样本**的键，没有全仓扫描；`tools/audit/report_render.mjs` 用的是 `control_code`（符合「或」），但同样没有断言钉住。<br>② 「控制点数量口径来自主表而不是 58」→ **全仓无任何断言**（`verify_control_points.py` 的 CP-2 查的是码重复，不是数量口径）。<br>③ 「构造一份只按 58 子类统计的报告，断言与主表口径不一致时报警」→ **全仓无实现**：`base/` 下 `subclass` 出现 0 次，无报警路径。<br>**若现在接上，runner 会把「键名唯一」记成「整条 SEC-5-33 已验证」—— 那是把 1/3 的覆盖说成 3/3。** | 补 ②③ 的执行点后可接：② 在 `verify_control_points.py` 加「控制点数量以主表行数为准、与 58 子类计数不等价」；③ 加「构造纯 58 口径报告 → 与主表口径比较 → 不一致必须报警」的正反样本。这两条补完后 V61 + 它们一起接行 78 |
 | 85 | SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4 | 冻结回归集规模、陷阱样本、覆盖、指纹与变更门 | B | 冻结回归集规模/陷阱样本/变更门：属阶段 5 回归治理 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 86 | SEC-6-GS-4 | 回归集维护归属与法务确认 | B | 回归集 owner 与法务确认：人工签署，阶段 5 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
 | 87 | 戊 / SEC-6-GS-5 / SEC-8-6 | 规则变更前后对比读数 | B | 规则变更前后对比读数：依赖冻结回归集，阶段 5 | 阶段 3–5 环境/模块落地后接；当前保持 untested |
