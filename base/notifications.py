@@ -53,12 +53,12 @@ BJT = timezone(timedelta(hours=8))
 # ── 通知类型 ────────────────────────────────────────────
 TYPES = frozenset({"invalidation", "auto_rereview", "takedown",
                    "lease_released", "formal_submit",
-                   "release_signed", "release_revoked"})
+                   "release_signed", "release_revoked", "case_overdue"})
 
 # 只进 Web inbox、不许发飞书的类型
 INBOX_ONLY = frozenset({"invalidation", "auto_rereview",
                         "lease_released", "formal_submit",
-                        "release_signed", "release_revoked"})
+                        "release_signed", "release_revoked", "case_overdue"})
 
 # 走飞书的类型（下线任务催办）
 FEISHU_TYPES = frozenset({"takedown"})
@@ -353,6 +353,7 @@ EVENT_TYPE = {
     "formal_submit": "formal_submit",
     "release_signed": "release_signed",
     "release_revoked": "release_revoked",
+    "case_overdue": "case_overdue",
     "takedown_created": "takedown",
     "takedown_completed": "takedown",
     "takedown_failed": "takedown",
@@ -520,6 +521,13 @@ def default_recipients(kind: str, subject: dict) -> list[str]:
         # 签发/撤回：通知提交人（他知道结果）。
         who = subj.get("submitter_id")
         return [who] if isinstance(who, str) and who else []
+
+    if kind == "case_overdue":
+        # 升级：发给 subject 里已解析好的接收人（由 case_watch 决定，这里不重算）。
+        got = subj.get("escalation_recipients")
+        if isinstance(got, (list, tuple)):
+            return [x for x in got if isinstance(x, str) and x]
+        return []
 
     if kind.startswith("takedown_"):
         # 下线任务：负责人 + 复核人，去重保序。
