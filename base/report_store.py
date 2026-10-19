@@ -36,6 +36,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.parse
 
@@ -47,6 +48,57 @@ try:
     from base.send_gateway import FORBIDDEN_RECEIPT_WORDS
 except Exception:  # noqa: BLE001
     from send_gateway import FORBIDDEN_RECEIPT_WORDS
+
+
+FINDING_LINE_RE = re.compile(r"^\s*-\s+(\S+)\s+·\s*控制点：\s*(\S+)", re.M)
+STATE_LINE_RE = re.compile(r"^\s*-\s*状态：\s*(.+?)\s*$", re.M)
+
+
+def rendered_report_mismatches(ir, text):
+    """C-59：报告渲染文本与 IR 的独立对拍。
+
+    ★ 「解析不到 finding 行」不能当成「零不一致」：IR 有 findings 而文本里
+      一行都解析不出 → `ir_render_unparsable`，由 publish 直接阻断。
+    """
+    errs = []
+    if not isinstance(text, str):
+        return ["ir_render_unparsable:text_not_str"]
+    findings = (ir or {}).get("findings")
+    decision = (ir or {}).get("decision")
+    if not isinstance(findings, list) or not isinstance(decision, dict):
+        return ["ir_render_unparsable:ir_missing_findings_or_decision"]
+
+    lines = FINDING_LINE_RE.findall(text)
+    if findings and not lines:
+        return ["ir_render_unparsable:no_finding_lines"]
+
+    ir_pairs = [(str(f.get("finding_id")), str(f.get("control_code")))
+                for f in findings if isinstance(f, dict)]
+    ir_ids = {i for i, _ in ir_pairs}
+    ir_by_id = {i: c for i, c in ir_pairs}
+    seen = {}
+    for fid, code in lines:
+        seen[(fid, code)] = seen.get((fid, code), 0) + 1
+    parsed_ids = {i for i, _ in lines}
+    for fid, code in ir_pairs:
+        if (fid, code) not in seen:
+            errs.append("missing_or_wrong_finding:%s:%s" % (fid, code))
+    for (fid, code), n in seen.items():
+        if fid not in ir_ids:
+            errs.append("unexpected_finding:%s" % fid)
+        elif ir_by_id.get(fid) != code:
+            errs.append("wrong_control_code:%s:%s!=%s" % (fid, code, ir_by_id.get(fid)))
+        if n > 1:
+            errs.append("duplicate_finding_line:%s" % fid)
+
+    state = decision.get("state")
+    if state is not None:
+        states = [s.strip() for s in STATE_LINE_RE.findall(text)]
+        if not states:
+            errs.append("ir_render_unparsable:no_state_line")
+        elif any(s != state for s in states):
+            errs.append("state_mismatch:%r!=%r" % (states[0], state))
+    return errs
 
 
 def _canonical(obj):
@@ -238,6 +290,13 @@ class ReportStore(object):
         hits = _receipt_hits(text)
         if hits:
             return _receipt_error(hits)
+        # ★ C-59：IR ↔ 渲染文本独立对拍。不一致/解析不出 → 不落盘、不给 URL。
+        mismatches = rendered_report_mismatches(ir, text)
+        if mismatches:
+            if mismatches[0].startswith("ir_render_unparsable"):
+                return {"ok": False, "url": None, "detail": mismatches[0]}
+            return {"ok": False, "url": None,
+                    "detail": "ir_render_mismatch:" + ";".join(mismatches[:3])}
         # ★ R1 里的 `source_ir_version` 指的是报告里那一行；优先用 IR 的
         #   `source_ir_version` 字段（渲染器就是打印它），缺省才退回 ir_version。
         source_version = ir.get("source_ir_version") or version

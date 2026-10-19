@@ -52,7 +52,9 @@ P_IT = {"id": "u5", "role": "IT", "tenant": "t1", "product_line": "p1"}
 
 
 def ir(version=1, body="A"):
-    return {"ir_id": "ir_1", "ir_version": version, "body": body}
+    return {"ir_id": "ir_1", "ir_version": version, "body": body,
+            "source_ir_version": "cu-test", "findings": [],
+            "decision": {"state": "PASS"}}
 
 
 def fp(x):
@@ -61,27 +63,36 @@ def fp(x):
 
 
 def render(x):
-    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n正文 %s\n"
-            % (x["ir_version"], fp(x), x.get("body", "")))
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n"
+            "- 状态：%s\n\n正文 %s\n"
+            % (x.get("source_ir_version") or x["ir_version"], fp(x),
+               x.get("decision", {}).get("state", "PASS"), x.get("body", "")))
 
 
 def render_missing_version(x):
-    return "# 报告\n\nsource_ir_fingerprint: %s\n\n正文 %s\n" % (fp(x), x.get("body", ""))
+    return ("# 报告\n\nsource_ir_fingerprint: %s\n- 状态：%s\n\n正文 %s\n"
+            % (fp(x), x.get("decision", {}).get("state", "PASS"), x.get("body", "")))
 
 
 def render_bad_fp(x):
-    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n正文\n"
-            % (x["ir_version"], "0" * 64))
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n"
+            "- 状态：%s\n\n正文\n"
+            % (x.get("source_ir_version") or x["ir_version"], "0" * 64,
+               x.get("decision", {}).get("state", "PASS")))
 
 
 def render_forbidden(x):
-    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n"
-            "本次审批已通过，无需处理。\n" % (x["ir_version"], fp(x)))
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n"
+            "- 状态：%s\n\n本次审批已通过，无需处理。\n"
+            % (x.get("source_ir_version") or x["ir_version"], fp(x),
+               x.get("decision", {}).get("state", "PASS")))
 
 
 def render_ratio(x):
-    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n"
-            "本周审核通过率为 98%%。\n" % (x["ir_version"], fp(x)))
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n"
+            "- 状态：%s\n\n本周审核通过率为 98%%。\n"
+            % (x.get("source_ir_version") or x["ir_version"], fp(x),
+               x.get("decision", {}).get("state", "PASS")))
 
 
 def main():
@@ -137,9 +148,12 @@ def main():
     T("B2 旧文件字节不变", open(path, "rb").read() == old_bytes, "")
     T("B3 索引两条（只追加）", len(store.read_index()["records"]) == 2, str(len(store.read_index()["records"])))
     # 渲染文本相同但 IR 版本不同 → 仍必须新 id（R2）
-    same_text = "# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n\n正文 X\n"
-    rr = store.publish(ir(3, "X"), lambda x: same_text % (x["ir_version"], fp(x)), ACL)
-    rr2 = store.publish(ir(4, "X"), lambda x: same_text % (x["ir_version"], fp(x)), ACL)
+    same_text = ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n"
+                 "- 状态：%s\n\n正文 X\n")
+    rr = store.publish(ir(3, "X"),
+                       lambda x: same_text % (x["source_ir_version"], fp(x), "PASS"), ACL)
+    rr2 = store.publish(ir(4, "X"),
+                        lambda x: same_text % (x["source_ir_version"], fp(x), "PASS"), ACL)
     T("B4 渲染文本相同、IR 版本不同 → 不同 id",
       rr.get("ok") and rr2.get("ok") and rr["report_id"] != rr2["report_id"], "%s / %s" % (rr, rr2))
 
