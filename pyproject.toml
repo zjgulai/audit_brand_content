@@ -12,3 +12,8 @@ dependencies = [
 [tool.uv]
 # 开发/CI/生产必须 `uv sync --locked`（G-02）；不许无锁安装。
 package = false
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+]
