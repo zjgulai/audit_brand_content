@@ -75,6 +75,43 @@ BASELINE = {"precision": 0.983, "recall": 0.962, "f1": 0.972,
             "catch_all": 162, "records": 291}
 
 
+def rule_key_problems(rules):
+    """C-78：rule_key 唯一机器键；subclass_code 只能是可选展示属性。
+
+    返回问题清单（空 = 合法）。这是执行点，不是注释。
+    """
+    if not isinstance(rules, list):
+        return ["rules_not_list"]
+    errs = []
+    keys = []
+    for i, r in enumerate(rules):
+        if not isinstance(r, dict):
+            errs.append("rule_%d_not_object" % i)
+            continue
+        k = r.get("rule_key")
+        if not isinstance(k, str) or not k.strip():
+            errs.append("rule_%d_missing_rule_key" % i)
+        else:
+            keys.append(k)
+    dup = sorted({k for k in keys if keys.count(k) > 1})
+    if dup:
+        errs.append("duplicate_rule_key:%s" % dup)
+    subclass = {}
+    for r in rules:
+        if not isinstance(r, dict):
+            continue
+        sc = r.get("subclass_code")
+        if sc is None:
+            continue
+        if not isinstance(sc, str) or not sc.strip():
+            errs.append("bad_subclass_code:%r" % (sc,))
+            continue
+        if sc in subclass:
+            errs.append("subclass_maps_two_rules:%s" % sc)
+        subclass[sc] = r.get("rule_key")
+    return errs
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
@@ -3092,6 +3129,55 @@ def main() -> int:
               len(_fr60) == 2 and not _bad60,
               f"命中 {len(_fr60)} 条 · 不合格 {_bad60 or '无'} · "
               f"两条的 wire_gap 都点名 Q47={'Q47' in ((_fr60[0].get('wire_gap') or '') if _fr60 else '')}")
+
+    # ── V61（C-78）：rule_key 是唯一机器键；58 子类只做可选展示 ─────────
+    if not a.only or a.only.startswith("V61"):
+        _rules_doc = json.loads((SKEL / "rules-v1.json").read_text(encoding="utf-8"))
+        _rules = _rules_doc.get("rules")
+        _problems = rule_key_problems(_rules)
+        check("V61a", "rule_key 唯一机器键：每条规则都有非空 rule_key，且无重复",
+              not _problems, str(_problems))
+        _keys = [r.get("rule_key") for r in (_rules or []) if isinstance(r, dict)]
+        check("V61b", "规则条数与 rule_key 数一致（缺失键会立刻少一条）",
+              len(_keys) == len(_rules or []) and len(_keys) > 0,
+              f"rules={len(_rules or [])} keys={len(_keys)}")
+
+        _subs = [r.get("subclass_code") for r in (_rules or [])
+                 if isinstance(r, dict) and r.get("subclass_code") is not None]
+        check("V61c", "subclass_code 可选；若出现，一个 subclass 最多映射一条规则",
+              len(_subs) == len(set(_subs)),
+              f"subclass_code 条数={len(_subs)} 唯一={len(set(_subs))}（当前清单未落盘，0 条）")
+
+        _readme = (SKEL.parent / "README.md").read_text(encoding="utf-8")
+        check("V61d", "58 子类权威清单未落盘时，README 必须明说「清单待补」，不得编数据",
+              "58 子类" in _readme and "清单待补" in _readme,
+              "README 含 58 子类 / 清单待补")
+
+        _hit_keys = [h.get("rule_key") for h in R["reject"]["hits"]]
+        check("V61e", "判定输出以 rule_key 为键（没有第二个机器键）；冲突时 rule_key 为准",
+              all(isinstance(k, str) and k in set(_keys) for k in _hit_keys),
+              f"hits 的 rule_key={sorted(set(_hit_keys))}")
+
+        # 反向对照：坏样本必须被 rule_key_problems 抓到
+        _bad_dup = copy.deepcopy(_rules)
+        if len(_bad_dup) >= 2:
+            _bad_dup[1]["rule_key"] = _bad_dup[0]["rule_key"]
+        check("V61f", "坏样本：重复 rule_key → 必须红",
+              "duplicate_rule_key" in " ".join(rule_key_problems(_bad_dup)),
+              str(rule_key_problems(_bad_dup)))
+        _bad_missing = copy.deepcopy(_rules)
+        if _bad_missing:
+            _bad_missing[0].pop("rule_key", None)
+        check("V61g", "坏样本：缺 rule_key → 必须红",
+              "missing_rule_key" in " ".join(rule_key_problems(_bad_missing)),
+              str(rule_key_problems(_bad_missing)))
+        _bad_sub = copy.deepcopy(_rules)
+        if len(_bad_sub) >= 2:
+            _bad_sub[0]["subclass_code"] = "SC-1"
+            _bad_sub[1]["subclass_code"] = "SC-1"
+        check("V61h", "坏样本：一个 subclass 挂两条 → 必须红",
+              "subclass_maps_two_rules" in " ".join(rule_key_problems(_bad_sub)),
+              str(rule_key_problems(_bad_sub)))
 
     ok = sum(1 for _, o, _ in RESULTS if o)
     n = len(RESULTS)

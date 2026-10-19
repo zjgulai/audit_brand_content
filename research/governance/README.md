@@ -398,3 +398,12 @@ R7-W3 报出一条 Amazon Ads 的「英国放松型覆写」证据，**我最初
 | G22 | ISO 13485 / IEC 60601-1 / ISO 10079-1 标准正文未取得 | **补齐前规则库不应把任何标准号写成「符合」** |
 | G23 | **EN 1186 / EN 14372 的标题与范围未取得**（CEN 检索走 APEX POST，被其 WAF 挡为 HTTP 500）；**欧洲理事会 ResAP(2004)5 正文未取得**（coe.int / rm.coe.int / edqm.eu 对本网络出口 IP 返回 Cloudflare 403） | 三项均为**取数通道问题，不是文件不存在**，换网络出口即可。**在补齐前规则库不应引用这三项作为硅胶的依据**。与 G22 同源，建议合并处理 |
 | G24 | **9 个州的 BPA 立法未核验**（IL / CT / VT / WI / WA / MD / VA / MA / NV） | 这些主机在本环境**网络层不可达** —— curl 与 web_fetch、带与不带浏览器 UA 均同样失败，且 archive.org 不可达、**无 Wayback 兜底**。BPA 结论建立在已核验的 CA / MN / NY / ME 四州上 |
+
+---
+
+## 规则键与 58 子类（C-78）
+
+- `research/governance/skeleton/rules-v1.json` 的 **`rule_key` 是唯一机器键**：每条规则必须有非空、互不重复的 `rule_key`；判定输出也以它为准。
+- Playbook v0 提到的「`分类确认` 表 12 个一级、58 个子类」**权威清单不在本仓盘上**（v0 只给了每族子类数 15/23/6/2/2/6/4，没有逐条名称）。**58 子类清单待补**——本仓不编造缺失条目。
+- `subclass_code` 只是**可选展示属性**，当前 0 条；补入时一个 subclass 最多映射一条规则，冲突时以 `rule_key` 为准。
+- 执行点：`python3 tools/verify_engine_contract.py --only V61`（V61a…V61h；含重复 `rule_key` / 缺键 / 一个 subclass 挂两条的反向对照）。
