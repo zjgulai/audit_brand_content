@@ -37,6 +37,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 TABLE = ROOT / "research" / "governance" / "control-points-v1.json"
 ROUTING = ROOT / "research" / "governance" / "routing-v1.json"
+HISTORY = ROOT / "research" / "governance" / "control-points-history.json"
+RULES = ROOT / "research" / "governance" / "skeleton" / "rules-v1.json"
 
 # Playbook §5.3.1 的九个字段（parent 允许为空值，但**字段必须存在**）
 REQUIRED_CP_FIELDS = (
@@ -257,13 +259,183 @@ def check_empty_families(cp: dict) -> list:
     return out
 
 
+# ───────────── C-70 / C-74 / C-76：族变更留痕 / 新码准入 / 码分配 ─────────────
+
+def _codes(cp):
+    return [r.get("control_code") for r in (cp.get("control_points") or [])
+            if isinstance(r, dict)]
+
+
+def _family_map(cp):
+    return {r.get("control_code"): r.get("family")
+            for r in (cp.get("control_points") or []) if isinstance(r, dict)}
+
+
+def _version_num(v):
+    import re as _re
+    m = _re.search(r"-v(\d+)$", str(v or ""))
+    if not m:
+        m = _re.search(r"^v(\d+)$", str(v or ""))
+    return int(m.group(1)) if m else None
+
+
+def check_registry(cp):
+    """C-76：主表即码分配登记表；一个码只能属于一个族；跨族拆分必须显式批准。"""
+    out = []
+    families = cp.get("families")
+    rows = [r for r in (cp.get("control_points") or []) if isinstance(r, dict)]
+    bad_family = []
+    for r in rows:
+        code = r.get("control_code")
+        fam = r.get("family")
+        if not isinstance(fam, str) or fam not in (families or []):
+            bad_family.append(f"{code}.family={fam!r}")
+    out.append(_check("C76-1", not bad_family,
+                      f"每行 family 必须是单值且在 families 内；非法 {len(bad_family)}"
+                      + (f"：{bad_family[:5]}" if bad_family else "")))
+
+    split = []
+    for r in rows:
+        code = r.get("control_code")
+        cross = (isinstance(r.get("family"), list)
+                 or "families" in r
+                 or r.get("family_split") is True)
+        if not cross:
+            continue
+        ap = r.get("family_split_approval")
+        ok = (isinstance(ap, dict) and not _blank(ap.get("who"))
+              and not _blank(ap.get("why"))
+              and isinstance(ap.get("evidence"), list) and ap["evidence"])
+        if not ok:
+            split.append(code)
+    out.append(_check("C76-2", not split,
+                      f"跨族拆分必须带 family_split_approval(who/why/evidence)；缺 {len(split)}"
+                      + (f"：{split}" if split else "")))
+
+    # 同一 code 出现两次且 family 不同（CP-2 只查重复，这里查「重复且跨族」）
+    seen = {}
+    conflict = []
+    for r in rows:
+        c, f = r.get("control_code"), r.get("family")
+        if c in seen and seen[c] != f:
+            conflict.append(c)
+        seen[c] = f
+    out.append(_check("C76-3", not conflict,
+                      f"同一 code 跨族 {len(conflict)}" + (f"：{conflict}" if conflict else "")))
+    return out
+
+
+def check_history(cp, history):
+    """C-70：历史文件存在；最后一条与当前 table_version/码/族快照一致。"""
+    out = []
+    if not isinstance(history, dict):
+        return [_check("H-1", False,
+                       "control-points-history.json 不存在或不是对象 —— 族/码变更无留痕")]
+    entries = history.get("entries")
+    if not isinstance(entries, list) or not entries:
+        return [_check("H-1", False, "history.entries 为空 —— 没有任何变更记录")]
+
+    bad_entry = []
+    bad_evidence = []
+    for i, e in enumerate(entries):
+        if not isinstance(e, dict):
+            bad_entry.append(f"#{i} 不是对象")
+            continue
+        for k in ("version", "at", "who", "why"):
+            if _blank(e.get(k)):
+                bad_entry.append(f"#{i} 缺 {k}")
+        ev = e.get("evidence")
+        if not isinstance(ev, list) or not ev:
+            bad_entry.append(f"#{i} 缺 evidence")
+        else:
+            for x in ev:
+                if not isinstance(x, str) or not x.strip():
+                    bad_evidence.append(f"#{i} evidence 项不是非空字符串")
+                elif not (ROOT / x).exists():
+                    bad_evidence.append(f"#{i} evidence 不存在：{x}")
+    out.append(_check("H-2", not bad_entry,
+                      f"{len(entries)} 条历史；字段不合格 {len(bad_entry)}"
+                      + (f"：{bad_entry[:4]}" if bad_entry else "")))
+    out.append(_check("H-2b", not bad_evidence,
+                      f"evidence 路径不合格 {len(bad_evidence)}"
+                      + (f"：{bad_evidence[:3]}" if bad_evidence else "")))
+
+    last = entries[-1] if isinstance(entries[-1], dict) else {}
+    out.append(_check("H-3", last.get("version") == cp.get("table_version"),
+                      "最后一条历史 version=%r；主表 table_version=%r"
+                      % (last.get("version"), cp.get("table_version"))))
+
+    cur_codes = sorted(_codes(cp))
+    hist_codes = last.get("codes")
+    out.append(_check("H-4", hist_codes == cur_codes,
+                      ("码集合与最后一条历史一致" if hist_codes == cur_codes else
+                       "码集合与最后一条历史不一致（增/删码必须升版本并追加历史）："
+                       "历史 %r / 当前 %r" % (hist_codes, cur_codes))))
+
+    cur_fam = _family_map(cp)
+    hist_fam = last.get("family_by_code")
+    out.append(_check("H-5", hist_fam == cur_fam,
+                      ("族归属与最后一条历史一致" if hist_fam == cur_fam else
+                       "族归属与最后一条历史不一致（改族未升版本/未留痕即红）："
+                       "历史 %r / 当前 %r" % (hist_fam, cur_fam))))
+    return out
+
+
+def check_new_codes(cp, history, rules):
+    """C-74：相对上一条历史新增的码，必须有规则引用/依据引用/版本；版本必须递增。"""
+    out = []
+    if not isinstance(history, dict):
+        return out
+    entries = history.get("entries")
+    if not isinstance(entries, list) or len(entries) < 2:
+        return out  # 初始基线：没有「上一版」可对比
+    prev = entries[-2] if isinstance(entries[-2], dict) else {}
+    prev_codes = set(prev.get("codes") or [])
+    current = _codes(cp)
+    new = [c for c in current if c not in prev_codes]
+    if not new:
+        return out
+
+    parents = set()
+    if not isinstance(rules, dict) or not isinstance(rules.get("rules"), list):
+        out.append(_check("C74-0", False, "E_RULES_UNREADABLE：有新增码但 rules-v1.json 读不出"))
+    else:
+        parents = {r.get("parent_rule") for r in rules["rules"] if isinstance(r, dict)}
+
+    rows = {r.get("control_code"): r for r in (cp.get("control_points") or [])
+            if isinstance(r, dict)}
+    no_rule, no_auth, no_ver = [], [], []
+    for code in new:
+        r = rows.get(code) or {}
+        if code not in parents:
+            no_rule.append("E_CP_RULE_MISSING:%s" % code)
+        if not (r.get("authority_ref") or []):
+            no_auth.append("E_CP_AUTHORITY_MISSING:%s" % code)
+        if _blank(r.get("version")):
+            no_ver.append("E_CP_VERSION_MISSING:%s" % code)
+    out.append(_check("C74-1", not no_rule, f"新增码缺规则引用 {len(no_rule)}：{no_rule}"))
+    out.append(_check("C74-2", not no_auth, f"新增码缺依据引用 {len(no_auth)}：{no_auth}"))
+    out.append(_check("C74-3", not no_ver, f"新增码缺版本号 {len(no_ver)}：{no_ver}"))
+
+    pv, cv = _version_num(prev.get("version")), _version_num(cp.get("table_version"))
+    inc_ok = pv is not None and cv is not None and cv > pv
+    out.append(_check("C74-4", inc_ok,
+                      "E_TABLE_VERSION_NOT_INCREMENTED：有新增码时 table_version 必须递增；"
+                      "上一版 %r / 当前 %r" % (prev.get("version"), cp.get("table_version"))))
+    return out
+
+
 # ─────────────────────────── 汇总 ───────────────────────────
 
-def evaluate(cp, rt) -> dict:
+def evaluate(cp, rt, history=None, rules=None, require_history=False) -> dict:
     checks = []
     checks += check_control_points(cp)
     checks += check_routing(rt, cp)
     checks += check_empty_families(cp)
+    checks += check_registry(cp)
+    if require_history or history is not None:
+        checks += check_history(cp, history)
+    checks += check_new_codes(cp, history, rules)
     reds = [c for c in checks if not c["ok"]]
     return {"checks": checks, "reds": reds,
             "verdict": "red" if reds else "ok",
@@ -311,8 +483,8 @@ def _deep(obj):
 def selftest(verbose: bool = False) -> int:
     results = []
 
-    def expect(name, cp, rt, want_ok):
-        r = evaluate(cp, rt)
+    def expect(name, cp, rt, want_ok, history=None, rules=None):
+        r = evaluate(cp, rt, history, rules)
         got = (r["verdict"] == "ok")
         results.append((name, got == want_ok, f"期望 {'绿' if want_ok else '红'}，实际 {r['verdict']}"
                         + ("" if got == want_ok else f"；红项={[c['id'] for c in r['reds']]}")))
@@ -370,6 +542,82 @@ def selftest(verbose: bool = False) -> int:
     cp["table_version"] = ""
     expect("table_version 空", cp, rt, False)
 
+    # ⑪ C-70/74/76：好样本 + 历史/规则
+    cp, rt = _deep(cp0), _deep(rt0)
+    hist = {
+        "entries": [{
+            "version": cp["table_version"], "at": "2026-10-18",
+            "who": "test", "why": "baseline", "evidence": ["README.md"],
+            "codes": [r["control_code"] for r in cp["control_points"]],
+            "family_by_code": {r["control_code"]: r["family"]
+                               for r in cp["control_points"]},
+        }]
+    }
+    rules = {"rules": [{"parent_rule": r["control_code"]}
+                       for r in cp["control_points"]]}
+    expect("历史/规则好样本", cp, rt, True, hist, rules)
+
+    # ⑫ 改族但版本/历史没跟 → H-5 红
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"][0]["family"] = "F2"
+    expect("改族未升版本", cp, rt, False, hist, rules)
+
+    # ⑬ 新增码缺规则/依据/版本 + 版本未递增 → C74 红
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"].append({
+        "control_code": "X03", "control_name": "new", "family": "F1",
+        "judge_type": "literal", "authority_kind": "external",
+        "authority_ref": [], "parent": None, "version": "", "status": "active",
+    })
+    rt["routes"].append({"control_code": "X03", "owner": "法务", "layer": "DP4",
+                         "due": "2d", "escalation": "项目统筹", "appeal": "receipt_id"})
+    hist_cur = _deep(hist)
+    hist_cur["entries"].append({
+        "version": "test-v2", "at": "2026-10-19", "who": "test", "why": "add X03",
+        "evidence": ["README.md"],
+        "codes": [r["control_code"] for r in cp["control_points"]],
+        "family_by_code": {r["control_code"]: r["family"] for r in cp["control_points"]},
+    })
+    cp["table_version"] = "test-v2"
+    r_bad = evaluate(cp, rt, hist_cur, rules)
+    ids = {c["id"] for c in r_bad["reds"]}
+    results.append(("新增码缺三条件", {"C74-1", "C74-2", "C74-3"} <= ids,
+                    f"红项={sorted(ids)}"))
+
+    # ⑭ 新码三条件齐但版本未递增 → C74-4 红
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"].append({
+        "control_code": "X03", "control_name": "new", "family": "F1",
+        "judge_type": "literal", "authority_kind": "external",
+        "authority_ref": [{"entry_id": "E3"}], "parent": None,
+        "version": "v1", "status": "active",
+    })
+    rt["routes"].append({"control_code": "X03", "owner": "法务", "layer": "DP4",
+                         "due": "2d", "escalation": "项目统筹", "appeal": "receipt_id"})
+    hist_same = _deep(hist_cur)
+    hist_same["entries"][-1]["version"] = cp["table_version"]
+    rules_x3 = {"rules": rules["rules"] + [{"parent_rule": "X03"}]}
+    r_bad2 = evaluate(cp, rt, hist_same, rules_x3)
+    results.append(("新码版本未递增", "C74-4" in {c["id"] for c in r_bad2["reds"]},
+                    f"红项={sorted({c['id'] for c in r_bad2['reds']})}"))
+
+    # ⑮ 跨族拆分无批准 → C76-2 红
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"][0]["families"] = ["F1", "F2"]
+    expect("跨族拆分无批准", cp, rt, False, hist, rules)
+
+    # ⑯ 同一 code 跨族 → CP-2/C76-3 红
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"].append(dict(cp["control_points"][0], family="F2"))
+    expect("同一 code 跨族", cp, rt, False, hist, rules)
+
+    # ⑰ 跨族拆分有显式批准 → 不误报（反向对照：不是恒红）
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"][0]["families"] = ["F1", "F2"]
+    cp["control_points"][0]["family_split_approval"] = {
+        "who": "产品+法务", "why": "跨族拆分批准", "evidence": ["README.md"]}
+    expect("跨族拆分有批准", cp, rt, True, hist, rules)
+
     ok = sum(1 for _, p, _ in results if p)
     total = len(results)
     print("=" * 62)
@@ -393,6 +641,8 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--table", default=str(TABLE))
     ap.add_argument("--routing", default=str(ROUTING))
+    ap.add_argument("--history", default=str(HISTORY))
+    ap.add_argument("--rules", default=str(RULES))
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -401,6 +651,8 @@ def main() -> int:
 
     cp, err1 = load(Path(args.table))
     rt, err2 = load(Path(args.routing))
+    hist, err3 = load(Path(args.history))
+    rules, err4 = load(Path(args.rules))
 
     # 读不到 → 未测（2），不是红（1），也不是通过（0）
     if cp is None or rt is None:
@@ -411,7 +663,7 @@ def main() -> int:
             print(f"⚠ 未测：{msg} —— 未测不是通过", file=sys.stderr)
         return 2
 
-    r = evaluate(cp, rt)
+    r = evaluate(cp, rt, hist, rules, require_history=True)
 
     if args.json:
         print(json.dumps(r, ensure_ascii=False, indent=1))

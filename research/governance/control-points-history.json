@@ -1,0 +1,67 @@
+{
+ "schema_version": "control-points-history/v1",
+ "note": "控制点主表的变更历史。每次族/码变更必须：① 升 table_version；② 追加一条 entry（who/why/evidence）；③ 更新 codes 与 family_by_code 快照。校验器：tools/verify_control_points.py 的 H-*/C74-*。",
+ "entries": [
+  {
+   "version": "cp-2026-10-18-v2",
+   "at": "2026-10-18",
+   "who": "T0-01 自动生成；原始操作人未留痕（待产品+法务签署时补录）",
+   "why": "初始基线：20 个 control_code 取自 rules-v1.json 的 parent_rule；族归属按 topic_label 语义判断；U02 因缺 authority_ref 停用并记入 known_gaps。",
+   "evidence": [
+    "research/governance/control-points-v1.json",
+    "research/governance/skeleton/rules-v1.json",
+    "PMO/implement/内容审查Agent-implement-阶段计划-v1.md"
+   ],
+   "changes": [
+    {
+     "kind": "baseline",
+     "detail": "20 码 / 7 族 / 4 空族（场景/权利/渠道/品牌）"
+    }
+   ],
+   "codes": [
+    "H01",
+    "H02",
+    "H03",
+    "H04",
+    "H05",
+    "H06",
+    "H07",
+    "H08",
+    "H09",
+    "M01",
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "U01",
+    "U02",
+    "U03",
+    "U04"
+   ],
+   "family_by_code": {
+    "H01": "宣称控制",
+    "H02": "宣称控制",
+    "H03": "宣称控制",
+    "H04": "宣称控制",
+    "H05": "宣称控制",
+    "H06": "披露控制",
+    "H07": "宣称控制",
+    "H08": "事实控制",
+    "H09": "宣称控制",
+    "M01": "宣称控制",
+    "M02": "宣称控制",
+    "M03": "事实控制",
+    "M04": "宣称控制",
+    "M05": "宣称控制",
+    "M06": "事实控制",
+    "M07": "披露控制",
+    "U01": "宣称控制",
+    "U02": "披露控制",
+    "U03": "宣称控制",
+    "U04": "宣称控制"
+   }
+  }
+ ]
+}
