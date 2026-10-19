@@ -137,6 +137,40 @@ def main():
     T("C1b store 对拍：正样本零不一致", rendered_report_mismatches(ir, md) == [],
       str(rendered_report_mismatches(ir, md)))
 
+    # 1c) ★ C-78 ①：报告渲染的键必须是 control_code / rule_key，**不是分类条目**
+    #
+    #   ★ 这一条与 V62c/V62d 是两层：那两条扫**源码文本**（静态），
+    #     这一条看**实际渲染出来的文本**（行为）。
+    #     源码里有 `control_code` 但模板没把它渲染出来，静态扫描照样绿 ——
+    #     所以必须真的跑一遍渲染器再读输出。
+    T("C1c 渲染输出里每个 finding 都带 control_code",
+      bool(ir["findings"]) and all(
+          re.search(r"控制点：\s*" + re.escape(f["control_code"]), md)
+          for f in ir["findings"]),
+      "md 里没找到 control_code")
+
+    T("C1d ★ 渲染输出里不出现 subclass（分类条目只是视图，不是键）",
+      "subclass" not in md, "md 里出现了 subclass")
+
+    # ★ 反向对照：给 finding 塞一个 subclass_code，渲染器**不许**拿它当键。
+    #   若渲染器改成了 `f.subclass_code || f.control_code`，这条会红。
+    ir_sub = json.loads(json.dumps(ir))
+    ir_sub["findings"][0]["subclass_code"] = "SC-99"
+    with open(runner, "w", encoding="utf-8") as f:
+        f.write(
+            "import { renderReport } from %r;\n"
+            "let input='';\n"
+            "for await (const c of process.stdin) input += c;\n"
+            "process.stdout.write(JSON.stringify(renderReport(JSON.parse(input))));\n"
+            % mod)
+    p2 = subprocess.run(["node", runner],
+                        input=json.dumps(snapshot(ir_sub), ensure_ascii=False),
+                        text=True, capture_output=True)
+    md_sub = (json.loads(p2.stdout).get("markdown") if p2.returncode == 0 and p2.stdout else "") or ""
+    T("C1e ★ 反向对照：带 subclass_code 时仍以 control_code 为键",
+      bool(md_sub) and "SC-99" not in md_sub and "H01" in md_sub,
+      "subclass 被当成了键，或渲染失败")
+
     # 2) 三种错配：finding_id / control_code / state
     bad_id = md.replace("- f1 · 控制点：H01", "- fX · 控制点：H01")
     bad_code = md.replace("- f1 · 控制点：H01", "- f1 · 控制点：H99")

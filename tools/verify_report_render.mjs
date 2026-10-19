@@ -354,6 +354,24 @@ try {
          && !(m11.text || "").includes("[[card:"),
          "C11 群消息带报告链接且无卡片原字符", JSON.stringify(m11.text));
 
+  // C12/C13 ★ C-78 ①：渲染的键必须是 control_code，不是分类条目
+  //
+  //   ★ 这两条看的是**渲染出来的文本**，不是源码里有没有这个词。
+  //     源码写了 `f.control_code` 但模板没输出它，静态扫描照样绿。
+  const snap_key = baseSnapshot();
+  const md_key = (R.renderReport(snap_key).markdown || "");
+  report(md_key.includes("控制点：H01"),
+         "C12 ★ 渲染输出以 control_code 为键（控制点：H01）",
+         md_key.slice(0, 160));
+
+  // 反向对照：给 finding 塞 subclass_code，渲染器不许拿它当键
+  const snap_sub = JSON.parse(JSON.stringify(snap_key));
+  snap_sub.ir.findings[0].subclass_code = "SC-99";
+  const md_sub = (R.renderReport(snap_sub).markdown || "");
+  report(md_sub.includes("H01") && !md_sub.includes("SC-99"),
+         "C13 ★ 反向对照：带 subclass_code 时仍以 control_code 为键，subclass 不渲染",
+         md_sub.slice(0, 160));
+
   console.log("----------------------------------------");
   if (failed === 0) {
     console.log(`✅ ${passed}/${passed + failed} 全过`);

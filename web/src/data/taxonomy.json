@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "version": "draft-0",
+    "status": "awaiting_spec",
+    "source": null,
+    "note": "页面骨架数据。规范文档落盘后替换本文件；在拿到规范前不填写任何未确认的轴定义、判定条件或 rule_id 归属。"
+  },
+  "axes": [
+    {
+      "code": "CHAN",
+      "name": "渠道控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    },
+    {
+      "code": "RIGHT",
+      "name": "权利控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    },
+    {
+      "code": "SCENE",
+      "name": "场景控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    },
+    {
+      "code": "DISC",
+      "name": "披露控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    },
+    {
+      "code": "BRAND",
+      "name": "品牌控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    },
+    {
+      "code": "FACT",
+      "name": "事实控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    },
+    {
+      "code": "CLAIM",
+      "name": "宣称控制",
+      "one_line": null,
+      "criteria": [],
+      "reviewer": null,
+      "evidence_required": [],
+      "boundary_counterexample": {
+        "rule_id": null,
+        "why": null
+      }
+    }
+  ],
+  "decision_tree": [
+    { "step": 1, "axis": "CHAN", "hit_condition": null, "route_to": null },
+    { "step": 2, "axis": "RIGHT", "hit_condition": null, "route_to": null },
+    { "step": 3, "axis": "SCENE", "hit_condition": null, "route_to": null },
+    { "step": 4, "axis": "DISC", "hit_condition": null, "route_to": null },
+    { "step": 5, "axis": "BRAND", "hit_condition": null, "route_to": null },
+    { "step": 6, "axis": "FACT", "hit_condition": null, "route_to": null },
+    { "step": 7, "axis": "CLAIM", "hit_condition": null, "route_to": null }
+  ],
+  "orthogonal_fields": {
+    "rule_nature": {
+      "label": "rule_nature",
+      "values": [],
+      "expected_count": 5,
+      "note": null
+    },
+    "jurisdiction": {
+      "label": "jurisdiction",
+      "values": [],
+      "note": null
+    },
+    "severity": {
+      "label": "severity",
+      "derivation": null,
+      "note": null
+    },
+    "quality_tag": {
+      "label": "quality_tag",
+      "positioning": null,
+      "note": null
+    }
+  },
+  "rule_examples": []
+}

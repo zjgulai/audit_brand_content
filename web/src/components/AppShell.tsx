@@ -11,6 +11,7 @@ export default function AppShell() {
         <strong>内容审查工作台</strong>
         <nav aria-label="主导航">
           <NavLink to="/queue">复核队列</NavLink>
+          <NavLink to="/taxonomy">分类规范</NavLink>
           <NavLink to="/login">登录</NavLink>
         </nav>
         <span className="shell__api">API：{apiBase}</span>

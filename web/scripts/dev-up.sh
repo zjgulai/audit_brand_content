@@ -121,7 +121,7 @@ if ! grep -q 'case-smoke' "${RUN_DIR}/queue.json"; then
   exit 1
 fi
 
-echo "[7/8] 页面断言：队列 → 案件详情 → 报告"
+echo "[7/8] 页面断言：队列 → 案件详情 → 报告 → 分类规范"
 node "${WEB}/scripts/check_pages.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --cookie "${COOKIE}" \
@@ -131,11 +131,11 @@ node "${WEB}/scripts/check_pages.mjs" \
   > "${RUN_DIR}/page.json" 2> "${RUN_DIR}/page.err"
 cat "${RUN_DIR}/page.json"
 
-echo "[8/8] 无障碍自动检查（三页）"
+echo "[8/8] 无障碍自动检查（四页）"
 node "${WEB}/scripts/a11y_check.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --cookie "${COOKIE}" \
-  --pages "/queue,/cases/case-smoke,/reports/report-smoke" \
+  --pages "/queue,/cases/case-smoke,/reports/report-smoke,/taxonomy" \
   --out "${RUN_DIR}/a11y.json" \
   > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
 cat "${RUN_DIR}/a11y.stdout"

@@ -9,5 +9,18 @@
     "retention": "保留期，如 24h / 7d / run-scoped",
     "data_class": "数据分级：public / internal / confidential / pii"
   },
-  "entries": []
+  "entries": [
+    {
+      "path": "tools/gold_pilot_fetch.py",
+      "symbol": "fetch_tmp_urls",
+      "api": "medias/batch_get_tmp_download_url",
+      "api_kind": "media_tmp_url",
+      "ordinal": 1,
+      "consumer": "gold_pilot_fetch（审查结论 gold 试点）",
+      "landing_root": "/Users/lute/audit-data/gold/pilot",
+      "retention": "run-scoped",
+      "data_class": "confidential",
+      "never_tracked": true
+    }
+  ]
 }

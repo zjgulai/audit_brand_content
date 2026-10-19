@@ -4,6 +4,7 @@ import CaseDetailPage from "./pages/CaseDetailPage";
 import LoginPage from "./pages/LoginPage";
 import QueuePage from "./pages/QueuePage";
 import ReportPage from "./pages/ReportPage";
+import TaxonomyPage from "./pages/TaxonomyPage";
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
         <Route path="/queue" element={<QueuePage />} />
         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
         <Route path="/reports/:reportId" element={<ReportPage />} />
+        <Route path="/taxonomy" element={<TaxonomyPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/queue" replace />} />
     </Routes>

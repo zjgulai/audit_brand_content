@@ -404,6 +404,14 @@ R7-W3 报出一条 Amazon Ads 的「英国放松型覆写」证据，**我最初
 ## 规则键与 58 子类（C-78）
 
 - `research/governance/skeleton/rules-v1.json` 的 **`rule_key` 是唯一机器键**：每条规则必须有非空、互不重复的 `rule_key`；判定输出也以它为准。
-- Playbook v0 提到的「`分类确认` 表 12 个一级、58 个子类」**权威清单不在本仓盘上**（v0 只给了每族子类数 15/23/6/2/2/6/4，没有逐条名称）。**58 子类清单待补**——本仓不编造缺失条目。
-- `subclass_code` 只是**可选展示属性**，当前 0 条；补入时一个 subclass 最多映射一条规则，冲突时以 `rule_key` 为准。
-- 执行点：`python3 tools/verify_engine_contract.py --only V61`（V61a…V61h；含重复 `rule_key` / 缺键 / 一个 subclass 挂两条的反向对照）。
+- Playbook v0 提到的「`分类确认` 表 12 个一级、58 个子类」：**2026-10-19 D-128 已找到权威清单**——
+  `规则清单-P0-P3-按等级-20261016.xlsx`（638 条规则）的「所属类别」是 **11 个唯一值**（不是 12），
+  「所属子类」是 **58 个唯一值**。58 子类清单见
+  `PMO/implement/58子类-候选映射草案-20261019.md`，尚未写入 `rules-v1.json`。
+- 按「11 类别 → 七族」映射，58 子类的族分布是 **10/28/6/2/2/6/4**，
+  与 v0 旧表写的 15/23/6/2/2/6/4 不一致；该差异已在草案 §0/§12 显式列出，待产品裁定。
+- `subclass_code` 只是**可选展示属性**，当前 0 条。D-127 口径（多对一）：
+  **每条规则最多带一个 `subclass_code`，一个 subclass 可以包含多条规则**；
+  冲突时以 `rule_key` 为准。
+- 执行点：`python3 tools/verify_engine_contract.py --only V61`（V61a…V61i；含重复 `rule_key` /
+  缺键 / 同一规则挂两个 `subclass_code` 必红 / 同一 subclass 挂多条规则不误报）。

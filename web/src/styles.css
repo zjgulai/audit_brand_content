@@ -119,3 +119,120 @@ th {
   color: #52606d;
   font-size: 0.9rem;
 }
+
+/* 分类规范页（只读） */
+.taxonomy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.taxonomy-card {
+  background: #fff;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.taxonomy-card h3 {
+  margin-top: 0;
+}
+
+.taxonomy-fields {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+}
+
+.taxonomy-fields dt {
+  font-weight: 600;
+  color: #334e68;
+}
+
+.taxonomy-fields dd {
+  margin: 0;
+}
+
+.taxonomy-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.taxonomy-placeholder {
+  color: #52606d;
+  font-style: italic;
+}
+
+.taxonomy-flow {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.taxonomy-flow__step {
+  position: relative;
+  background: #fff;
+  border: 1px solid #d9e2ec;
+  border-left: 4px solid #0b63ce;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+}
+
+.taxonomy-flow__step:not(:last-child)::after {
+  content: "↓";
+  position: absolute;
+  left: 2rem;
+  bottom: -1.15rem;
+  color: #0b63ce;
+  font-weight: 700;
+}
+
+.taxonomy-flow__step h3 {
+  margin: 0.2rem 0 0.4rem;
+}
+
+.taxonomy-flow__step p {
+  margin: 0.2rem 0;
+}
+
+.taxonomy-flow__index {
+  font-size: 0.8rem;
+  color: #52606d;
+}
+
+.taxonomy-lookup {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.taxonomy-lookup input {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #9fb3c8;
+  border-radius: 4px;
+  min-width: 18rem;
+  font: inherit;
+}
+
+.taxonomy-lookup button {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid #0b63ce;
+  background: #0b63ce;
+  color: #fff;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.taxonomy-result {
+  background: #fff;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}

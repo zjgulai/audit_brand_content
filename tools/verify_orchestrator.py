@@ -225,6 +225,13 @@ def main():
            and r["ir"]["control_points_version"] == "cp-test-v9",
            "C5 回执/IR 记实际 control_points_version",
            repr((r["receipt"]["control_points_version"], r["ir"]["control_points_version"])))
+    r_v10 = build(Counter()).run(request(control_points_version="cp-test-v10"))
+    report(r_v10["receipt"]["control_points_version"] == "cp-test-v10"
+           and r_v10["ir"]["control_points_version"] == "cp-test-v10"
+           and r_v10["receipt"]["control_points_version"] != "cp-test-v9",
+           "C5b 换一个版本号 → 回执/IR 跟着变（不是写死常量）",
+           repr((r_v10["receipt"]["control_points_version"],
+                 r_v10["ir"]["control_points_version"])))
 
     # C6 高严重度也不提前停
     c6 = Counter()

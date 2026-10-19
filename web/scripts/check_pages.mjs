@@ -204,8 +204,39 @@ async function main() {
   const reportPath = await evalValue("location.pathname");
   const reportShot = await shot("report.png");
 
+  // 4) 分类规范页（只读骨架：七轴、七步、正交字段、rule_id 查找框）
+  await cdp.send("Page.navigate", { url: `${base}/taxonomy` });
+  const taxonomyBody = await waitBody("分类规范");
+  const taxonomyCodes = ["CHAN", "RIGHT", "SCENE", "DISC", "BRAND", "FACT", "CLAIM"];
+  const taxonomyOk =
+    taxonomyBody.includes("分类规范") &&
+    taxonomyCodes.every((code) => taxonomyBody.includes(code)) &&
+    taxonomyBody.includes("七步判定顺序") &&
+    taxonomyBody.includes("正交字段");
+  const taxonomyTyped = await evalValue(`(() => {
+    const el = document.querySelector('#rule-lookup');
+    if (!el) return false;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    ).set;
+    setter.call(el, 'T1.1.medical-cure');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(200);
+  await evalValue("document.querySelector('#rule-lookup')?.form?.requestSubmit()");
+  await sleep(200);
+  const taxonomyLookupBody = await bodyText();
+  const taxonomyLookup =
+    taxonomyTyped &&
+    (taxonomyLookupBody.includes('未找到该 rule_id') ||
+      taxonomyLookupBody.includes('归属轴'));
+  const taxonomyPath = await evalValue("location.pathname");
+  const taxonomyShot = await shot("taxonomy.png");
+
   const result = {
-    ok: queueOk && caseOk && reportOk,
+    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup,
     queue: { ok: queueOk, shot: queueShot, body: queueBody.slice(0, 500) },
     case: {
       ok: caseOk,
@@ -220,6 +251,13 @@ async function main() {
       path: reportPath,
       shot: reportShot,
       body: reportBody.slice(0, 600),
+    },
+    taxonomy: {
+      ok: taxonomyOk && taxonomyLookup,
+      path: taxonomyPath,
+      lookup: taxonomyLookup,
+      shot: taxonomyShot,
+      body: taxonomyBody.slice(0, 700),
     },
   };
   console.log(JSON.stringify(result, null, 2));
