@@ -22,7 +22,6 @@
 """
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
 import os
@@ -159,9 +158,11 @@ def main():
 
     # ── C L4-2 重建 / 删文件后可复现 ───────────────────────────────
     rb = store.rebuild(ir(1, "A"), render, expected_report_id=rid)
-    T("C1 rebuild 得到同一 id / 同一内容",
+    T("C1 rebuild 得到同一 id / 同一内容 / 同一 sha256",
       rb.get("ok") is True and rb.get("report_id") == rid
-      and rb.get("text") == render(ir(1, "A")), str(rb)[:200])
+      and rb.get("text") == render(ir(1, "A"))
+      and rb.get("sha256") == hashlib.sha256(
+          render(ir(1, "A")).encode("utf-8")).hexdigest(), str(rb)[:200])
     os.unlink(path)
     T("C2 删文件后 read 不给 URL",
       store.read(rid, P_SUB_OWN).get("ok") is False
@@ -169,8 +170,11 @@ def main():
     rb2 = store.rebuild(ir(1, "A"), render, expected_report_id=rid)
     T("C3 删文件后仍能从 IR 重建同内容", rb2.get("ok") is True and rb2.get("text") == render(ir(1, "A")), str(rb2)[:200])
     rr3 = store.publish(ir(1, "A"), render, ACL)
-    T("C4 用 IR 重新 publish 可恢复静态文件",
-      rr3.get("ok") is True and os.path.isfile(path) and open(path, "rb").read() == old_bytes, str(rr3))
+    T("C4 用 IR 重新 publish 可恢复静态文件，并标明 restored",
+      rr3.get("ok") is True and os.path.isfile(path)
+      and open(path, "rb").read() == old_bytes
+      and rr3.get("duplicate") is True and rr3.get("restored") is True,
+      str(rr3))
     T("C5 重建内容不同 → 必须拒",
       store.rebuild(ir(1, "A"), lambda x: render(x) + "X", expected_report_id=rid).get("ok") is False, "")
 
@@ -201,17 +205,49 @@ def main():
       rn.get("ok") is True and "通过率" in open(
           os.path.join(fs.root, rn.get("path", "")), encoding="utf-8").read(), str(rn))
 
-    # ── E ACL 回读 ─────────────────────────────────────────────────
+    # D7 非法 ACL 形状必须拒，且不落盘
+    acl_shape = ReportStore(os.path.join(TMP, "acl_shape"), base_url)
+    bad_acls = [
+        ("缺 tenant", {"product_line": "p1", "submitter_id": "u1", "assigned": []}),
+        ("缺 product_line", {"tenant": "t1", "submitter_id": "u1", "assigned": []}),
+        ("缺 submitter_id", {"tenant": "t1", "product_line": "p1", "assigned": []}),
+        ("assigned 非 list", {"tenant": "t1", "product_line": "p1",
+                              "submitter_id": "u1", "assigned": "u2"}),
+    ]
+    bad_acl_results = []
+    for name, bad_acl in bad_acls:
+        r = acl_shape.publish(ir(30, "ACL"), render, bad_acl)
+        bad_acl_results.append((name, r))
+    T("D7 非法 ACL 形状 → 全部拒且不落盘",
+      all(r.get("ok") is False and r.get("url") is None
+          and str(r.get("detail", "")).startswith("bad_acl")
+          for _, r in bad_acl_results)
+      and acl_shape.read_index()["records"] == [], str(bad_acl_results))
+
+    # D8 坏 index 行必须触发 index_corrupt，而不是按空索引继续发布
+    bad_idx = ReportStore(os.path.join(TMP, "bad_index"), base_url)
+    bad_idx_path = os.path.join(bad_idx.root, "reports", "index.jsonl")
+    with open(bad_idx_path, "w", encoding="utf-8") as f:
+        f.write("{not-json\n")
+    r_bad_idx = bad_idx.publish(ir(31, "BADIDX"), render, ACL)
+    T("D8 坏 index 行 → publish 拒（index_corrupt）",
+      r_bad_idx.get("ok") is False and r_bad_idx.get("url") is None
+      and r_bad_idx.get("detail") == "index_corrupt", str(r_bad_idx))
+
+    # ── E ACL 回读（独立干净 store，避免继承 F 段的重复索引） ──────
+    acl_store = ReportStore(os.path.join(TMP, "acl_clean"), base_url)
+    acl_pub = acl_store.publish(ir(40, "ACLCLEAN"), render, ACL)
+    acl_rid = acl_pub.get("report_id")
     allowed = [("E1 提交人本人", P_SUB_OWN), ("E2 DP3 已指派同品线", P_DP3),
                ("E3 项目统筹同租户", P_COORD)]
     denied = [("E4 提交人他人", P_SUB_OTHER), ("E5 DP3 跨租户", P_DP3_OTHER_TENANT),
               ("E6 DP3 跨品线", P_DP3_WRONG_PL), ("E7 DP3 未指派", P_DP3_UNASSIGNED),
               ("E8 项目统筹跨租户", P_COORD_OTHER), ("E9 IT 读内容", P_IT)]
     for cid, p in allowed:
-        r = store.read(rid, p)
-        T(cid + " → 给 URL", r.get("ok") is True and r.get("url") == r1["url"], str(r))
+        r = acl_store.read(acl_rid, p)
+        T(cid + " → 给 URL", r.get("ok") is True and r.get("url") == acl_pub["url"], str(r))
     for cid, p in denied:
-        r = store.read(rid, p)
+        r = acl_store.read(acl_rid, p)
         T(cid + " → 无 URL", r.get("ok") is False and r.get("url") is None, str(r))
 
     # ── F 完整性：改旧报告 / 索引重复 ──────────────────────────────
@@ -244,18 +280,44 @@ def main():
     except Exception:  # noqa: BLE001
         T("G2 数据根在仓内 → 拒", True, "")
 
-    # 源码静态扫描：所有 URL 字面量不得指向 /api/ 或渲染服务
-    src = open(os.path.join(ROOT, "base", "report_store.py"), encoding="utf-8").read()
-    urls = [n.value for n in ast.walk(ast.parse(src))
-            if isinstance(n, ast.Constant) and isinstance(n.value, str) and "://" in n.value]
-    T("G3 源码 URL 字面量不含 /api/ 或 render",
-      all("/api/" not in u.lower() and "render" not in u.lower() for u in urls), str(urls))
+    # G3 行为级 URL 负样本：样本集必须非空，且非法 URL 一律拒。
+    # 旧版扫源码里含 `://` 的字面量，实测为空集 → all([])==True，
+    # 把 `_valid_url` 改成恒 True 也全绿（AGENTS §2.4「空集恒真」）。
+    bad_urls = [
+        "javascript:alert(1)",
+        "http://static.example.com/reports/rp123.md",
+        "reports/rp123.md",
+        "",
+        base_url + "/api/reports/rp123.md",
+        base_url + "/render/rp123.md",
+        base_url + "/reports/rp123.txt",
+    ]
+    T("G3 URL 负样本集非空", len(bad_urls) > 0, repr(bad_urls))
+    T("G3a 合法静态 URL 放行",
+      acl_store._valid_url(acl_pub["url"], base_url) is True, repr(acl_pub["url"]))
+    T("G3b 非法 URL 全部拒",
+      all(acl_store._valid_url(u, base_url) is False for u in bad_urls),
+      repr([(u, acl_store._valid_url(u, base_url)) for u in bad_urls]))
+    # G3c 行为级：read 遇到索引里的坏 URL 必须拒绝，而不是只测静态方法。
+    bad_url_store = ReportStore(os.path.join(TMP, "bad_url_read"), base_url)
+    bp = bad_url_store.publish(ir(41, "BADURL"), render, ACL)
+    bad_idx_path = os.path.join(bad_url_store.root, "reports", "index.jsonl")
+    with open(bad_idx_path, encoding="utf-8") as f:
+        idx_rows = [json.loads(line) for line in f if line.strip()]
+    idx_rows[0]["url"] = "javascript:alert(1)"
+    with open(bad_idx_path, "w", encoding="utf-8") as f:
+        for row in idx_rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    r_bad_url = bad_url_store.read(bp.get("report_id"), P_SUB_OWN)
+    T("G3c read 遇到坏 URL → 拒绝且不给 URL",
+      r_bad_url.get("ok") is False and r_bad_url.get("url") is None
+      and r_bad_url.get("detail") == "bad_url", str(r_bad_url))
 
     # ── H 反向对照（变异由外部执行；这里守住输入坏样本） ───────────
     T("H1 输入带 renderer 但内容不符 → 重建必须拒",
       store.rebuild(ir(1, "A"), lambda x: render(x) + "DIFF", expected_report_id=rid).get("ok") is False, "")
-    T("H2 未授权 principal 永远拿不到 url",
-      all(store.read(rid, p).get("url") is None for _, p in denied), "")
+    T("H2 未授权 principal 永远拿不到 url（干净 store）",
+      all(acl_store.read(acl_rid, p).get("url") is None for _, p in denied), "")
 
     shutil.rmtree(TMP, ignore_errors=True)
     for f in fails:

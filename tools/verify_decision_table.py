@@ -21,6 +21,8 @@
     （judge_adapter / status_resolver / 其他 decision_*）。
   H **反向对照**：改链序、去 I1–I7、candidate 计严重度、partial 放 PASS、
     去掉 release_status —— 验证器必须红（源码变异由外部执行，本脚本守住断言）。
+    H3 改为与独立期望表对拍（不再 `decide(x) == decide(x)` 自比），
+    并用「三个不同输入必须给出不同标签」保证常量实现必红。
 
 ## 退出码
 
@@ -339,9 +341,35 @@ def main():
     T("H2 声明 max_sev 与 findings 不一致 → ERROR（不许按假数据判）",
       r_mis.get("run_state") == "ERROR", str(r_mis))
 
-    # 确定性
-    T("H3 同一输入连跑两次结果一致",
-      decide(inp(findings=[F(sev="L4", auth="ok")])) == decide(inp(findings=[F(sev="L4", auth="ok")])), "")
+    # H3 不再拿 decide 和自己比（旧版 `decide(x) == decide(x)` 对常量实现恒真）。
+    # 改为与**独立期望表**逐项对拍；再用「不同输入必须给出不同标签」证明
+    # 常量/退化实现必红。
+    expected_rows = [
+        ("H3a chain7", inp(findings=[F(sev="L4", auth="ok")]),
+         7, "BLOCK", "DP2"),
+        ("H3b chain15", inp(), 15, "PASS", "DP1"),
+        ("H3c chain1", inp(coverage_state="missing"), 1, "未审查", "DP0"),
+    ]
+    got_rows = []
+    for cid, x, chain, state, layer in expected_rows:
+        r = decide(x)
+        got_rows.append(r)
+        T("%s 与独立期望表对拍" % cid,
+          r.get("chain") == chain and r.get("state") == state
+          and r.get("layer") == layer and r.get("external_label") == state
+          and r.get("release_status") == "待放行",
+          "want chain=%r state=%r layer=%r got=%r"
+          % (chain, state, layer, {k: r.get(k) for k in
+                                   ("chain", "state", "layer",
+                                    "external_label", "release_status")}))
+    T("H3d ★ 常量实现必红：三个不同输入不得返回同一组标签",
+      len({(r.get("chain"), r.get("state"), r.get("layer"))
+           for r in got_rows}) == len(expected_rows),
+      repr([(r.get("chain"), r.get("state"), r.get("layer"))
+            for r in got_rows]))
+    T("H3e ★ 输出必须带 chain 字段（契约漏项探针）",
+      all(r.get("chain") is not None for r in got_rows),
+      repr([r.get("chain") for r in got_rows]))
 
     # ── J 判定逻辑唯一性：全仓静态扫描（C-46 / L2-1a） ──────────────
     scanned, hits = scan_decision_logic()
