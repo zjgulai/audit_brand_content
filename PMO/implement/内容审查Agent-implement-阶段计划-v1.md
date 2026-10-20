@@ -323,6 +323,38 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 
 **并行分工（2026-10-19）**：0e=G-4 门残差（takedown 人级 allowlist / IT 按对象收敛 / grant scope）；6d=API↔IR 联调测试；cleanup=前端工作台 v0 脚手架；9a=decision_table/disposition_router/orchestrator/report_store 四批变异审计。
 
+### 后端生产装配派工登记（2026-10-20）
+
+> **登记依据**：`web-write-isolation`（audit-multi-content-16 / f297a6）报告委托方已明确顺序：
+> 先提交 Web/部署方案（已完成），再指定后端生产装配负责人。
+> **本会话（4b）只登记这件事，不实现、不验收、不改 `api/` 或 `base/` 代码。**
+
+| 项 | 值 |
+|---|---|
+| **owner** | `web-write-isolation`（audit-multi-content-16 / f297a6）—— 唯一实现负责人 |
+| **状态** | **未开工**（派工 ≠ 已实现；截至本行落盘时无代码提交） |
+| **批次** | 另批实现与提交，不在当前 Web 批次内 |
+
+**范围（五项，全部未开工）**：
+
+1. 持久 review / lease / draft / formal 台账
+2. actor + payload 绑定的**原子**幂等（`Idempotency-Key` 与写入同事务）
+3. 正式身份接口装配（真实 SSO，非替身 principal）
+4. 按权限读取 draft / formal
+5. 权威 finding 追加 → 投影重建 / 新鲜度 → GET 回读
+
+外加：health / readiness。
+
+**边界（不因派工而改变）**：
+
+- `confirm` / `reject` 与**生产写入口**在端到端门绿前**继续关闭**。
+- 不部署、不连接服务器。
+- **本会话（4b）继续**：编排 / 合同与验收登记 / 规范与分类维护；**不写这批 `api/`、`base/` 代码**。
+- **9a 的变异审计仍是放行前置** —— 派工不替代它。
+
+> ⚠️ **这一节是派工记录，不是完成记录。** 上表 ✅ 的验证器跑的是本地内存台账（见本节上方边界说明）；
+> 五项生产能力一项都还没实现。读到时请按「已派、未开工」理解。
+
 ---
 
 ## 5. 第 1 阶段：核心流水线（S0–S9）
