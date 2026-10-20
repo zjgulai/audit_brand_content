@@ -78,6 +78,7 @@ L1 里的生成脚本**。异议一那条判据（生成脚本在 L1 + 输入可
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import io
 import json
 import re
@@ -148,6 +149,81 @@ REGISTRY = [
             "而真正的理由是一次**治理裁定**（Owner：`.ua/` 只收正文），不是技术判据 ——"
             "把它写成 `derived` 会让 B 面去找一个不存在的生成器，写成 `vendored` 则是说谎"
             "（它不是别人管的）。"},
+    # ── 2026-10-21 补录：五组此前无人认领的忽略规则 ──────────────
+    #   ★ 起因是一次**真回归**：10-21 为了堵两个红线（skill/ 单复数、公开仓二进制）
+    #     往 `.gitignore` 加了 10 条规则，**没回到 §三 同步** —— 本模块当场变红。
+    #     这正是 §三 表头那句「改动本文件 = 改动分级 = 需回到 §三 同步，
+    #     否则台账与制品会漂移」的第二次应验（第一次是 B0.5 的 PMO 两条）。
+    #     所以这一组不是「顺手补登记」，是**那条断言抓到的真事故的修复**。
+
+    {"rules": ["skill/*"],
+     "class": "vendored",
+     "adr_ref": "§三 L2 · `skill/`（单数）安装位副本（2026-10-21 补录）",
+     "why": ("**别人管的 / 安装位副本**：37 个成员目录的来源是 Momcozy 知识库、SI-Agent、"
+             "kimi、MinMax，各自有自己的出处。★ 它与 `.gitignore` 里的 `skills/`（复数）"
+             "**不是同一个目录** —— 单复数差一个字母，而 `skills/` 那条从来盖不住它。"
+             "实测：`git check-ignore -v skill/` 在补这条之前 **rc=1**，"
+             "而 `git add -n skill` 是 **220 个文件**（含 27 个 Proprietary 内部件）。")},
+    {"rules": ["!skill/README.md", "!skill/标准化台账-20261017.md"],
+     "class": "primary",
+     "adr_ref": "§三 L2 · `skill/` 的两份来历/裁定文档（2026-10-21 补录）",
+     "why": ("★ **两条是「放行」不是「忽略」**（`!` 前缀），但它们同样是 `.gitignore` 里的一条规则，"
+             "所以同样必须被认领 —— 否则 C 面会把它们当未认领报红。"
+             "这两份是本仓**自己写的**来历说明与裁定台账（谁给的、凭什么这么分），"
+             "L1 里找不到第二份 → `primary`。它们**尚未 `git add`**：共用工作区里先暂存，"
+             "可能被别人的 commit 扫走，提交时要显式点名。")},
+
+    {"rules": ["__pycache__/", "*.pyc"],
+     "class": "vendored",
+     "adr_ref": "§三 L2 · 依赖与构建产物（2026-10-21 补录）",
+     "why": ("Python 字节码缓存，跑一次脚本就生成、可从源码重建。"
+             "★ 本机真正的缓存目录其实在 `~/Library/Caches/com.apple.python/`（见 `AGENTS.md` §2.1.1），"
+             "但某些工具链仍会在仓内写 `__pycache__/` —— 两条都要挡，不然一次 `git add -A` 就带进来。")},
+    {"rules": [".playwright-mcp/"],
+     "class": "runtime",
+     "adr_ref": "§三 L2 · `.playwright-mcp/`（2026-10-21 补录）",
+     "why": ("浏览器自动化的工作目录：console 日志等运行态产物。只会增长、回滚无意义，"
+             "与 `PMO/logs/` 同类。")},
+    {"rules": ["research/live/snapshot-*.json"],
+     "class": "vendored",
+     "adr_ref": "§三 L2 · `research/live/` 快照本体（2026-10-21 改判，见 §三 补记）",
+     "why": ("★★ **这一条的理由不是「可复算」，是「含 PII」，两者必须分开说清。**"
+             "技术上可由 `tools/live_snapshot.py` 重拉，但重拉需要网络 + 凭据，"
+             "**本仓给不出可追溯的本地输入** —— 所以按 §三 的判据它不属 `derived`"
+             "（B 面会去找一个本仓没有的输入文件，第一版就是这么红的）。"
+             "真正不许入库的原因是 10-20 那份快照里有 **186 条审核人真名 + 186 条逐字内部原话**，"
+             "而本仓是**公开**的。已入库的 09-16 旧快照只有 8 条且这两列**全为空** —— "
+             "所以这不是「一直如此」，是换源才第一次把真名带到入库边缘。"
+             "⭐ **执行点不是这条 .gitignore，是 `tools/verify_kb.py` 的 E8**："
+             "`.gitignore` 挡不住 `git add -f`，E8 查的是「被跟踪的快照里有没有非空真名」。"
+             "`LATEST.json`（只含 sha256 与计数）照常入 L1，别人重拉一次即得同数据。")},
+    {"rules": ["PMO/audit/momcozy-catalog/"],
+     "class": "vendored",
+     "adr_ref": "§三 L2 · `PMO/audit/momcozy-catalog/`（2026-10-21 补录）",
+     "why": ("采集来的商品图与元数据：25 MB / 108 个文件，其中 **62 张真实客户产品图**。"
+             "与上一条同因：**来源是本仓之外（Momcozy 商品页），本仓给不出可追溯的本地输入**，"
+             "所以归 `vendored`（判据不适用）而不是 `derived`；"
+             "**不许入库的真正理由是公开仓红线（`AGENTS.md` §2.6）**，不是可复算性。"
+             "§2.6 原文：「判据是 `git ls-files` 里没有任何媒体/文档二进制」。"
+             "执行点是 `tools/verify_download_governance.py` 的 DG-3，不是这条忽略规则。"
+             "★ 它的生成脚本 `tools/momcozy/batch_download.py` 目前**未被 git 跟踪**，"
+             "这件事本身是另一个待修项（见 `PMO/implement/索引-20261021.md`）。")},
+    {"rules": ["规则清单-P0-P3-按等级-20261016.xlsx"],
+     "class": "vendored",
+     "adr_ref": "§三 L2 · 上游业务导出的原始件（2026-10-21 补录）",
+     "why": ("上游业务方导出的 638 条规则清单（316 KB，43 列）。**别人给的**，本仓给不出生成脚本 —— "
+             "与 `skills/` 那条同类的「判据不适用」。"
+             "★ 但它**被多份 L1 文档当作来源引用**（`research/governance/README.md`、"
+             "`Playbook/内容审查Agent-产品Playbook-v1.1.md`、`tools/verify_engine_contract.py` 的 V61d），"
+             "所以「不在库里」这件事本身有代价：引用它的文档换台机器就断链。"
+             "这一条已登记为待决，不由本次补录解决。")},
+    {"rules": ["PMO/守衡-创建全景图与知识库体系-讨论稿-v1.md.corrupt-tail.bin"],
+     "class": "runtime",
+     "adr_ref": "§三 L2 · 事故留证（2026-10-21 补录）",
+     "why": ("`shell 追加重定向写坏文件` 那次事故留下的尾块（3.2 KB，`file` 判为 `data`）—— "
+             "**事故证据，不是制品**。按 `AGENTS.md` §2.2 那条教训留档；"
+             "它不会是任何人的输入，也不会被重建。")},
+
     # ── derived：可复算 ────────────────────────────────────────────
     {"rules": ["research/governance/skeleton/_data/records.json"],
      "class": "derived", "adr_ref": "§三 L2 · `skeleton/_data/records.json`",
@@ -264,9 +340,11 @@ REGISTRY = [
              "`bash base/build_ocr.sh` 一条命令重建。"
              "★ 编译要指定 SDK：本机默认的 MacOSX27.0 是坏的（SDK 由 Swift 6.4 构建、"
              "编译器是 6.3.3），脚本按「能用」顺序试而不是写死一个。")},
-    {"rules": [".venv-r4/", ".pylibs/", ".vendor/", "node_modules/"],
+    {"rules": [".venv-r4/", ".venv/", ".pylibs/", ".vendor/", "node_modules/"],
      "class": "vendored", "adr_ref": "§三 L2 · 依赖与构建产物，可由清单重建",
-     "why": "依赖与构建产物。"},
+     "why": ("依赖与构建产物。★ `.venv/` 是 2026-10-21 补进来的 —— "
+             "它在 `.gitignore:114` 里躺了很久而登记表从未认领，C 面一直红着一条；"
+             "与 `.venv-r4/` 同性质（`uv sync` 建的虚拟环境），没有理由分成两格。")},
     {"rules": ["skills/", "research/repos/", "research/method/codex_research/",
                "research/method/Kb2Agent/"],
      "class": "vendored", "adr_ref": "§三 L2 · 别人管的（后四个各有自己的 .git）",
@@ -497,11 +575,63 @@ def face_D() -> list[str]:
             "_cfprof", "_chromeprof", "backup-", "deprecated/")
     mine = [f for f in files if not any(s in f for s in SKIP)]
     cm = claimed_rules()
+
+    def _covers(path, rule):
+        """这条登记规则是否覆盖这个盘上路径。**按 gitignore 的 glob 语义，不是字符串前缀。**
+
+        ★★ 2026-10-21 修：原实现是 `f == r or f.startswith(r + "/")` —— 只认**整目录**，
+          对 `skill/*`、`__pycache__/`、`*.pyc`、`.ua/*.md` 这类 glob 规则**一律匹配不上**，
+          于是它们盖住的文件全被报成「未被登记表覆盖」。
+
+          实测差距：**报 429 个，真实只有 4 个** —— 100 倍的假阳性。
+          这正是本项目反复记的那个病：**一个会误报的检查器比没有检查器更糟**
+          （`AGENTS.md` §2.1.1），因为它会让人开始不看报告。
+
+          语义对齐 `.gitignore` 的两条：① 含通配符的模式按 `fnmatch`，且**可在任意层级匹配**
+          （`__pycache__/` 要能盖住 `base/__pycache__/`）；② 不含通配符的按路径前缀。
+        """
+        r = rule.rstrip("/")
+        if not r:
+            return False
+        if any(ch in r for ch in "*?["):
+            parts = path.split("/")
+            for i in range(len(parts)):
+                if fnmatch.fnmatch("/".join(parts[i:]), r):
+                    return True
+            return fnmatch.fnmatch(path, r)
+        return path == r or path.startswith(r + "/")
+
     unreg = []
     for f in mine:
-        if any(f == r.rstrip("/") or f.startswith(r.rstrip("/") + "/") for r in cm):
+        if any(_covers(f, r) for r in cm):
             continue
         unreg.append(f)
+
+    # ── 外部忽略源：不归本仓登记表管，但**必须显式声明**，不许静默跳过 ──
+    #   ★ 2026-10-21：D 面修掉 glob 误报之后，只剩 4 个未覆盖，它们的共同点是
+    #     **忽略它们的不是本仓的 `.gitignore`** —— 本仓登记表永远认领不到。
+    #     按 `AGENTS.md` §2.4.3「分不清三样东西」的教训：这不许写成「未覆盖 0」，
+    #     也不许默默 SKIP 掉。逐个点名 + 写清它是谁管的、凭什么。
+    #
+    #   ★ 为什么不做成通配（如 `**/.claude/**`）：通配会把日后新出现的外部忽略文件
+    #     静默吞掉，而这里要的恰恰是「新东西必须被看见」（与 §三 L2 那条同一条道理）。
+    EXTERNAL_IGNORE = {
+        ".claude/settings.local.json":
+            "**全局 gitignore**（`~/.config/git/ignore`）忽略，不归本仓管。"
+            "Claude Code 的本地设置，含本机路径，本来就不该进任何共享仓。",
+        "web/dist/":
+            "**`web/.gitignore`** 忽略（`dist/`）。前端构建产物，`npm run build` 可重建，"
+            "与 `node_modules/` 同类 —— 但它由子目录自己的规则管，不由根 `.gitignore`。",
+    }
+
+    def _externally_ignored(path):
+        for pre, _why in EXTERNAL_IGNORE.items():
+            p = pre.rstrip("/")
+            if path == p or path.startswith(p + "/"):
+                return pre
+        return None
+
+    unreg = [f for f in unreg if _externally_ignored(f) is None]
     for f in unreg[:12]:
         print(f"  ✗ 未被任何登记项覆盖：{f}")
     print(f"  盘上本项目 L2/L3 文件 {len(mine)} 个 · 未覆盖 {len(unreg)} 个 · "
