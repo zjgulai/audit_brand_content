@@ -38,6 +38,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -305,6 +306,77 @@ def main():
                if _due == 0 else
                "⏰ 有承诺逾期未交付（明细见下；修复前先核『是不是我把到期日算错了』）\n     "
                + _buf.getvalue().strip().replace("\n", "\n     ")))
+
+        # ── E8 飞书快照不入公开仓（2026-10-21 加）────────────────────
+        #   起因：10-20 重拉快照后，`research/live/snapshot-20261020T162244Z.json`
+        #   含 **186 条**记录，其中 `审核人` 真名 186 条、`原文反馈` 逐字内部原话 186 条。
+        #   而本仓库是**公开**的，`research/live/` 当时没有任何忽略规则。
+        #   已入库的 09-16 旧快照只有 8 条、且这两列**全为空** —— 所以这不是「一直如此」，
+        #   是这次换源才第一次把真名与原话带到入库边缘。
+        #
+        #   ★ 为什么必须有这一条：`.gitignore` **不是执行点** ——
+        #     `git add -f` 能绕过它（AGENTS.md §2.6 对下载产物写过同一句话）。
+        #     这里查的是「实际进了索引没有」，而不是「有没有写忽略规则」。
+        #
+        #   ★★ 判据第二轮修正（2026-10-21，第一版写错了）：
+        #     第一版按**文件名**判（`snapshot-*.json` 被跟踪即红）。实测立刻红，
+        #     但红的是 **09-16 那份旧快照** —— 它有 8 条记录，`审核人` 与 `原文反馈`
+        #     两列 **全为空**，不含任何 PII。按文件名判会把它一起杀掉，
+        #     而 `verify_landing.py` / `lp_consistency.py` / `build_whitelist.py` /
+        #     `build_context_guards.py` **四处硬编码依赖它**。
+        #     也就是说：第一版判据**判的是形状，不是危害**。
+        #     改成按**内容**判：被跟踪的快照里，只要有非空的 `审核人` 或 `原文反馈`，
+        #     就是真 PII 进了公开仓。旧快照自然通过，新快照自然被挡住。
+        def _tracked_live_snapshots():
+            """返回被 git 跟踪的 `research/live/snapshot-*.json` 列表。
+
+            git 不可用时返回 None —— 调用方必须落「未测」，不许当成「没有」。
+            """
+            try:
+                r = subprocess.run(
+                    ["git", "ls-files", "-z", "research/live/"],
+                    cwd=load.REPO, capture_output=True, timeout=20)
+            except (OSError, subprocess.SubprocessError):
+                return None
+            if r.returncode != 0:
+                return None
+            names = [x.decode("utf-8", "replace") for x in r.stdout.split(b"\0") if x]
+            return [n for n in names if re.search(r"snapshot-[^/]*\.json$", n)]
+
+        def _pii_in_snapshot(path):
+            """返回 (真名条数, 逐字原话条数)。读不出来返回 (None, None) —— 那是未测。"""
+            try:
+                doc = json.load(open(os.path.join(load.REPO, path), encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                return None, None
+            recs = ((doc.get("sources") or {}).get("kb_samples") or {}).get("records") or []
+            n_name = sum(1 for r in recs
+                         if str((r.get("fields") or {}).get("审核人") or "").strip())
+            n_text = sum(1 for r in recs
+                         if str((r.get("fields") or {}).get("原文反馈") or "").strip())
+            return n_name, n_text
+
+        _tracked_snaps = _tracked_live_snapshots()
+        if _tracked_snaps is None:
+            c.add("E8", "飞书快照：被跟踪的不得含真名与原话", False,
+                  "⚠ 未测：git 取不到跟踪集，无法判断快照是否已入库（这不是通过）",
+                  skipped=True)
+        else:
+            _dirty, _unreadable = [], []
+            for _p in _tracked_snaps:
+                _nn, _nt = _pii_in_snapshot(_p)
+                if _nn is None:
+                    _unreadable.append(_p)
+                elif _nn or _nt:
+                    _dirty.append(f"{_p}（审核人 {_nn} 条 / 原文反馈 {_nt} 条）")
+            c.add("E8", "飞书快照：被跟踪的不得含真名与原话",
+                  not _dirty and not _unreadable,
+                  (f"✅ 被跟踪快照 {len(_tracked_snaps)} 份，逐份查过，"
+                   f"`审核人` 与 `原文反馈` 均为空" if not _dirty and not _unreadable else
+                   (f"❌ {len(_dirty)} 份快照含真名或逐字原话，公开仓不许有：{_dirty[:3]}；"
+                    f"修复：git rm --cached <路径>"
+                    if _dirty else
+                    f"⚠ 未测：{_unreadable[:3]} 读不出，无法判断（这不是通过）")))
 
         # ── E3 台账与快照同代（基准日、数字都建在这上面）──────────
         c.add("E3", "台账与快照同代",

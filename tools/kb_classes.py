@@ -42,7 +42,9 @@ import kb_materials_data as md   # noqa: E402
 OUT = os.path.join(load.KB, "知识库-v1.json")
 EXT = os.path.join(load.KB, "外部标准库-v1.json")
 EXT_STAGING = os.path.join(load.KB, "_staging", "外部标准库-研究稿.json")
-SAMPLES = os.path.join(load.KB, "_evidence", "正负样本.raw.txt")
+# ★ 2026-10-20：原来的 `SAMPLES = _evidence/正负样本.raw.txt` 已删。
+#   样本现在读 `research/live/LATEST.json`（见 parse_samples）。留着一个没有消费者的
+#   常量，正是 AGENTS.md §2.4 点名的「定义了没人用」——它会让人以为还有第二条源。
 SKEL = os.path.join(load.REPO, "research", "governance", "skeleton")
 
 # ── 定义：逐字取自业务侧「知识库分类说明」表（这一半是抄的，且应当只是抄） ──
@@ -81,26 +83,58 @@ def _json(p, default=None):
 
 
 def parse_samples():
-    """逐条解析正负样本证据落盘件。
+    """从当前快照里读「正面和负面样本」表，现算规模与质量读数。
 
-    ★ 这里有一处**文件自己和自己打架**：抬头写 `total=8 returned=8`，
-    而盘上的记录块只有 **5** 条。两处必有一处错（拉取时截断 / 计数错），
-    在重新拉取之前**不许把 8 当成事实**。所以本函数同时返回两个数，
-    让差值出现在登记表里 —— 一个不一致如果只写在散文里，就只是抱怨。
+    ★ 2026-10-20 换源（在此之前读的是 `_evidence/正负样本.raw.txt`）。
+
+    旧实现读的是一份 1.3 KB 的 dump：5 条记录、抬头写 `returned=8`、备注全是「样例」。
+    它还把这处「文件自己和自己打架」当成整个样本库的问题。实测云端同表当时已有
+    **186 条**真实记录，`渠道/市场` `审核人` `来源` `提交时间` 四列 186/186 非空。
+
+    也就是说：**真实记录不是 1 条，是 0 条被读到。** 病不在数据，在源。
+
+    现在读 `research/live/LATEST.json` 指向的快照。★ 刻意**不复用** kb_facts 的
+    解析器 —— E2 要在「登记表里写的数」与「重算出来的数」之间比对，两者必须来自
+    不同的实现，否则那条检查恒真。这条理由在换源之后一字未变。
     """
-    if not os.path.exists(SAMPLES):
+    ptr = os.path.join(load.REPO, "research", "live", "LATEST.json")
+    if not os.path.exists(ptr):
         return None
-    txt = open(SAMPLES, encoding="utf-8").read()
-    head = re.search(r"total=(\d+)\s+has_more=(\S+)\s+returned=(\d+)", txt)
-    blocks = [b for b in txt.split("\n  ---") if "分类 =" in b]
-    marked = sum(1 for b in blocks if '备注（如处理结果/建议） = "样例"' in b
-                 or '备注（如处理结果/建议） ="样例"' in b)
+    try:
+        latest = json.load(open(ptr, encoding="utf-8"))
+        snap_path = os.path.join(load.REPO, "research", "live", latest["latest"])
+        doc = json.load(open(snap_path, encoding="utf-8"))
+    except (OSError, KeyError, json.JSONDecodeError):
+        return None
+    src = (doc.get("sources") or {}).get("kb_samples")
+    if src is None:
+        return None
+    recs = src.get("records") or []
+    fields = [(r.get("fields") or {}) for r in recs]
+
+    def _has(f, k):
+        v = f.get(k)
+        if isinstance(v, str):
+            return v.strip() != ""
+        if isinstance(v, list):
+            return len(v) > 0
+        return v is not None
+
+    marked = sum(1 for f in fields if "样例" in str(f.get("备注（如处理结果/建议）") or ""))
     return {
-        "文件头声明": {"total": int(head.group(1)), "returned": int(head.group(3))} if head else None,
-        "盘上记录数": len(blocks),
+        "文件头声明": {"total": src.get("api_total"), "returned": src.get("read_count")},
+        "盘上记录数": len(recs),
         "标注为样例": marked,
-        "真实样本": len(blocks) - marked,
-        "不一致": (int(head.group(3)) != len(blocks)) if head else None,
+        "真实样本": len(recs) - marked,
+        "不一致": (src.get("api_total") != src.get("read_count")) if src.get("api_total") else None,
+        "快照": latest.get("latest"),
+        "快照时刻": doc.get("captured_at_utc"),
+        # 下面四个是这次换源之后**才第一次能被算出来**的质量读数
+        "无原因分类": sum(1 for f in fields if not _has(f, "原因分类")),
+        "无图片附件": sum(1 for f in fields
+                          if f.get("素材类型") == "图片" and not _has(f, "图片素材")),
+        "无建议": sum(1 for f in fields if not _has(f, "建议")),
+        "正例数": sum(1 for f in fields if f.get("分类") == "正例"),
     }
 
 
@@ -143,18 +177,29 @@ def status_rows():
                    "ext_staging_sources": len(staging.get("sources", []))},
         },
         "内部正面与负面样本库": {
-            "本地现有条目": ("无法判定：证据落盘件自相矛盾（抬头声明 "
-                             f"{smp['文件头声明']['returned'] if smp and smp['文件头声明'] else '?'} 条，"
-                             f"盘上 {smp['盘上记录数'] if smp else '?'} 条）"
-                             if smp and smp["不一致"] else
-                             (f"{smp['盘上记录数']} 条，其中标注「样例」{smp['标注为样例']} 条"
-                              f"→ 真实样本 {smp['真实样本']} 条" if smp else "无证据落盘件")),
-            "状态": "空白",
-            "缺口说明": "这是 Agent 训练素材的核心来源，也是最贵的一块；"
-                        "现有记录是模板示范，不是数据。且落盘件自身计数不一致，须重新拉取",
+            "本地现有条目": (
+                (f"{smp['盘上记录数']} 条（快照 {smp['快照']}，"
+                 f"应用身份可见 {smp['文件头声明']['total']} 条）；"
+                 f"正向样本 {smp['正例数']} 条 / 无原因分类 {smp['无原因分类']} 条 / "
+                 f"无建议 {smp['无建议']} 条 / 标图但无图 {smp['无图片附件']} 条"
+                 if smp else "无样本快照（先跑 python3 tools/live_snapshot.py）")),
+            "状态": ("有货但未治理" if smp and smp["盘上记录数"] else "空白"),
+            "缺口说明": (
+                "★ 2026-10-20 换源。此前读的是 `_evidence/正负样本.raw.txt`"
+                "（5 条、备注全写「样例」），据此判定「没有真实样本」——**判错了**："
+                "云端同表当时已有 186 条，问题在本地没读，不在业务方没交。"
+                "现在真实缺陷换了形态：① 全表 0 条正例（`分类` 字段的「正例」选项从未被用），"
+                "于是「PASS 误放率」无法测；② 27% 记录 `原因分类` 为空，"
+                "正文前缀是 `【审核问题】`（不在 7 个枚举里），疑为流程反馈混入样本；"
+                "③ `素材类型=图片` 却有 55 条没有图片附件；④ 视频样本 0 条。"
+                "这些**都还未经业务确认**，登记为缺口而不是就地清洗。"),
             "量": {"samples_on_disk": smp["盘上记录数"] if smp else None,
                    "samples_marked_sample": smp["标注为样例"] if smp else None,
-                   "samples_real": smp["真实样本"] if smp else None},
+                   "samples_real": smp["真实样本"] if smp else None,
+                   "samples_positive": smp["正例数"] if smp else None,
+                   "samples_no_reason": smp["无原因分类"] if smp else None,
+                   "samples_no_advice": smp["无建议"] if smp else None,
+                   "samples_image_missing": smp["无图片附件"] if smp else None},
         },
         "措辞表达库": {
             "本地现有条目": (f"规则 {len(rules)} 条 + 白名单 active "

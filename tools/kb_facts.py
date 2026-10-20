@@ -56,6 +56,38 @@ END = "<!-- facts:end -->"
 IN_FLIGHT = ("进行中", "未开始", "已停滞")
 
 
+def _load_live_samples():
+    """从 `research/live/LATEST.json` 指向的快照里取「正面和负面样本」表。
+
+    返回 `(doc, source)`：`doc` 是整份快照，`source` 是 `sources["kb_samples"]`。
+    任何一环缺失都**返回 `(None, None)` 而不是抛异常** —— 调用方要把「没拉到」
+    与「拉到了但是 0 条」区分开，这两种情况在报告里必须长得不一样
+    （AGENTS.md §2.4.1：空结果与读错了不许混为一谈）。
+
+    ★ 刻意**不复用** `tools/live_snapshot.py` 里的 `SOURCES` 常量：
+      那个文件是**写快照**的，本文件是**读快照**的。共用一份常量会让
+      「拉取端与消费端同时改错」变成一个静默的巧合，而 E2 需要的正是两套独立实现。
+    """
+    ptr = os.path.join(load.REPO, "research", "live", "LATEST.json")
+    if not os.path.exists(ptr):
+        return None, None
+    try:
+        latest = json.load(open(ptr, encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None, None
+    name = latest.get("latest")
+    if not name:
+        return None, None
+    path = os.path.join(load.REPO, "research", "live", name)
+    if not os.path.exists(path):
+        return None, None
+    try:
+        doc = json.load(open(path, encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None, None
+    return doc, (doc.get("sources") or {}).get("kb_samples")
+
+
 def _rows(snap):
     led = json.load(open(LEDGER, encoding="utf-8"))
     rs = [r for r in led["records"] if r["role"] != "excluded"]
@@ -124,14 +156,163 @@ def compute(snap=None):
                   for t in snap.ledger_tables() for f in (t.fields or [])
                   if any(k in str(f) for k in ("开始", "启动"))]
 
-    # 正负样本的证据落盘件：★ 它自己和自己打架（抬头 returned=8，盘上 5 条）。
-    #   这里**独立解析一遍**（不复用 kb_classes 的解析器）—— E2 要在「登记表里写的数」
-    #   与「重算出来的数」之间比对，两者必须来自不同的实现，否则那条检查是恒真的。
-    smp_p = os.path.join(KB, "_evidence", "正负样本.raw.txt")
-    smp_txt = open(smp_p, encoding="utf-8").read() if os.path.exists(smp_p) else ""
-    smp_head = re.search(r"returned=(\d+)", smp_txt)
-    smp_blocks = [b for b in smp_txt.split("\n  ---") if "分类 =" in b]
-    smp_marked = sum(1 for b in smp_blocks if '备注（如处理结果/建议） = "样例"' in b)
+    # 正负样本：★ 2026-10-20 换源。
+    #
+    #   在此之前读的是 `_evidence/正负样本.raw.txt`（1.3 KB / 5 条 / 抬头 returned=8），
+    #   而云端同表当时已有 **186 条**。也就是说：**管线在读一份 09-16 的旧 dump，
+    #   并把「抬头 vs 盘上」的计数矛盾当成样本库的全部问题。**
+    #   真相更简单也更难看 —— 不是数据没有，是本地没读。
+    #
+    #   现在读 `research/live/LATEST.json` 指向的快照（`tools/live_snapshot.py` 产出，
+    #   与云端同一次拉取）。★ 这里**仍然独立解析一遍**（不复用 kb_classes 的解析器）：
+    #   E2 要在「登记表里写的数」与「重算出来的数」之间比对，两者必须来自不同的实现，
+    #   否则那条检查是恒真的 —— 这条理由在换源之后一字未变。
+    smp_doc, smp_src = _load_live_samples()
+    smp_recs = (smp_src or {}).get("records") or []
+    smp_total = (smp_src or {}).get("api_total")
+    # 「样例」是旧 dump 里的标记；新快照的备注列已变成自动评分（「价值评分: N」）。
+    # 保留这个数，是为了让它**降到 0 并保持 0** 时能被看见：
+    # 一旦又有真实记录被手工标成样例，它会重新变正。
+    smp_marked = sum(
+        1 for it in smp_recs
+        if "样例" in str((it.get("fields") or {}).get("备注（如处理结果/建议）") or "")
+    )
+
+    # ── 图文对应与正文噪音（2026-10-20 委托方指出后当场量化）──────────────
+    #   委托方的原话是「很多『图片素材』和『具体原因/分析』无法对应」以及
+    #   「『具体原因/分析』里有很多噪音文本」。这两句都能变成可重算的数，
+    #   所以它们是判据，不是印象。
+    #
+    #   ★ 「无法对应」的成因不是内容没写清楚，而是**结构上不可能对应**：
+    #     344 个附件的文件名 **100% 是 `sN_N.png`** —— 占位式重命名，
+    #     原始文件名（含时间/序号/素材标识）在采集时就丢了。
+    #     于是「这句话说的是第几张图」这件事**没有任何字段承载**。
+    _att_re = re.compile(r"^s\d+_\d+\.png$")
+    smp_att_names = [a.get("name") or ""
+                     for it in smp_recs
+                     for a in ((it.get("fields") or {}).get("图片素材") or [])]
+    smp_att_renamed = sum(1 for n in smp_att_names if _att_re.match(n))
+    # 附件数 vs 原文反馈里 `!Image` 标记数：不等即「贴进群里的图和存下来的图不是同一组」
+    smp_att_count_mismatch = 0
+    for it in smp_recs:
+        f = it.get("fields") or {}
+        n_img = len(f.get("图片素材") or [])
+        n_mark = len(re.findall(r"!Image|\[图片\]", str(f.get("原文反馈") or "")))
+        if n_img != n_mark:
+            smp_att_count_mismatch += 1
+
+    def _noise(f):
+        """`具体原因/分析` 里属于「聊天转录」而非「审查结论」的特征。
+
+        这些特征不是我们猜的：它们是从正文里数出来的，且**同时出现在多数记录里**，
+        说明这一列实际上存的是「把群里那段对话粘过来」，而不是「结构化的判定理由」。
+        """
+        t = str(f.get("具体原因/分析") or "")
+        marks = 0
+        marks += 1 if re.search(r"^\s*【审核问题】", t) else 0
+        marks += 1 if re.search(r"@[一-龥A-Za-z]{2,6}", t) else 0
+        marks += 1 if re.search(r"(麻烦看看|看看呀|麻烦看下|辛苦|姐姐|收到|好的)", t) else 0
+        marks += 1 if re.search(r"(\[图片\]|!Image|:YouAreTheBest:|【项目方|【初审|【终审|【复审)", t) else 0
+        return marks
+
+    smp_noise_marks = [_noise(it.get("fields") or {}) for it in smp_recs]
+    smp_noise_any = sum(1 for m in smp_noise_marks if m > 0)
+    smp_noise_heavy = sum(1 for m in smp_noise_marks if m >= 2)
+
+    # ── 更深的一层（2026-10-20 挖掘后）：这张表不是判例库，是设计审核群的聊天转录 ──
+    #   两个发现必须成为可重算的数，否则下一个人会拿 `审核人` 字段去统计「谁审得多」，
+    #   得到一个完全错的结论。
+    #
+    #   ① `审核人` 字段 == `来源` 里的名字（都是**把内容转进群的人**），
+    #      而**不是**正文 `【终审-@X】` 里被请去审的人。
+    #   ② `原文反馈` 的 `【审核】` 段里，很大一部分正文其实是**送审请求**
+    #      （`【终审-@X】麻烦看看` + 一段需求简报），不含任何审核结论。
+    _req_re = re.compile(r"^\s*【(初审|终审|复审|复核)[^】]*】")
+    _src_name_re = re.compile(r"·\s*([^·]+?)\s*$")
+    _verdict_re = re.compile(r"(建议|不对|去掉|不合适|应该改|需要改|重新|错误|用错|不要用)")
+
+    def _first_audit_body(text):
+        """取第一段 `【审核 …】` 的正文（与 kb_sample_extract 同口径，但独立实现）。"""
+        marks = [(m.group(1), m.start(), m.end())
+                 for m in re.finditer(r"^【([^】]{1,40})】", text, re.M)]
+        for i, (hdr, _s, hend) in enumerate(marks):
+            if hdr.strip().startswith("审核"):
+                end = marks[i + 1][1] if i + 1 < len(marks) else len(text)
+                return text[hend:end].strip()
+        return None
+
+    smp_reviewer_is_forwarder = 0   # 审核人字段 == 来源名（即转发者）
+    smp_audit_is_request = 0        # 审核段正文实为送审请求
+    smp_request_no_verdict = 0      # 送审请求且完全不含判定词
+    for it in smp_recs:
+        f = it.get("fields") or {}
+        who = str(f.get("审核人") or "").strip()
+        m = _src_name_re.search(str(f.get("来源") or ""))
+        src_name = (m.group(1).strip() if m else "")
+        if who and who == src_name:
+            smp_reviewer_is_forwarder += 1
+        body = _first_audit_body(str(f.get("原文反馈") or ""))
+        if body is not None and _req_re.match(body):
+            smp_audit_is_request += 1
+            if not _verdict_re.search(body):
+                smp_request_no_verdict += 1
+
+    # ── 品牌层（2026-10-20）：三个数，全部从制品算，不手写 ─────────────
+    #   这一层此前**一条缺口编号都没有**，而它是最高频的问题类别
+    #   （讨论稿 33/98；样本表里「品牌一致性」71/186 也是最高频）。
+    #   缺编号 = 缺执行点 = 缺了也没人会知道。
+    brand = {
+        "控制点_品牌族": None,       # 空族即为 0
+        "控制点_总数": None,
+        "七轴_BRAND_条数": None,
+        "引擎品牌规则数": None,      # rules-v1 里 topic 以 BRAND 开头 / 关键词属品牌语境
+    }
+    cp_p = os.path.join(load.REPO, "research", "governance", "control-points-v1.json")
+    if os.path.exists(cp_p):
+        cpd = json.load(open(cp_p, encoding="utf-8"))
+        fams = cpd.get("families") or []
+        # 实测（2026-10-20）：`families` 是**字符串列表**（族名），不是对象列表。
+        # 第一版按 `.get("family")` 取，直接 AttributeError —— 记在这里，
+        # 免得下一个人又照着「一般是对象数组」的直觉写一遍。
+        names = [str(x) for x in fams] if isinstance(fams, list) else (
+            list(fams.keys()) if isinstance(fams, dict) else [])
+        empty = [e.get("family") for e in (cpd.get("empty_families") or [])]
+        brand["控制点_总数"] = len(names) + len(empty)
+        brand["控制点_品牌族"] = (
+            0 if "品牌控制" in empty else sum(
+                1 for n in names if "品牌" in n))
+        brand["控制点_空族"] = len(empty)
+    mece_p = os.path.join(load.REPO, "research", "governance",
+                          "rules-mece-migration-v1.json")
+    if os.path.exists(mece_p):
+        m = json.load(open(mece_p, encoding="utf-8"))
+        asg = m.get("assignments") or m.get("items") or []
+        # 实测（2026-10-20）：轴名字段叫 **`primary`**（FACT/CLAIM/DISC/BRAND/…），
+        # 不是 `axis`。第一版读 `axis`，得到 0 —— 一个「字段名读错 → 安静产出 0」
+        # 的教科书例子（AGENTS.md §2.4.1 第 1 行）。所以这里同时留两个键做兜底，
+        # 但以 `primary` 为准。
+        brand["七轴_BRAND_条数"] = sum(
+            1 for a in asg
+            if str(a.get("primary") or a.get("axis") or "").upper().startswith("BRAND"))
+
+    # 品牌资产落盘完整度：manifest 声明了哪些文件、盘上少了几个。
+    #   ★ 这个数此前只存在于 `verify_assets_baseline.py` 的退出码里，而该 verifier
+    #     没被登记进 AGENTS.md §2.1 的自证表 —— 所以它天天红，没人看见。
+    #     放进 kb_facts 之后，E2「缺口量可重算」会顺带守住它。
+    brand_asset = {"files": None, "missing": None}
+    man_p = os.path.join(load.REPO, "PMO", "audit", "momcozy-assets", "manifest.json")
+    if os.path.exists(man_p):
+        try:
+            man = json.load(open(man_p, encoding="utf-8"))
+            files = man.get("files") or []
+            brand_asset["files"] = len(files)
+            brand_asset["missing"] = sum(
+                1 for f in files
+                if f.get("dst_path") and not os.path.exists(
+                    os.path.join(load.REPO, f["dst_path"])))
+        except (json.JSONDecodeError, OSError):
+            pass
+
     ext_p = os.path.join(KB, "外部标准库-v1.json")
     ext_doc = json.load(open(ext_p, encoding="utf-8")) if os.path.exists(ext_p) else {"entries": []}
 
@@ -140,6 +321,13 @@ def compute(snap=None):
     rules_p = os.path.join(load.REPO, "research", "governance", "skeleton", "rules-v1.json")
     n_rules = len(json.load(open(rules_p, encoding="utf-8"))["rules"]) \
         if os.path.exists(rules_p) else 0
+    # 品牌：引擎里有没有品牌规则（实测 26 条全是医疗/FDA/竞品/安全/紧迫感，0 条品牌）
+    if os.path.exists(rules_p):
+        _rs = json.load(open(rules_p, encoding="utf-8"))["rules"]
+        brand["引擎品牌规则数"] = sum(
+            1 for r in _rs
+            if str(r.get("topic") or "").upper().startswith("BRAND")
+            or "brand" in str(r.get("rule_key") or "").lower())
     # 存量广告语料（B3.4 演练）：有文案的 / 没文案的 / 没文案却被标绿的
     rec_p = os.path.join(load.REPO, "research", "governance", "skeleton", "_data",
                          "records.json")
@@ -242,10 +430,38 @@ def compute(snap=None):
         "demands_unmapped": ev["totals"]["demands_unmapped"],
         "empty_tables": sum(1 for t in snap.all() if t.kind == "empty"),
         "start_like_fields": len(start_like),
-        "samples_on_disk": len(smp_blocks),
+        # ★ 键名刻意不改（samples_on_disk 等）：改名会让「读数变了」与「键名变了」
+        #   混在一次 diff 里，而 E2 正是拿这些键做比对的。改的是**取值来源**。
+        "samples_on_disk": len(smp_recs),
         "samples_marked_sample": smp_marked,
-        "samples_real": len(smp_blocks) - smp_marked,
-        "samples_header_returned": int(smp_head.group(1)) if smp_head else None,
+        "samples_real": len(smp_recs) - smp_marked,
+        "samples_header_returned": smp_total if smp_total is not None else None,
+        "samples_source": (os.path.basename(
+            (smp_doc or {}).get("_file") or "research/live/LATEST.json")),
+        "samples_snapshot_at": (smp_doc or {}).get("captured_at_utc"),
+        "samples_unclassified": sum(
+            1 for it in smp_recs
+            if not str((it.get("fields") or {}).get("原因分类") or "").strip()),
+        # ── 2026-10-20 委托方指出后当场量化：图文对应 / 正文噪音 ──
+        "samples_attachments": len(smp_att_names),
+        "samples_att_renamed": smp_att_renamed,
+        "samples_att_count_mismatch": smp_att_count_mismatch,
+        "samples_noise_any": smp_noise_any,
+        "samples_noise_heavy": smp_noise_heavy,
+        "samples_positive": sum(
+            1 for it in smp_recs
+            if (it.get("fields") or {}).get("分类") == "正例"),
+        # ── 2026-10-20 挖深：这张表是聊天转录，不是判例库 ──
+        "samples_reviewer_is_forwarder": smp_reviewer_is_forwarder,
+        "samples_audit_is_request": smp_audit_is_request,
+        "samples_request_no_verdict": smp_request_no_verdict,
+        # ── 品牌层（2026-10-20）：此前没有任何缺口编号的那一层 ──
+        "brand_control_points": brand["控制点_品牌族"],
+        "brand_control_empty_families": brand.get("控制点_空族"),
+        "brand_axis_rules": brand["七轴_BRAND_条数"],
+        "brand_engine_rules": brand["引擎品牌规则数"],
+        "brand_asset_files": brand_asset["files"],
+        "brand_asset_files_missing": brand_asset["missing"],
         "ext_entries": len(ext_doc.get("entries", [])),
         "ext_ratified": sum(1 for e in ext_doc.get("entries", [])
                             if e.get("status") == "ratified"),
@@ -304,7 +520,7 @@ def compute(snap=None):
         "src_fragments_missing_records": (mf.get("轴4_语料完备性") or {}).get("受影响记录数"),
         "kb_classes_ready": sum([
             len(ext_doc.get("entries", [])) > 0,
-            (len(smp_blocks) - smp_marked) > 0,
+            (len(smp_recs) - smp_marked) > 0,
             n_rules > 0,
             prod_readable > 0,
         ]),

@@ -119,3 +119,8 @@ __pycache__/
 
 # 浏览器自动化工作目录
 .playwright-mcp/
+
+# 飞书快照：含真名与逐字内部原话，**不入公开仓**（AGENTS.md §2.6）。
+# LATEST.json 只含 sha256 与计数，可以入库；快照本体由 `python3 tools/live_snapshot.py` 现场重拉。
+# 判据：`git ls-files research/live/` 里不许出现 snapshot-*.json（verify_kb 的 E8 守着）。
+research/live/snapshot-*.json

@@ -1,16 +1,16 @@
 {
-  "latest": "snapshot-20260916T050845Z.json",
-  "captured_at_utc": "2026-09-16T05:08:45.473112+00:00",
+  "latest": "snapshot-20261020T162244Z.json",
+  "captured_at_utc": "2026-10-20T16:22:44.083486+00:00",
   "sources": {
     "ad_copy": {
       "read_count": 291,
       "api_total": 291,
-      "content_sha256": "0927fd58b0f8bf104b5e8f9a1c4dd356ea4f509b45fba38db4207c2efd6c31f6"
+      "content_sha256": "232c8963887246f4993484e22f1593a189e526209820405f505cd7a821f4e59a"
     },
     "boundary_rules": {
       "read_count": 21,
       "api_total": 21,
-      "content_sha256": "2a1a219a7e76b459e6a7c846559fedd9023f8b6e08f146feadda85ad312c34bb"
+      "content_sha256": "fc35fe32ec98df94f31e96066516e7e8e5ccf3c9ce58aaa32e8af6e967de3223"
     },
     "w1_claims": {
       "read_count": 19,
@@ -20,17 +20,17 @@
     "rewrite_lib": {
       "read_count": 52,
       "api_total": 52,
-      "content_sha256": "bc1aa46519a860836265188020c74b0257c04d8351327d2171b0e5fbe4eddf1f"
+      "content_sha256": "4ff654139772ff1226e369a428307679084ff1ed7ddbbbcf2dec69a3c82e80c6"
     },
     "kb_materials": {
-      "read_count": 15,
-      "api_total": 15,
-      "content_sha256": "6460ec5b5fb0f8821237a22a74a8137f358ebf9edecab436e34f505e24728336"
+      "read_count": 33,
+      "api_total": 33,
+      "content_sha256": "e1c188b9011e0c42787d7304a122424df998dc08adc55ca53a592c15ebe08c16"
     },
     "kb_samples": {
-      "read_count": 8,
-      "api_total": 8,
-      "content_sha256": "edc06d151b034228aa6a14cbbab217eaac357529ec32e0e3ef6ba64e88939ea1"
+      "read_count": 186,
+      "api_total": 186,
+      "content_sha256": "5711b123511a890eed2bf84705173bfd2adde9424ca1c7a882900015c808b388"
     }
   }
 }
