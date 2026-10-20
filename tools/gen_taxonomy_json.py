@@ -202,11 +202,15 @@ def build(raw: str, body: str) -> dict:
     ]
 
     # 欠定争议：给工作台展示「这条判据有争议」
+    # ⚠️ 字段名踩过坑：这里原来叫 `axis`，装的是**争议描述**（如「DSC12 枚举太窄…」），
+    # 而 `axes[].code` 是七轴枚举值 —— 同一个词两种类型，按名字取枚举值会拿到一句话
+    # 且不报错。现已拆成 `axis_code`（枚举，可为 null）+ `dispute`（描述）。
     disputes = [
         {
             "rule_id": d["rule_id"],
             "section": d["section"],
-            "axis": d["axis"],
+            "axis_code": _axis_code_of(d["axis"]),
+            "dispute": d["axis"],
             "status": "underdetermined",
             "resolved_in": None,
         }
@@ -282,6 +286,24 @@ def _orthogonal() -> dict:
             "note": "topic 不参与主轴判定，不得反向推理",
         },
     }
+
+
+def _axis_code_of(desc: str) -> str | None:
+    """从争议描述里认出一个七轴枚举值；认不出返回 None。
+
+    只认**开头**的轴名（如 `FCT5 …` → FACT），不做全串搜索 ——
+    描述里常同时出现两个轴（「DSC12 枚举太窄，FCT10 测试不通过」），
+    在串中间搜索会按出现顺序返回结果，等于赌写法。
+    """
+    m = re.match(r"^(CHAN|RIGHT|SCENE|DISC|BRAND|FACT|CLAIM)\b", desc.strip())
+    if m:
+        return m.group(1)
+    # 编号前缀 → 轴（FCT5 → FACT）
+    m = re.match(r"^(CHN|RGT|SCN|DSC|BRD|FCT|CLM)\d+", desc.strip())
+    if m:
+        return {"CHN": "CHAN", "RGT": "RIGHT", "SCN": "SCENE", "DSC": "DISC",
+                "BRD": "BRAND", "FCT": "FACT", "CLM": "CLAIM"}[m.group(1)]
+    return None
 
 
 def check_coverage(raw: str, data: dict) -> list[str]:

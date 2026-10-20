@@ -9,49 +9,56 @@
       {
         "rule_id": "r-724b26ecb1dee9c4",
         "section": "4.16.a",
-        "axis": "ALLOWED / NOT_A_RULE 两处打架",
+        "axis_code": null,
+        "dispute": "ALLOWED / NOT_A_RULE 两处打架",
         "status": "underdetermined",
         "resolved_in": null
       },
       {
         "rule_id": "r-6f2500bc187d8fae",
         "section": "4.16.b",
-        "axis": "DSC12 枚举太窄，FCT10 测试不通过",
+        "axis_code": "DISC",
+        "dispute": "DSC12 枚举太窄，FCT10 测试不通过",
         "status": "underdetermined",
         "resolved_in": null
       },
       {
         "rule_id": "r-4244b23b0f2d3cc4",
         "section": "4.16.c",
-        "axis": "「补充说明」里装的是事实命题，不是披露",
+        "axis_code": null,
+        "dispute": "「补充说明」里装的是事实命题，不是披露",
         "status": "underdetermined",
         "resolved_in": null
       },
       {
         "rule_id": "r-99839b4c5e713fa0",
         "section": "4.16.d",
-        "axis": "FCT5 的排除句与规则触发条件正相反",
+        "axis_code": "FACT",
+        "dispute": "FCT5 的排除句与规则触发条件正相反",
         "status": "underdetermined",
         "resolved_in": null
       },
       {
         "rule_id": "r-38f01299f58fc6e4",
         "section": "4.16.e",
-        "axis": "FCT2 只写了「目标型号」，没写「品类级」",
+        "axis_code": "FACT",
+        "dispute": "FCT2 只写了「目标型号」，没写「品类级」",
         "status": "underdetermined",
         "resolved_in": null
       },
       {
         "rule_id": "r-640dfb910ee7c32b",
         "section": "4.16.f",
-        "axis": "与 §4.16.b 同形，且**旧 §4.21 把它硬写成 FACT 是错的**",
+        "axis_code": null,
+        "dispute": "与 §4.16.b 同形，且**旧 §4.21 把它硬写成 FACT 是错的**",
         "status": "underdetermined",
         "resolved_in": null
       },
       {
         "rule_id": "r-b4660b7a28845f00",
         "section": "4.16.g",
-        "axis": "**判据打架**：同一份规范两条路给出两个轴",
+        "axis_code": null,
+        "dispute": "**判据打架**：同一份规范两条路给出两个轴",
         "status": "underdetermined",
         "resolved_in": null
       }
