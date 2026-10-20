@@ -47,6 +47,18 @@ export const THRESHOLDS = Object.freeze({ axisExact: 0.95, unknownRate: 0.05 });
 /** 复跑稳定性门槛：unstable 超过 2% 时，即使 stable_correct 达标也不能判「达标」。 */
 export const UNSTABLE_MAX = 0.02;
 
+/**
+ * 契约违规率上限。
+ *
+ * 契约违规 = 解析成功、但字段之间自相矛盾（目前只看 `x_test` 与 `primary`）。
+ * 它与「答错」是两件事：前者要改契约或提示词，后者要改判据。
+ * 一旦这个比例过高，说明模型根本没按契约作答，此时**任何 axis_exact 都不该被当结果**。
+ *
+ * 阈值 10% 不是拍的：65 条 × 5 轮里，解析失败是 1.85%，
+ * 而契约违规若超过 10%，等于每十条就有一条答案自相矛盾 —— 那份读数的方差会盖过任何改进。
+ */
+export const CONTRACT_VIOLATION_MAX = 0.10;
+
 /** 七轴，按判定顺序。顺序本身是契约的一部分（先命中先归）。 */
 export const AXES = Object.freeze(['CHAN', 'RIGHT', 'SCENE', 'DISC', 'BRAND', 'FACT', 'CLAIM']);
 
@@ -81,7 +93,15 @@ const SYSTEM_PROMPT = `你是一个内容合规规则的分类器。任务：判
 - 「改成 2~3 天」= FACT（改数值）；「补充一句就医提示」= DISC（加披露）。两者都出现时，
   看规则的主动作是什么：改数值 → FACT；加一句独立的告知 → DISC。
 - **「补充说明 / 补充：X」要过一道测试再判**（规范 DSC11–DSC12 / FCT10）：
-  把 X 拿掉，原句是否变假或不可执行？
+  把 X 拿掉，**原句**是否变假或不可执行？
+
+  **「原句」的定义（照下面逐字取，不许自己找一句读着通顺的）：**
+  规则正文形如「原表述：A；修订为：B；修订原因：C」时，**原句 = A**，X = B 里「补充」后面那串。
+  规则正文只有「修订为：B」而没有「原表述：A」时，才把 B 里的主句当原句、把补充串当 X。
+  **不许**把 B 里已经含了 X 的那句当成「原句」—— 那样 X 永远拿不掉，测试会恒真。
+
+  **原句是标题/提问式时（如「X 怎么办？」「为什么会 Y」），拿掉 X 会让它失去答案 ——
+  这算「不可执行」，x_test 填 false，判 FACT。** 不要因为它字面上仍是问句就判 true。
   · 变假/不可执行 → X 是主命题缺失的事实成分 → FACT（FCT10）。
     例：「补充说明：体重增长趋势应符合 WHO 生长曲线」→ 拿掉后「规律稳步增长」无参照 → FACT。
   · 仍为真且可执行，只是受众少知道一件事 → DISC（DSC12）。
@@ -101,15 +121,31 @@ const SYSTEM_PROMPT = `你是一个内容合规规则的分类器。任务：判
 3. 只选一个 primary。确实同时有两个独立动作时才填 secondary（删掉前者后者仍独立成立）
 4. 判不了就返回 unknown，code 用 U3（指代不明）或 U9（七轴均不命中）
 
+**必须先把 X 测试的结论写进 x_test 字段，再据此选 primary。** 顺序不许反：
+先选轴、再编一句测试结论，是这次要禁掉的写法。
+
+x_test 三个取值，只许照下面定义填：
+- "n/a" —— 这条规则不是「补充／补充说明／补充提示：X」的形式，X 测试不适用
+- "false" —— 是补充型，且拿掉 X 后原句为假或不可执行 → 必须 primary=FACT
+- "true" —— 是补充型，且拿掉 X 后原句仍为真且可执行 → 见下面两条分支
+
+x_test 为 "true" 时再分两支，**这一步不许跳过**：
+- X 属于 DSC12 的封闭枚举（风险 / 禁忌 / 就医提示 / 免责 / 身份关系 / 法定标识）→ primary=DISC
+- X 不属于上述六类（例如「优点 / 理由 / 适用人群 / 使用要领 / 行为建议」）→
+  **primary=null，unknown="U12"**。这是判据缺口，**不许硬塞进 DISC，也不许改判 FACT**。
+
 输出严格 JSON，字段名必须逐字如下，不要改名、不要加字段、不要 markdown 围栏、不要解释：
 
-{"primary":"CHAN|RIGHT|SCENE|DISC|BRAND|FACT|CLAIM","secondary":null或同上,
+{"x_test":"true|false|n/a","x":"被拿掉的那串 X 的逐字引用，n/a 时填 null",
+ "primary":"CHAN|RIGHT|SCENE|DISC|BRAND|FACT|CLAIM","secondary":null或同上,
  "rule_nature":"prohibition|mandate|disclosure|substantiation|recommendation",
  "jurisdiction":"GLOBAL|US|CA|EU|UK|CN|BR|AU|SG|AT|BH|PLATFORM|MULTI",
  "confidence":"high|medium|low","reason":"一句话，按第几条判定条件命中","unknown":null}
 
-判不了时只输出：{"primary":null,"unknown":"U3","reason":"为什么判不了"}
-primary 与 unknown 不许同时非空。`;
+判不了时只输出：{"x_test":<按上面填>,"x":<同上>,"primary":null,"unknown":"U3","reason":"为什么判不了"}
+primary 与 unknown 不许同时非空。
+x_test 为 false 时 primary 必须是 FACT；为 true 且 X 属 DSC12 枚举时必须是 DISC。
+这条约束会被机器校验，违反会被记成契约违规而不是答错。`;
 
 /* ───────────────────────── 纯函数（可被 --selftest 直接断言） ───────────────────────── */
 
@@ -146,8 +182,24 @@ export function buildUserMessage(rule, { blind = false } = {}) {
  * 不宽松收下的理由：宽容解析会把「模型没按契约答」变成「模型答了但答错」，
  * 两者在读数上长得一样，而下一步动作完全不同（前者改提示词，后者改判据）。
  *
+ * ── 2026-10-20 加 `x_test`：把「X 测试」从自由叙述变成必填字段 ──────────
+ *
+ * 起因是一个实测：`r-b2530a099df678b3` 在 15 轮里给出 FACT×9 / DISC×6，
+ * 两边的 reason 都写「按 X 测试」，但**对测试结果的判断相反**
+ * （一边说「拿掉后主命题变错」，一边说「拿掉后原文仍成立」）。
+ *
+ * 也就是说：同一个测试、同一条规则，模型在**叙述层**给了两个互斥的结论，
+ * 而叙述层没有任何东西会因此变红。这跟「判据打架」是两件事 ——
+ * 规范定不定得住，与模型执行得稳不稳，实测下来几乎无关
+ * （unique 组平均 1.42 种答案 / ambiguous 组 1.43 种，见 §4.16）。
+ *
+ * 修法不是改提示词措辞，是**让测试结果成为可校验的字段**：
+ * 模型必须先填 `x_test`，再据此选 primary；两者矛盾 = 契约违规，单独计数，
+ * **不计入 axis_exact**（否则契约违规会被算成答错，掩盖真因）。
+ *
  * @returns {null | {primary:string|null, secondary:string|null, rule_nature:string|null,
- *                  jurisdiction:string|null, confidence:string, reason:string, unknown:string|null}}
+ *                  jurisdiction:string|null, confidence:string, reason:string, unknown:string|null,
+ *                  x_test:string|null, x:string|null, contract_violation:string|null}}
  */
 export function parseVerdict(raw) {
   if (typeof raw !== 'string' || !raw.trim()) return null;
@@ -184,6 +236,26 @@ export function parseVerdict(raw) {
   const secondaryRaw = obj.secondary;
   const secondary = secondaryRaw === null || secondaryRaw === undefined ? null : pick(secondaryRaw, AXES);
 
+  // ── x_test 契约校验 ───────────────────────────────────────────────
+  // 缺失或取值不在封闭集合 = 契约违规（不是答错）。
+  const xTestRaw = obj.x_test;
+  const xTest = ['true', 'false', 'n/a'].includes(xTestRaw) ? xTestRaw : null;
+  const xRaw = typeof obj.x === 'string' && obj.x.trim() ? obj.x.trim() : null;
+
+  let violation = null;
+  if (xTest === null) {
+    violation = `x_test 缺失或取值非法（收到 ${JSON.stringify(xTestRaw)}）`;
+  } else if (xTest === 'false' && primary !== 'FACT') {
+    // 拿掉 X 后原句为假/不可执行 → 规范要求 FACT；判成别的轴就是自相矛盾
+    violation = `x_test=false 但 primary=${primary}（规范要求 FACT）`;
+  } else if (xTest === 'true' && primary === 'FACT') {
+    // 拿掉 X 后原句仍真且可执行 → FCT10 判它不成立；仍判 FACT 就是自相矛盾
+    // 注意：DSC12 不在枚举内且落 U12 的情形，由下面的分支放行
+    violation = `x_test=true 但 primary=FACT（FCT10 的去除测试不成立）`;
+  } else if (xTest !== 'n/a' && xTest !== null && !xRaw) {
+    violation = `x_test=${xTest} 但 x 为空（必须逐字引用被拿掉的那串 X）`;
+  }
+
   return {
     primary,
     secondary,
@@ -192,6 +264,9 @@ export function parseVerdict(raw) {
     confidence: pick(obj.confidence, CONFIDENCES) ?? 'low',
     reason: typeof obj.reason === 'string' ? obj.reason.trim() : '',
     unknown,
+    x_test: xTest,
+    x: xRaw,
+    contract_violation: violation,
   };
 }
 
@@ -207,36 +282,58 @@ export function score(rows) {
   const n = rows.length;
   const parsed = rows.filter((r) => r.verdict);
   const nParsed = parsed.length;
+  // 契约违规：解析成功、但字段之间自相矛盾（目前只看 x_test 与 primary）。
+  // **单列、不进分母** —— 它和「答错」是两件事：前者要改契约/提示词，后者要改判据。
+  const violations = parsed.filter((r) => r.verdict.contract_violation);
+  const nContractViolation = violations.length;
+  const clean = parsed.filter((r) => !r.verdict.contract_violation);
+  const nClean = clean.length;
   if (n === 0 || nParsed === 0) {
     return {
       tested: false, n, nRun: rows.filter((r) => !r.transportFailure).length, nParsed,
       axisExact: null, exact: 0, unknown: 0, secondaryExact: null, nSecondary: 0,
+      nContractViolation: 0, contractViolationRate: null,
       pass: false, failures: ['一条都没解析成功 —— 未测，不是 0%'],
     };
   }
+  // 全部都是契约违规时，等于没有可用读数 —— 同样是「未测」
+  if (nClean === 0) {
+    return {
+      tested: false, n, nRun: rows.filter((r) => !r.transportFailure).length, nParsed,
+      axisExact: null, exact: 0, unknown: 0, secondaryExact: null, nSecondary: 0,
+      nContractViolation, contractViolationRate: 1,
+      pass: false, failures: [`${nContractViolation}/${nParsed} 条契约违规 —— 没有可用读数，未测`],
+    };
+  }
 
-  const exact = parsed.filter((r) => r.verdict.primary === r.gold).length;
-  const unknown = parsed.filter((r) => r.verdict.primary === null).length;
+  const exact = clean.filter((r) => r.verdict.primary === r.gold).length;
+  const unknown = clean.filter((r) => r.verdict.primary === null).length;
 
   // secondary 只在**两边都给了**的时候才计 —— gold 没标次要轴的条目不该算作答错
-  const withSecondary = parsed.filter((r) => r.goldSecondary && r.verdict.secondary);
+  const withSecondary = clean.filter((r) => r.goldSecondary && r.verdict.secondary);
   const nSecondary = withSecondary.length;
   const secondaryExact = nSecondary
     ? withSecondary.filter((r) => r.verdict.secondary === r.goldSecondary).length / nSecondary
     : null;
 
-  const axisExact = exact / nParsed;
-  const unknownRate = unknown / nParsed;
+  const axisExact = exact / nClean;
+  const unknownRate = unknown / nClean;
+  const contractViolationRate = nContractViolation / nParsed;
 
   const failures = [];
   if (axisExact < THRESHOLDS.axisExact) failures.push(`axis_exact ${axisExact.toFixed(4)} < ${THRESHOLDS.axisExact}`);
   if (unknownRate > THRESHOLDS.unknownRate) failures.push(`unknown_rate ${unknownRate.toFixed(4)} > ${THRESHOLDS.unknownRate}`);
   // 解析失败的条数必须显式扣出来 —— 否则「解析失败」会被算成「答错」
   if (nParsed < n) failures.push(`解析失败 ${n - nParsed}/${n}（未计入分母，但记在这里）`);
+  // 契约违规率高到一定程度，说明契约本身没被遵守 —— 此时任何准确率都不该被当结果
+  if (contractViolationRate > CONTRACT_VIOLATION_MAX) {
+    failures.push(`契约违规 ${nContractViolation}/${nParsed} = ${(contractViolationRate * 100).toFixed(1)}% > ${(CONTRACT_VIOLATION_MAX * 100).toFixed(0)}%（x_test 与 primary 自相矛盾）`);
+  }
 
   return {
     tested: true, n, nRun: rows.filter((r) => !r.transportFailure).length, nParsed,
     axisExact, exact, unknown, secondaryExact, nSecondary,
+    nContractViolation, contractViolationRate,
     pass: failures.length === 0, failures,
   };
 }
@@ -420,6 +517,40 @@ function selftest() {
   ok('解析：unknown 契约', v4 && v4.primary === null && v4.unknown === 'U9');
   const v5 = parseVerdict('{"primary":"FACT","unknown":"U9"}');
   ok('解析：同时给 primary 与 unknown → null（契约不允许）', v5 === null);
+
+  // ── 3b x_test 契约（2026-10-20 加）──────────────────────────────
+  // 正反成对：只验「矛盾形态会被抓到」的话，一个恒返回 violation 的实现也能过；
+  // 所以每一种合规形态都必须配一条「不许被误报」的反向对照。
+  const xt = (o) => parseVerdict(JSON.stringify(o));
+
+  // 合规三态
+  const okNA = xt({ x_test: 'n/a', x: null, primary: 'CHAN', unknown: null });
+  ok('x_test：n/a 且非补充型 → 合规', okNA && okNA.contract_violation === null && okNA.x_test === 'n/a');
+  const okFalse = xt({ x_test: 'false', x: '短期优先冷藏', primary: 'FACT', unknown: null });
+  ok('x_test：false + FACT → 合规（反向对照，不许误报）', okFalse && okFalse.contract_violation === null);
+  const okTrueD = xt({ x_test: 'true', x: '全程需有人守护', primary: 'DISC', unknown: null });
+  ok('x_test：true + DISC → 合规（反向对照，不许误报）', okTrueD && okTrueD.contract_violation === null);
+  const okTrueU12 = xt({ x_test: 'true', x: '该姿势的优点', primary: null, unknown: 'U12' });
+  ok('x_test：true + U12（缺口）→ 合规', okTrueU12 && okTrueU12.contract_violation === null);
+
+  // 违规三态 —— 每一条都必须真被抓到
+  const badMissing = xt({ primary: 'FACT', unknown: null });
+  ok('x_test：缺失 → 契约违规', badMissing && /缺失或取值非法/.test(badMissing.contract_violation || ''));
+  const badFalseFact = xt({ x_test: 'false', x: 'X', primary: 'DISC', unknown: null });
+  ok('x_test：false 但判 DISC → 契约违规', badFalseFact && /要求 FACT/.test(badFalseFact.contract_violation || ''));
+  const badTrueFact = xt({ x_test: 'true', x: 'X', primary: 'FACT', unknown: null });
+  ok('x_test：true 但判 FACT → 契约违规（FCT10 测试不成立）', badTrueFact && /去除测试不成立/.test(badTrueFact.contract_violation || ''));
+  const badNoX = xt({ x_test: 'true', x: null, primary: 'DISC', unknown: null });
+  ok('x_test：true 但 x 为空 → 契约违规', badNoX && /x 为空/.test(badNoX.contract_violation || ''));
+  const badEnum = xt({ x_test: 'maybe', x: 'X', primary: 'FACT', unknown: null });
+  ok('x_test：取值不在封闭集合 → 契约违规', badEnum && /缺失或取值非法/.test(badEnum.contract_violation || ''));
+
+  // 计分必须把契约违规与答错分开（否则真因被掩盖）
+  const sc0 = score([
+    { gold: 'FACT', verdict: { primary: 'FACT', contract_violation: null } },
+    { gold: 'DISC', verdict: { primary: 'FACT', contract_violation: 'x_test=true 但 primary=FACT' } },
+  ]);
+  ok('计分：契约违规单列，不计入分母', sc0.nParsed === 2 && sc0.nContractViolation === 1 && sc0.exact === 1);
 
   // ── 4 计分 ──
   const rows = [
