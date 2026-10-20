@@ -309,7 +309,11 @@ def _axis_code_of(desc: str) -> str | None:
 def check_coverage(raw: str, data: dict) -> list[str]:
     """**执行点**：规范 §3 的每个编号条件都必须在 JSON 里；JSON 里不许有规范已删的。"""
     problems = []
-    spec_ids = [m.group(1) for m in COND_ROW.finditer(raw)]
+    # 只扫 §3（七轴定义）那一段。
+    # 全文扫会把 §9「已知限制」等处引用的条款号当成条件行 —— 实测 §9.10 的
+    # 「DSC12 / FCT10」对比表让覆盖检查报「编号重复」，而正文其实没问题。
+    s3 = raw[raw.find("## 3. "):raw.find("\n## 4.")]
+    spec_ids = [m.group(1) for m in COND_ROW.finditer(s3)]
     json_ids = []
     for a in data["axes"]:
         for c in a["criteria"]:

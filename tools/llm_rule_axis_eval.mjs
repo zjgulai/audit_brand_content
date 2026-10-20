@@ -132,7 +132,9 @@ x_test 三个取值，只许照下面定义填：
 x_test 为 "true" 时再分两支，**这一步不许跳过**：
 - X 属于 DSC12 的封闭枚举（风险 / 禁忌 / 就医提示 / 免责 / 身份关系 / 法定标识）→ primary=DISC
 - X 不属于上述六类（例如「优点 / 理由 / 适用人群 / 使用要领 / 行为建议」）→
-  **primary=null，unknown="U12"**。这是判据缺口，**不许硬塞进 DISC，也不许改判 FACT**。
+  **primary=null，unknown="U9"**（规范 §2.6 的「七轴均未命中且不属于任何预处理桶 = 规范缺口」）。
+  **不许硬塞进 DISC，也不许改判 FACT，也不许自造新码** ——
+  评测器里任何不在规范 §2.6 表内的 UNKNOWN 码都是私造的，规范才是唯一真值。
 
 输出严格 JSON，字段名必须逐字如下，不要改名、不要加字段、不要 markdown 围栏、不要解释：
 
@@ -250,7 +252,7 @@ export function parseVerdict(raw) {
     violation = `x_test=false 但 primary=${primary}（规范要求 FACT）`;
   } else if (xTest === 'true' && primary === 'FACT') {
     // 拿掉 X 后原句仍真且可执行 → FCT10 判它不成立；仍判 FACT 就是自相矛盾
-    // 注意：DSC12 不在枚举内且落 U12 的情形，由下面的分支放行
+    // 注意：DSC12 不在枚举内、按 §2.6 U9 报缺口的情形，由下面的分支放行
     violation = `x_test=true 但 primary=FACT（FCT10 的去除测试不成立）`;
   } else if (xTest !== 'n/a' && xTest !== null && !xRaw) {
     violation = `x_test=${xTest} 但 x 为空（必须逐字引用被拿掉的那串 X）`;
@@ -530,8 +532,8 @@ function selftest() {
   ok('x_test：false + FACT → 合规（反向对照，不许误报）', okFalse && okFalse.contract_violation === null);
   const okTrueD = xt({ x_test: 'true', x: '全程需有人守护', primary: 'DISC', unknown: null });
   ok('x_test：true + DISC → 合规（反向对照，不许误报）', okTrueD && okTrueD.contract_violation === null);
-  const okTrueU12 = xt({ x_test: 'true', x: '该姿势的优点', primary: null, unknown: 'U12' });
-  ok('x_test：true + U12（缺口）→ 合规', okTrueU12 && okTrueU12.contract_violation === null);
+  const okTrueGap = xt({ x_test: 'true', x: '该姿势的优点', primary: null, unknown: 'U9' });
+  ok('x_test：true + U9（规范缺口）→ 合规', okTrueGap && okTrueGap.contract_violation === null);
 
   // 违规三态 —— 每一条都必须真被抓到
   const badMissing = xt({ primary: 'FACT', unknown: null });
