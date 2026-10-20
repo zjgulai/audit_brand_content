@@ -13,7 +13,7 @@ type Axis = {
   criteria: string[];
   reviewer: string | null;
   evidence_required: string[];
-  boundary_counterexample: Counterexample;
+  boundary_counterexample: Counterexample | null;
 };
 
 type TreeStep = {
@@ -45,6 +45,19 @@ type Taxonomy = {
     status: string;
     source: string | null;
     note: string;
+    /** 规范**内容**版本（与文件名解耦）。`version` 是文件名里的 v1，不得当版本用。 */
+    spec_version?: string;
+    /** 规范正文 sha256 前 12 位。指纹变了才是规范变了。 */
+    spec_fingerprint?: string;
+    /** 已登记的欠定边界（§4.16）。`axis_code` 可为 null —— 多轴争议。 */
+    boundary_disputes?: Array<{
+      rule_id: string;
+      section: string;
+      axis_code: string | null;
+      dispute: string;
+      status: string;
+      resolved_in: string | null;
+    }>;
   };
   axes: Axis[];
   decision_tree: TreeStep[];
@@ -91,12 +104,50 @@ export default function TaxonomyPage() {
   return (
     <section aria-labelledby="taxonomy-title">
       <h1 id="taxonomy-title">分类规范</h1>
+      <p className="spec-version">
+        {/*
+          ★ 断言 A9：spec_version 与 spec_fingerprint 必须同时出现。
+          只写 version 会漂：同名 -v1 文件可以装不同内容。
+        */}
+        <span>按 spec {taxonomy.meta.spec_version ?? "未测"}</span>
+        <span className="font-data">{taxonomy.meta.spec_fingerprint ?? "未测"}</span>
+      </p>
       <p className="hint">
-        只读浏览页。当前为页面骨架，轴定义、判定条件、复核人与反例待规范文档落盘后填充；
-        数据源：<code>web/src/data/taxonomy.json</code>（{taxonomy.meta.version} ·{" "}
-        {taxonomy.meta.status}）。
+        只读浏览页。数据源：<code>web/src/data/taxonomy.json</code>（
+        {taxonomy.meta.spec_version ?? taxonomy.meta.version} · {taxonomy.meta.status}）。
+        该文件由 <code>tools/gen_taxonomy_json.py</code> 从规范正文生成，<strong>不得手改</strong>。
       </p>
       <p className="hint">{taxonomy.meta.note}</p>
+
+      {(taxonomy.meta.boundary_disputes ?? []).length > 0 && (
+        <>
+          <h2>已登记欠定边界（{taxonomy.meta.boundary_disputes!.length} 条）</h2>
+          <p className="hint">
+            这些规则的边界<b>规范确实定不住</b>，不是判读者错。界面展示
+            <code>underdetermined</code> 而不强行给一个轴 ——
+            其中 <code>axis_code</code> 为空的条目是<b>多轴争议</b>。
+          </p>
+          <ul className="notrun">
+            {taxonomy.meta.boundary_disputes!.map((d) => (
+              <li key={d.rule_id}>
+                <span className="font-data" style={{ fontSize: 11 }}>
+                  {d.section}
+                </span>
+                <span>
+                  {d.dispute}
+                  {d.axis_code === null && (
+                    <b style={{ marginLeft: "0.4rem" }}>· 多轴争议</b>
+                  )}
+                </span>
+                <span className="notrun__why">
+                  {d.status}
+                  {d.resolved_in ? `（${d.resolved_in}）` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2>七轴卡片</h2>
       <div className="taxonomy-grid">
@@ -124,7 +175,17 @@ export default function TaxonomyPage() {
               </dd>
               <dt>边界反例</dt>
               <dd>
-                {axis.boundary_counterexample.rule_id ? (
+                {/*
+                  ★ 2026-10-20 修复：boundary_counterexample 在 RIGHT / SCENE 两轴上是 null
+                  （规范尚未给出反例），旧代码直接读 .rule_id 会抛
+                  `Cannot read properties of null`，整页白屏且 a11y 检查拿到空 body。
+                  null 是「没有反例」，不是「反例缺失待填」——文案要分开。
+                */}
+                {axis.boundary_counterexample === null ? (
+                  <span className="taxonomy-placeholder">
+                    该轴暂无边界反例（规范未给出）
+                  </span>
+                ) : axis.boundary_counterexample.rule_id ? (
                   <>
                     <code>{axis.boundary_counterexample.rule_id}</code>
                     {" — "}

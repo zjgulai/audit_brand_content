@@ -168,39 +168,40 @@ async function main() {
     })()`);
     if (!clicked) await sleep(200);
   }
-  const caseBody = await waitBody("案件详情");
+  // ★ 2026-10-20：原来等的是「案件详情」，而那个标题在**加载中**就已经出现，
+  //   于是读到的是加载态（body 里只有「加载中…」）。改成等一个数据态标志。
+  await waitBody("证据链");
+  const caseBody = await waitBody("证据链");
+  // ★ 不再硬编码 BLOCK / DP2 / H01 —— 取样案件来自真实队列，标签随数据变化。
+  //   断言只锁「这一屏必须有的结构与铁律」，不锁某条案件的取值。
   const caseOk =
     clicked &&
     caseBody.includes("案件详情") &&
     caseBody.includes(expectCase) &&
-    caseBody.includes("BLOCK") &&
-    caseBody.includes("DP2") &&
-    caseBody.includes("待放行") &&
+    !caseBody.includes("加载中…") &&
+    caseBody.includes("对外标签") &&
+    caseBody.includes("待放行") &&          // 铁律：机器不得改放行状态
     caseBody.includes("覆盖证明") &&
-    caseBody.includes("H01");
+    caseBody.includes("未评估") &&
+    caseBody.includes("证据链") &&
+    caseBody.includes("复核动作");
   const casePath = await evalValue("location.pathname");
   const caseShot = await shot("case.png");
 
   // 3) 点进报告
-  let clickedReport = false;
-  for (let i = 0; i < 40 && !clickedReport; i++) {
-    clickedReport = await evalValue(`(() => {
-      const a = [...document.querySelectorAll('a')].find(
-        (x) => (x.getAttribute('href') || '').startsWith('/reports/')
-      );
-      if (!a) return false;
-      a.click();
-      return true;
-    })()`);
-    if (!clickedReport) await sleep(200);
-  }
+  // 3) 报告页 —— 直接按 URL 访问，不依赖「取样案件恰好有报告」。
+  //    ★ 2026-10-20：原来靠点详情页里的报告链接，但夹具里只有 1/4 的案件有报告，
+  //      取样的那条常常没有 → 断言失败但页面其实是好的。这是**夹具形态**的问题，
+  //      不是页面的问题，所以改断言而不改夹具：没有报告是一个真实状态，要能单独验。
+  await cdp.send("Page.navigate", { url: `${base}/reports/${expectReport}` });
   const reportBody = await waitBody("报告查看");
+  await sleep(600);
+  const reportBody2 = await waitBody("报告查看");
   const reportOk =
-    clickedReport &&
-    reportBody.includes("报告查看") &&
-    reportBody.includes(expectReport) &&
-    reportBody.includes(expectCase) &&
-    reportBody.includes("发布时刻");
+    reportBody2.includes("报告查看") &&
+    reportBody2.includes(expectReport) &&
+    !reportBody2.includes("加载中…") &&
+    (reportBody2.includes("发布时刻") || reportBody2.includes("未发布"));
   const reportPath = await evalValue("location.pathname");
   const reportShot = await shot("report.png");
 
@@ -247,10 +248,9 @@ async function main() {
     },
     report: {
       ok: reportOk,
-      clicked: clickedReport,
       path: reportPath,
       shot: reportShot,
-      body: reportBody.slice(0, 600),
+      body: reportBody2.slice(0, 600),
     },
     taxonomy: {
       ok: taxonomyOk && taxonomyLookup,

@@ -58,6 +58,13 @@ test -s "${DATA}/cases.json"
   > "${RUN_DIR}/seed.log" 2>&1
 test -s "${DATA}/reports.json"
 
+# 夹具：把 21 条确定性样例案件**合并**进临时投影（保留 case-smoke 这条真实案件）。
+# 不合并就没法看队列形态 —— smoke 只造 1 条，且它是 BLOCK，本身不该出现在待办队列里。
+# 夹具每条带 sample:true，界面据此显示「样例数据」。
+"${PY}" "${WEB}/scripts/seed_fixture.py" --out "${DATA}" --merge \
+  >> "${RUN_DIR}/seed.log" 2>&1
+grep -q '"sample": true' "${DATA}/cases.json"
+
 echo "[2/8] npm run build"
 ( cd "${WEB}" && npm run build ) > "${RUN_DIR}/build.log" 2>&1
 test -d "${WEB}/dist"
@@ -111,34 +118,69 @@ echo "[6/8] curl /review-api/queue"
 HTTP_STATUS="$(curl --max-time 5 -s -o "${RUN_DIR}/queue.json" \
   -w '%{http_code}' \
   -H "Cookie: session=${COOKIE}" \
-  "http://127.0.0.1:${API_PORT}/review-api/queue")"
+  "http://127.0.0.1:${API_PORT}/api/v1/queue")"
 if [ "${HTTP_STATUS}" != "200" ]; then
-  echo "curl /review-api/queue → ${HTTP_STATUS}"
+  echo "curl /api/v1/queue → ${HTTP_STATUS}"
   exit 1
 fi
-if ! grep -q 'case-smoke' "${RUN_DIR}/queue.json"; then
-  echo "queue 响应里没有 case-smoke"
+
+# ★ 2026-10-20：这里从「断言 case-smoke 在队列里」改成「队列里不许有非待办标签」。
+#   旧断言是错的：case-smoke 是 BLOCK，而 BLOCK 本来就不该进待办队列 ——
+#   旧断言反而在保护那个 bug（它走的还是「全部可读案件」的联调别名）。
+#   新判据是**否定式**：任何一条不属于 {REVIEW, 待自决} 就红。
+QUEUE_OFF="$(python3 - "${RUN_DIR}/queue.json" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1], encoding="utf-8"))
+allowed = {"REVIEW", "待自决"}
+bad = [r.get("case_id") for r in rows if str(r.get("state")) not in allowed]
+print(",".join(bad[:5]))
+PY
+)"
+if [ -n "${QUEUE_OFF}" ]; then
+  echo "队列里出现了非待办标签的案件：${QUEUE_OFF}"
+  echo "（/api/v1/queue 只应有 REVIEW 与 待自决；出现别的说明口径坏了）"
   exit 1
 fi
+QUEUE_N="$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1],encoding='utf-8'))))" "${RUN_DIR}/queue.json")"
+test "${QUEUE_N}" -gt 0 || { echo "队列为空，无法验证界面"; exit 1; }
+
+# 从真实队列里取第一条案件做详情页断言（不再硬编码 case-smoke）
+FIRST_CASE="$(python3 -c "
+import json,sys
+rows=json.load(open(sys.argv[1],encoding='utf-8'))
+print(rows[0]['case_id'])" "${RUN_DIR}/queue.json")"
+echo "队列 ${QUEUE_N} 条 · 详情页取样：${FIRST_CASE}"
 
 echo "[7/8] 页面断言：队列 → 案件详情 → 报告 → 分类规范"
 node "${WEB}/scripts/check_pages.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --cookie "${COOKIE}" \
-  --case "case-smoke" \
+  --case "${FIRST_CASE}" \
   --report "report-smoke" \
   --screenshots "${RUN_DIR}" \
   > "${RUN_DIR}/page.json" 2> "${RUN_DIR}/page.err"
 cat "${RUN_DIR}/page.json"
 
-echo "[8/8] 无障碍自动检查（四页）"
+echo "[8/9] 无障碍自动检查（四页）"
 node "${WEB}/scripts/a11y_check.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --cookie "${COOKIE}" \
-  --pages "/queue,/cases/case-smoke,/reports/report-smoke,/taxonomy" \
+  --pages "/queue,/cases/${FIRST_CASE},/reports/report-smoke,/taxonomy" \
   --out "${RUN_DIR}/a11y.json" \
   > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
 cat "${RUN_DIR}/a11y.stdout"
+
+echo "[9/9] 复核切片断言（A1–A9，含反向对照）"
+node "${WEB}/scripts/check_review_slice.mjs" \
+  --base "http://127.0.0.1:${WEB_PORT}" \
+  --api "http://127.0.0.1:${API_PORT}" \
+  --cookie "${COOKIE}" \
+  --out "${RUN_DIR}/slice.json" 2>&1 | tail -20
+SLICE_RC=${PIPESTATUS[0]}
+if [ "${SLICE_RC}" -ne 0 ]; then
+  echo "复核切片断言未通过（rc=${SLICE_RC}；2=有未测，同样不算通过）"
+  exit "${SLICE_RC}"
+fi
 
 echo "API_PORT=${API_PORT}"
 echo "WEB_PORT=${WEB_PORT}"
