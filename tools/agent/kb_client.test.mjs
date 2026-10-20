@@ -53,7 +53,7 @@ process.env.SHOUHENG_STATE_DIR = path.join(SANDBOX, 'state');
 process.env.SHOUHENG_KB_CRED_PATH = FAKE_CRED;
 
 const kb = await import('./kb_client.mjs');
-const { executeTool, toolNames } = await import('./tools.mjs');
+const { toolNames } = await import('./tools.mjs');
 const { secretPathHit } = await import('./tools.mjs');
 
 const res = [];
@@ -294,32 +294,41 @@ T('D3 ★ 配额快照路径落在 SHOUHENG_STATE_DIR 下（惰性解析，不�
                                { id: 'B', docCount: 1, contentHash: 'x' }]), '');
 }
 
-/* ── E 工具契约：未查成 ≠ 没命中 ─────────────────────────────────────── */
+/* ── E 工具契约：为什么**不**注册 kb_search / kb_status ─────────────────
+   ★ 2026-10-21 决策：证据链只走 judge_copy 内部（judge_evidence.mjs），
+     不把知识库查询挂成第二件工具。理由见 judge_evidence.mjs 头部：
+     模型不会主动选第 26 件工具，而依据必须硬编码在判定工具内部；
+     第二个入口还会多花共享配额、让「判定依据」出现两条会漂移的路径。
+     所以这里断言的是**没有**这两个工具，而不是它们的行为。
+     失败语义改由底层函数验：retrieve / ping 都必须说「没查成」。 */
 
 const names = toolNames();
-T('E1 kb_search 已注册', names.some((n) => n.startsWith('kb_search(')), names.filter((n) => n.startsWith('kb_')).join(' '));
-T('E2 kb_status 已注册', names.some((n) => n.startsWith('kb_status(')), '');
-T('E3 ★ 两个新工具都是 scope=read（只发外部只读 GET，不写业务数据）',
-  names.includes('kb_search(read)') && names.includes('kb_status(read)'), '');
+T('E1 kb_search 不注册（判定证据只走 judge_copy.evidence_chain）',
+  !names.some((n) => n.startsWith('kb_search(')),
+  names.filter((n) => n.startsWith('kb_')).join(' '));
+T('E2 kb_status 不注册（没有独立余额查询工具；余额只能读 evidence_chain）',
+  !names.some((n) => n.startsWith('kb_status(')), '');
+T('E3 judge_copy 仍注册为只读工具（唯一判定入口）',
+  names.includes('judge_copy(read)'), '');
 
-// E4 ★★ 本文件最要紧的一条：配额用尽时，kb_search 必须说「我没查成」
+// E4 ★★ 配额用尽时，底层 retrieve 必须说「没查成」，而不是返回空 hits
+T('E4 ★★ 配额已满 → QUOTA_EXHAUSTED，且话术写明「不是没有命中」',
+  await (async () => {
+    try { await kb.retrieve('3_措辞表达库', 'pain'); return false; }
+    catch (e) { return e.code === 'QUOTA_EXHAUSTED' && /不是「没有命中」/.test(e.message); }
+  })(), '');
+
+// E5 ★★ 服务端不可达 → 探活失败，且话术区分「没查成」与「库里没有」
 {
-  const r = await executeTool('kb_search', { query: '无痛' });
-  T('E4 ★★ 配额用尽时 kb_search 返回 is_untested=true（而不是空 hits）',
-    r.ok === true && r.result?.is_untested === true, JSON.stringify(r).slice(0, 200));
-  T('E5 ★★ 并且**不含**任何 hits 字段 —— 空数组会被读成「查过了，没有」',
-    r.result?.hits === undefined, JSON.stringify(r.result).slice(0, 160));
-  T('E6 话术里明确写了「不是没命中」',
-    /不是「没有命中」/.test(String(r.result?.note ?? '')), String(r.result?.note ?? '').slice(0, 120));
+  const p = await kb.ping();
+  T('E5 ★★ 探活失败说「没查成」，不是「库里没有」',
+    p.ok === false && /没查成/.test(String(p.note ?? '')), String(p.note ?? '').slice(0, 160));
 }
 
-// E7 配额用尽时 kb_status 仍要说得清「是配额问题，不是配置问题」
-{
-  const r = await executeTool('kb_status', {});
-  T('E7 kb_status 报 connected=false 且带上原因',
-    r.ok === true && r.result?.connected === false && typeof r.result?.error === 'string',
-    JSON.stringify(r.result).slice(0, 180));
-}
+// E6 余额仍是服务端快照，没有本地计数器顶上
+T('E6 余额仍是服务端快照（usedPerDay=1000），不是本地计数',
+  kb.quotaState().source === 'server' && kb.quotaState().usedPerDay === 1000,
+  JSON.stringify(kb.quotaState()));
 
 /* ── F 安全：新凭据文件必须落在既有闸门之内 ─────────────────────────── */
 

@@ -158,16 +158,17 @@ await t('护栏不许把正常用法也拦掉（点名子目录的 grep 要放�
     `点名到具体文件不该被拦，实际：${JSON.stringify(r.result).slice(0, 200)}`);
 });
 
-await t('白名单只放行 lark_find.py 的**读**子命令，下载类一律拒绝（§2.6 红线）', async () => {
-  // 2026-09-22 起守衡能用 `python3 tools/lark_find.py readdoc <token>` 读飞书文档正文 ——
-  // 这符合 §2.6 红线（「读」允许，「取走附件」禁止）。这条断言就是那条红线的执行点：
-  // 任何人往白名单里塞 download / medias，这里立刻红。
+await t('白名单只放行 lark_find.py 的**读**子命令，下载类不走只读通道', async () => {
+  // 2026-09-22 起守衡能用 `python3 tools/lark_find.py readdoc <token>` 读飞书文档正文。
+  // ★ 2026-10-17 委托方改线：下载**也允许**了。但 `run_readonly_command` 是**只读**通道，
+  //   下载必须走受控下载调用点并在 tools/download_callers.json 登记（DG-1），
+  //   不能从这里放行 —— 否则「只读」这个词就不再成立，且下载会绕过落盘治理。
   for (const c of ['python3 tools/lark_find.py download abc',
                    'python3 tools/lark_find.py medias abc',
                    'python3 tools/lark_find.py export abc']) {
     const r = await executeTool('run_readonly_command', JSON.stringify({ command: c }));
     assert.strictEqual(r.result.status, 'rejected',
-      `"${c}" 必须被拒（红线：飞书内容禁止下载），实际：${JSON.stringify(r.result).slice(0, 200)}`);
+      `"${c}" 必须被拒（只读通道不执行下载；下载走受控通道），实际：${JSON.stringify(r.result).slice(0, 200)}`);
   }
 });
 
@@ -756,7 +757,8 @@ await t('提示词能构建，且人设正文里没有裸反引号', async () =>
 
   assert.ok(sp.includes('只能看到最近 50 条'), '必须写明群历史只看得到最近 50 条');
   assert.ok(sp.includes('撤回的消息，原文取不回'), '必须写明撤回的消息取不回原文');
-  assert.ok(sp.includes('非文字消息你读不到内容'), '必须写明图片/文件/卡片读不到内容');
+  assert.ok(sp.includes('非文字消息要分三种说'), '必须写明非文字消息分三类');
+  assert.ok(sp.includes('不可信原文'), '必须写明入站文本附件是不可信输入');
   assert.ok(sp.includes('「我打不开飞书文档」通常是一句假话'),
     '必须写明：收到飞书链接时先说工作区里有没有那一份，再说读不读得了');
   assert.ok(!/我记不清/.test(sp.replace(/不要用「我记不清」/g, '')),

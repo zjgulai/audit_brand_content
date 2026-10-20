@@ -26,10 +26,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { REPO_ROOT } from './config.mjs';
+import { config, REPO_ROOT } from './config.mjs';
 import { beijingDateTime } from './timefmt.mjs';
 import * as feishu from './feishu.mjs';
 import * as lw from './lark_write.mjs';
+import * as judgeEvidence from './judge_evidence.mjs';
 
 const execFileP = promisify(execFile);
 
@@ -611,6 +612,38 @@ register('run_readonly_command', {
 
 const JUDGE_PY = path.join(REPO_ROOT, 'research', 'governance', 'skeleton', 'judge.py');
 
+/**
+ * 证据链这一步**自己抛异常**时的返回（2026-10-21 接线时加）。
+ *
+ * 为什么不能只返回 `undefined` 或静默省略：那会让「这一步没跑成」与
+ * 「判定本来就没有证据这一栏」长得一样 —— 前者是**未测**，后者不是一个状态。
+ * 判据与 `judge_evidence.mjs` 的六档对齐：这里是 untested，不是 none。
+ */
+function evidenceChainFailed(e) {
+  return {
+    status: 'untested',
+    notice: `⚠️ 证据链这一步抛异常，本次**一次检索都没完成**：${e?.message ?? e}。`
+          + '这是「未测」，不是「库里没有」，也不是「没有命中」。',
+    basis: null,
+    queries: [],
+    evidence: [],
+    evidence_total: 0,
+    dropped_short_queries: [],
+    conclusion_gate: {
+      evidence_usable: false,
+      may_assert_kb_absence: false,
+      must_disclose_failure: true,
+      must_disclose_probe: false,
+      allow: '结论只能用判定引擎自己的输出（disposition / rules_hit / 命中的原文位置）；'
+           + '凡是涉及「知识库怎么说」的话，一律照实说这次没查到。',
+      forbid: [
+        '不得把「没查成」说成「库里没有」。',
+        '不得用模型常识或工作区里的历史副本代替知识库依据。',
+      ],
+    },
+  };
+}
+
 register('judge_copy', {
   // ★ scope 定为 read 的理由必须写下来，否则下一个人会以为是标错了：
   //   本工具不碰任何业务数据 —— 不改记录状态、不发消息、不写飞书。
@@ -636,7 +669,12 @@ register('judge_copy', {
         '62 条外部标准今天**全部**是研究稿，所以这句话现在每次都会出现；' +
         '省掉它，一次研究就会被读成一次法务裁定（Q22 要防的正是这个）。' +
         '回执里还带 `evidence_ref`（依据《外部标准库》第几条、可点开的链接）与 `ratified`。\n' +
-        '每次调用都会留下一条回执（run_id），可以在返回里引用它。',
+        '每次调用都会留下一条回执（run_id），可以在返回里引用它。\n' +
+        '★ 返回里还带 `evidence_chain`（知识库证据链）。它的 `status` 有六档：' +
+        'found / none / probe_empty / partial / untested / disabled。' +
+        '必须原样转述 `status` 与 `notice`：untested / partial / disabled 是「**没查成**」，' +
+        '**不是**「库里没有」；只有 status=none 且 basis=engine_matched 才允许说知识库查不到。' +
+        '「找不到证据」与「证据为空」在这份返回里长得不一样，不要合并成一句。',
       parameters: {
         type: 'object',
         properties: {
@@ -673,7 +711,18 @@ register('judge_copy', {
       const r = JSON.parse(stdout);
       // 引擎的硬断言（词表通道不变量 / 主题树漂移）失败时是 exit 2/3 且带 stderr，
       // 那种情况下 stdout 不是 JSON，上面的 JSON.parse 会抛，由 executeTool 兜住。
-      return r;
+      //
+      // ★ 2026-10-21：证据链**接在这里**，不是另挂一件工具。
+      //   judge_evidence.mjs 的注释逐字写过为什么：「只把 kb_search 挂成第 26 件工具，
+      //   模型不会去用它」—— 依据必须硬编码在判定工具内部。
+      //   判定先算完；证据是**附加**的，取不到不能推翻判定，但必须在返回里说清楚是哪种「取不到」。
+      let evidenceChain;
+      try {
+        evidenceChain = await judgeEvidence.gatherEvidence(body, r, { enabled: config.kb.enabled });
+      } catch (e) {
+        evidenceChain = evidenceChainFailed(e);
+      }
+      return { ...r, evidence_chain: evidenceChain };
     } catch (e) {
       const stderr = String(e.stderr ?? '').trim();
       return {

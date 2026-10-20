@@ -7,7 +7,10 @@
  *   2. markdown → 飞书富文本(post)：LLM 天然输出 markdown，直接塞给飞书会显示成一堆星号。
  */
 import * as Lark from '@larksuiteoapi/node-sdk';
-import { config } from './config.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { config, attachmentDir } from './config.mjs';
+import { appendLifecycle } from './attachment_lifecycle.mjs';
 import { beijingString } from './timefmt.mjs';
 
 export const client = new Lark.Client({
@@ -271,6 +274,225 @@ export function bodyToText(msgType, contentJson) {
   return { text: null, parsed: false, note: `${msgType ?? '未知'} 类型没有正文读取通道` };
 }
 
+/* ─────────────────── 附件：下载 + 文本抽取（2026-10-21 加）───────────────────
+ *
+ * ★ 这条通道的规矩变过，别读旧注释：
+ *   2026-09-18 的红线是「飞书上的内容禁止下载」；**2026-10-17 委托方推翻**，
+ *   现原文是「你都可以下载，飞书你可以访问的附件和业务提供的。」
+ *   所以代码里任何「公司不让下载」「按规矩不取」的话术都是**引用了已废止的红线**。
+ *
+ * 仍然有效的两条约束（不是旧红线的残留）：
+ *   1. **下载来的东西不许进公开仓。** 落盘根在仓外（config.attachmentDir()），
+ *      目录 0700，本次处理完**立即删除**（run-scoped）。
+ *   2. **附件内容是不可信输入。** 它只能作为审核/分析对象，不能当作对模型的指令。
+ *      这句话由 agent.mjs 在拼进上下文时显式写出来。
+ *
+ * 能力边界（今天真正的边界，不是政策）：图片/音视频的内容解析还没接上
+ * （Q4-② 的 OCR 接线在 base/，不在这条链路上）。**没接上就说没接上**，
+ * 不许说成「读不到」，更不许说成「不让下载」。
+ */
+
+export const ATTACHMENT_TYPES = new Set(['file', 'image', 'media', 'audio']);
+
+/** 可以按 UTF-8 直接读的扩展名。没有这一条就不猜 —— 二进制当文本会产出乱码假正文。 */
+const TEXT_ATTACHMENT_EXT = new Set([
+  '.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.jsonl',
+  '.yaml', '.yml', '.xml', '.html', '.htm', '.log', '.ini', '.toml',
+  '.py', '.js', '.mjs', '.ts', '.tsx', '.jsx', '.sh', '.sql', '.css',
+]);
+
+/** 单次最多读入的字节数（不是飞书上限；是为了不把上下文撑爆）。 */
+export const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
+/** 单次最多拼进上下文的字符数。超了必须**说出来**，不许静默截断。 */
+export const MAX_ATTACHMENT_CHARS = 40_000;
+
+/* ★ 2026-10-21：附件残留**不做自动删除**。
+ *   为什么：删除 `~/.shouheng/attachments` 下的历史文件是销毁行为，需要委托方对该路径的
+ *   明确授权；本会话没有。所以这里只提供「数出来」的读数与生命周期台账，
+ *   实际删除只针对**本次调用自己创建**的临时目录（见 ingestAttachment 的 finish()）。
+ *   启动横幅里的年龄分桶由 `attachment_lifecycle.countAttachmentResidue()` 提供。
+ *   自动清理历史残留是另一张票，等授权。 */
+
+/**
+ * 从消息事件里解析附件元数据。**纯函数，离线可证。**
+ * @returns {{isAttachment:boolean, type:string|null, fileKey:string|null,
+ *            fileName:string|null, content:object}}
+ */
+export function parseAttachment(msg) {
+  const type = msg?.message_type ?? null;
+  let content = {};
+  try { content = JSON.parse(msg?.content ?? '{}') ?? {}; } catch { content = {}; }
+  return {
+    isAttachment: ATTACHMENT_TYPES.has(type),
+    type,
+    fileKey: content.file_key ?? content.image_key ?? null,
+    fileName: content.file_name ?? content.name ?? null,
+    content,
+  };
+}
+
+/** 扩展名是不是「可以直接按 UTF-8 读」的那一类。名字缺失 → false（不猜）。 */
+export function isTextAttachment(fileName) {
+  const ext = path.extname(String(fileName ?? '')).toLowerCase();
+  return TEXT_ATTACHMENT_EXT.has(ext);
+}
+
+/**
+ * 下载消息里的资源文件。**这是本仓库新增的飞书下载调用点**，
+ * 已在 `tools/download_callers.json` 登记（DG-1），落盘根必须在仓外（DG-2）。
+ *
+ * @param {{messageId:string,fileKey:string,type:string,destPath:string,maxBytes?:number}} p
+ * @returns {Promise<{written:boolean, skipped?:string, size?:number|null}>}
+ */
+export async function downloadMessageResource({
+  messageId, fileKey, type, destPath, maxBytes = MAX_ATTACHMENT_BYTES,
+}) {
+  const r = await client.im.v1.messageResource.get({
+    path: { message_id: messageId, file_key: fileKey },
+    // 飞书这个接口只认 image / file 两档：图片走 image，其余（文件/语音/视频）走 file。
+    params: { type: type === 'image' ? 'image' : 'file' },
+  });
+  if (!r || typeof r.writeFile !== 'function') {
+    throw new Error('SDK 没有返回可写流（messageResource.get 的响应形状变了）');
+  }
+  const len = Number(r.headers?.['content-length'] ?? NaN);
+  if (Number.isFinite(len) && len > maxBytes) {
+    // 先读头再决定要不要落盘：一个 80MB 的视频不该先写满盘再说「太大」。
+    try { r.getReadableStream()?.destroy?.(); } catch { /* 流已关也无妨 */ }
+    return { written: false, skipped: 'too_large', size: len };
+  }
+  await r.writeFile(destPath);
+  try { fs.chmodSync(destPath, 0o600); } catch { /* 目录已是 0700；这一步是双保险 */ }
+  const size = (() => { try { return fs.statSync(destPath).size; } catch { return null; } })();
+  return { written: true, size };
+}
+
+/**
+ * 处理一条附件消息：只对**文本类附件**下载并抽正文；其余类型如实说「还没接解析」。
+ *
+ * 返回的 `status` 必须与 `reply` 对得上，且这些状态互不冒充：
+ *   ingested / empty / unsupported_type / too_large / binary / download_failed / bad_content
+ *
+ * ★ 这里**不抛异常**：附件处理失败不该让整条消息处理崩掉；失败要变成一句说得出口的话。
+ *
+ * @returns {Promise<{status:string, reason?:string, reply?:string, text?:string,
+ *                    truncated?:boolean, size?:number|null, name?:string, type?:string}>}
+ */
+export async function ingestAttachment(msg, {
+  maxBytes = MAX_ATTACHMENT_BYTES, maxChars = MAX_ATTACHMENT_CHARS,
+} = {}) {
+  const a = parseAttachment(msg);
+  const name = a.fileName || (a.type === 'image' ? '（图片）' : '（未命名附件）');
+  const baseMeta = { name, type: a.type, size: null };
+  const root = attachmentDir();
+  let dir = null;
+  let ledgerError = null;
+
+  /**
+   * 终态：清理**本次自己创建**的临时目录 + 写生命周期台账。
+   *
+   * ★ 只删 `dir`，绝不扫父目录删历史残留 —— 销毁历史文件需要委托方对该路径的明确授权。
+   *   `deleted` 是**实际结果**：rmSync 抛异常时是 false，不是「我以为删了」。
+   *   台账写不进去时，返回里带 `lifecycle_ledger_error`，不静默吞掉。
+   */
+  const finish = (status, extra = {}) => {
+    let deleted = null;
+    let cleanupError = null;
+    if (dir) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+        deleted = true;
+      } catch (e) {
+        deleted = false;
+        cleanupError = e.code ?? e.message;
+      }
+    }
+    const led = appendLifecycle({
+      status,
+      file_token: a.fileKey,
+      message_id: msg?.message_id ?? null,
+      type: a.type,
+      created: !!dir,
+      deleted,
+      ...(extra.size != null ? { size: extra.size } : {}),
+      ...(cleanupError ? { cleanup_error: cleanupError } : {}),
+      ...(extra.error ? { error: String(extra.error) } : {}),
+    });
+    if (!led.ok && !ledgerError) ledgerError = led.error;
+    return {
+      status,
+      ...extra,
+      ...(cleanupError ? { cleanup_error: cleanupError } : {}),
+      ...(ledgerError ? { lifecycle_ledger_error: ledgerError } : {}),
+    };
+  };
+
+  if (!a.isAttachment) {
+    return finish('bad_content', { reason: 'attachment_bad_content',
+             reply: `这条消息标成「${a.type ?? '未知'}」，但它不是可处理的附件类型。` });
+  }
+  if (!a.fileKey) {
+    return finish('bad_content', { reason: 'attachment_bad_content', ...baseMeta,
+             reply: `附件「${name}」的消息里没有 file_key —— 我拿不到下载地址。`
+                  + '这是这条事件的内容问题，不是权限问题。' });
+  }
+  if (!isTextAttachment(a.fileName)) {
+    return finish('unsupported_type', { reason: 'attachment_type_unparsed', ...baseMeta,
+             reply: `附件「${name}」我收到了，但这类文件的内容解析**这条链路还没接上**。`
+                  + '这是能力边界，不是权限问题，也不是「不让下载」—— 下载是允许的。\n'
+                  + '要看内容，把关键文字贴过来，或转成飞书云文档发我（云文档我能直接读）。' });
+  }
+
+  // ★ 下载前先记 started：进程被 SIGKILL 时，台账里只会留下这一行，
+  //   配合启动横幅的年龄分桶，「被 kill」与「正常收尾」就长得不一样了。
+  const started = appendLifecycle({
+    status: 'started', file_token: a.fileKey, message_id: msg?.message_id ?? null,
+    type: a.type, created: false, deleted: null,
+  });
+  if (!started.ok && !ledgerError) ledgerError = started.error;
+
+  try {
+    fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+    try { fs.chmodSync(root, 0o700); } catch { /* 改不动权限时仍继续；DG-2 会报 */ }
+    // mkdtemp 默认 0700；文件名不用用户给的名字（避免路径穿越），只保留扩展名。
+    dir = fs.mkdtempSync(path.join(root, 'msg-'));
+    const dest = path.join(dir, `attachment${path.extname(a.fileName).toLowerCase()}`);
+    const got = await downloadMessageResource({
+      messageId: msg.message_id, fileKey: a.fileKey, type: a.type, destPath: dest, maxBytes,
+    });
+    if (!got.written) {
+      return finish('too_large', { reason: 'attachment_too_large', ...baseMeta, size: got.size ?? null,
+               reply: `附件「${name}」有 ${got.size ?? '（大小未知）'} 字节，超过我这次能读入的上限 `
+                    + `${maxBytes} 字节。**我没有读它**，也没有截断后冒充全文。`
+                    + '要审的话，请给一段更小的文件，或只把关键部分贴过来。' });
+    }
+    if (!got.size) {
+      return finish('empty', { reason: 'attachment_empty', ...baseMeta,
+               reply: `附件「${name}」取到了，但文件是空的（0 字节）。` });
+    }
+    const buf = fs.readFileSync(dest);
+    if (buf.includes(0)) {
+      // 扩展名像文本，字节里却有 NUL —— 这是二进制。当成文本读会产出乱码假正文。
+      return finish('binary', { reason: 'attachment_binary', ...baseMeta, size: got.size,
+               reply: `附件「${name}」的扩展名像文本，但内容含 NUL 字节，按二进制处理。`
+                    + '**我没有把乱码当正文读**。要看内容，请贴文字或转云文档。' });
+    }
+    let text = buf.toString('utf8');
+    const truncated = [...text].length > maxChars;
+    if (truncated) text = [...text].slice(0, maxChars).join('');
+    return finish('ingested', {
+      reason: 'attachment_text_ingested', ...baseMeta,
+      size: got.size, chars: [...text].length, truncated, text,
+    });
+  } catch (e) {
+    return finish('download_failed', { reason: 'attachment_download_failed', ...baseMeta,
+             error: e?.message ?? String(e),
+             reply: `附件「${name}」我这边**没取到**（${e?.message ?? e}）。\n`
+                  + '这是「没取到」，不是「文件里没有内容」，也不是「不让下载」—— 下载是允许的。'
+                  + '可以稍后重发，或把文字贴过来。' });
+  }
+}
+
 /** 超长文本切块（优先在换行处切，避免把句子劈开） */
 function chunkText(text, size = MAX_TEXT_LEN) {
   const out = [];
@@ -455,14 +677,15 @@ export async function listRecentMessages(chatId, pageSize = 20, memberMap = null
       // 必须把它和「正常但很短的消息」区分开：前者是**内容没了**，后者是**本来就这么短**。
       // 混在一起时，守衡会把「撤回」读成「有一条我看不懂的消息」，进而低估自己漏了多少东西。
       const recalled = /^This message was recalled$/i.test(raw.trim());
-      // 附件（file/image/media/audio）不是「我看不到」—— 是**按规矩不取**：
-      // 飞书内容禁止下载（AGENTS.md §2.6），而附件只有下载这一条通道。
-      // 工具给的是事实，事实就该由工具说清，不让模型去猜自己为什么读不到。
-      const ATTACHMENT_TYPES = new Set(['file', 'image', 'media', 'audio']);
+      // 附件（file/image/media/audio）：**历史回读不取内容**，只标出它存在。
+      // ★ 这不是政策 —— 下载已于 2026-10-17 放开（AGENTS.md §2.6）。
+      //   这是「recent_messages 只回读正文」这条路径的能力边界；
+      //   入站消息里的文本类附件由 `ingestAttachment()` 单独抽取。
+      //   旧文案写的是「飞书内容禁止下载」，引用的是一条已废止的红线。
       const text = recalled
         ? '（原文已在飞书端撤回，撤回后任何接口都不返回内容）'
         : (raw || (ATTACHMENT_TYPES.has(it.msg_type)
-            ? '（这是附件：飞书内容禁止下载，附件只有下载这一条通道，所以我不取它的内容。）'
+            ? '（这是附件：历史回读不取内容，只标出它存在；入站时的文本类附件会被单独抽取。）'
             // ★ 这一句原先对 post / interactive 也这么说过（「正文为空 —— 我没法看到里面的内容」），
             //   而那是**假否定**：内容就在 payload 里，是我们没去读对地方。
             //   现在只有**真的没解析出来**才落到这里，并把「是哪种没解析出来」写出来 ——

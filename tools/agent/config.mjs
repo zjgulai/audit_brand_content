@@ -12,6 +12,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  attachmentRoot, countAttachmentResidue, formatResidue,
+} from './attachment_lifecycle.mjs';
 
 export const AGENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const TOOLS_DIR = path.resolve(AGENT_DIR, '..');
@@ -26,6 +29,23 @@ export function stateDir() {
     : path.join(REPO_ROOT, 'PMO', 'shouheng-state');
 }
 export const STATE_DIR = stateDir();   // 兼容既有引用；需要可覆盖语义时用 stateDir()
+
+/**
+ * 附件落盘根（2026-10-21 加）。
+ *
+ * ★ 必须在**仓外**，且目录权限 0700 —— 这是 AGENTS.md §2.6 改线后仍然有效的约束：
+ *   下载允许了，但**下载来的东西不许进公开仓**（仓库是公开的，附件里可能有客户素材、
+ *   个人信息）。判据在 `tools/verify_download_governance.py` 的 DG-2；
+ *   `tools/download_callers.json` 里本调用点的 `landing_root` 指的就是这个目录。
+ *
+ * 惰性解析，理由与 stateDir() 相同：测试要把根指到临时目录时，改环境变量就得生效。
+ * 默认 `~/.shouheng/attachments`，可用 SHOUHENG_ATTACHMENT_DIR 覆盖。
+ */
+export function attachmentDir() {
+  // 路径解析收在 attachment_lifecycle.mjs 一处：启动横幅与附件处理必须看同一个根，
+  // 两份实现一定会漂移（本项目已经记过这个病）。
+  return attachmentRoot();
+}
 
 /**
  * 确保目录存在。失败只警告，不抛。
@@ -139,5 +159,9 @@ export function describeConfig() {
     // maxTokens 必须进启动横幅：它是「回复被腰斩」的直接成因，
     // 之前 1600 这个值无处可见，事故发生时没人能一眼看出来。
     maxTokens: config.llm.maxTokens,
+    // ★ 2026-10-21：附件落盘的年龄分桶。只读、不删。
+    //   如果 >24h 桶不是 0，说明「处理完立即删」没有在所有路径上生效 ——
+    //   这件事必须自己显形，而不是靠人记得去扫目录。
+    attachmentResidue: formatResidue(countAttachmentResidue()),
   };
 }

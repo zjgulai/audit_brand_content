@@ -64,14 +64,24 @@ from pathlib import Path
 
 __all__ = ["validate_registry"]
 
-# 已知的飞书下载接口只有这两族；登记表的 api 字段必须落在这里面。
+# 已知的飞书下载接口。登记表的 api 字段必须落在这里面。
 # 用正则而不是精确字符串，是因为 token 段在不同脚本里写法不同（{t} / <expr> / :file_token）。
+#
+# ★ 2026-10-21 扩第三族 `im_message_resource`：守衡的群附件入站
+#   （tools/agent/feishu.mjs 的 downloadMessageResource）走的是
+#   `im/v1/messages/{message_id}/resources/{file_key}` —— 它是下载，不是普通读消息。
+#   JS 扫描器本来就能认出它（shape=request_path），但登记表只认两族，于是
+#   「代码里有调用、登记表里无族可归」会变成一条无法消除的红。
+#   扩族必须同时改 `_api_kind_of_registry_api` 与 `_call_api_kind`，
+#   并且登记项要过 landing_root 的仓外 + 0700 判据（DG-2）。
 _RE_DRIVE_FILE_API = re.compile(
     r"drive/v1/files/[^/\s]+/download(?:$|[?#\s])", re.I)
 _RE_MEDIA_TMP_API = re.compile(
     r"medias/batch_get_tmp_download_url(?:$|[?#\s])", re.I)
+_RE_IM_RESOURCE_API = re.compile(
+    r"im/v1/messages/[^/\s]+/resources/[^/\s]+(?:$|[?#\s])", re.I)
 
-KNOWN_API_KINDS = ("drive_file", "media_tmp_url")
+KNOWN_API_KINDS = ("drive_file", "media_tmp_url", "im_message_resource")
 RETENTIONS = ("run-scoped", "24h", "7d", "30d", "1y")
 DATA_CLASSES = ("public", "internal", "confidential", "pii")
 
@@ -128,6 +138,8 @@ def _api_kind_of_registry_api(api):
         return "media_tmp_url"
     if _RE_DRIVE_FILE_API.search(s):
         return "drive_file"
+    if _RE_IM_RESOURCE_API.search(s):
+        return "im_message_resource"
     return None
 
 
@@ -147,6 +159,11 @@ def _call_api_kind(call):
     if ("batch_get_tmp_download_url" in low or "batch_get_tmp_url" in low
             or "download_media" in low or "downloadmedia" in low):
         return "media_tmp_url"
+    # 群附件入站：SDK 方法名 client.im.v1.messageResource.get，
+    # JS 扫描器把它记成 shape=request_path、marker=func:downloadMessageResource。
+    # 必须放在 drive_file 的兜底之前 —— 否则「download」这个词会把它误归成 drive_file。
+    if "messageresource" in low or ("im/v1/messages" in low and "/resources/" in low):
+        return "im_message_resource"
     if ("drive/v1/files/" in low and "download" in low
             or "downloadfile" in low or "download_file" in low
             or "files.download" in low):

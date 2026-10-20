@@ -286,6 +286,22 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
     evidence_total: 0,
     evidence_capped: false,
     dropped_short_queries: picked.dropped_short,
+    // ★ 2 字中文词是这条链路**已知的盲区**，必须在返回里显式说出来。
+    //   BM25 用 trigram 分词，查询词必须 ≥3 字；而中文禁用词大量是 2 字
+    //   （「无菌」「冰冷」「完美」）。它们被跳过**不等于**库里没有 ——
+    //   不说这一句，读的人会把「没查」当成「没有」。
+    //
+    //   ★ 结案读数（2026-10-21，聚合计数，未打印原文、未落盘）：
+    //     规则库 116 个中文关键词里 **30 个是 2 字（25.9%）**；
+    //     当前 232 条真实广告以英文为主，**中文关键词命中 0 次**（2 字 0 次，≥3 字 0 次）。
+    //     两个数必须一起说：只写 25.9% 会让人以为现在就有问题，只写 0 会让人以为没风险。
+    //     结构性风险 25.9%，当前英文语料实测影响 0；风险在中文内容进来的那天变成真的。
+    dropped_short_note: picked.dropped_short.length
+      ? `⚠️ 有 ${picked.dropped_short.length} 个引擎命中的表述不足 ${MIN_QUERY_CHARS} 个字符`
+        + `（${picked.dropped_short.map((s) => `「${s}」`).join('、')}），`
+        + 'trigram 索引检索不到，已跳过。这是分词限制，**不是「库里没有这些词」**；'
+        + '要查它们必须换一个 ≥3 字的说法。'
+      : null,
     evidence_required_by_rules: reqs,
     // 进来时的**上次服务端回报**（可能很旧，看 asOf）。不是本地计数。
     quota_before: kb.quotaState(),

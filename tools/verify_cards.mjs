@@ -756,35 +756,42 @@ head('L6/L7 内核文案 · 兜底话术不许被自己的检测器拦下 + 拒�
   }
 }
 
-/* ─────────────── N 附件 · 「按规矩不取」不许被说成「我读不到」 ─────────────── */
-head('N 附件 · 策略边界不许被说成能力边界');
+/* ─────────────── N 附件 · 2026-10-17 改线后的判据 ─────────────── */
+head('N 附件 · 旧红线已废止，话术必须是能力边界');
 {
-  // 依据 AGENTS.md §2.6 红线：飞书上的内容禁止下载。
-  // 附件（file/image/media/audio）只有下载这一条通道，所以对它们是**不取**，不是**读不到**。
-  // 为什么值得专门守：两种说法在对方那里引出的动作**完全相反** ——
-  //   「读不到 / 没权限」→ 去申请权限、去找文件主人（全是白跑）
-  //   「按规矩不取」→ 把文字贴过来，或者存成飞书云文档发我
-  // 这条规矩横跨三个文件（内核直答 / 群历史占位 / 卡片模版），所以三处一起断言。
+  // ★ 这一段的判据**变过**，两个日期都留着：
+  //   2026-09-18：「飞书上的内容禁止下载」→ 附件按规矩**不取**，
+  //     所以当时守的是「不取」不许被说成「看不到 / 没权限」。
+  //   2026-10-17：委托方推翻 ——「你都可以下载，飞书你可以访问的附件和业务提供的。」
+  //     于是「按规矩不取」这句话本身**成了错的**。今天真正的边界是能力：
+  //       · 文本类附件（txt/md/csv/json…）→ 下载、抽正文、作为不可信输入交给模型；
+  //       · 图片/音视频 → 解析还没接上，说「能力边界」，并给出替代路径；
+  //       · 任何地方都不许再引用「禁止下载 / 公司不让下载」。
+  //   所以本段从「守不取」改成「守不把能力不足说成规矩不许」，并**反向**检查旧话术已清掉。
   const BANNED = [
-    [/看到里面的内容/, '把「不取」说成「看不到」'],
-    [/只能读文本消息/, '把规矩说成能力不足'],
-    [/没有下载.{0,8}能力|能力还没做|工具集里没有/, '把规矩说成「能力还没做」'],
-    [/没权限|权限不足/, '把规矩说成权限问题'],
+    [/看到里面的内容/, '把没解析说成「看不到」'],
+    [/只能读文本消息/, '把能力边界说成「只能读文本」'],
+    [/能力还没做|工具集里没有/, '把能力边界说成「能力还没做」'],
+    [/没权限|权限不足/, '把能力边界说成权限问题'],
   ];
+  const DEAD_POLICY = /禁止下载|公司不让下载|附件我不取|附件只有下载这一条通道/;
   const hitsOf = (t) => BANNED.filter(([re]) => re.test(t)).map(([, why]) => why);
 
-  // N1/N2 内核直答（agent.mjs）—— 群里第一眼看到的就是它
+  // N1/N2 内核分支（agent.mjs）—— 群里第一眼看到的就是它
   const agent = fs.readFileSync(path.join(HERE, 'agent', 'agent.mjs'), 'utf8');
-  const a0 = agent.indexOf('ATTACHMENT_TYPES.has');
-  const a1 = agent.indexOf("reason: 'unsupported_type'");
+  const a0 = agent.indexOf("if (msg.message_type !== 'text')");
+  const a1 = agent.indexOf('const question = botMentioned', a0);
   const branch = a0 >= 0 && a1 > a0 ? agent.slice(a0, a1) : '';
   if (!branch) no('N1 找到附件分支', 'agent.mjs 里找不到附件分支 —— 断言落空比断言失败更危险');
   else {
     const h = hitsOf(branch);
-    if (h.length) no('N1 内核直答', `附件分支里还留着「${h.join('、')}」`);
-    else ok('N1 内核直答说的是「不取」，不是「读不到」');
-    if (!/贴过来|云文档/.test(branch)) no('N2 内核直答给替代路径', '说了不取，却没告诉对方下一步能怎么做');
-    else ok('N2 内核直答给了走得通的替代路径');
+    if (h.length) no('N1 内核分支话术', `附件分支里还留着「${h.join('、')}」`);
+    else ok('N1 内核分支没说成「看不到 / 没权限 / 能力还没做」');
+    if (!/feishu\.ingestAttachment\(/.test(branch)) {
+      no('N2 内核分支真的走下载/抽取', '附件分支里没有 ingestAttachment(...) —— 接线断了');
+    } else if (!/attachmentTurnText\(/.test(branch)) {
+      no('N2 内核分支把附件原文交给模型', '抽取到了却没有拼进用户轮');
+    } else ok('N2 内核分支把文本类附件交给 ingestAttachment 并拼进用户轮');
   }
 
   // N3 卡片模版 cannot-read 的**示例**——
@@ -793,26 +800,26 @@ head('N 附件 · 策略边界不许被说成能力边界');
   const cr = BY_KIND.get('cannot-read');
   const hc = cr ? hitsOf(JSON.stringify(cr.sample)) : ['找不到 cannot-read'];
   if (hc.length) no('N3 cannot-read 模版示例', `示例里还有「${hc.join('、')}」`);
-  else ok('N3 cannot-read 模版示例说的是「不取」');
+  else ok('N3 cannot-read 模版示例说的是「没解析」');
 
-  // N4 群历史占位（feishu.mjs）—— 「我看不到什么」由工具给，不该让模型猜。
-  //   只查**附件那一句**：非附件类型说「我没法看到里面的内容」是对的，不该被误伤。
+  // N4 群历史占位（feishu.mjs）—— 历史回读不取附件内容，是**能力边界**，不是旧政策。
   const fe = fs.readFileSync(path.join(HERE, 'agent', 'feishu.mjs'), 'utf8');
-  const f0 = fe.indexOf('const ATTACHMENT_TYPES = new Set');
-  const fSlice = f0 >= 0 ? fe.slice(f0, f0 + 900) : '';
-  const fm = fSlice.match(/这是附件：[^']*/);
-  if (!fm) no('N4 找到附件占位', 'feishu.mjs 里找不到附件那一句占位文案');
-  else {
-    const hf = hitsOf(fm[0]);
-    if (hf.length) no('N4 群历史占位', `附件占位里还有「${hf.join('、')}」`);
-    else if (!/不取/.test(fm[0])) no('N4 附件占位要写明「不取」', '占位文案没把「不取」说出来，模型只能自己猜');
-    else ok('N4 群历史占位说的是「不取」');
-  }
+  const f0 = fe.indexOf('这是附件：历史回读');
+  const seg = f0 >= 0 ? fe.slice(f0, f0 + 200) : '';
+  if (!seg) no('N4 找到附件占位', 'feishu.mjs 里找不到「这是附件：历史回读…」这一句');
+  else if (DEAD_POLICY.test(seg)) no('N4 群历史占位', '占位文案里还在引用已废止的下载禁令');
+  else if (!/不取内容/.test(seg)) no('N4 附件占位要写明能力边界',
+    '占位文案没说「历史回读不取内容」，读的人会以为附件被读过');
+  else ok('N4 群历史占位说的是「历史回读不取内容」');
 
-  // N5 检测器自证：喂**改动前**的旧文案必须报红，否则上面几条都是空转
-  const OLD = '（file 类型，正文为空 —— 我没法看到里面的内容）';
-  if (!hitsOf(OLD).length) no('N5 检测器自证', '喂 2026-09-18 之前的旧文案没报红 —— 这几条正则是空转的');
-  else ok('N5 检测器自证：喂旧文案会红');
+  // N5 旧话术必须已清掉 + 检测器自证（喂旧文案必须命中）
+  const OLD_AGENT = '附件我不取 —— 飞书上的内容公司不让下载';
+  const OLD_FE = '（这是附件：飞书内容禁止下载，附件只有下载这一条通道，所以我不取它的内容。）';
+  if (!DEAD_POLICY.test(OLD_AGENT) || !DEAD_POLICY.test(OLD_FE)) {
+    no('N5 检测器自证', '喂 2026-09-18 的旧话术没命中 —— DEAD_POLICY 是空转的');
+  } else if (agent.includes(OLD_AGENT) || fe.includes(OLD_FE)) {
+    no('N5 旧话术已清掉', 'agent.mjs / feishu.mjs 里还留着已废止的红线话术');
+  } else ok('N5 旧话术已清掉，且检测器喂旧文案会命中');
 }
 
 /* ─────────────── I 文档里的自证数不能是写死的 ─────────────── */
