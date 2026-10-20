@@ -208,11 +208,11 @@
     "risk_green": 157,
     "risk_green_spend_usd": 23147.35,
     "risk_green_no_text": 55,
-    "risk_green_uncovered": 99,
+    "risk_green_uncovered": 102,
     "risk_green_uncovered_spend_usd": 7400.16,
     "ads_unread": 2,
     "ads_total_spend_usd": 43060.59,
-    "risk_blind_spot_rate": 0.431
+    "risk_blind_spot_rate": 0.444
    },
    "量说明": "绿标条数 / 它们的投放金额 / 其中无文案 / 其中规则未覆盖 / 未覆盖那批的金额 / 整行没读到的（不是无文案广告）/ 全表投放 / 盲区率 —— 八个数并排。**「已查且通过」那一格没有键，因为它恒为 0**，由 audit_risk_label.py 直接印出来。",
    "owner": "广告投放侧（creative=Roxie）+ 源表口径",

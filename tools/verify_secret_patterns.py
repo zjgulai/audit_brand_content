@@ -172,11 +172,16 @@ def controls():
     def ok(name, cond, detail=""):
         checks.append((name, bool(cond), detail))
 
-    fake_key = (
-        "-----BEGIN RSA PRIVATE KEY-----\n"
-        "MIIBOgIBAAJBAKfakefakefakefakefakefakefakefakefakefakefake\n"
-        "-----END RSA PRIVATE KEY-----\n"
-    )
+    # ★ 夹具**运行时拼装**，文件里不留完整形态 —— 否则扫描器会扫到自己。
+    #   这不是豁免：拼出来的字符串与真私钥块**逐字相同**，对照组照样会红。
+    #   第一次提交时它还是 untracked（`git ls-files` 看不见），所以 0 红；
+    #   入库后开始扫自己，5 条全中 —— 一个把自己的夹具当成真凭据的扫描器，
+    #   会让人立刻开始忽略它（AGENTS.md §2.1.1）。
+    _B, _E = "-----BEGIN ", "-----END "
+    _K = "RSA PRIVATE KEY-----"
+    fake_key = (_B + _K + "\n"
+                "MIIBOgIBAAJBAKfakefakefakefakefakefakefakefakefakefakefake\n"
+                + _E + _K + "\n")
     f = scan_text(fake_key)
     ok("正样本：完整私钥块 → 红", any(x["kind"] == "private_key" for x in f), str(f))
 
@@ -186,19 +191,20 @@ def controls():
     ok("负样本：文件名含 token 但内容干净 → 绿（只扫内容）",
        scan_text("VALUE = 1\n", path="pycparser/ply/ctokens.py") == [], "")
 
-    doc = "文档说明：不要写 -----BEGIN PRIVATE KEY----- 这种块。\n"
+    doc = "文档说明：不要写 " + _B + "PRIVATE KEY" + _K + " 这种块。\n"
     ok("负样本：文档提到 BEGIN PRIVATE KEY 但无 END → 绿",
        scan_text(doc) == [], str(scan_text(doc)))
 
-    cloud = "AKIAABCDEFGHIJKLMNOP\n"
+    cloud = "AKIA" + "ABCDEFGHIJKLMNOP" + "\n"
     ok("正样本：AKIA + 16 位 → 红",
        any(x["kind"] == "aws_access_key" for x in scan_text(cloud)), "")
 
-    bearer = "Authorization: Bearer abcdefghijklmnopqrstuvwx\n"
+    bearer = "Authorization: Bearer " + "abcdefghijklmnopqrstuvwx" + "\n"
     ok("正样本：Bearer + 24 位 → 红",
        any(x["kind"] == "bearer_token" for x in scan_text(bearer)), "")
 
-    cred = "cat ~/.dsh/credentials/lark.json\n"
+    # 同上：夹具运行时拼装，文件里不留可照抄的命令形态。
+    cred = "cat " + "~/.dsh/" + "credentials" + "/lark.json\n"
     ok("正样本：cat 读 credentials → 红",
        any(x["kind"] == "shell_read" for x in scan_text(cred)), "")
 
