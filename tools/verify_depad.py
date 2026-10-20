@@ -66,7 +66,16 @@ from collections import Counter
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 只查这些后缀 —— 二进制资产（png/xlsx/zip）没有「读得出来」这回事
-EXTS = (".md", ".py", ".mjs", ".js", ".cjs", ".ts", ".json", ".yml", ".yaml",
+#
+# ★ 2026-10-20 补 .tsx / .jsx / .mts / .cts：
+#   原来这里只有 `.ts`，**没有 `.tsx`**。后果是一次真事故：
+#   `web/src` 下 9 个 React 页面全部被 +4096 填充（`tsc` 报
+#   `TS1490: File appears to be binary`，`read` 工具也打不开），
+#   而这个检查器每次跑都打印「扫描 7231 个文本文件 · 被填充 0 个」——
+#   **它的输入比它说出口的结论小**，正是 AGENTS.md §2.4.1 那个病。
+#   判据要能指得出对象：断言里数一句「盘上 .tsx 有几个、扫描目标里有几个」。
+EXTS = (".md", ".py", ".mjs", ".js", ".cjs", ".jsx", ".ts", ".tsx",
+        ".mts", ".cts", ".json", ".yml", ".yaml",
         ".txt", ".csv", ".tsv", ".sh", ".toml", ".cfg", ".ini", ".html", ".css")
 # 不进这些目录 —— 依赖、虚拟环境、浏览器缓存不是我们的内容
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", ".venv-r4", ".pylibs",
