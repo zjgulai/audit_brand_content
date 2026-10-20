@@ -28,9 +28,11 @@
 """
 from __future__ import annotations
 
+import ipaddress
 import os
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
@@ -45,6 +47,10 @@ from base.auth_session import SessionStore  # noqa: E402
 DATA_ROOT = os.environ.get("REVIEW_API_DATA_ROOT")
 if not DATA_ROOT:
     raise SystemExit("REVIEW_API_DATA_ROOT 未设置")
+if os.environ.get("APP_ENV", "").strip().lower() != "dev":
+    raise SystemExit("review_api_dev 只允许 APP_ENV=dev")
+if os.environ.get("REVIEW_DEV_IDENTITY") != "1":
+    raise SystemExit("review_api_dev 需要显式 REVIEW_DEV_IDENTITY=1")
 
 SESSION_DB = os.environ.get("REVIEW_API_SESSION_DB", ":memory:")
 
@@ -91,12 +97,59 @@ app = create_app(
     session_store=_store,
     repository=FileProjectionRepository(DATA_ROOT),
     principals=PRINCIPALS,
+    app_env="dev",
 )
 
 
+def _loopback_host(host: str) -> bool:
+    value = (host or "").strip().lower()
+    if value.startswith("["):
+        end = value.find("]")
+        value = value[1:end] if end > 0 else value
+    elif value.count(":") == 1:
+        value = value.rsplit(":", 1)[0]
+    # 裸 IPv6（如 ::1）含多个冒号，不能按 host:port 规则切。
+    if value == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(value).is_loopback
+    except ValueError:
+        return False
+
+
+def _dev_request_allowed(request: Request) -> bool:
+    client = request.client.host if request.client else ""
+    host = request.headers.get("host", "")
+    origin = request.headers.get("origin")
+    if not _loopback_host(client) or not _loopback_host(host):
+        return False
+    if origin:
+        parsed = urlparse(origin)
+        if parsed.scheme not in ("http", "https") or not _loopback_host(parsed.hostname or ""):
+            return False
+    return True
+
+
+def _deny_non_loopback(request: Request) -> JSONResponse | None:
+    if _dev_request_allowed(request):
+        return None
+    return JSONResponse(
+        status_code=403,
+        content={
+            "code": "403",
+            "message": "开发身份接口只允许 loopback 请求",
+            "details": None,
+            "request_id": request.headers.get("x-request-id", ""),
+        },
+    )
+
+
 @app.get("/dev/identities")
-def dev_identities() -> JSONResponse:
+def dev_identities(request: Request) -> JSONResponse:
     """身份切换器的数据源。只读，不含凭据。"""
+    denied = _deny_non_loopback(request)
+    if denied is not None:
+        return denied
     return JSONResponse({"identities": DEV_IDENTITIES})
 
 
@@ -108,6 +161,9 @@ async def dev_session(request: Request) -> JSONResponse:
     只接受 PRINCIPALS 里已有的 id —— 这是「选一个已有身份」，
     不是「扮演任意人」。未知 id 一律 400。
     """
+    denied = _deny_non_loopback(request)
+    if denied is not None:
+        return denied
     try:
         body = await request.json()
     except Exception:  # noqa: BLE001 — 空体或坏 JSON 都按缺参数处理
@@ -126,13 +182,16 @@ async def dev_session(request: Request) -> JSONResponse:
         )
 
     tenant = PRINCIPALS[principal_id].get("tenant_id", "t1")
+    old_cookie = request.cookies.get("session")
     cookie = _store.create_session(principal_id, tenant=tenant)
+    if old_cookie and old_cookie != cookie:
+        _store.revoke_session(old_cookie)
     response = JSONResponse({"principal": principal_id, "tenant": tenant})
     response.set_cookie(
         key="session",
         value=cookie,
         httponly=True,
-        samesite="lax",
+        samesite="strict",
         path="/",
     )
     return response

@@ -15,7 +15,7 @@
  *   node web/scripts/check_review_slice.mjs --base http://127.0.0.1:5177 \
  *        --api http://127.0.0.1:8899 --cookie <opaque> [--out result.json]
  */
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -28,8 +28,10 @@ function arg(name, fallback) {
 const base = arg("base", "http://127.0.0.1:5180").replace(/\/$/, "");
 const api = arg("api", "").replace(/\/$/, "");
 const cookie = arg("cookie", "");
+let activeCookie = cookie;
 const outFile = arg("out", "");
 const debugPort = Number(arg("debug-port", "9337"));
+const enableDevIdentity = arg("enable-dev-identity", "0") === "1";
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 const chrome =
   process.env.CHROME_BIN ||
@@ -154,13 +156,38 @@ async function main() {
     }
   }
 
+  async function clickNamedButton(name) {
+    return ev(`(() => {
+      const button=[...document.querySelectorAll('button')].find(
+        (x) => x.textContent?.trim() === ${JSON.stringify(name)}
+      );
+      if (!button || button.disabled) return false;
+      button.click();
+      return true;
+    })()`);
+  }
+
+  if (enableDevIdentity) {
+    await goto("/queue");
+    const enabled = await clickNamedButton("启用本地开发身份");
+    if (!enabled) throw new Error("本地开发身份按钮不可点");
+    const end = Date.now() + 8000;
+    while (Date.now() < end) {
+      if ((await bodyText()).includes("DP3 审核员（u_dp3）")) break;
+      await sleep(150);
+    }
+    const cookies = await cdp.send("Network.getCookies", { urls: [base] });
+    activeCookie = cookies.cookies?.find((item) => item.name === "session")?.value ?? "";
+    if (!activeCookie) throw new Error("显式启用后没有新 session cookie");
+  }
+
   // ── A1 队列口径（正向 + 反向对照）──────────────────────────────────
   // 正向：后端 /api/v1/queue 每条 state ∈ {REVIEW, 待自决}
   let queueStates = [];
   if (api) {
     try {
       const r = await fetch(`${api}/api/v1/queue`, {
-        headers: cookie ? { Cookie: `session=${cookie}` } : {},
+        headers: activeCookie ? { Cookie: `session=${activeCookie}` } : {},
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       queueStates = (await r.json()).map((x) => String(x.state));
@@ -358,16 +385,22 @@ async function main() {
   if (api && casePath) {
     const caseId = casePath.split("/").pop();
     try {
+      const cookies = await cdp.send("Network.getCookies", { urls: [base] });
+      activeCookie = cookies.cookies?.find((item) => item.name === "session")?.value ?? "";
+      if (!activeCookie) throw new Error("A5 前没有当前 session cookie");
       const r = await fetch(`${api}/api/v1/cases/${encodeURIComponent(caseId)}/actions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(cookie ? { Cookie: `session=${cookie}` } : {}),
+          "Idempotency-Key": "slice-a5-missing-conclusion",
+          ...(activeCookie ? { Cookie: `session=${activeCookie}` } : {}),
         },
         body: JSON.stringify({ version: 0, action: "submit" }),
       });
-      record("A5", "submit 缺 conclusion 必须被后端拒绝（400）",
-        r.status === 400, `实际 HTTP ${r.status}`);
+      const response = await r.json();
+      record("A5", "submit 缺 conclusion 被拒绝且原因正确（400）",
+        r.status === 400 && response.message === "submit 必须带 conclusion",
+        `HTTP ${r.status}: ${response.message}`);
     } catch (e) {
       record("A5", "submit 缺 conclusion 必须被拒绝", null, e.message);
       untested = true;
@@ -385,10 +418,22 @@ async function main() {
     brandInBadge.length === 0, brandInBadge.join(" "));
 
   // ── A7 夹具生成物过契约校验 ────────────────────────────────────────
-  // 这里不重跑 Python（那需要 --out），而是断言夹具脚本的自证能过。
-  // 真正的契约校验在 seed_fixture.py --selftest 的 T3/T3b。
-  record("A7", "夹具自证（T3/T3b 契约+类型）由 seed_fixture.py --selftest 承担",
-    true, "");
+  try {
+    const output = execFileSync(
+      path.join(repoRoot, ".venv/bin/python"),
+      [path.join(repoRoot, "web/scripts/seed_fixture.py"), "--selftest"],
+      { encoding: "utf8", timeout: 60000 },
+    );
+    record(
+      "A7",
+      "夹具自证真实运行并通过",
+      /13\/13 项通过/.test(output),
+      output.trim().split("\n").pop(),
+    );
+  } catch (e) {
+    record("A7", "夹具自证真实运行", null, e?.message ?? String(e));
+    untested = true;
+  }
 
   // ── A8 争议条目渲染 underdetermined 且不硬给单轴 ───────────────────
   await goto("/taxonomy");

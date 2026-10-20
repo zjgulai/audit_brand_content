@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useIdentity } from "../components/IdentitySwitcher";
 import { QUEUE_LABELS, reviewApi, splitQueue, type CaseSummary } from "../api/client";
 
 /**
@@ -40,13 +41,21 @@ export function stateBadge(state: string | null | undefined): {
 }
 
 export default function QueuePage() {
+  const { devEnabled, current, sessionEpoch } = useIdentity();
   const [rows, setRows] = useState<CaseSummary[] | null>(null);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
   const { pathname } = useLocation();
 
   useEffect(() => {
+    if (devEnabled && current === null) {
+      setRows(null);
+      setError(null);
+      return;
+    }
     let alive = true;
+    setRows(null);
+    setError(null);
     reviewApi
       .getQueue()
       .then((data) => {
@@ -60,7 +69,7 @@ export default function QueuePage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [current, devEnabled, sessionEpoch]);
 
   const { queued, offQueue } = useMemo(
     () => splitQueue(rows ?? []),

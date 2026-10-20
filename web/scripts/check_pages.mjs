@@ -20,6 +20,7 @@ const cookie = arg("cookie", "");
 const expectCase = arg("case", "case-smoke");
 const expectReport = arg("report", "report-smoke");
 const shots = arg("screenshots", "");
+const enableDevIdentity = arg("enable-dev-identity", "0") === "1";
 const debugPort = Number(arg("debug-port", "9334"));
 const chrome =
   process.env.CHROME_BIN ||
@@ -149,6 +150,26 @@ async function main() {
     }
   }
 
+  async function clickNamedButton(name) {
+    return evalValue(`(() => {
+      const button=[...document.querySelectorAll('button')].find(
+        (x) => x.textContent?.trim() === ${JSON.stringify(name)}
+      );
+      if (!button || button.disabled) return false;
+      button.click();
+      return true;
+    })()`);
+  }
+
+  if (enableDevIdentity) {
+    await cdp.send("Page.navigate", { url: `${base}/queue` });
+    await waitBody("启用本地开发身份");
+    if (!(await clickNamedButton("启用本地开发身份"))) {
+      throw new Error("本地开发身份按钮不可点");
+    }
+    await waitBody("DP3 审核员（u_dp3）");
+  }
+
   // 1) 队列
   await cdp.send("Page.navigate", { url: `${base}/queue` });
   const queueBody = await waitBody(expectCase);
@@ -236,8 +257,40 @@ async function main() {
   const taxonomyPath = await evalValue("location.pathname");
   const taxonomyShot = await shot("taxonomy.png");
 
+  // 5) 390px 窄屏：队列与详情不能横向溢出，队列行/主要控件至少 44px。
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await cdp.send("Page.navigate", { url: `${base}/queue` });
+  await waitBody(expectCase);
+  const queueMobile = await evalValue(`(() => {
+    const row=document.querySelector('.queue__row');
+    const controls=[...document.querySelectorAll('.queue__filter, .shell__header nav a, .shell__right select')];
+    return {
+      noOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+      rowHeight: row ? row.getBoundingClientRect().height : 0,
+      controlsMin44: controls.every(x => x.getBoundingClientRect().height >= 44),
+    };
+  })()`);
+  await cdp.send("Page.navigate", { url: `${base}/cases/${expectCase}` });
+  await waitBody("证据链");
+  const caseMobile = await evalValue(`(() => ({
+    noOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+    actionButtonsMin44: [...document.querySelectorAll('.actions .btn')]
+      .every(x => x.getBoundingClientRect().height >= 44),
+  }))()`);
+  const responsiveOk =
+    Boolean(queueMobile?.noOverflow) &&
+    Number(queueMobile?.rowHeight || 0) >= 44 &&
+    Boolean(queueMobile?.controlsMin44) &&
+    Boolean(caseMobile?.noOverflow) &&
+    Boolean(caseMobile?.actionButtonsMin44);
+
   const result = {
-    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup,
+    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk,
     queue: { ok: queueOk, shot: queueShot, body: queueBody.slice(0, 500) },
     case: {
       ok: caseOk,
@@ -258,6 +311,12 @@ async function main() {
       lookup: taxonomyLookup,
       shot: taxonomyShot,
       body: taxonomyBody.slice(0, 700),
+    },
+    responsive: {
+      ok: responsiveOk,
+      viewport: "390x844",
+      queue: queueMobile,
+      case: caseMobile,
     },
   };
   console.log(JSON.stringify(result, null, 2));

@@ -1,7 +1,8 @@
 # Source brief · 内容审核工作台（Web 复核面）
 
 > 依据 `turn-into-app` 的 source-brief 模板填写。来源已实际读取，不是转述。
-> 生成日期：2026-10-20。**本轮只出文档，不改 `web/` 代码。**
+> 生成日期：2026-10-20。本 brief 保存设计起点，后续已有 Web 原型实现，**不是生产验收结论**。
+> 当前部署阶段、并行任务与未闭门见 [部署准备方案 v1](deployment-plan-v1.md)；不以本页历史“已通”读数证明生产写动作可用。
 
 ## Source and provenance
 
@@ -11,10 +12,10 @@
 | 前后端规格 | `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md`（1429 行，v1.3.1） | 全文；P-01…P-12 页面清单、状态矩阵、数据对象 |
 | 决策总账 | `PMO/audit/内容审查Agent-决策总账-v2-20261018.md`（224 行） | 全文；124 条直接决策、Q-01…Q-13、C-1…C-7 |
 | 分类规范 | `PMO/implement/内容审查分类规范-v1.md`（144 KB） | 结构；七轴定义与**未读完**——7 轴 + 5 正交字段的权威源，本 brief 不复制其内容 |
-| 现成前端 | `web/`（Vite + React 19 + react-router-dom 7） | 全部源码；5 个路由，API 客户端只有 GET |
-| 真实读 API | `api/review_api.py`（22 KB） | 19 个 GET；`can_read_content` 逐案鉴权 |
-| 真实写 API | `api/write_api.py`（21.7 KB） | 12 个 POST；已由 `api/review_api.py:553` 实挂载 |
-| 联调链路 | `web/scripts/dev-up.sh` | 实跑 8 步，rc=0；40 项无障碍 0 违规 |
+| 现成前端 | `web/`（Vite + React 19 + react-router-dom 7） | 全部源码；4 个业务路由；读客户端与开发验收写客户端分离，生产构建保持只读 |
+| 真实读 API | `api/review_api.py` | 案件/队列/报告等 GET；`can_read_content` 逐案鉴权 |
+| 真实写 API | `api/write_api.py` | 人工动作端点已挂载；本地开发验收只启用 claim/save_draft/submit，confirm/reject 与签发继续关闭 |
+| 联调链路 | `web/scripts/dev-up.sh` | 11 阶段实跑 rc=0；生产边界8/8、dev入口8/8、写链0→1→2→3、无障碍40项0违规、切片15/15、身份隔离通过 |
 | 品牌色 | `www.momcozy.com` 首页 CSS 实测 | `#6A2C3A`(23 次) / `#9c5455`(21 次) / `#f6eeed` / `#D7C0B3` / `#C3B4AE` |
 
 **没读到 / 没核的**：真实飞书 OAuth（T-1 未核）；`PRD/feishu/` 上游正文；容器 OCR/ASR（阶段 3 未开工）。

@@ -18,6 +18,9 @@ export const apiBase = (
   import.meta.env.VITE_REVIEW_API_BASE ?? "/review-api"
 ).replace(/\/$/, "");
 
+/** 同源开发端点的根；只由开发身份模块使用。 */
+export const appOrigin = apiBase.replace(/\/review-api$/, "");
+
 /** 五标签。闭集 —— 出现别的值是后端坏了，不是新标签。 */
 export const FIVE_LABELS = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"] as const;
 export type Label = (typeof FIVE_LABELS)[number];
@@ -60,6 +63,19 @@ export interface NotEvaluated {
   why?: string | null;
 }
 
+export interface ReviewSummary {
+  case_id: string;
+  status: "unassigned" | "claimed" | "released" | "closed" | string;
+  assignee: string | null;
+  version: number;
+  claimed_at: string | null;
+  last_activity: string | null;
+  lease_expires: number | null;
+  released_at: string | null;
+  released_draft_id: string | null;
+  primary_draft_id: string | null;
+}
+
 export interface CaseDetail {
   case_id: string;
   ir: {
@@ -86,7 +102,37 @@ export interface CaseDetail {
     control_points_version?: string;
     created_at?: string;
   };
-  review?: Record<string, unknown> | null;
+  review?: ReviewSummary | null;
+}
+
+export interface LedgerMutation {
+  version: number;
+  status?: string;
+  assignee?: string | null;
+  lease_expires?: number | null;
+  primary_draft_id?: string | null;
+}
+
+export interface DraftMutation extends LedgerMutation {
+  draft: {
+    draft_id: string;
+    case_id: string;
+    author: string;
+    notes: string;
+    content_hash: string;
+  };
+  formal: null;
+}
+
+export interface SubmitMutation extends LedgerMutation {
+  formal: {
+    formal_id: string;
+    case_id: string;
+    author: string;
+    submitted_at: string;
+    from_draft_id: string | null;
+    conclusion: Record<string, unknown>;
+  };
 }
 
 export interface ReportSummary {
@@ -116,7 +162,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init?: { method?: string; body?: unknown; idempotencyKey?: string },
 ): Promise<T> {
@@ -178,80 +224,4 @@ export const reviewApi = {
 
   getReport: (reportId: string) =>
     request<ReportSummary>(`/reports/${encodeURIComponent(reportId)}`),
-
-  // ── 人工动作：只走写 API ────────────────────────────────────────────
-
-  claim: (caseId: string, idempotencyKey?: string) =>
-    request<Record<string, unknown>>(
-      `/cases/${encodeURIComponent(caseId)}/claim`,
-      { method: "POST", body: {}, idempotencyKey },
-    ),
-
-  unclaim: (caseId: string, version: number, idempotencyKey?: string) =>
-    request<Record<string, unknown>>(
-      `/cases/${encodeURIComponent(caseId)}/unclaim`,
-      { method: "POST", body: { version }, idempotencyKey },
-    ),
-
-  /** 存草稿：不可变全字段快照。系统只推荐 latest，**绝不预选**。 */
-  saveDraft: (
-    caseId: string,
-    version: number,
-    draft: { form?: unknown; notes?: string; evidence_selections?: unknown[] },
-    idempotencyKey?: string,
-  ) =>
-    request<Record<string, unknown>>(
-      `/cases/${encodeURIComponent(caseId)}/actions`,
-      {
-        method: "POST",
-        body: { version, action: "save_draft", draft },
-        idempotencyKey,
-      },
-    ),
-
-  /** 提交结论：必须是显式动作。conclusion 缺失后端会 400（断言 A5）。 */
-  submitConclusion: (
-    caseId: string,
-    version: number,
-    conclusion: Record<string, unknown>,
-    idempotencyKey?: string,
-  ) =>
-    request<Record<string, unknown>>(
-      `/cases/${encodeURIComponent(caseId)}/actions`,
-      {
-        method: "POST",
-        body: { version, action: "submit", conclusion },
-        idempotencyKey,
-      },
-    ),
-
-  confirmFinding: (
-    caseId: string,
-    version: number,
-    findingId: string,
-    idempotencyKey?: string,
-  ) =>
-    request<Record<string, unknown>>(
-      `/cases/${encodeURIComponent(caseId)}/actions`,
-      {
-        method: "POST",
-        body: { version, action: "confirm", finding_id: findingId },
-        idempotencyKey,
-      },
-    ),
-
-  rejectFinding: (
-    caseId: string,
-    version: number,
-    findingId: string,
-    idempotencyKey?: string,
-  ) =>
-    request<Record<string, unknown>>(
-      `/cases/${encodeURIComponent(caseId)}/actions`,
-      {
-        method: "POST",
-        body: { version, action: "reject", finding_id: findingId },
-        idempotencyKey,
-      },
-    ),
 };

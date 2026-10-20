@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-  ApiError,
   reviewApi,
   type CaseDetail,
   type Finding,
@@ -21,7 +20,7 @@ import taxonomy from "../data/taxonomy.json";
  * 它做三件事，全部可由字段核对，不编造：
  *   1. 把每条 finding 还原成「命中哪条规则 · 原文在哪 · 依据能不能核」
  *   2. 说清覆盖是 partial 还是 full，以及哪几族**根本没跑**（不是 0）
- *   3. 让人动手：认领 / 存草稿 / 提交结论 —— 且都必须经写 API
+ *   3. 显示复核台账摘要；开发验收可动态加载人工写动作，生产构建保持只读
  */
 
 const WHY_TEXT: Record<string, string> = {
@@ -50,6 +49,9 @@ interface SpecMeta {
 }
 
 const meta = (taxonomy as { meta?: SpecMeta }).meta ?? {};
+const DevReviewActions = __REVIEW_WRITE_ENABLED__
+  ? lazy(() => import("../components/DevReviewActions"))
+  : null;
 
 /**
  * ★ 2026-10-20 删掉了一段死代码，记在这里因为它长得太像在工作：
@@ -186,59 +188,67 @@ function NotEvaluatedList({ items }: { items: NotEvaluated[] }) {
 
 export default function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
-  const { current } = useIdentity();
+  const { devEnabled, current, sessionEpoch } = useIdentity();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const [flash, setFlash] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const requestGeneration = useRef(0);
 
-  const load = useCallback(() => {
-    if (!caseId) return;
-    let alive = true;
-    Promise.all([reviewApi.getCase(caseId), reviewApi.listReports()])
-      .then(([caseDetail, reportRows]) => {
-        if (!alive) return;
-        setDetail(caseDetail);
-        setReports(reportRows.filter((r) => r.case_id === caseId));
-        setError(null);
-      })
-      .catch((e: unknown) => {
-        if (!alive) return;
-        const err = e as { status?: number; message?: string };
-        setError({ status: err.status ?? 0, message: err.message ?? String(e) });
-      });
-    return () => {
-      alive = false;
+  const readCase = useCallback(async () => {
+    if (!caseId) throw new Error("缺少案件编号");
+    const [caseDetail, reportRows] = await Promise.all([
+      reviewApi.getCase(caseId),
+      reviewApi.listReports(),
+    ]);
+    return {
+      caseDetail,
+      reports: reportRows.filter((report) => report.case_id === caseId),
     };
   }, [caseId]);
 
-  useEffect(() => load(), [load]);
+  const applyReadback = useCallback(
+    (result: { caseDetail: CaseDetail; reports: ReportSummary[] }) => {
+      setDetail(result.caseDetail);
+      setReports(result.reports);
+      setError(null);
+      return result.caseDetail;
+    },
+    [],
+  );
 
-  const act = async (name: string, fn: () => Promise<unknown>) => {
-    setBusy(name);
-    setFlash(null);
+  const refreshAfterWrite = useCallback(async () => {
+    const generation = requestGeneration.current;
     try {
-      await fn();
-      setFlash({ kind: "ok", text: `${name} 已提交` });
-      load();
-    } catch (e: unknown) {
-      if (e instanceof ApiError) {
-        const why =
-          e.status === 409
-            ? "版本冲突：案件已被他人改动，请刷新后重试"
-            : e.status === 403
-              ? "无权执行该动作"
-              : e.message;
-        setFlash({ kind: "error", text: `${name} 失败（${e.status}）：${why}` });
-      } else {
-        setFlash({ kind: "error", text: `${name} 失败：${String(e)}` });
-      }
-    } finally {
-      setBusy(null);
+      const result = await readCase();
+      if (generation !== requestGeneration.current) return null;
+      return applyReadback(result);
+    } catch {
+      return null;
     }
-  };
+  }, [applyReadback, readCase]);
+
+  const load = useCallback(async () => {
+    if (!caseId) return null;
+    const generation = ++requestGeneration.current;
+    try {
+      const result = await readCase();
+      if (generation !== requestGeneration.current) return null;
+      return applyReadback(result);
+    } catch (cause: unknown) {
+      if (generation !== requestGeneration.current) return null;
+      const err = cause as { status?: number; message?: string };
+      setError({ status: err.status ?? 0, message: err.message ?? String(cause) });
+      return null;
+    }
+  }, [applyReadback, caseId, readCase]);
+
+  useEffect(() => {
+    requestGeneration.current += 1;
+    setDetail(null);
+    setReports([]);
+    setError(null);
+    if (!devEnabled || current !== null) void load();
+  }, [caseId, current, devEnabled, load, sessionEpoch]);
 
   if (error) {
     const head = error.status === 403 ? "403 · 无权读取该案件" : error.status === 404 ? "404 · 案件不存在" : "读取失败";
@@ -275,6 +285,9 @@ export default function CaseDetailPage() {
   const partial = cov.coverage_state === "partial";
   const notEvaluated = cov.not_evaluated_reason ?? [];
   const isCandidate = (ir.findings ?? []).some((f) => f.status === "candidate");
+  const review = detail.review;
+  const leaseActive =
+    typeof review?.lease_expires === "number" && review.lease_expires > Date.now() / 1000;
 
   return (
     <section className="case">
@@ -368,60 +381,44 @@ export default function CaseDetailPage() {
 
       <div className="actions">
         <h2 style={{ marginTop: 0, border: "none", paddingBottom: 0 }}>复核动作</h2>
-        {flash && (
-          <div
-            className={"state " + (flash.kind === "error" ? "state--error" : "state--warn")}
-            role="status"
-            style={{ marginTop: 0 }}
-          >
-            {flash.text}
+        <dl className="facts">
+          <dt>台账状态</dt>
+          <dd>{review?.status ?? "未读取"}</dd>
+          <dt>负责人</dt>
+          <dd>{review?.assignee ?? "未认领"}</dd>
+          <dt>台账版本</dt>
+          <dd className="font-data">{review?.version ?? "未读取"}</dd>
+          <dt>租约</dt>
+          <dd>
+            {review?.lease_expires
+              ? `${leaseActive ? "有效至" : "已过期于"} ${new Date(review.lease_expires * 1000).toLocaleString()}`
+              : "无"}
+          </dd>
+          <dt>主草稿</dt>
+          <dd className="font-data">{review?.primary_draft_id ?? "无"}</dd>
+          <dt>正式记录</dt>
+          <dd>当前 GET 不返回 formal 摘要</dd>
+        </dl>
+        {__REVIEW_WRITE_ENABLED__ && DevReviewActions ? (
+          current ? (
+            <Suspense fallback={<p className="hint">加载开发写动作…</p>}>
+              <DevReviewActions
+                key={`${detail.case_id}:${current.id}`}
+                detail={detail}
+                refresh={refreshAfterWrite}
+              />
+            </Suspense>
+          ) : (
+            <div className="state state--warn" role="note">
+              只读：先显式启用本地开发身份。身份未建立前不会加载写动作。
+            </div>
+          )
+        ) : (
+          <div className="state state--warn" role="note">
+            只读：生产认证写入口尚未接入，生产构建不包含人工写动作模块。
           </div>
         )}
-        <label htmlFor="review-note">理由 / 备注（存草稿或提交时一并记录）</label>
-        <textarea
-          id="review-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="写清依据与判断；空理由的提交不构成复核结论。"
-        />
         <div className="actions__row" style={{ marginTop: "0.6rem" }}>
-          <button
-            type="button"
-            className="btn btn--primary"
-            disabled={busy !== null}
-            onClick={() => act("认领", () => reviewApi.claim(detail.case_id))}
-          >
-            认领
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={busy !== null || note.trim() === ""}
-            onClick={() =>
-              act("存草稿", () =>
-                reviewApi.saveDraft(detail.case_id, 0, { notes: note }),
-              )
-            }
-            title={note.trim() === "" ? "先写理由" : undefined}
-          >
-            存草稿
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={busy !== null || note.trim() === ""}
-            onClick={() =>
-              act("提交结论", () =>
-                reviewApi.submitConclusion(detail.case_id, 0, {
-                  notes: note,
-                  state: dec.state,
-                }),
-              )
-            }
-            title={note.trim() === "" ? "先写理由" : undefined}
-          >
-            提交结论
-          </button>
           {isCandidate && (
             <>
               {/*
@@ -471,8 +468,11 @@ export default function CaseDetailPage() {
           </div>
         )}
         <p className="actions__note">
-          当前身份：{current?.label ?? "未选择"}（{current?.id ?? "未选择"}）。
-          所有动作经写 API，前端不构造状态变更；版本冲突会返回 409。
+          {__REVIEW_WRITE_ENABLED__ && DevReviewActions
+            ? current
+              ? `当前开发身份：${current.label}（${current.id}）。人工意见不改变机器标签或放行状态。`
+              : "当前没有开发 session；页面保持只读。"
+            : "生产构建保持只读；真实认证与持久写链另行验收。"}
         </p>
       </div>
 

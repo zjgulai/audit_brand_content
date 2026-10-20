@@ -61,20 +61,24 @@ VITE_REVIEW_API_BASE=https://example.com/review-api npm run build
 - `GET /reports`
 - `GET /reports/{id}`
 
-**写（只人工动作，不经这些端点改判定与放行）**
-- `POST /cases/{id}/claim` · `/unclaim`
-- `POST /cases/{id}/actions`（`save_draft` / `submit` / `confirm` / `reject`）
+**开发验收写动作（只在 `vite serve` + `APP_ENV=dev` + `REVIEW_DEV_IDENTITY=1`）**
+- `POST /cases/{id}/claim`
+- `POST /cases/{id}/actions`（`save_draft` / `submit`）
+- 每个用户意图带独立 Idempotency-Key；未知网络结果的显式重试复用同一 key/version/body
+- 保存、提交均使用 GET 返回的台账 version，成功后再 GET 核对 version、草稿 ID 与 closed
 
-**不包含** `release-decision` / `release-revoke` / `submissions`。
-阶段二 Web 仍不提供签发、撤回或发布入口 —— 这条由 `check_review_slice.mjs` 的 **A4** 断言。
+**生产构建保持只读**：不含 `/dev/*`、替身 principal、写客户端 chunk、claim/actions 请求模板。
+仍不包含 `release-decision` / `release-revoke` / `submissions`；confirm/reject 因后端权威写入与投影回读未闭继续禁用。
+`check_production_bundle.mjs` 断言这条边界。
 
 ## 本地身份切换器
 
-`web/scripts/review_api_dev.py` 提供 `GET /dev/identities` 与 `POST /dev/session`，
-页面右上角据此切换 DP3 / DP4 / 签发人。
+`web/scripts/review_api_dev.py` 提供 `GET /dev/identities` 与 `POST /dev/session`。
+它默认拒绝启动，只有 `APP_ENV=dev` + `REVIEW_DEV_IDENTITY=1` 才注册使用；端点只接受 loopback client/Host/Origin。
+页面不会自动建立替身身份，必须显式点击启用；切换会隐藏旧内容、清空备注并撤销旧 session。
 
-**它只存在于本地联调入口**：生产入口 `api/review_api.py` 没有这些路由，一行都没改。
-它也不是登录：不保存、不校验凭据，只接受已登记的几个 principal id。
+**生产构建不包含开发身份模块**：Vite 按 `command === "serve"` 决定编译常量，任何 `build`（即使 mode/NODE_ENV 误配）都关闭开发身份与写模块。
+正式入口 `api/review_api.py` 没有 `/dev/*`；部署网关仍须拒绝 `/dev/*`。
 
 ## 样例数据
 
@@ -83,7 +87,7 @@ VITE_REVIEW_API_BASE=https://example.com/review-api npm run build
 
 ```bash
 python3 web/scripts/seed_fixture.py --out <dir> [--merge]
-python3 web/scripts/seed_fixture.py --selftest   # 12 项反向对照
+python3 web/scripts/seed_fixture.py --selftest   # 13 项反向对照
 ```
 
 每条带 `sample: true`。`dev-up.sh` 用 `--merge` 与 `case-smoke` 这条真实案件并存。
@@ -100,38 +104,42 @@ A6（品牌红不得用于状态徽标）、A8（欠定条目渲染 underdetermi
 
 退出码 `0` 通过 / `1` 有断言红 / `2` 有未测（**2 不是通过**）。
 
-## 边界
+## 部署准备（本轮不部署）
 
+部署方案与上线阻塞清单见 [部署准备方案 v1](docs/deployment-plan-v1.md)。
+目标机房环境以 `DEPLOY-01` 存本地部署记忆；内部地址、登录账号及凭据不进公开仓。
+当前工作台是本地验收原型，**不是生产业务已就绪**：开发身份入口、写请求幂等/版本、
+持久台账与投影新鲜度、真实认证与多模态等仍有上线前置；确认/驳回按钮继续禁用。
 
-## 本地联调（真实后端）
+方案整理不等于部署授权。本轮不连接服务器、不上传、不改 DNS/TLS、不启动远端服务。
+
+## 本地联调（非生产入口）
 
 前置：仓库根有 `.venv`（uv 环境），本机有 Chrome。
+从仓库根运行：
 
 ```bash
-./scripts/dev-up.sh
+bash web/scripts/dev-up.sh
 ```
 
-脚本做的事（幂等，失败退非零）：
+脚本做的事（失败退非零；不应拿到生产执行）：
 
-1. 用 `tools/smoke_end_to_end.py` 的 `SMOKE_DUMP_IR` 在**临时目录**生成投影（`cases.json`，含 `case-smoke`）；
-2. 用 `scripts/seed_projection.py` 给临时投影补一条 `report-smoke`（仍只写临时目录）；
-3. `npm run build`；
-4. 建本地 session（`u_dp3` / `t1`），启动真实 `api/review_api.py`（经 `scripts/review_api_dev.py` 装配临时投影 + session store）；`review_api_dev.py` 里的 `u_dp3` / `u_signer` 是**本地替身 principal**（固定 `open_id` / `tenant_id`），仅供 dev 联调，不是生产 IdP 身份；
-5. 启动 Vite dev，`/review-api` 反向代理到后端；
-6. `curl /review-api/queue` 断言 200 且含 `case-smoke`；
-7. 用本机 Chrome（CDP）走 **队列 → 案件详情 → 报告查看 → 分类规范** 四段：
-   断言案件页渲染 `case-smoke / BLOCK / DP2 / 待放行 / 覆盖证明 / H01`，
-   报告页渲染 `report-smoke / case-smoke / 发布时刻`，分类规范页渲染七个轴码、七步判定、正交字段与 rule_id 查找框；截图与日志落在临时目录。
+1. 在临时目录生成 smoke 投影和报告，再合并 `seed_fixture.py` 的确定性样例；
+2. 构建**生产包**并检查不含开发身份/写端点；运行 dev wrapper fail-closed 自证；
+3. 显式建立每个浏览器自己的开发 session，检查队列与四页只读展示；
+4. 真实执行认领→存草稿→提交复核意见→GET 回读，断言 version 0→1→2→3、草稿 ID 与 closed；
+5. 跑 390px 无横向溢出/44px 触控门、无障碍、切片断言（A5 精确错误原因、A7 真跑夹具自证）与身份切换隔离；旧 session 必须撤销。
 
-端口默认自动选空闲端口；也可用 `REVIEW_API_PORT` / `WEB_PORT` 指定。
-脚本只读：不调用任何写端点，不写仓库内文件。
+**边界说明**：所有写动作只针对临时内存台账，进程退出即丢；通过不代表生产持久化、真实 SSO、confirm/reject、draft/formal 全文恢复或投影重建已完成。
+脚本会创建本地数据/session/审计并发出 POST，不是零副作用检查。最近实跑：11 阶段 rc=0，生产包 8/8、dev fail-closed 8/8、写链 version 0→1→2→3、无障碍 40 项 0 违规、切片 15/15、身份隔离与旧 session 撤销通过。
 
-只想单独断言队列页是否渲染出某个案件时，可直接用
-`node scripts/check_queue_page.mjs --url http://127.0.0.1:5173/queue --cookie "$COOKIE" --expect case-smoke`；
-它用本机 Chrome CDP，不依赖 Playwright，失败退 1、Chrome 起不来退 2。
+端口默认自动选空闲端口，可由 `REVIEW_API_PORT` / `WEB_PORT` 指定。
+`check_queue_page.mjs` 的 `--expect` 只能取真实待办案件，不能再用 BLOCK 案件检验待办队列。
 
-开发代理：`vite.config.ts` 把 `/review-api` 代理到 `REVIEW_API_PROXY`（默认 `http://127.0.0.1:8010`），dev-up 会注入实际后端端口。
-重写规则：`/review-api/queue` 保持原样（后端联调别名），其余 `/review-api/*` 重写到 `/api/v1/*`（cases / reports 只读端点）。
+开发代理：`vite.config.ts` 把所有 `/review-api/*` 重写到 `/api/v1/*`，
+包括 `/review-api/queue`；`/dev/*` 仅代理开发身份功能。
+**Vite 代理不随静态构建发布**，正式部署需单独配置反代并拒绝 `/dev/*`。
+
 
 ## 无障碍（WCAG 2.2 AA 基线）
 
@@ -147,9 +155,9 @@ A6（品牌红不得用于状态徽标）、A8（欠定条目渲染 underdetermi
 - 存在 `:focus-visible` 规则，聚焦元素有可见轮廓
 - 文本颜色对比：普通文本 ≥4.5、大字 ≥3.0；背景图/渐变/透明度非 1 的项跳过并列入 `unmeasured`
 
-`dev-up.sh` 第 8 步会跑它，失败非零。
+`dev-up.sh` 第 9 步会跑它，失败非零。
 
-**当前读数**：40 项检查 / 0 违规（四页各 10 项；以脚本实跑为准）。
+**当前读数**：40 项检查 / 0 违规；另有 390×844 页面断言：队列/详情无横向溢出，队列行与主要控件 ≥44px（以脚本实跑为准）。
 **修复前（三页时）**：30 项 / 9 违规 —— 每页各 3 项：缺 skip-link、无 `:focus-visible` 规则、聚焦元素无可见轮廓。
 
 **明确未测（必须人工）**：键盘全流程、读屏语义与焦点顺序、动态内容播报、

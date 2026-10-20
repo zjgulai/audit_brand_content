@@ -679,6 +679,20 @@ code {
   .shell__right {
     margin-left: 0;
   }
+
+  /* 390px 触控门：不改变桌面 control-room 密度。 */
+  .shell__header nav a,
+  .shell__right select,
+  .shell__right .btn,
+  .queue__filter,
+  .actions .btn {
+    min-height: 44px;
+  }
+
+  .queue__filter,
+  .actions .btn {
+    padding-block: 0.65rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

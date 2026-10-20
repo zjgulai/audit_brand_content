@@ -36,6 +36,7 @@ const pages = arg(
 ).split(",").map((s) => s.trim()).filter(Boolean);
 const outFile = arg("out", "");
 const debugPort = Number(arg("debug-port", "9335"));
+const enableDevIdentity = arg("enable-dev-identity", "0") === "1";
 const chrome =
   process.env.CHROME_BIN ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -321,6 +322,22 @@ async function main() {
       url: origin,
       path: "/",
     });
+  }
+
+  if (enableDevIdentity) {
+    await cdp.send("Page.navigate", { url: `${base}/queue` });
+    await sleep(300);
+    await cdp.send("Runtime.evaluate", {
+      expression: `(() => {
+        const button=[...document.querySelectorAll('button')].find(
+          x=>x.textContent?.trim()==='启用本地开发身份'
+        );
+        if(!button || button.disabled) return false;
+        button.click(); return true;
+      })()`,
+      returnByValue: true,
+    });
+    await sleep(900);
   }
 
   const results = [];

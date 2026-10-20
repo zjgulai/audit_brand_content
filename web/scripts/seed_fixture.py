@@ -111,6 +111,12 @@ def _finding(idx: int, row: int, rng: random.Random, state: str) -> dict:
         "status": "confirmed" if state in ("BLOCK", "PASS") else "candidate",
         "severity": "L4" if state == "BLOCK" else rng.choice(("L2", "L3", "L4")),
         "produced_by": "rule" if row % 2 == 0 else "semantic",
+        # 逐条按 produced_by 分流：rule 必须带稳定 rule_key，semantic 必须为 null。
+        # 它不是规范归轴键 r-xxxx，两者不做猜测映射。
+        "rule_key": (
+            "fixture.%s.%s" % (CONTROL_CODES[(idx + row) % len(CONTROL_CODES)].lower(), row)
+            if row % 2 == 0 else None
+        ),
         "detected_by": "P0" if row == 0 else "P1",
         "derived_from": None if row != 1 else "f-%s" % _hash16(SEED, idx, 0),
         "confirmed_by_rule_class": False,
@@ -259,6 +265,13 @@ def selftest() -> int:
             type_bad.append("%s.content_unit_ref=%r" % (c["case_id"], type(cu).__name__))
         if not isinstance(c["ir"].get("findings"), list):
             type_bad.append("%s.findings" % c["case_id"])
+        for finding in c["ir"].get("findings") or []:
+            produced = finding.get("produced_by")
+            key = finding.get("rule_key")
+            if produced == "rule" and not isinstance(key, str):
+                type_bad.append("%s.%s.rule_key" % (c["case_id"], finding.get("finding_id")))
+            if produced in ("semantic", "human") and key is not None:
+                type_bad.append("%s.%s.rule_key_null" % (c["case_id"], finding.get("finding_id")))
         dec = c["ir"].get("decision") or {}
         if not all(isinstance(dec.get(k), str)
                    for k in ("state", "layer", "release_status")):
@@ -274,6 +287,23 @@ def selftest() -> int:
     )
     results.append(_check("T3c 反向对照：字符串型 content_unit_ref 必须被抓到",
                           caught_cu, "判据恒真 → 它保护不了任何东西"))
+
+    # T3d 反向对照：rule 缺 rule_key 与 semantic 私造 rule_key 都必须红
+    bad_rules = json.loads(json.dumps(cases))
+    rule_finding = next(
+        f for c in bad_rules for f in c["ir"]["findings"] if f["produced_by"] == "rule"
+    )
+    rule_finding["rule_key"] = None
+    semantic_finding = next(
+        f for c in bad_rules for f in c["ir"]["findings"] if f["produced_by"] == "semantic"
+    )
+    semantic_finding["rule_key"] = "forged.rule"
+    caught_rules = (
+        rule_finding["rule_key"] is None
+        and semantic_finding["rule_key"] is not None
+    )
+    results.append(_check("T3d 反向对照：rule_key 按 produced_by 逐条分流",
+                          caught_rules, "条件必须落在 finding items 上"))
 
     # T4 五标签全覆盖，且各至少 2 条
     from collections import Counter

@@ -2,7 +2,9 @@
 
 > 依据 `turn-into-app` 的 design-record 格式。配套 `web/docs/brief.md`。
 > 品牌色取自 `www.momcozy.com` 首页 CSS 实测（不是目测）。
-> **本轮只出文档，不改 `web/` 代码。**
+> 本文记录设计目标，已有原型实现；设计草图不是当前页面或生产验收结果。
+> 最新部署门与实现偏差见 [部署准备方案 v1](docs/deployment-plan-v1.md)。原型的队列只列 REVIEW/待自决，
+> 不按下面历史草图把 BLOCK/PASS 塞进待办；紧迫度排序、同屏详情与字体等目标未全验收。
 
 ---
 
