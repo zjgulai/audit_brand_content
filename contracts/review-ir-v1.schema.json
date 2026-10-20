@@ -69,6 +69,11 @@
             "description": "★ 每次实质状态变化**新建一条、新 id**（Playbook §3.3.4.2）。验收 16 断言「两条 finding_id 相同必须拒绝」"
           },
           "control_code": { "type": "string", "minLength": 1 },
+          "rule_key": {
+            "type": ["string", "null"],
+            "minLength": 1,
+            "description": "★ 产出这条 finding 的**检测规则**键（如 T2.1.1.milk-supply）。produced_by=rule 时必填且非空；semantic/human 必须为 null（它们没有规则身份，不许猜）。★ 它**不是**规范归轴键 rule_id（r-xxxx）—— 两者无映射，见规范 §9.12"
+          },
           "status": { "type": "string", "enum": ["candidate", "confirmed", "rejected", "superseded"] },
           "severity": {
             "type": "string",
@@ -175,6 +180,25 @@
       },
       "then": {
         "properties": { "content_unit_ref": { "required": ["failure_kind"] } }
+      }
+    },
+    {
+      "description": "★ rule_key 按 produced_by 分流，**逐条判**（不是整个数组判一次）。rule 型必须有非空 rule_key；semantic/human 型必须为 null —— 它们没有规则身份，填了就是编。★★ 条件必须放在 items.allOf 里：放在顶层 allOf 会变成「只要有一条是 rule 型，全部 finding 都要带 rule_key」，混合数组必被误拒（2026-10-20 实测抓到的真 bug）",
+      "properties": {
+        "findings": {
+          "items": {
+            "allOf": [
+              {
+                "if": { "properties": { "produced_by": { "const": "rule" } }, "required": ["produced_by"] },
+                "then": { "required": ["rule_key"], "properties": { "rule_key": { "type": "string", "minLength": 1 } } }
+              },
+              {
+                "if": { "properties": { "produced_by": { "enum": ["semantic", "human"] } }, "required": ["produced_by"] },
+                "then": { "properties": { "rule_key": { "type": "null" } } }
+              }
+            ]
+          }
+        }
       }
     }
   ],

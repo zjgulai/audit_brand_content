@@ -118,6 +118,13 @@ def main():
             out.append({
                 "finding_id": "f%d" % (i + 1),
                 "control_code": h["control_code"],
+                # ★ 2026-10-20 补：`judge()` 的 HIT_FIELDS 本来就含 `rule_key`
+                #   （`base/rule_judge.py:40-42`），而这里原来只搬 control_code / severity /
+                #   quote / location，**把 rule_key 丢了** —— 下游 `evidence_sync` 是
+                #   `out = dict(finding)` 整体复制，丢在这一跳就再也恢复不了。
+                #   后果：finding 只能追到「哪一类控制点」，追不到「哪条检测规则」，
+                #   而 control_code 并不唯一（26 条规则里 H01/H02/H05/M03/M04 各挂 2 条）。
+                "rule_key": h["rule_key"],
                 "status": "confirmed",
                 "severity": h["severity"],
                 "produced_by": "rule",

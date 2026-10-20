@@ -415,6 +415,88 @@ def check_behavior(schemas: dict) -> list:
        "attempt-v1 的 allOf 里有「accepted → 必须 ir_id」的条件守卫"
        + ("" if has_accepted_guard else "（**没有** —— schema 被改窄了）"))
 
+    # ── B-5 rule_key 按 produced_by 逐条分流：判据来自 review-ir-v1 的
+    #        findings.items.allOf 里那两条 if/then ────────────────────────
+    #
+    # ★ 这一条的两个坑，都是 2026-10-20 实测撞出来的：
+    #   ① 条件**必须**下沉到 items.allOf。写成顶层 allOf + contains 时，
+    #      「只要有一条是 rule 型，全部 finding 都要带 rule_key」—— 混合数组必被误拒。
+    #      （我第一版就是这么写的，12 组正反例里「混合 rule+semantic」那一项当场红。）
+    #   ② semantic/human 的 rule_key 必须是 null，不能借别的规则的键 ——
+    #      它们没有规则身份，填了就是编。
+    #
+    # 所以下面的断言**不查文本，直接跑 validate**：正样本必须过、坏样本必须拒。
+    # 这与 B-1…B-4「从 schema 读结构」是同一纪律：schema 改坏就红。
+    ir_schema = schemas.get("review-ir-v1") or {}
+    # 条件可以放在两处，两处都要认：
+    #   (a) 顶层 allOf[] 的某个成员里 → properties.findings.items.allOf
+    #   (b) findings.items 自己的 allOf 里
+    # 只要任意一处有「produced_by 分流 rule_key」的 if/then，就算结构在。
+    # ★ 不认同顶层 allOf 里直接挂 if/then（不带 properties）的写法 ——
+    #   那种写法作用在整个数组上，就是下面要挡的那个 bug。
+    cand = [dig(ir_schema, "properties", "findings", "items", "allOf") or []]
+    for sub in (ir_schema.get("allOf") or []):
+        cand.append(dig(sub, "properties", "findings", "items", "allOf") or [])
+    item_allof = [x for lst in cand for x in lst]
+
+    def _is_rule_branch(s) -> bool:
+        return (dig(s, "if", "properties", "produced_by", "const") == "rule"
+                and "rule_key" in (dig(s, "then", "required") or []))
+
+    def _is_nonrule_branch(s) -> bool:
+        enum = dig(s, "if", "properties", "produced_by", "enum") or []
+        return (set(enum) >= {"semantic", "human"}
+                and dig(s, "then", "properties", "rule_key", "type") == "null")
+
+    def _rk_case(findings) -> bool:
+        """构造一份最小合规 IR，塞入给定 findings，返回「是否通过校验」。"""
+        base = {
+            "ir_id": "ir-rk", "ir_version": "v1", "source_ir_version": "v1",
+            "content_unit_ref": {"unit_id": "u-rk", "kind": "free_text", "parse_status": "ok"},
+            "findings": list(findings),
+            "decision": {"state": "REVIEW", "layer": "DP3",
+                         "release_status": "待放行", "obligations": []},
+            "coverage": {"coverage_state": "full", "modalities_evaluated": ["text"],
+                         "rules_version": "r1", "control_points_applied": ["H01"]},
+            "receipt_ref": "rc-rk", "rule_snapshot": "r1", "kb_snapshot": "k1",
+            "control_points_version": "cp-2026-10-18-v2",
+            "created_at": "2026-10-20T00:00:00Z",
+        }
+        return not validate(base, ir_schema, "$", [])
+
+    def _f(**kw):
+        f = {"finding_id": "f1", "control_code": "H01", "status": "candidate",
+             "severity": "L3", "produced_by": "rule", "derived_from": None,
+             "rule_key": "T1.1.medical-cure"}
+        f.update(kw)
+        return f
+
+    rk_checks = [
+        # 正样本：这些必须过
+        ("rule+非空键", [_f()], True),
+        ("semantic+null", [_f(produced_by="semantic", rule_key=None)], True),
+        ("human+null", [_f(produced_by="human", rule_key=None)], True),
+        ("空数组", [], True),
+        # ★ 混合数组：这一项抓的就是「条件写在顶层」那个 bug
+        ("混合 rule+semantic", [_f(),
+                                _f(finding_id="f2", produced_by="semantic", rule_key=None)], True),
+        # 坏样本：这些必须被拒
+        ("rule+null键", [_f(rule_key=None)], False),
+        ("rule+缺键", [{k: v for k, v in _f().items() if k != "rule_key"}], False),
+        ("semantic+借键", [_f(produced_by="semantic", rule_key="T9.x")], False),
+        ("混合里 rule 缺键", [_f(), _f(finding_id="f2", produced_by="rule", rule_key=None)], False),
+    ]
+    rk_bad = []
+    for name, fs, want in rk_checks:
+        got = _rk_case(fs)
+        if got != want:
+            rk_bad.append(f"{name}（期望{'过' if want else '拒'}，实际{'过' if got else '拒'}）")
+
+    ok("B-5", bool(item_allof) and not rk_bad,
+       "rule_key 按 produced_by 逐条分流"
+       + ("" if not rk_bad else f"；{len(rk_bad)} 项不符：" + "、".join(rk_bad))
+       + ("" if item_allof else "（findings.items.allOf 缺失 —— 条件被挪到顶层了？）"))
+
     return out
 
 
