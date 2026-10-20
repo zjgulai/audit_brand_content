@@ -252,12 +252,69 @@ async function main() {
       showsPartial ? "标了 partial 但没写限制语" : "",
     );
 
-    // ── A9 spec_version 与 spec_fingerprint 必须同时出现 ──────────────
+    // ── A9 spec 版本双标识：必须同时出现，且指纹必须等于当前正文算出的那个 ──
+    //
+    // ★ 2026-10-20 收紧。第一版只断言「`按 spec vN` 与 12 位 hex 都出现了」，
+    //   结果全绿而实际发生过一件事：规范正文被改了 53 行、`spec_fingerprint`
+    //   从 562a90352c23 变成 9a8388d369c9，而 `spec_version` 是生成器里的
+    //   **硬编码字面量**（`tools/gen_taxonomy_json.py:224`），仍是 v1.1。
+    //   于是「版本没变、内容变了」——同号两版，正是这条断言本该防的形状。
+    //
+    //   现在比的是**磁盘上 JSON 与规范正文是否同步**，不是「界面上有没有字」。
     const hasVersion = /按 spec v?\d/.test(caseBody) || /按 spec 未测/.test(caseBody);
     const hasFp = /[0-9a-f]{12}/.test(caseBody);
-    record("A9", "详情页同时显示 spec_version 与 spec_fingerprint",
-      hasVersion && hasFp,
-      `version=${hasVersion} fingerprint=${hasFp}`);
+    const taxJson = JSON.parse(
+      fs.readFileSync(path.join(repoRoot, "web/src/data/taxonomy.json"), "utf8"),
+    );
+    const jsonFp = taxJson?.meta?.spec_fingerprint;
+    const jsonVer = taxJson?.meta?.spec_version;
+    // 界面显示的指纹必须是 JSON 里的那个（不允许界面写死一个）
+    const fpMatchesJson = Boolean(jsonFp) && caseBody.includes(jsonFp);
+    record(
+      "A9",
+      "详情页同时显示 spec_version 与 spec_fingerprint，且指纹与 taxonomy.json 一致",
+      hasVersion && hasFp && fpMatchesJson,
+      `version=${hasVersion} fp=${hasFp} fpMatchesJson=${fpMatchesJson}`,
+    );
+
+    // A9b ★ 版本漂移：规范正文变了 → 指纹必须变（这条能红）
+    //   判据：正文指纹 == taxonomy.json 的指纹。相等才说明 JSON 跟上了正文。
+    //   注意这不保证 spec_version 也跟上（生成器里它是字面量，见 A9c）。
+    try {
+      const body = fs.readFileSync(
+        path.join(repoRoot, "PMO/implement/内容审查分类规范-v1.md"),
+        "utf8",
+      );
+      const { execFileSync } = await import("node:child_process");
+      const out = execFileSync(
+        "python3",
+        [path.join(repoRoot, "tools/gen_taxonomy_json.py"), "--check"],
+        { encoding: "utf8", timeout: 60000 },
+      );
+      record("A9b", "taxonomy.json 与规范正文同步（gen_taxonomy_json --check）",
+        /一致/.test(out), out.trim().split("\n").pop());
+    } catch (e) {
+      record("A9b", "taxonomy.json 与规范正文同步", null,
+        `生成器不可用：${e?.message ?? e}`);
+    }
+
+    // A9c ★ 版本号是否真的跟随内容 —— 现在**必然红**，这是已知缺陷的读点
+    //   生成器第 224 行 `"spec_version": "v1.1"` 是字面量，而 docstring 第 20 行
+    //   说它「从规范正文算」。规范已被改过 53 行，版本号却没动。
+    //   这条断言存在的目的不是让它绿，是让这个缺口**每次跑都看得见**。
+    const genSrc = fs.readFileSync(
+      path.join(repoRoot, "tools/gen_taxonomy_json.py"),
+      "utf8",
+    );
+    const versionIsLiteral = /"spec_version":\s*"v[\d.]+"/.test(genSrc);
+    record(
+      "A9c",
+      "spec_version 是从正文算的（不是字面量）",
+      !versionIsLiteral,
+      versionIsLiteral
+        ? "生成器里是硬编码 \"v1.1\"，而 docstring 说「从正文算」——正文改了版本号不会变"
+        : "",
+    );
   } else {
     record("A3", "partial 覆盖必须渲染限制语", null, "队列里没有案件可点");
     record("A9", "spec 版本双标识", null, "队列里没有案件可点");

@@ -51,11 +51,45 @@ interface SpecMeta {
 
 const meta = (taxonomy as { meta?: SpecMeta }).meta ?? {};
 
-/** 规则号 → 争议登记（按 rule_id 精确匹配，不做模糊）。 */
-function disputeOf(ruleId: string | null | undefined) {
-  if (!ruleId) return null;
+/**
+ * ★ 2026-10-20 删掉了一段死代码，记在这里因为它长得太像在工作：
+ *
+ * 原先有 `disputeOf(ruleId)`，按 `rule_id` 精确匹配 `meta.boundary_disputes`，
+ * 但调用处写的是 `disputeOf(f.control_code)` —— 实参形如 `H02`，
+ * 而 disputes 的键形如 `r-724b26ecb1dee9c4`。**永远不相等**，
+ * 欠定徽标一次都没渲染过，而类型检查、构建、A8 全绿。
+ *
+ * 更根本的是：**`Finding` 契约里没有 `rule_id`**
+ * （`api/review_api.py` 的 `class Finding` 只有 finding_id / control_code /
+ * status / severity / ... 见断言 A10）。所以「按 rule_id 关联 finding 与欠定条目」
+ * 这件事**在当前契约下无法成立**，不是查法写错。
+ *
+ * 现在改成：不假装能逐条关联，在证据链旁边如实说明这条断层。
+ */
+
+/**
+ * 本页能诚实说的：规范登记了若干欠定条目，但 finding 侧没有能与之对上的键。
+ *
+ * ★ 措辞经过一次更正（4b，2026-10-20）。原先写「这不等于『没有落上』—— 是查不了」，
+ *   但「查不了」和「没有落上」在界面上长得一样，都会被复核员读成「这里没问题」。
+ *   最后一句必须是**否定式的那半句**：只说明关联做不到，不说明本案件不落在其中。
+ */
+function SpecSeamNote({ disputeCount }: { disputeCount: number }) {
+  if (disputeCount === 0) return null;
   return (
-    (meta.boundary_disputes ?? []).find((d) => d.rule_id === ruleId) ?? null
+    <div className="state state--warn" role="note" style={{ margin: "0 0 0.6rem" }}>
+      <strong>规范有 {disputeCount} 条已登记欠定边界，本页无法逐条关联</strong>
+      <p style={{ margin: "0.3rem 0 0" }}>
+        <code>Finding.control_code</code>（形如 H02）与{" "}
+        <code>boundary_disputes[].rule_id</code>（形如 r-724b26ec…）不是同一个键，
+        而欠定条目描述里的条款号（DSC12 / FCT5 / FCT2）同样对不上，
+        所以无法判断某条 finding 是否落在其中。
+      </p>
+      <p style={{ margin: "0.3rem 0 0" }}>
+        <b>这只说明关联做不到，不说明本案件不落在其中任何一条。</b>
+        欠定条目本身见「分类规范」页。
+      </p>
+    </div>
   );
 }
 
@@ -64,7 +98,6 @@ function EvidenceItem({ f, index }: { f: Finding; index: number }) {
   const isLong = typeof quote === "string" && quote.length > 180;
   const authority = String(f.authority_state ?? "ok");
   const authText = AUTHORITY_TEXT[authority] ?? authority;
-  const dispute = disputeOf(f.control_code);
 
   return (
     <li className="evidence__item">
@@ -126,14 +159,6 @@ function EvidenceItem({ f, index }: { f: Finding; index: number }) {
           <strong>规则冲突</strong>
           ：这条 finding 涉及两条互相矛盾的依据，<strong>须人工裁定</strong>，不静默取一。
           {f.resolution_detail?.reason ? `（${f.resolution_detail.reason}）` : ""}
-        </div>
-      )}
-
-      {dispute && (
-        <div className="state state--warn" style={{ margin: "0.35rem 0 0" }}>
-          <strong>规范欠定（{dispute.section}）</strong>
-          ：{dispute.dispute}
-          {dispute.axis_code === null && " —— 多轴争议，规范没有给出单一轴"}
         </div>
       )}
     </li>
@@ -316,6 +341,7 @@ export default function CaseDetailPage() {
       <NotEvaluatedList items={notEvaluated} />
 
       <h2>证据链（智能体时刻 · 本地渲染，不接模型）</h2>
+      <SpecSeamNote disputeCount={(meta.boundary_disputes ?? []).length} />
       {(ir.findings ?? []).length === 0 ? (
         <p className="hint">无 finding。</p>
       ) : (
@@ -397,11 +423,53 @@ export default function CaseDetailPage() {
             提交结论
           </button>
           {isCandidate && (
-            <span className="hint">
-              有候选 finding：可回到证据链逐条确认 / 驳回（待接）。
-            </span>
+            <>
+              {/*
+                ★ 2026-10-20：这两个按钮**刻意禁用**，不是没做完。
+                实测证据（两条，缺一条都不成立）：
+                  1. api/review_api.py:377 是 `FindingStore()` —— 空仓库，
+                     从没从投影载入任何 finding。对真实案件调 confirm 返回
+                     404「finding 不存在」。
+                  2. 即使载入了，读侧也看不见：GET /cases/{id} 的 ir 直接取
+                     投影文件（`case["ir"]`），而 finding_store 在 review_api.py
+                     里一次都没被读过（grep `.active()` → 0 命中）。
+                 于是 write_api 写 finding_store、read_api 读投影文件，
+                 两条路不通。修它要决定「ir.findings 的真相源是谁」，
+                 属 ADR 级变更，不在 Web 范围内。
+                 见 web/docs/handoff-4b.md §五。
+              */}
+              <button
+                type="button"
+                className="btn"
+                disabled
+                title="后端 finding_store 未接线，确认后不会反映到 ir.findings"
+              >
+                确认 finding
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled
+                title="后端 finding_store 未接线，驳回后不会反映到 ir.findings"
+              >
+                驳回 finding
+              </button>
+            </>
           )}
         </div>
+        {isCandidate && (
+          <div className="state state--warn" role="note" style={{ marginTop: "0.5rem" }}>
+            <strong>逐条确认 / 驳回暂不可用（不是没做完，是后端未接线）</strong>
+            <p style={{ margin: "0.3rem 0 0" }}>
+              写端点 <code>POST /cases/{"{id}"}/actions</code> 的 confirm / reject
+              会写进 <code>finding_store</code>，但该仓库是空的
+              （<code>api/review_api.py:377</code> 未从投影载入），
+              且读侧 <code>GET /cases/{"{id}"}</code> 的 findings 直接取自投影文件、
+              从不读 <code>finding_store</code>。两条路不通 ——
+              点了也看不到变化，所以这里禁用，而不是假装能点。
+            </p>
+          </div>
+        )}
         <p className="actions__note">
           当前身份：{current?.label ?? "未选择"}（{current?.id ?? "未选择"}）。
           所有动作经写 API，前端不构造状态变更；版本冲突会返回 409。

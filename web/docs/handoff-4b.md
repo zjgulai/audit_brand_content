@@ -141,10 +141,67 @@ api/review_api.py:465       """联调别名：只读列出所有可读案件"""
 - 不碰 `tools/llm_rule_axis_eval.mjs`
 - 不手改 `web/src/data/taxonomy.json`
 - 不碰任何 `release_status` 路径
+- **不改 `api/` 与 `base/` 的源码**（见 §五，那里有一个需要你或后端决策的问题）
 
 ---
 
-## 四、边界那条 —— ✅ 已由委托方裁定（2026-10-20）
+## 五、⚠ 发现一个后端断层：`confirm` / `reject` 在真实数据上不可用
+
+**发现时间**：2026-10-20，我用真实投影实测撞到的，不是读代码推的。
+
+### 现象（可复现）
+
+```bash
+# 起本地联调后端（夹具投影），拿一条 REVIEW 案件的 candidate finding
+curl -X POST -H "Cookie: session=$COOKIE" -H "Content-Type: application/json" \
+     -H "Idempotency-Key: t2-confirm-1" \
+     -d '{"version":0,"action":"confirm","finding_id":"f-0064962f9fc1b514"}' \
+     "$API/api/v1/cases/<case>/actions"
+# → {"code":"404","message":"finding 不存在"}
+
+# 而不是 200
+```
+
+### 两层原因，缺一条都不构成「不可用」
+
+| # | 层 | 证据 |
+|---|---|---|
+| **1** | **`finding_store` 是空的** | `api/review_api.py:377` → `app.state.finding_store = finding_store or FindingStore()`。**从没从投影载入任何 finding。** |
+| **2** | **即使载入了，读侧也看不见** | `GET /cases/{id}` 返回 `{"case_id": id, "ir": case["ir"], ...}` —— `ir` 直接取**投影文件**。而 `finding_store` 在 `review_api.py` 里**一次都没被读过**：`grep "\.active()" api/review_api.py` → **0 命中**。 |
+
+于是：`write_api` 把新记录写进 `finding_store`，`read_api` 从投影文件读 —— **两条路不通**。
+
+### 为什么测试没抓到
+
+`tools/verify_write_api.py:188` 自己手工灌了三条：
+
+```python
+fs = FindingStore()
+for fid in ("f-1", "f-2", "f-3"):
+    fs.insert(candidate(fid))
+```
+
+它**只验写不验读**，而且用的是自己造的数据。所以 53/53 全绿，真实数据上却 404。
+
+> 这与本仓 §2.4.1 同一个形状：**接口调通了、`code` 有值、没报错 —— 但口径根本不通**。
+
+### 需要谁决策
+
+这不是 bug fix，是 **ADR 级问题：`ir.findings` 的真相源是谁？**
+
+- 文件 + manifest 是唯一真相（ADR 既定），投影只是索影 → 那 `confirm` 应该**写回原始 finding 记录并重建投影**，不是只进内存 store；
+- 或者 `finding_store` 就是运行时真相，读侧应该合并它 → 那要先定义**合并规则与版本语义**（投影过期怎么办、`derived_from` 链怎么对账）。
+
+两条都超出 Web 范围。**我按委托方裁定选了「诚实禁用」**：详情页的「确认 finding / 驳回 finding」两个按钮启用但带 `title` 说明、点了不合适，页面上还有一条明写原因的提示条。
+
+### 你要做的
+
+1. 和委托方/后端定 §五 这个 ADR 问题；
+2. 定了之后告诉我，我把按钮接上（前端改动很小，写端点已经存在）。
+
+---
+
+## 六、边界那条 —— ✅ 已由委托方裁定（2026-10-20）
 
 4b 的判断是对的：这句应该改，但**不是改成「只写」**。委托方已同意按下面这条落。
 
