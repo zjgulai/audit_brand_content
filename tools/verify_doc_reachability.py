@@ -60,6 +60,9 @@
      2026-09-22 实测 B 匹配 4 篇、整个 `PMO/守衡-*` 有 10 篇、其中不可达 6 篇 —— 见报告）
   C  不可达总数 <= `PINNED_UNREACHABLE`（钉住值，见该常量处的复现命令与日期）
   D  每一份**非豁免**的第一方文档都可达
+  D2 每一份**非豁免**的 `PMO/implement/*.md` 都可达（2026-10-21 加）。
+     D 是个兜底断言，红的时候只见到一张清单；D2 把「这个目录该有自己的入口」
+     变成一条**按目录**的断言（与 A / B2 同形），红的时候指得出是哪一批
   E1 不可达集合 == 各豁免类之并（分项之和 = 总数，且未归类数为 0）
   E2 有自述文件的豁免类，其自述文件在盘上
   G1 文档点名的 `.ua/*.cjs` 必须「在库」或「已在 `ON_DISK_ONLY` 声明」——
@@ -163,6 +166,12 @@ TOPDIRS = (
 #   所以：**要收紧就收紧到「当前豁免类之和」**（今天是 0），并在抬升时把新读数与原因写进这段；
 #   而 `E1`（分项之和 == 总数、未归类数 0）与 `D`（非豁免的第一方文档必须可达）两条
 #   **不依赖这个常量**，它们才是防漏的主力。
+#
+# ★ **2026-10-21 读数：豁免类之和 = 87（全部是 CAPTURED_ASSET），不是上面那句的 0。**
+#   那句话是 2026-09-22 的读数，**已经过期**（§2.2 第 1 条：文档里的数字要么带复现命令，
+#   要么标明时刻）。钉住值**仍未收紧**，仍是 100：这 87 份是 momcozy 资产包，
+#   它正在被采集侧持续扩写，把上界钉在「当前值」会让扩充资产包的人先撞一次与本任务无关的红。
+#   防漏靠 D/D2/E1 —— 它们对**任何新增的、非豁免的**文档立刻生效，不需要这个数。
 PINNED_UNREACHABLE = 100
 
 
@@ -230,6 +239,17 @@ EXEMPT_CLASSES = (
 REQUIRED_ADR_RE = re.compile(r"^ADR/ADR-[^/]*\.md$")
 REQUIRED_PMO_RE = re.compile(r"^PMO/守衡-[^/]*修复记录\.md$")
 REQUIRED_PMO_ALL_RE = re.compile(r"^PMO/守衡-[^/]*\.md$")
+#: `PMO/implement/` 是**第一方实现记录**目录（评测 / 回测 / 复核 / 执行票）。
+#: 2026-10-21 实测：19 份里有 7 份从起点走不到 —— 其中 6 份在**已入库文档**里 0 条入边，
+#: 1 份只被另一份不可达文档引用；另有 1 份只被 `tools/*.mjs` 提到（机器产物不当中继）。
+#: 注意口径：`ADR/ADR-0016` 正文其实引用了其中 2 份，但那份 ADR **尚未入库**，
+#: 不在 `git ls-files` 的图里 —— 所以「0 条入边」只成立于**已入库**这个口径内。
+#: 它们**不属于任何豁免类**，所以 D 与 E1 同时红。D2 把这条变成按目录的结构性断言。
+#:
+#: 用 `（?:.*/)?` 而不是 `[^/]*`：将来若分个子目录，断言要**跟着覆盖**下去。
+#: 若只写 `[^/]*`，子目录里的文档既不进分母也不进判据 —— 那是**静默漏检**，
+#: 而不是「这个目录只管一层」。口径就该是「implement 下的一切」。
+REQUIRED_IMPLEMENT_RE = re.compile(r"^PMO/implement/(?:.*/)?[^/]*\.md$")
 
 MD_LINK_RE = re.compile(r"\]\(([^)\s]+)\)")
 REF_LINK_RE = re.compile(r"^[ \t]*\[[^\]]+\]:[ \t]*(\S+)", re.M)
@@ -368,6 +388,19 @@ def bfs(seeds, bodies, tracked, doc_only_relay=True, wide=False):
     return seen, parents
 
 
+def _first_class(path):
+    """一个路径属于哪个豁免类（**先匹配先算**，命中即返回）；都不属于返回 None。
+
+    ★ 只此一处实现「归类」。`analyze()` 的三处（不可达归类、类成员统计、D2 的分母）
+    必须共用它 —— 第一版 class_span 自己写了一遍「任一谓词命中」，于是同一份文件
+    在两个类里各算一次，打印出「SCRATCH 共 28」而 E1 只算 20（见 class_span 处的注释）。
+    """
+    for cid, pred, _why, _ev in EXEMPT_CLASSES:
+        if pred(path):
+            return cid
+    return None
+
+
 def analyze(tracked, docs, bodies, seeds=SEEDS, doc_only_relay=True, wide=False):
     """纯函数：给定期望数据，算出全部读数。控制组直接复用本函数（§2.1：反向对照只在内存里做）。"""
     reach, parents = bfs(seeds, bodies, tracked, doc_only_relay=doc_only_relay, wide=wide)
@@ -380,11 +413,7 @@ def analyze(tracked, docs, bodies, seeds=SEEDS, doc_only_relay=True, wide=False)
     classified = set()
     unclassified = []
     for d in unreachable:
-        hit = None
-        for cid, pred, _why, _ev in EXEMPT_CLASSES:   # ★ 先匹配先算：三个谓词会重叠
-            if pred(d):
-                hit = cid
-                break
+        hit = _first_class(d)          # ★ 先匹配先算：谓词会重叠
         if hit is None:
             unclassified.append(d)
         else:
@@ -408,15 +437,22 @@ def analyze(tracked, docs, bodies, seeds=SEEDS, doc_only_relay=True, wide=False)
     for cid, _pred, _why, _ev in EXEMPT_CLASSES:
         class_span[cid] = [0, 0]          # [总份数, 其中可达份数]
     for d in docs:
-        for cid, pred, _why, _ev in EXEMPT_CLASSES:
-            if pred(d):
-                class_span[cid][0] += 1
-                if d in reach_docs:
-                    class_span[cid][1] += 1
-                break
+        cid = _first_class(d)             # ★ 同一套读法（先匹配先算），见 _first_class
+        if cid is not None:
+            class_span[cid][0] += 1
+            if d in reach_docs:
+                class_span[cid][1] += 1
     class_span = dict((k, tuple(v)) for k, v in class_span.items())
 
     non_exempt_unreachable = sorted(d for d in unreachable if d not in classified)
+
+    # ── D2 的读数 · `PMO/implement/` 的分母与不可达集 ──────────────────────
+    # 分母只算**非豁免**的那几份：全算的话，一个目录里全是草稿时断言覆盖 0 份、
+    # 分母却 > 0，那就成了一条**恒真的断言**（§2.4：本仓最贵的那个形状）。
+    implement_docs = [d for d in docs if REQUIRED_IMPLEMENT_RE.match(d)]
+    implement_scoped = [d for d in implement_docs if _first_class(d) is None]
+    implement_unreachable = [d for d in unreachable if REQUIRED_IMPLEMENT_RE.match(d)
+                             and d not in classified]
 
     return {
         "seeds": [s for s in seeds],
@@ -434,9 +470,11 @@ def analyze(tracked, docs, bodies, seeds=SEEDS, doc_only_relay=True, wide=False)
         "unreachable_adr": sorted(d for d in unreachable if REQUIRED_ADR_RE.match(d)),
         "unreachable_pmo_fix": sorted(d for d in unreachable if REQUIRED_PMO_RE.match(d)),
         "unreachable_pmo_all": sorted(d for d in unreachable if REQUIRED_PMO_ALL_RE.match(d)),
+        "unreachable_implement": implement_unreachable,
         "adr_n": len([d for d in docs if REQUIRED_ADR_RE.match(d)]),
         "pmo_fix_n": len([d for d in docs if REQUIRED_PMO_RE.match(d)]),
         "pmo_all_n": len([d for d in docs if REQUIRED_PMO_ALL_RE.match(d)]),
+        "implement_n": len(implement_scoped),
         "parents": parents,
     }
 
@@ -571,6 +609,21 @@ def check(reading, pinned, root=ROOT, dangling=None):
     else:
         P.append("D 非豁免的第一方文档 0 份不可达（豁免 %d 份，见 E1）" % reading["unreachable_n"])
 
+    # D2 —— `PMO/implement/` 按目录的断言（2026-10-21 加）。
+    # ★ 两次踩过同一个坑，所以这里两条都写死：分母为 0 必须红（§2.4），
+    #   而「不可达」的集合必须与 D 用同一个 `classified` 口径（否则 D 绿 D2 红，
+    #   读的人会以为其中一条坏了）。判据是**非豁免**的那几份，理由见 analyze 里 implement_scoped。
+    if reading["implement_n"] == 0:
+        F.append(("D2", "分母为 0：`PMO/implement/` 下没有任何非豁免文档，"
+                        "这条断言恒真（不是通过）—— 目录被搬走/改名时也要红一次"))
+    elif reading["unreachable_implement"]:
+        F.append(("D2", "有 %d 份 PMO/implement 文档不可达：%s"
+                  " —— 它们是第一方实现记录，入口应登记在 README「第 1 阶段文档索引」"
+                  % (len(reading["unreachable_implement"]),
+                     ", ".join(reading["unreachable_implement"][:8]))))
+    else:
+        P.append("D2 全部 %d 份非豁免 PMO/implement 文档可达" % reading["implement_n"])
+
     # E1 分项之和 = 总数（恒等式，§2.4.1 做法 2）。分区读法下这个恒等式**结构性**成立；
     # 若三个谓词各自独立过滤，重叠的文件会被算两次，这条恒等式就只在碰巧无重叠时成立。
     total = sum(len(v) for v in reading["by_class"].values())
@@ -664,6 +717,7 @@ def _fixture(readme_body, extra=None, drop=()):
         "ADR/ADR-0001-甲.md": "# 甲\n",
         "PMO/守衡-查名修复记录.md": "# 查名修复记录\n",
         "PMO/守衡-架构说明.md": "# 架构说明\n",
+        "PMO/implement/评测记录示例.md": "# 评测记录\n",
         "research/一方文档.md": "# 一方\n",
         "research/readmes/别家README.md": "# 外部抓取\n",
         "skills-inventory/refs/第三方/SKILL.md": "# 第三方\n",
@@ -686,6 +740,7 @@ def _ok_readme():
         "- `ADR/README.md`\n"
         "- `PMO/守衡-查名修复记录.md`\n"
         "- `PMO/守衡-架构说明.md`\n"
+        "- `PMO/implement/评测记录示例.md`\n"
         "- `research/一方文档.md`\n"
         "- `skills-inventory/refs/第三方/SKILL.md`\n"
         "- `research/readmes/别家README.md`\n"
@@ -764,6 +819,7 @@ def run_controls(root=ROOT, pinned=PINNED_UNREACHABLE, real=None):
         [],
         "# Fixture 入口\n\n- `AGENTS.md`\n- `ADR/README.md`\n"
         "- `PMO/守衡-查名修复记录.md:12`\n- `PMO/守衡-架构说明.md`\n"
+        "- `PMO/implement/评测记录示例.md`\n"
         "- `research/一方文档.md`\n- `skills-inventory/refs/第三方/SKILL.md`\n"
         "- `research/readmes/别家README.md`\n- `research/distill/scratch/_t1.md`\n")
 
@@ -811,6 +867,45 @@ def run_controls(root=ROOT, pinned=PINNED_UNREACHABLE, real=None):
         ["B"],
         _ok_readme(),
         drop=("PMO/守衡-查名修复记录.md",))
+
+    # ── C23 / C24 · D2（`PMO/implement/` 按目录的断言）的反向对照 ─────────────
+    #     D2 是 2026-10-21 为「7 份评测/回测记录从起点走不到」加的（D 与 E1 同时红）。
+    #     只证明「补完链接现在绿」不算数 —— 必须证明**再造一份没入边的，它仍会红**（§2.4.1）。
+    one("★ C23 新增一份无入边的 PMO/implement 文档 → D2 必须红（下次漏登记也一样抓到）",
+        ["D2"],
+        _ok_readme(),
+        extra={"PMO/implement/无入边评测.md": "# 新写但没人链\n"})
+
+    one("★ C24 `PMO/implement/` 下的非豁免文档一份都不剩（分母为 0）→ D2 必须红，不许恒绿",
+        ["D2"],
+        _ok_readme(),
+        drop=("PMO/implement/评测记录示例.md",))
+
+    # C25 与 C23 同一条判据，但**喂真实仓数据**（与 C12 同一手法：只在内存里加，盘上一个字节不动）。
+    #     为什么 fixture 之外还要一条真的：fixture 的图只有 12 个节点，D2 在那上面成立
+    #     并不等于它在 395 份文档的真实图上成立（比如真实图里 PMO/implement 已有 19 份、
+    #     其中 12 份本来就有入边 —— 「新加一份没入边的」会不会被别的边顺带捞到，只有真图能答）。
+    FAKE_IMPL = "PMO/implement/无入边新文档-对照样本.md"
+    if not real_tracked or not real_docs:
+        UNTESTED.append("C25 拿不到真实仓数据，真实图上「新文档无入边必须红」那条对照没跑")
+        lines.append("  ⚠ C25 未测：拿不到真实仓数据")
+    else:
+        t2 = set(real_tracked) | {FAKE_IMPL}
+        d2 = sorted(set(real_docs) | {FAKE_IMPL})
+        b2 = dict(real_bodies)
+        b2[FAKE_IMPL] = "# 对照样本：写完了但没人链\n"
+        r2 = analyze(t2, d2, b2)
+        _p2, f2 = check(r2, pinned, root=root)
+        got2 = set(x[0] for x in f2)
+        if "D2" in got2 and FAKE_IMPL in r2["unreachable_implement"]:
+            P.append("★ C25 真实仓数据 + 内存里新加一份无入边的 PMO/implement 文档 → D2 必须红")
+            lines.append("  ✓ ★ C25 真实图（%d 份文档）+ 内存新文档 → D2 红，且该文件确实在不可达清单里"
+                         % r2["docs_n"])
+        else:
+            F.append(("C25", "真实图上新加一份无入边 implement 文档后 D2 没红（红了 %s；"
+                             "该文件在 D2 不可达集里=%s）—— D2 在真实图上不成立"
+                      % (sorted(got2), FAKE_IMPL in r2["unreachable_implement"])))
+            lines.append("  ✗ ★ C25 真实图上 D2 没抓住新加的无入边文档")
 
     # C12 历史缺陷必须能被抓住：把**真实的**仓数据里的两个起点都换回「没有链接的存根」，
     #     在内存里重算一次 —— ADR 必须全部不可达、总数必须超过钉住值。
