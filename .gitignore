@@ -37,6 +37,12 @@ node_modules/
 
 # 第三方技能库与克隆（各自有自己的 .git；纳管会变成 gitlink 或重复纳管）
 skills/
+# 提取件：skill/ 下的安装位副本（来源见 skill/README.md）。
+# 实际目录是 skill/（单数），上面的 skills/ 不覆盖它；不忽略会让一次 `git add -A`
+# 把内部件、第三方件与硬编码 token 一起带进公开仓。两份来历/裁定文档放行。
+skill/*
+!skill/README.md
+!skill/标准化台账-20261017.md
 research/repos/
 research/method/codex_research/
 research/method/Kb2Agent/
@@ -106,3 +112,10 @@ PMO/shouheng-state/
 
 # Python venv (uv sync)
 .venv/
+
+# Python 字节码缓存（跑脚本的副产物，不该入库）
+__pycache__/
+*.pyc
+
+# 浏览器自动化工作目录
+.playwright-mcp/
