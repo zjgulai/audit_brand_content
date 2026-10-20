@@ -171,6 +171,28 @@ def parse_section4(raw: str) -> list[dict]:
     return out
 
 
+def parse_spec_version(raw: str) -> str:
+    """从正文的版本说明块里读 `spec_version`。
+
+    ⚠️ 这里原来写的是字面量 `"v1.1"`，而 docstring 第 20 行说它「从规范正文算」。
+    实测后果（2026-10-20，16 指出）：加了 §9.10 之后指纹正确变了，
+    版本号却仍是 v1.1 —— **同一个 v1.1 对应了两份不同的规范**。
+
+    这正是本仓 §2.4.1 那个病：**一个会过期的读数，没有任何东西在它过期时变红。**
+    `--check` 也拦不住，因为它只比 §3 的编号覆盖，`spec_version` 不参与比较。
+
+    所以：**从正文解析，解析不出来就退 2（未测），不许回退到默认值。**
+    回退默认值会让「读不到」和「读到了 v1.1」长得一模一样。
+    """
+    m = re.search(r"`spec_version`:\s*\*\*([0-9A-Za-z._-]+)\*\*", raw)
+    if not m:
+        raise SystemExit(
+            "⚠ 未测：规范正文里找不到 `spec_version`: **vX.Y** 标记。\n"
+            "  期望形如：> - `spec_version`: **v1.1**（在文件头部版本说明块内）"
+        )
+    return m.group(1)
+
+
 def build(raw: str, body: str) -> dict:
     axes = parse_axes(raw)
     s4 = parse_section4(raw)
@@ -221,7 +243,7 @@ def build(raw: str, body: str) -> dict:
     return {
         "meta": {
             "version": "v1",
-            "spec_version": "v1.1",
+            "spec_version": parse_spec_version(raw),
             "spec_fingerprint": fingerprint(body),
             "status": "published",
             "source": "PMO/implement/内容审查分类规范-v1.md",
@@ -359,6 +381,25 @@ def selftest() -> int:
 
     # 4) 版本说明块必须被剥掉：正文里不该出现 VER_BEGIN 的标记
     ok("指纹正文已剥掉版本说明块", VER_BEGIN not in body)
+
+    # 5) spec_version 必须从正文解析，不许硬编码。
+    #    反向对照：正文里的版本号一改，build() 的结果必须跟着变 ——
+    #    只验「能解析出 v1.1」的话，一个返回字面量的实现也能过。
+    ok("spec_version 从正文解析", parse_spec_version(raw) == data["meta"]["spec_version"])
+    bumped = raw.replace("`spec_version`: **v1.1**", "`spec_version`: **v9.9**", 1)
+    ok(
+        "改正文版本号 → meta.spec_version 跟着变（反向对照）",
+        build(bumped, body)["meta"]["spec_version"] == "v9.9",
+    )
+    # 标记缺失时必须退 2，不许回退默认值 ——
+    # 「读不到」和「读到了 v1.1」若长得一样，就是 §2.4.1 那个病。
+    stripped = re.sub(r"`spec_version`:\s*\*\*[0-9A-Za-z._-]+\*\*", "（已删）", raw)
+    raised = False
+    try:
+        parse_spec_version(stripped)
+    except SystemExit:
+        raised = True
+    ok("版本标记缺失 → 退 2（未测），不回退默认值", raised)
 
     failed = [n for n, p in checks if not p]
     for n, p in checks:
