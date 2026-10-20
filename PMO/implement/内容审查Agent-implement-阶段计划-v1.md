@@ -309,6 +309,16 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 
 **假绿修复进展**：`contracts` 43→46、`finding_store` 25→33、`submission_router` 38→40，均 rc=0（待 9a 复跑确认）。
 
+> ⚠️ **这张表的 ✅ 只表示「验证器自己跑绿了」，不表示「生产可用」。**（2026-10-20 补）
+>
+> 上表里凡是涉及**写链**的（`verify_write_api` / `verify_reviews_ledger` / `smoke_end_to_end`），
+> 跑的都是**本地内存台账**：`SessionStore(":memory:")`、`FindingStore()` 从没从投影载入过、
+> 幂等只在进程内成立。**生产持久 review 台账、原子幂等、真实身份接口、draft/formal GET、
+> 权威追加→投影新鲜度，这五项一个都没实现，也没派工。**
+>
+> 复核员/委托方读这张表时，请读成「子系统自证通过」，不要读成「可以上生产」。
+> 这条边界与 `AGENTS.md` §2.4.1 是同一个形状：**验证器绿 ≠ 真实路径通**。
+
 **过程中发现并修复的环境问题**：`base/__pycache__/coverage_composer.cpython-312.pyc` 与 `base/coverage_composer.cpython-39.pyc` 损坏（UTF-8 解码失败），导致端到端冒烟导入失败——K-27 同形；清除项目缓存子树后即绿。`base/` 目录下直接躺着 `.pyc` 属异常，已删除。
 
 **并行分工（2026-10-19）**：0e=G-4 门残差（takedown 人级 allowlist / IT 按对象收敛 / grant scope）；6d=API↔IR 联调测试；cleanup=前端工作台 v0 脚手架；9a=decision_table/disposition_router/orchestrator/report_store 四批变异审计。
