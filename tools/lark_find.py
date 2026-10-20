@@ -105,8 +105,21 @@ def main():
         if r.get("code") != 0:
             print("❌", json.dumps(r, ensure_ascii=False)[:500]); return 1
         for it in r["data"].get("items", []):
+            # ★★ 2026-10-21 修：这里原先打印 `records={it.get('revision')}` ——
+            #   **`revision` 是表结构的版本号，不是记录数。** 于是「负面样本」被报成
+            #   `records=1803`，而实际 `records` 接口的 `total` 是 **186**。
+            #   一个假的「1803 条」会被当成真实规模读进任何依赖它的文档。
+            #   现在：`revision` 照实叫 `revision`，记录数**现算**（多一次请求，
+            #   但计数只有这一种可信来源）。
+            try:
+                _tr = _req(f"{BASE}/bitable/v1/apps/{bt}/tables/{it['table_id']}"
+                           f"/records?page_size=1", t)
+                _n = (_tr.get("data") or {}).get("total")
+                _n_txt = f"records={_n}" if _n is not None else "records=未知"
+            except Exception:                                    # noqa: BLE001
+                _n_txt = "records=未测"
             print(f"  table_id={it['table_id']}  name={it.get('name')}  "
-                  f"records={it.get('revision')}")
+                  f"{_n_txt}  revision={it.get('revision')}")
         return 0
 
     if cmd == "fields":
