@@ -383,6 +383,30 @@ else:
     check("A6b", rc == 0 and "--no-kick" in out and not marker_s.exists(),
           f"救活分支 --no-kick → 退出码 {rc}（应 0，进程未动）")
 
+    # ── S1–S4  `--stop`：闸门必须也盖住「停」 ────────────────────────────
+    # ★ 2026-10-22 真事故：委托方要求「先别往外发」，而唯一的停法是直接在 bash 里
+    #   `launchctl bootout` —— **绕过了闸门**，也没留痕。C1 没红只因那句不在仓库代码里。
+    #   停与起是同一种对外动作（群里从此没人答话，且不会有任何东西记下来），
+    #   所以它必须走同一套 --yes / --why / 留痕。
+    rc, out = run_sandbox_gate(gate_s, env_s, "--stop", "--check")
+    check("S1", rc == 0 and "未做任何动作" in out and not marker_s.exists(),
+          f"--stop --check → 退出码 {rc}（应 0，纯查看、不动进程）")
+
+    rc, out = run_sandbox_gate(gate_s, env_s, "--stop")
+    check("S2", rc == 3 and not marker_s.exists(),
+          f"--stop 不给 --yes → 退出码 {rc}（应 3，停也要显式确认）")
+
+    rc, out = run_sandbox_gate(gate_s, env_s, "--stop", "--yes")
+    check("S3", rc == 3 and "why" in out and not marker_s.exists(),
+          f"--stop --yes 不给理由 → 退出码 {rc}（应 3，停也要留痕）")
+
+    # S4：反向对照 —— 带 --why + --no-kick 必须放行且**不 bootout**。
+    # 判据不是「rc==0」，而是「rc==0 **且** 标记文件没被写」—— 只查退出码的话，
+    # 一个根本没走到 bootout 的实现也会绿（§2.4：名字出现过 ≠ 它拦得住）。
+    rc, out = run_sandbox_gate(gate_s, env_s, "--stop", "--yes", "--why=selftest", "--no-kick")
+    check("S4", rc == 0 and "--no-kick" in out and not marker_s.exists(),
+          f"--stop --no-kick → 退出码 {rc}（应 0，进程未动）")
+
     # A6r：反向对照 —— 删掉 rescue 的 --why 检查，A6 必须红（不是空转）
     sb_r = make_sandbox_gate(remove_rescue_why=True)
     if sb_r is None:

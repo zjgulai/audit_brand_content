@@ -59,7 +59,7 @@ EXIT_REFUSED=3
 CONSENT="${SHOUHENG_RESTART_CONSENT:-$ROOT/PMO/shouheng-state/restart-consent}"
 CONSENT_MAX_AGE=300          # 5 分钟。够人念完再决定，不够跨过一次别人的重启。
 
-YES=0; CHECK=0; WHY=""; SINCE=""; NO_KICK=0
+YES=0; CHECK=0; WHY=""; SINCE=""; NO_KICK=0; STOP=0
 for a in "$@"; do
   case "$a" in
     --yes)   YES=1 ;;
@@ -74,6 +74,13 @@ for a in "$@"; do
     # 存在的理由：不加它，那块读数在最常见的时刻恒为「无」—— 恒真的读数等于没读。
     # 自证拿它做反向对照：--since=0 必须列出整个 import 图，--since=<未来> 必须为空。
     --since=*) SINCE="${a#--since=}" ;;
+    # ★ 2026-10-22 补：`--stop` —— 闸门此前只盖住了「起」，没盖住「停」。
+    #   实测事故：委托方要求「先别往外发」，而唯一的停法是在 bash 里直接
+    #   `launchctl bootout`，**绕过了闸门**。C1 没红只因那句不在仓库代码里 ——
+    #   但下一个人也会这么干，而那时没人知道它停过、为什么停。
+    #   与 §2.4.7「判据没盖住的那一跳，就是事故所在的那一跳」同一个形状。
+    #   停也是对外动作：群里从此没人答话，且**不会有任何东西记下来**。
+    --stop) STOP=1 ;;
     -h|--help) sed -n '2,32p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "未知参数：$a" >&2; exit 2 ;;
   esac
@@ -179,7 +186,104 @@ PY
 }
 
 PID="$(pid_of)"
+
+# ── --stop：把守衡停下，且**同样走闸门** ─────────────────────────────────
+#
+# ★ 为什么停也要有闸门：停与起是**同一种对外动作**。停下去之后群里发的消息
+#   不会被回答，而且不会有任何东西记下来（消息从长连接推进来，进程不在就是丢了）。
+#   2026-10-22 实测：委托方要求「先别往外发」，唯一的停法是直接
+#   `launchctl bootout` —— **绕过了闸门**，也没留痕。C1 没红只因那句不在仓库代码里。
+#
+# 三档同样要分清楚（§2.4.3：未测 ≠ 通过 ≠ 红）：
+#   ① 已停 + 服务已卸载 → 停成功了
+#   ② 已停 + 服务仍加载 → 危险：KeepAlive 随时会把它拉回来
+#   ③ 还在跑             → 停失败
+if [ "$STOP" = "1" ]; then
+  echo "──────────────────────────────────────────────────────"
+  if [ "$CHECK" = "1" ]; then
+    echo "  --stop --check：以上为查看，未做任何动作"
+    exit 0
+  fi
+  if [ "$YES" = "0" ]; then
+    echo "  确认停止要把服务从 launchd 卸载：加 --yes --why=\"<理由>\""
+    echo "  ⚠ 停下去之后群里发的消息**不会被回答，也不会有任何东西记下来**。"
+    exit "$EXIT_REFUSED"
+  fi
+  if [ -z "$WHY" ]; then
+    echo "  ✗ 拒绝停止：--yes 必须配 --why=\"<理由>\" —— 停也是对外动作，理由就是痕迹。"
+    exit "$EXIT_REFUSED"
+  fi
+  if [ "$NO_KICK" = "1" ]; then
+    echo "  （--no-kick：--why 校验已过，但**没有执行 bootout** —— 进程一个字节没动）"
+    exit 0
+  fi
+
+  PID_BEFORE="${PID:-none}"
+  echo "  执行          launchctl bootout $DOMAIN/$LABEL  [stop]"
+  launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true   # 未加载时 bootout 会失败，不算错
+  sleep 3
+
+  PID_AFTER="$(pid_of)"
+  STILL_LOADED=0
+  launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1 && STILL_LOADED=1
+
+  echo "──────────────────────────────────────────────────────"
+  if [ -n "${PID_AFTER:-}" ]; then
+    echo "  ✗ 还在跑      PID $PID_AFTER —— 停失败，群里仍然有人在答话"
+    RC=1
+  elif [ "$STILL_LOADED" = "1" ]; then
+    echo "  ⚠ 进程停了，但**服务仍加载在 launchd 里** —— KeepAlive 随时会把它拉回来"
+    echo "    这不是「已停」，是「暂时没在跑」。要真停必须 bootout 成功。"
+    RC=1
+  else
+    echo "  ✓ 已停        PID $PID_BEFORE → 无；服务已从 launchd 卸载"
+    echo "    重启：bash tools/restart_shouheng.sh --yes --why=\"<理由>\"（会自动 bootstrap）"
+    RC=0
+  fi
+
+  printf '{"at":"%s","mode":"stop","pid_before":"%s","pid_after":"none","why":"%s","ok":%s}\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$PID_BEFORE" \
+    "$(printf '%s' "$WHY" | tr -d '"\\')" "$([ "$RC" = 0 ] && echo true || echo false)" >> "$LEDGER"
+  echo "  已留痕        PMO/logs/restart-ledger.jsonl"
+  exit "$RC"
+fi
+
+# ── 「服务在 launchd 里吗」—— 与「进程在跑吗」是**两个不同的读数** ─────────
+#
+# ★ 2026-10-22 实测事故：守衡 09-30 收到 SIGTERM 后停机 21.3 天，plist 一直在
+#   ~/Library/LaunchAgents/（与仓库副本 sha256 逐字节相同），但**服务从未被
+#   bootstrap 加载**。于是 rescue 分支发的 `launchctl kickstart -k` 当场失败：
+#       Could not find service "com.shouheng.lark"  → 退出码 113
+#   **救活路径上没有任何一条命令能把它装回去。**
+#
+# 这正是 §2.4.7 那个形状的第二次出现：**判据没盖住的那一跳，就是事故所在的那一跳。**
+# 闸门盖住了 kickstart，没盖住 bootstrap —— 而 §2.7 那句「唯一正确的重启方式是
+# launchctl kickstart -k」，在「服务从未加载」这个前提下**整条作废**。
+#
+# 所以这里把状态拆成三档，**三档的输出必须长得不一样**（§2.4.3：未测 ≠ 通过 ≠ 红）：
+#   ① PID 有            → 在跑
+#   ② 无 PID、服务已加载 → 没在跑，但 kickstart 能救
+#   ③ 无 PID、服务未加载 → 没在跑且**装不回去**，要先 bootstrap
+SERVICE_LOADED=0
+if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
+  SERVICE_LOADED=1
+fi
+PLIST_SRC="$HOME/Library/LaunchAgents/$LABEL.plist"
+
 echo "── 守衡重启闸门 ──────────────────────────────────────"
+if [ -z "${PID:-}" ]; then
+  if [ "$SERVICE_LOADED" = "1" ]; then
+    echo "  服务状态      ✓ 已加载进 launchd（只是进程没在跑）"
+  else
+    echo "  服务状态      ✗ **未加载** —— launchctl 里找不到 $LABEL"
+    if [ -f "$PLIST_SRC" ]; then
+      echo "                plist 在 $PLIST_SRC"
+      echo "                → 救活必须先 bootstrap；只发 kickstart 会退 113（2026-10-22 实测）"
+    else
+      echo "                ⚠ plist 也不在 $PLIST_SRC —— 连装回去的东西都没有，这是【未测】不是【没在跑】"
+    fi
+  fi
+fi
 if [ -n "${PID:-}" ]; then
   # ★ 2026-09-22 重写：这一块原先读 `ps -o lstart=`，而 ps 在受限环境里被拒
   #   （DSH 沙箱下 `/bin/ps: Operation not permitted`）→ 启动时刻**永远**读不到，
@@ -339,6 +443,20 @@ if [ -z "${PID:-}" ]; then
     exit 0
   fi
   MODE="rescue"
+  # ★ 2026-10-22 补：救活要分两条路。服务没加载时 kickstart 必然退 113，
+  #   而「装回去」这件事此前**在闸门之外没有任何一处被允许**（§2.4.7）。
+  #   这里不放开闸门，而是把 bootstrap 收进闸门 —— 它仍然走同一套
+  #   --yes / --why / 留痕 / 凭证作废，只是最后那一行命令不同。
+  if [ "$SERVICE_LOADED" = "1" ]; then
+    ACTION="kickstart"
+  elif [ -f "$PLIST_SRC" ]; then
+    ACTION="bootstrap"
+  else
+    # 没加载、连 plist 都没有 → 这不是「没在跑」，是【未测】：我连装回去的东西都没有。
+    echo "  ✗ 拒绝救活：服务未加载，且 $PLIST_SRC 不存在 ——"
+    echo "    这不是「它没在跑」，是**没有可加载的配置**。先把它装回来再说（退 2 = 未测）。"
+    exit 2
+  fi
 else
   # ── 在跑：这是重启，默认拒绝 ──────────────────────────────
   echo "──────────────────────────────────────────────────────"
@@ -396,11 +514,25 @@ fi
 
 # ── 执行 ───────────────────────────────────────────────────
 PID_BEFORE="${PID:-none}"
-echo "  执行          launchctl kickstart -k $DOMAIN/$LABEL  [$MODE]"
+# 执行哪条命令，只由**闸门自己算出来的** SERVICE_LOADED 决定，不听调用方说。
+if [ "$MODE" = "rescue" ] && [ "$ACTION" = "bootstrap" ]; then
+  EXEC_LINE="launchctl bootstrap $DOMAIN $PLIST_SRC"
+else
+  EXEC_LINE="launchctl kickstart -k $DOMAIN/$LABEL"
+fi
+echo "  执行          ${EXEC_LINE}  [$MODE]"
 # 凭证**一次性**：执行前就作废。放在 kickstart 之后作废的话，kickstart 失败时
 # 凭证还留着，下一次 --yes 会拿一份「已经用过的同意」再试一遍 —— 那不叫同意。
 rm -f "$CONSENT" || true
-launchctl kickstart -k "$DOMAIN/$LABEL" || { echo "  ✗ kickstart 失败（退出码 ${?}）—— 它可能现在没在跑，或 label 不对"; exit 1; }
+if [ "$MODE" = "rescue" ] && [ "$ACTION" = "bootstrap" ]; then
+  launchctl bootstrap "$DOMAIN" "$PLIST_SRC" || {
+    RC_BOOT=$?
+    echo "  ✗ bootstrap 失败（退出码 ${RC_BOOT}）—— plist 可能不合法，或它其实已经加载了"
+    exit 1
+  }
+else
+  launchctl kickstart -k "$DOMAIN/$LABEL" || { echo "  ✗ kickstart 失败（退出码 ${?}）—— 它可能现在没在跑，或 label 不对"; exit 1; }
+fi
 
 # 等它起来（最多 20 秒），并**证明它真的回来了** —— 只 kickstart 不验证，
 # 等于把「重启完了」当成「重启好了」。
