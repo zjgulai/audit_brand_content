@@ -52,6 +52,7 @@
 | `lark_*.py` | 飞书 HTTP 与人员/文档查找 | `AGENTS.md` §2.1（`lark_people.py --controls` 是自证入口） |
 | `migrate_*.py` | **一次性**迁移脚本（把本地词表/规则/知识库推到飞书表）。已跑完，**别再跑** —— 同名表已存在时它会拒绝（这是设计） | `PMO/规则库-落地记录-20260922.md` 等落地记录 |
 | `agent/` | 守衡（飞书机器人）的运行时。**改这个目录要先读 `AGENTS.md` §2.5 / §2.7** | [`PMO/守衡-架构说明.md`](../PMO/守衡-架构说明.md) |
+| `bj_time.py` | **全仓唯一「今天」来源**：`BJ` / `bj_now()` / `bj_today()` / `bj_today_iso()`。新增任何取「今天」的代码必须 `from bj_time import bj_today`，不许自己写 `date.today()` 或裸 `datetime.now()` | [`PMO/implement/日期口径统一-20261021.md`](../PMO/implement/日期口径统一-20261021.md)（自证：`python3 tools/bj_time.py --selftest`） |
 | `reply-cards/` | 飞书卡片的模版、登记表与信封 | [`reply-cards/README.md`](./reply-cards/README.md) |
 
 ## 四、benchmark / 评测

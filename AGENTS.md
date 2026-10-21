@@ -46,7 +46,7 @@
 | **「谁验什么」的登记表与实现对得上吗** | `python3 tools/verify_coverage.py`（改任何 `verify_*` 时**必跑**，加 `--controls`） | 六段双向反证：**A 名册完整**（每个已跟踪的 `verify_*` 都在册，且在册的都真实存在）/ **B 主体存在** / **C 主体被引用**（`subjects` 的文件名+父目录段要在该 verifier 源码里出现）/ **D 空即声明** / **E 未入库可见** / **F 反向对照**。★ **2026-10-21 加这一行的原因**：新增 `verify_*` 却没登记，A 段扫的是 `git ls-files`，于是**提交前全绿、提交后变红** —— 当天两个会话各踩一次（一个真红被后端会话撞见才发现，一个差点）。它原先只写在 `README.md` 与一条 `legal-decisions` 的 verification 链里，**不在本表**，而本表才是改 verifier 的人实际照着做的东西。★ **E 段比 A 段更早**：`subjects` 里的文件未被跟踪又没标 `untracked` → 立刻红，所以「光了登记不 `git add`」同样是红的 |
 | **多模态与向量模型选型** | `python3 tools/verify_model_selection.py`（改选型文档/清单时跑；加 `--controls`） | S1–S8：选型文档的 provider/输入组合/audio·video/ASR/规模/Price 断言必须与 `~/.cache/magpie/models.json` 及 `vod`/`tokenhub` 实时清单一致；**依赖 `~/.cache/magpie` 清单，不在盘上 → 退 2（未测）**；有红退 1；`--controls` 好样本绿、坏样本各自红、清单缺失判未测。**绝不读 `~/.config/magpie/`（凭据）** |
 | **品牌用词规则** | `python3 tools/verify_brand_rules.py`（改品牌规则 JSON 时跑；加 `--controls`） | B1–B4：字段/`pattern` 可编译/`exclude_patterns` 与 `context_exclusion[].pattern` 集合恒等/规则指向；**8 条规则无排除项 → ⚠ 告警，不是通过项；不能读成「排除逻辑已验证」**；文件缺失 → 退 2（未测）；`--controls` 好样本绿、坏样本各自红 |
-| **多模态 provider 层** | `python3 tools/verify_multimodal_provider.py`（改 `base/multimodal_provider.py` 时跑；加 `--controls`） | M1–M16 + C/D 段：**没接能力 ≠ 通过**（空注册表/空任务/不支持/无可复核观察必须落 `untested`）；**未授权时一次 provider 都不许调**；`actual_egress_status` 只许 `none`/`untested`；E 段对源码做单点删除，证明守卫真在执行点；导入失败 → 退 2（未测） |
+| **多模态 provider 层** | `python3 tools/verify_multimodal_provider.py`（改 `base/multimodal_provider.py` 时跑；加 `--controls`） | M1–M16 + C/D 段：**没接能力 ≠ 通过**（空注册表/空任务/不支持/无可复核观察必须落 `untested`）；**未授权时一次 provider 都不许调**；`actual_egress_status` 只许 `none`/`untested`；**介质判据两段**：含 `/` 先按**主类型**判，`application/*` 只认逐个点名的容器，**有斜杠但判不出 → `()`，不许退回子串匹配**（否则 `audio/mp4` 被 `mp4` 认成 video）；只有裸串才走子串；E 段单点删除证明守卫在执行点；导入失败 → 退 2（未测） |
 | **生成物可读性（全仓库）** | `python3 tools/verify_depad.py` | 有没有文件被环境 +4096 填充成 read 工具打不开 |
 | **仓内文本里有没有凭据** | `python3 tools/verify_secret_patterns.py`（改扫描器时加 `--controls`） | 扫 `git ls-files` 的**文本内容**（数量随仓库增长，以脚本输出为准），按**形态**判：完整私钥块（BEGIN **到** END，只出现 BEGIN 不算）/ AKIA·ghp_·sk- / Bearer ≥24 位 / 命令式读凭据目录、代码式打开凭据文件。★ **刻意没有 allowlist** —— 那是免死金牌（登记了就再也不扫）；误报靠**行内上下文**排除（说明句、测试夹具），不做文件级豁免。★ 它补的是三道闸之间的真空：`tools.mjs` 的 `secretGuard()` 只管 agent 运行时、DG-3 只管二进制/PII、`verify_depad` 只管 +4096。**不并进 DG**：两者失败后要查的东西不同，合成一个退出码就分不清该改哪一侧。`--controls` 8/8（含 ctokens.py / 配置键名必须绿） |
 | **L1 里那件 418KB 产物能不能重建** | `python3 tools/verify_browser_ext_artifact.py` | 跑一遍构建配方（`.vendor/dsh-browser-main/extensions/dsh-browser` 的 `scripts/build.mjs`）再**逐文件 sha256** 对回 `dsh-browser-ext/`：16 个文件多一个少一个、内容差一个字节都红；**`.vendor/` 不在盘上 → 退 2（未测），不是绿**（见 §2.4）。★ 它是 `Q39` 选项 A 的落地：**配方与校验合在一个文件里** |
@@ -602,6 +602,23 @@ after .lastState = ok                          ← 原来是 drift 也会被抹�
 > **判据没盖住的那一跳，就是事故所在的那一跳。**
 > 修法不是补一条「源码里要出现 `sayTo`」的文本断言（那正是 §2.4 点名的假执行点），
 > 而是把它拆成一个**能被调用**的纯函数，让判据真的走进去。
+
+#### 2.4.8 同一个病的第九个变体：**同一个量有两个口径，而只有一个被看见**
+
+2026-10-21 撞见四次，症状不同、根因相同：
+
+| 表面 | 两个口径 | 被看见的是 |
+|---|---|---|
+| `verify_kb` 结论行写死「2 条」 | 字面量 vs 实际 12 条 | 字面量（一直 ✅） |
+| `_MEDIA_HINTS` 召回 100% | 整串子串 vs MIME 主类型 | 前者（`audio/mp4` 认成音视频双全） |
+| 预算余量 | `getsize`（逻辑视图）vs `stat`（+4096） | 前者（差 4096 = 一条教训） |
+| `village-naming` 的 `require_context` | 「正确名称在场」vs「这句是否违规」 | 前者（真违规全挡掉） |
+
+**规矩：同一个量能算出两个数时，结论行必须两个都报**，并写明判定用哪个、为什么。
+
+执行点：`verify_agents_budget.py` 的 B1（`max(real, stat)`，stat 读不到退 2）。
+**注入方按哪个数判断仍未测**，依据见 `PMO/AGENTS预算读数-填充态-20261021.md`。
+它第一次在真实编辑里就响了：改完本节后 real 62235 / stat 66331，B1 当场红。
 
 ---
 
