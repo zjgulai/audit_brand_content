@@ -77,6 +77,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+_TOOLS = str(ROOT / "tools")
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import bj_now  # noqa: E402
+
 BASE_DIR = ROOT / "PRD" / "feishu"
 INDEX = BASE_DIR / "索引-v1.json"
 CRED = Path(os.path.expanduser("~/.dsh/credentials/shouheng-lark.json"))
@@ -451,7 +456,7 @@ def main():
                 _t = _dt.datetime.strptime(_v, "%Y-%m-%d %H:%M:%S")
             except ValueError:
                 _bads.append(f"{_f}: `{_v}` 解析不了"); continue
-            _now = _dt.datetime.now() + _dt.timedelta(days=1)
+            _now = bj_now().replace(tzinfo=None) + _dt.timedelta(days=1)
             _floor = _dt.datetime(2020, 1, 1)
             if not (_floor <= _t <= _now):
                 _bads.append(f"{_f}: `{_v}` 不在 [{_floor:%Y-%m-%d}, {_now:%Y-%m-%d}] 内")

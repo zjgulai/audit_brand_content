@@ -299,6 +299,48 @@
       "kind": "history",
       "from_version": "v1.0",
       "maps_to": "11.2"
+    },
+    {
+      "file": "PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "PMO/implement/基准复核-14条-20261020.md",
+      "section": "7.3",
+      "kind": "current",
+      "heading": "一票否决项（P0 级，命中即 BLOCK）"
+    },
+    {
+      "file": "Playbook/内容审查Agent-产品Playbook-v0.md",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "Playbook/内容审查Agent-产品Playbook-v0.md",
+      "section": "6.6",
+      "kind": "current",
+      "heading": "置信度与分流策略"
+    },
+    {
+      "file": "Playbook/内容审查Agent-产品Playbook-v0.md",
+      "section": "7.3",
+      "kind": "current",
+      "heading": "一票否决项（P0 级，命中即 BLOCK）"
+    },
+    {
+      "file": "research/governance/rules-mece-migration-v1.json",
+      "section": "7.3",
+      "kind": "current",
+      "heading": "一票否决项（P0 级，命中即 BLOCK）"
     }
   ]
 }
