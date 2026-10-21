@@ -1,0 +1,773 @@
+{
+  "_meta": {
+    "name": "品牌用词规则-候选-v1",
+    "generated_at": "2026-10-21",
+    "status": "candidate_not_in_rules_v1",
+    "not_for_production": true,
+    "rule_family": "T10",
+    "batch": 1,
+    "count": 10,
+    "source_report": "PMO/implement/品牌判据-候选-20261021.md",
+    "why_batch_1_first": "2026-10-21 实测的 5.6%–9.9% 误报，来源是生成期词表混进发布期。把这 10 条发布期用词规则单独拉出来跑，如果误报率显著低于 9.9%，证明分层判断对；如果不低，说明我们对『发布期』的理解也错了。两种结果都有信息。",
+    "schema_note": "字段沿用 research/governance/skeleton/rules-v1.json 的形状；match.exclude_patterns 与 examples 是候选扩展，导入前需规范 owner 复核。",
+    "common_context_rule": "引用竞品原话、法规/研究原文、用户原话时，一律降级为 manual_review，不 auto_reject；引用段落不当作品牌自己的话。",
+    "blocking_issue": "10 条规则的 parent_rule 是哨兵 __PENDING_CONTROL_POINT__，不是真实控制点。现状：没有任何断言会因此变红 —— verify_engine_contract.py:184 的 V1c 只查键在不在（k not in hit），哨兵能过；verify_control_points.py:508 的 C74-1 查的是反方向（新控制点必须有规则指向），导入而不建新控制点时它也看不见。风险恰恰在此：它会安静地通过，而 hit 里带的是 __PENDING_CONTROL_POINT__ 这种不是控制点的字符串。所以这条哨兵需要一个执行点，否则它只是一句自白 —— 见 _meta.required_assertions。",
+    "blocking_issue_type": "import_blocker",
+    "exclusion_source_of_truth": "match.exclude_patterns",
+    "exclusion_note": "match.exclude_patterns 是执行点；context_exclusion 只是给人看的注释；导入前必须有一条断言让两者对齐，否则会漂。",
+    "required_assertions": [
+      {
+        "id": "A",
+        "file": "tools/verify_control_points.py",
+        "assert": "rules-v1.json 里任何规则的 parent_rule 必须属于控制点主表 control_code 全集 ∪ {安全词}；出现 __PENDING_CONTROL_POINT__ 或任何未知字符串 → 红",
+        "now": "绿（候选规则尚未进 rules-v1.json；现有 26 条都合法）",
+        "on_import": "红，直到 10 条 parent_rule 被映射为真实控制点"
+      },
+      {
+        "id": "B",
+        "file": "tools/verify_brand_rules.py（建议新建）",
+        "assert": "context_exclusion 改为结构化 [{id, pattern, note}]，match.exclude_patterns 与它的 pattern 集合恒等；每个 pattern 必须编译通过；有 exclude_patterns 就必须有对应 note",
+        "now": "未实现；候选 JSON 目前是文本说明 + 正则",
+        "on_import": "先改候选格式，再落断言；否则两处会漂"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "rule_key": "T10.1.clinical",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 临床感/机器感",
+      "modality": "prohibit",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "clinical",
+          "临床感"
+        ],
+        "patterns": [
+          "(?i)\\bclinical\\b",
+          "临床感"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "exclude_patterns": [
+          "(?i)clinical\\s+(trial|study|research|evidence)",
+          "临床(试验|研究|证据)"
+        ],
+        "context_note": "引用竞品/法规/研究原文时排除；clinical trial/study 是研究语境，不是品牌调性。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "命中后人工确认是不是在说 Momcozy 自己；引用段落降级。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:45",
+          "条文号": "L8",
+          "原文": "严禁使用 Clinical (临床感) 或 Machine (机器)，应改为 Personal Care (个人护理) 或 Companion (陪伴者)。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "Clinical-grade pump for hospital-level performance.",
+            "source": "knowledge_base.md:45（规则原文）",
+            "source_type": "constructed_from_rule"
+          },
+          {
+            "text": "这台吸奶器临床感太强，像医疗设备。",
+            "source": "knowledge_base.md:45（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "The clinical trial enrolled 200 mothers and measured milk output.",
+            "source": "构造反例；规则来源 knowledge_base.md:45",
+            "source_type": "constructed_context_excluded"
+          },
+          {
+            "text": "竞品原文：『clinical-grade performance』——我们在对比页引用。",
+            "source": "构造反例；引用排除规则 knowledge_base.md:45",
+            "source_type": "constructed_context_excluded"
+          }
+        ]
+      },
+      "false_positive_risk": "中高：clinical 在法规/研究/竞品引用里很常见；必须靠 exclude_patterns + 引用上下文降级。",
+      "context_exclusion": "引用竞品/法规/研究原文、clinical trial/study 除外。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.machine",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 临床感/机器感",
+      "modality": "prohibit",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "machine",
+          "机器感"
+        ],
+        "patterns": [
+          "(?i)\\bmachine\\b",
+          "机器感"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "exclude_patterns": [
+          "(?i)machine\\s+(washable|washing|learning|readable)",
+          "(?i)state\\s+machine",
+          "机器(学习|可读|状态机)"
+        ],
+        "context_note": "machine washable / machine learning / state machine 是技术固定搭配，不是品牌调性。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "命中后人工确认是不是在形容产品/体验；技术固定搭配降级。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:45",
+          "条文号": "L8",
+          "原文": "严禁使用 Clinical (临床感) 或 Machine (机器)。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "This machine is the best pump for busy moms.",
+            "source": "knowledge_base.md:45（规则原文）",
+            "source_type": "constructed_from_rule"
+          },
+          {
+            "text": "这条文案机器感太重，改成『陪伴者』。",
+            "source": "knowledge_base.md:45（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "How to Remove Spit-Up Stains from a Baby Swing Seat Cover Without Machine Washing.doc",
+            "source": "research/kb/台账-v1.json:17276",
+            "source_type": "corpus_context_excluded"
+          },
+          {
+            "text": "Using a machine-learning classifier, YouTube has devised a score for each video.",
+            "source": "research/governance/R4-metrics-and-transparency-evidence.md:167",
+            "source_type": "corpus_context_excluded"
+          }
+        ]
+      },
+      "false_positive_risk": "高：machine 的技术固定搭配很多；必须用 exclude_patterns，否则误报会压过命中。",
+      "context_exclusion": "machine washable / machine learning / machine-readable / state machine 除外。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.weight-loss",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 减肥/瘦身",
+      "modality": "prohibit",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "weight loss",
+          "weight-loss",
+          "减肥",
+          "瘦身",
+          "slimming",
+          "diet"
+        ],
+        "patterns": [
+          "(?i)\\bweight[\\s-]?loss\\b",
+          "减肥|瘦身",
+          "(?i)\\bslimming\\b"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "require_context": [
+          "收腹带",
+          "束腹",
+          "产后",
+          "postpartum",
+          "belly band",
+          "waist"
+        ],
+        "context_note": "只有当主语是产后收腹/束腹类产品时才命中；泛健康文章、新生儿体重下降、法规原文除外。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "没有产品上下文时降级；不能把泛健康内容判成品宣。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:46",
+          "条文号": "L8",
+          "原文": "严禁使用 Weight Loss (减肥/瘦身) 来描述收腹带，应改为 Core Support (核心支撑) 或 Healing (愈合)。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "This postpartum waist belt supports weight loss after pregnancy.",
+            "source": "knowledge_base.md:46（规则原文）",
+            "source_type": "constructed_from_rule"
+          },
+          {
+            "text": "产后收腹带能帮助瘦身，恢复身材。",
+            "source": "knowledge_base.md:46（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "Ads promoting or marketing dietary, health, or weight loss or weight gain products and services must be targeted to people at least 18 years or older.",
+            "source": "research/kb/外部标准库-v1.json:667",
+            "source_type": "corpus_context_excluded"
+          },
+          {
+            "text": "Newborn Weight Loss After Birth: What’s Normal and When to Call Your Pediatrician.doc",
+            "source": "research/kb/台账-v1.json:22784",
+            "source_type": "corpus_context_excluded"
+          }
+        ]
+      },
+      "false_positive_risk": "高：weight loss 在法规、儿科、泛健康内容里很常见；没有产品上下文就降级。",
+      "context_exclusion": "法规/研究原文、新生儿体重下降、泛健康文章除外；只对产后收腹/束腹产品命中。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.enjoy-every-moment",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 毒鸡汤",
+      "modality": "prohibit",
+      "severity": "L1",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "享受每一刻"
+        ],
+        "patterns": [
+          "享受每一刻"
+        ],
+        "languages": [
+          "zh"
+        ],
+        "context_note": "引用的用户原话里出现时降级；品牌自己的文案命中。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "引用用户原话/评论区摘录时人工确认。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:22",
+          "条文号": "L2",
+          "原文": "拒绝毒鸡汤 (No Toxic Positivity): 绝不说 \"享受每一刻\" 或 \"一切都值得\"。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2 / momcozy_quick_reference.md",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "享受每一刻",
+            "source": "knowledge_base.md:22（规则原文）",
+            "source_type": "rule_text"
+          },
+          {
+            "text": "享受每一刻，做个幸福的妈妈。",
+            "source": "knowledge_base.md:22（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "享受当下，不必完美。",
+            "source": "构造反例；规则来源 knowledge_base.md:22",
+            "source_type": "constructed_near_miss"
+          },
+          {
+            "text": "享受这一刻的安静。",
+            "source": "构造反例；规则来源 knowledge_base.md:22",
+            "source_type": "constructed_near_miss"
+          }
+        ]
+      },
+      "false_positive_risk": "低：精确短语；近义词不会命中，需靠同义词表另行召回。",
+      "context_exclusion": "引用用户原话/评论区摘录时降级。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.all-worth-it",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 毒鸡汤",
+      "modality": "prohibit",
+      "severity": "L1",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "一切都值得"
+        ],
+        "patterns": [
+          "一切都值得"
+        ],
+        "languages": [
+          "zh"
+        ],
+        "context_note": "引用的用户原话里出现时降级。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "引用用户原话时人工确认。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:22",
+          "条文号": "L2",
+          "原文": "绝不说 \"享受每一刻\" 或 \"一切都值得\"。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "一切都值得",
+            "source": "knowledge_base.md:22（规则原文）",
+            "source_type": "rule_text"
+          },
+          {
+            "text": "一切都值得，为了宝宝。",
+            "source": "knowledge_base.md:22（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "一切都很值得。",
+            "source": "构造反例；规则来源 knowledge_base.md:22",
+            "source_type": "constructed_near_miss"
+          },
+          {
+            "text": "这一切都值得。",
+            "source": "构造反例；规则来源 knowledge_base.md:22",
+            "source_type": "constructed_near_miss"
+          }
+        ]
+      },
+      "false_positive_risk": "低到中：近义词『一切都很值得』不会命中；需要同义词表或人工兜底。",
+      "context_exclusion": "引用用户原话时降级。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.you-should",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 说教",
+      "modality": "prohibit",
+      "severity": "L1",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "你应该"
+        ],
+        "patterns": [
+          "你应该"
+        ],
+        "languages": [
+          "zh"
+        ],
+        "context_note": "引用的用户原话/问答里出现时降级；品牌自己的建议式文案命中。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "引用用户原话时人工确认；『你应当』是近义但不是本条精确串。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:23",
+          "条文号": "L2",
+          "原文": "拒绝爹味说教 (No Preaching): 绝不用 \"你应该\" 或 \"好妈妈都会...\"。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2 / momcozy_quick_reference.md",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "你应该每天坚持泵奶。",
+            "source": "knowledge_base.md:23（规则原文）",
+            "source_type": "constructed_from_rule"
+          },
+          {
+            "text": "你应该像好妈妈一样安排作息。",
+            "source": "knowledge_base.md:23（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "你应当先咨询医生。",
+            "source": "构造反例；规则来源 knowledge_base.md:23",
+            "source_type": "constructed_near_miss"
+          },
+          {
+            "text": "用户留言：『你应该多休息』——这是用户原话，我们在回应里引用。",
+            "source": "构造反例；引用排除规则 knowledge_base.md:23",
+            "source_type": "constructed_context_excluded"
+          }
+        ]
+      },
+      "false_positive_risk": "中：『你应该』在用户问答/引用里常见；精确串降低误报，但引用上下文必须降级。",
+      "context_exclusion": "引用用户原话/问答时降级；『你应当』不在本条命中范围。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.good-mother",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 说教",
+      "modality": "prohibit",
+      "severity": "L1",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "好妈妈都会"
+        ],
+        "patterns": [
+          "好妈妈都会"
+        ],
+        "languages": [
+          "zh"
+        ],
+        "context_note": "引用的用户原话里出现时降级。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "引用用户原话时人工确认。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:23",
+          "条文号": "L2",
+          "原文": "绝不用 \"你应该\" 或 \"好妈妈都会...\"。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2 / momcozy_quick_reference.md",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "好妈妈都会",
+            "source": "knowledge_base.md:23（规则原文）",
+            "source_type": "rule_text"
+          },
+          {
+            "text": "好妈妈都会累，别自责。",
+            "source": "knowledge_base.md:23（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "妈妈都会累。",
+            "source": "构造反例；规则来源 knowledge_base.md:23",
+            "source_type": "constructed_near_miss"
+          },
+          {
+            "text": "好妈妈也会累。",
+            "source": "构造反例；规则来源 knowledge_base.md:23",
+            "source_type": "constructed_near_miss"
+          }
+        ]
+      },
+      "false_positive_risk": "低：精确短语；近义句不会命中。",
+      "context_exclusion": "引用用户原话时降级。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.1.sacred-motherhood",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.1",
+      "topic_label": "用词与表达 · 毒鸡汤",
+      "modality": "prohibit",
+      "severity": "L1",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "当妈很神圣"
+        ],
+        "patterns": [
+          "当妈很神圣"
+        ],
+        "languages": [
+          "zh"
+        ],
+        "context_note": "引用的用户原话里出现时降级。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "引用用户原话时人工确认。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 快速参考",
+          "条目ID": "quick_reference.md:10",
+          "条文号": "文案三要三不要",
+          "原文": "不要：毒鸡汤（“当妈很神圣”、“享受每一刻”）。"
+        }
+      ],
+      "source_legacy": "momcozy_quick_reference.md",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "当妈很神圣",
+            "source": "quick_reference.md:10（规则原文）",
+            "source_type": "rule_text"
+          },
+          {
+            "text": "当妈很神圣，所以要享受每一刻。",
+            "source": "quick_reference.md:10（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "当妈很伟大。",
+            "source": "构造反例；规则来源 quick_reference.md:10",
+            "source_type": "constructed_near_miss"
+          },
+          {
+            "text": "当妈很辛苦。",
+            "source": "构造反例；规则来源 quick_reference.md:10",
+            "source_type": "constructed_near_miss"
+          }
+        ]
+      },
+      "false_positive_risk": "低：精确短语；近义句不会命中。",
+      "context_exclusion": "引用用户原话时降级。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.2.village-naming",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.2",
+      "topic_label": "专有名词 · 社群命名",
+      "modality": "prohibit",
+      "severity": "L1",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "user group",
+          "user community",
+          "用户群",
+          "用户社群"
+        ],
+        "patterns": [
+          "(?i)\\buser\\s+(group|community)\\b",
+          "用户群|用户社群"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "require_context": [
+          "Momcozy Village",
+          "官方社群",
+          "我们的社群",
+          "our community",
+          "our village"
+        ],
+        "context_note": "只有指代 Momcozy 官方社群时命中；竞品社群/泛称不命中。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "竞品/泛称上下文降级；官方社群才升为命中。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:42",
+          "条文号": "L8",
+          "原文": "Momcozy Village: 官方社群的名称，严禁说成“user group”。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "Join our user group to meet other moms.",
+            "source": "knowledge_base.md:42（规则原文）",
+            "source_type": "constructed_from_rule"
+          },
+          {
+            "text": "我们的用户群会分享真实故事。",
+            "source": "knowledge_base.md:42（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "The competitor's user group is large.",
+            "source": "构造反例；规则来源 knowledge_base.md:42",
+            "source_type": "constructed_context_excluded"
+          },
+          {
+            "text": "A user group is a generic term; we call ours Momcozy Village.",
+            "source": "构造反例；规则来源 knowledge_base.md:42",
+            "source_type": "constructed_context_excluded"
+          }
+        ]
+      },
+      "false_positive_risk": "中：user group 是泛称；没有官方社群上下文时不能判。",
+      "context_exclusion": "竞品社群/泛称/术语解释除外；只在指代 Momcozy Village 时命中。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    },
+    {
+      "rule_key": "T10.2.doublefit-naming",
+      "parent_rule": "__PENDING_CONTROL_POINT__",
+      "topic": "T10.2",
+      "topic_label": "专有名词 · 部件命名",
+      "modality": "prohibit",
+      "severity": "L2",
+      "disposition": "manual_review",
+      "evaluability": "auto",
+      "match": {
+        "keywords": [
+          "suction cup",
+          "plastic part",
+          "吸盘",
+          "塑料件"
+        ],
+        "patterns": [
+          "(?i)\\bsuction\\s+cup\\b",
+          "(?i)\\bplastic\\s+part\\b",
+          "吸盘|塑料件"
+        ],
+        "languages": [
+          "en",
+          "zh"
+        ],
+        "require_context": [
+          "DoubleFit",
+          "法兰",
+          "flange",
+          "泵",
+          "pump"
+        ],
+        "context_note": "只有指代 DoubleFit 法兰/吸奶器部件时命中；泛技术描述/竞品部件不命中。"
+      },
+      "downgrade_band": {
+        "effect": "manual_review",
+        "note": "技术定义/竞品上下文降级；品牌自己的部件描述才命中。"
+      },
+      "evidence_required": "brand_style_guide",
+      "external_ref": [
+        {
+          "库名": "Momcozy 品牌知识库",
+          "条目ID": "knowledge_base.md:39",
+          "条文号": "L8",
+          "原文": "DoubleFit™ Flange: 严禁说“suction cup”或“plastic part”，必须强调“双层密封法兰”。"
+        }
+      ],
+      "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
+      "detection_layer": "native",
+      "examples": {
+        "positive": [
+          {
+            "text": "The suction cup keeps the flange in place.",
+            "source": "knowledge_base.md:39（规则原文）",
+            "source_type": "constructed_from_rule"
+          },
+          {
+            "text": "这个塑料件就是 DoubleFit 法兰。",
+            "source": "knowledge_base.md:39（规则原文）",
+            "source_type": "constructed_from_rule"
+          }
+        ],
+        "negative": [
+          {
+            "text": "The suction cup is a generic term for the flange.",
+            "source": "构造反例；规则来源 knowledge_base.md:39",
+            "source_type": "constructed_context_excluded"
+          },
+          {
+            "text": "Competitor X uses a plastic part in its pump.",
+            "source": "构造反例；规则来源 knowledge_base.md:39",
+            "source_type": "constructed_context_excluded"
+          }
+        ]
+      },
+      "false_positive_risk": "中高：suction cup 是通用部件词；没有 DoubleFit/法兰上下文时不能判。",
+      "context_exclusion": "技术定义/竞品部件/泛称除外；只在指代 DoubleFit 法兰时命中。",
+      "parent_rule_unassigned": true,
+      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "exclusion_source_of_truth": "match.exclude_patterns"
+    }
+  ]
+}
