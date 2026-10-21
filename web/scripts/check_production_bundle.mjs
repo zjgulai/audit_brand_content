@@ -35,11 +35,21 @@ const forbiddenChecks = [
 ];
 const checks = forbiddenChecks.map(([label, predicate]) => [`不含${label}`, predicate(source)]);
 checks.push(["不含写客户端 chunk", files.every((name) => !name.includes("write-client"))]);
+// ★ T-210：内部判定数据只在**生产构建**里必须为空。
+//   dev-up 的 hostile-build 是 `--mode development` 构建，本来就允许带 dev 模块，
+//   所以那一次检查显式不带 `--production`，跳过这两条（不是放行生产）。
+const hasInternalData = (text) =>
+  text.includes("rule_examples") || text.includes("boundary_disputes");
+checks.push(["不含内部判定数据（rule_examples / boundary_disputes）", !hasInternalData(source)]);
 checks.push(["生产界面明确只读", source.includes("只读 · 生产认证写入口未接入")]);
 // 反向对照：已知坏样本必须让对应谓词失败，证明扫描器不是恒真。
 checks.push([
   "反向对照：植入 /dev/session 必须被抓到",
   forbiddenChecks[0][1](source + '\nfetch("/dev/session")') === false,
+]);
+checks.push([
+  "反向对照：植入 rule_examples 必须被抓到",
+  hasInternalData(source + '\nconst __probe = "rule_examples";') === true,
 ]);
 let failed = 0;
 for (const [label, ok] of checks) {

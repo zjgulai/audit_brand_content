@@ -38,14 +38,6 @@ const AUTHORITY_TEXT: Record<string, string> = {
 interface SpecMeta {
   spec_version?: string;
   spec_fingerprint?: string;
-  boundary_disputes?: Array<{
-    rule_id?: string;
-    section?: string;
-    axis_code?: string | null;
-    dispute?: string;
-    status?: string;
-    resolved_in?: string | null;
-  }>;
 }
 
 const meta = (taxonomy as { meta?: SpecMeta }).meta ?? {};
@@ -83,7 +75,7 @@ function SpecSeamNote({ disputeCount }: { disputeCount: number }) {
       <strong>规范有 {disputeCount} 条已登记欠定边界，本页无法逐条关联</strong>
       <p style={{ margin: "0.3rem 0 0" }}>
         <code>Finding.control_code</code>（形如 H02）与{" "}
-        <code>boundary_disputes[].rule_id</code>（形如 r-724b26ec…）不是同一个键，
+        <code>欠定条目的 rule_id</code>（形如 r-724b26ec…）不是同一个键，
         而欠定条目描述里的条款号（DSC12 / FCT5 / FCT2）同样对不上，
         所以无法判断某条 finding 是否落在其中。
       </p>
@@ -192,6 +184,18 @@ export default function CaseDetailPage() {
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
+  // ★ T-210：欠定条目数只在 dev 构建加载（生产构建里这段分支会被整块丢弃）。
+  const [disputeCount, setDisputeCount] = useState(0);
+  useEffect(() => {
+    if (!__REVIEW_DEV_IDENTITY__) return;   // 任何 build 都是 false
+    let alive = true;
+    import("../data/taxonomyInternal").then((m) => {
+      if (alive) setDisputeCount(m.boundaryDisputes.length);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const requestGeneration = useRef(0);
 
   const readCase = useCallback(async () => {
@@ -354,7 +358,7 @@ export default function CaseDetailPage() {
       <NotEvaluatedList items={notEvaluated} />
 
       <h2>证据链（智能体时刻 · 本地渲染，不接模型）</h2>
-      <SpecSeamNote disputeCount={(meta.boundary_disputes ?? []).length} />
+      <SpecSeamNote disputeCount={disputeCount} />
       {(ir.findings ?? []).length === 0 ? (
         <p className="hint">无 finding。</p>
       ) : (

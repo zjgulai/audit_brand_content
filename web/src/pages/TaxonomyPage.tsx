@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import taxonomyJson from "../data/taxonomy.json";
 
 type Counterexample = {
@@ -39,6 +39,15 @@ type RuleExample = {
   evidence?: string[];
 };
 
+type BoundaryDispute = {
+  rule_id: string;
+  section: string;
+  axis_code: string | null;
+  dispute: string;
+  status: string;
+  resolved_in: string | null;
+};
+
 type Taxonomy = {
   meta: {
     version: string;
@@ -49,20 +58,10 @@ type Taxonomy = {
     spec_version?: string;
     /** 规范正文 sha256 前 12 位。指纹变了才是规范变了。 */
     spec_fingerprint?: string;
-    /** 已登记的欠定边界（§4.16）。`axis_code` 可为 null —— 多轴争议。 */
-    boundary_disputes?: Array<{
-      rule_id: string;
-      section: string;
-      axis_code: string | null;
-      dispute: string;
-      status: string;
-      resolved_in: string | null;
-    }>;
   };
   axes: Axis[];
   decision_tree: TreeStep[];
   orthogonal_fields: Record<string, ValueField>;
-  rule_examples: RuleExample[];
 };
 
 const taxonomy = taxonomyJson as unknown as Taxonomy;
@@ -87,6 +86,26 @@ function ListOrPending({ items, empty = PENDING }: { items: string[]; empty?: st
 export default function TaxonomyPage() {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<RuleExample | "not_found" | null>(null);
+  // ★ T-210：内部数据只在 dev 构建加载（生产构建里这段会被 Rollup 整块丢掉）。
+  const [internal, setInternal] = useState<{
+    ruleExamples: RuleExample[];
+    boundaryDisputes: BoundaryDispute[];
+  } | null>(null);
+  useEffect(() => {
+    if (!__REVIEW_DEV_IDENTITY__) return;   // 任何 build 都是 false
+    let alive = true;
+    import("../data/taxonomyInternal").then((m) => {
+      if (!alive) return;
+      setInternal({
+        ruleExamples: m.ruleExamples as RuleExample[],
+        boundaryDisputes: m.boundaryDisputes as BoundaryDispute[],
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const disputes = internal?.boundaryDisputes ?? [];
   const steps = [...taxonomy.decision_tree].sort((a, b) => a.step - b.step);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -97,7 +116,7 @@ export default function TaxonomyPage() {
       return;
     }
     setResult(
-      taxonomy.rule_examples.find((item) => item.rule_id === id) ?? "not_found",
+      (internal?.ruleExamples ?? []).find((item) => item.rule_id === id) ?? "not_found",
     );
   }
 
@@ -118,17 +137,22 @@ export default function TaxonomyPage() {
         该文件由 <code>tools/gen_taxonomy_json.py</code> 从规范正文生成，<strong>不得手改</strong>。
       </p>
       <p className="hint">{taxonomy.meta.note}</p>
+      {(!internal || internal.ruleExamples.length === 0) && (
+        <p className="hint">
+          生产构建不包含内部规则示例与欠定边界登记；判定依据以案件 findings 为准。
+        </p>
+      )}
 
-      {(taxonomy.meta.boundary_disputes ?? []).length > 0 && (
+      {disputes.length > 0 && (
         <>
-          <h2>已登记欠定边界（{taxonomy.meta.boundary_disputes!.length} 条）</h2>
+          <h2>已登记欠定边界（{disputes.length} 条）</h2>
           <p className="hint">
             这些规则的边界<b>规范确实定不住</b>，不是判读者错。界面展示
             <code>underdetermined</code> 而不强行给一个轴 ——
             其中 <code>axis_code</code> 为空的条目是<b>多轴争议</b>。
           </p>
           <ul className="notrun">
-            {taxonomy.meta.boundary_disputes!.map((d) => (
+            {disputes.map((d) => (
               <li key={d.rule_id}>
                 <span className="font-data" style={{ fontSize: 11 }}>
                   {d.section}
