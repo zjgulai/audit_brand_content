@@ -591,6 +591,15 @@
     "web/a11y-manual-v1.json"
    ],
    "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
+  },
+  {
+   "verifier": "tools/verify_skill_inventory.py",
+   "asserts": "skill/ 清单治理：跟踪集恰等于放行清单 · 整体被忽略且无单点放行 · 放行文档在盘且无真凭据形态 · 成员目录数不低于下界",
+   "subjects": [
+    "skill/README.md",
+    "skill/标准化台账-20261017.md",
+    ".gitignore"
+   ]
   }
  ]
 }
