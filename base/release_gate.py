@@ -315,10 +315,11 @@ class ReleaseGate(object):
             raise StepUpError("没有 session store —— step-up 无法消费，拒绝签发")
         if not isinstance(token, str) or not token:
             raise StepUpError("step-up token 缺失")
-        ok = self.sessions.consume_step_up(
+        ref = self.sessions.consume_step_up_ref(
             token, principal.get("id"), case.get("case_id"), action, nonce, now=now)
-        if not ok:
+        if not ref:
             raise StepUpError("step-up token 无效（过期/已用/绑定不符）")
+        return ref
 
     # ── sign / reject / revoke ───────────────────────────────────────
     def sign(self, case, principal, token, nonce, decision="signed",
@@ -334,7 +335,7 @@ class ReleaseGate(object):
         self._authorize(case, principal, "sign")
         binding = _binding(case)
         action = "reject" if decision == "rejected" else "sign"
-        self._consume(principal, case, action, token, nonce, now)
+        step_up_ref = self._consume(principal, case, action, token, nonce, now)
 
         sid = "sig-" + _sha(_canonical({
             "case_id": case["case_id"], "case_version": case["case_version"],
@@ -346,7 +347,7 @@ class ReleaseGate(object):
             "signature_version": SIGNATURE_VERSION,
             "signer_id": principal["id"],
             "signed_at": str(now),
-            "step_up_ref": token,
+            "step_up_ref": step_up_ref,
             "decision": decision,
             "reason": reason,
             "derived_from": (st["signatures"][-1]["signature_id"]
@@ -373,9 +374,15 @@ class ReleaseGate(object):
             raise InvalidTransition("只有 signed 可撤回，当前 %s"
                                     % (st["status"] if st else "missing"))
         self._authorize(st["case"], principal, "revoke")
-        self._consume(principal, st["case"], "revoke", token, nonce, now)
+        step_up_ref = self._consume(
+            principal, st["case"], "revoke", token, nonce, now)
         st["status"] = "revoked"
         st["release_status"] = "已撤回"
+        st["events"].append({
+            "kind": "release_revoked", "at": now,
+            "actor": principal.get("id"), "step_up_ref": step_up_ref,
+            "reason": reason,
+        })
         if isinstance(case, dict):
             st["case"] = copy.deepcopy(case)
         return {"status": st["status"], "release_status": st["release_status"]}

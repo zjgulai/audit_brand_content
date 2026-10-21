@@ -485,13 +485,9 @@
       "test_id": "acceptance-131",
       "criteria": "TS-28",
       "fixture": "{root}/tools/verify_auth_session.py",
-      "command": "{venv} {root}/tools/verify_auth_session.py"
-    },
-    "132": {
-      "test_id": "acceptance-132",
-      "criteria": "TS-29",
-      "fixture": "{root}/tools/verify_auth_session.py",
-      "command": "{venv} {root}/tools/verify_auth_session.py"
+      "command": "{venv} {root}/tools/verify_auth_session.py && {venv} {root}/tools/verify_release_gate.py && {venv} {root}/tools/verify_production_app.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     },
     "133": {
       "test_id": "acceptance-133",
@@ -502,20 +498,18 @@
     "134": {
       "test_id": "acceptance-134",
       "criteria": "TS-31",
-      "fixture": "{root}/tools/verify_reviews_ledger.py",
-      "command": "{venv} {root}/tools/verify_reviews_ledger.py"
+      "fixture": "{root}/tools/verify_business_event_store.py",
+      "command": "{venv} {root}/tools/verify_reviews_ledger.py && {venv} {root}/tools/verify_business_event_store.py && {venv} {root}/tools/verify_projection_store.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     },
     "135": {
       "test_id": "acceptance-135",
       "criteria": "TS-32",
-      "fixture": "{root}/tools/verify_auth_session.py",
-      "command": "{venv} {root}/tools/verify_auth_session.py"
-    },
-    "136": {
-      "test_id": "acceptance-136",
-      "criteria": "TS-33",
-      "fixture": "{root}/tools/verify_reviews_ledger.py",
-      "command": "{venv} {root}/tools/verify_reviews_ledger.py"
+      "fixture": "{root}/tools/verify_backend_recovery.py",
+      "command": "{venv} {root}/tools/verify_auth_session.py && {venv} {root}/tools/verify_backend_recovery.py && {venv} {root}/tools/verify_production_app.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     },
     "35": {
       "test_id": "acceptance-35",
@@ -568,8 +562,10 @@
     "107": {
       "test_id": "acceptance-107",
       "criteria": "TS-4",
-      "fixture": "{root}/tools/verify_atomic_commit.py",
-      "command": "{venv} {root}/tools/verify_atomic_commit.py"
+      "fixture": "{root}/tools/verify_projection_store.py",
+      "command": "{venv} {root}/tools/verify_atomic_commit.py && {venv} {root}/tools/verify_business_event_store.py && {venv} {root}/tools/verify_projection_store.py && {venv} {root}/tools/verify_backend_recovery.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     },
     "54": {
       "test_id": "acceptance-54",
@@ -654,8 +650,10 @@
     "104": {
       "test_id": "acceptance-104",
       "criteria": "TS-1",
-      "fixture": "{root}/tools/verify_write_api.py",
-      "command": "{venv} {root}/tools/verify_write_api.py && {venv} {root}/tools/verify_review_api.py"
+      "fixture": "{root}/tools/verify_production_app.py",
+      "command": "{venv} {root}/tools/verify_write_api.py && {venv} {root}/tools/verify_review_api.py && {venv} {root}/tools/verify_web_auth.py && {venv} {root}/tools/verify_production_app.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     },
     "69": {
       "test_id": "acceptance-69",

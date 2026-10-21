@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "projection-status-v1.schema.json",
+  "title": "projection-status/v1 —— 权威与查询投影新鲜度",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "authority",
+    "projection",
+    "lag_commits",
+    "lag_seconds",
+    "last_error_code",
+    "reconcile_token"
+  ],
+  "properties": {
+    "schema_version": { "const": "projection-status/v1" },
+    "status": {
+      "type": "string",
+      "enum": ["fresh", "lagging", "corrupt", "unavailable"]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seq", "manifest_sha256", "committed_at"],
+      "properties": {
+        "seq": { "type": "integer", "minimum": 0 },
+        "manifest_sha256": { "type": ["string", "null"] },
+        "committed_at": { "type": ["string", "null"] }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applied_seq", "manifest_sha256", "schema_version", "rebuilt_at"],
+      "properties": {
+        "applied_seq": { "type": "integer", "minimum": 0 },
+        "manifest_sha256": { "type": ["string", "null"] },
+        "schema_version": { "type": "integer", "minimum": 1 },
+        "rebuilt_at": { "type": ["string", "null"] }
+      }
+    },
+    "lag_commits": { "type": "integer", "minimum": 0 },
+    "lag_seconds": { "type": "number", "minimum": 0 },
+    "last_error_code": { "type": ["string", "null"] },
+    "reconcile_token": { "type": ["string", "null"] }
+  }
+}

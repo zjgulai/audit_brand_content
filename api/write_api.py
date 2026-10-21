@@ -8,12 +8,16 @@ API 层不计算 state/layer，也不写 decision/coverage。
 """
 from __future__ import annotations
 
+import calendar
 import copy
+import hashlib
+import json
 import threading
 import time
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from base import takedown as TD
@@ -44,6 +48,10 @@ class ActionBody(VersionBody):
     finding_id: Optional[str] = None
     draft: Optional[Dict[str, Any]] = None
     conclusion: Optional[Dict[str, Any]] = None
+    source_draft_id: Optional[str] = None
+    field_path: Optional[str] = None
+    fragment: Any = None
+    assignee: Optional[str] = None
 
 
 class AppealCreate(BaseModel):
@@ -194,7 +202,8 @@ class AppealStore(object):
                 if not paused_at:
                     continue
                 try:
-                    ts = time.mktime(time.strptime(paused_at, "%Y-%m-%dT%H:%M:%SZ"))
+                    ts = calendar.timegm(
+                        time.strptime(paused_at, "%Y-%m-%dT%H:%M:%SZ"))
                 except ValueError:
                     continue
                 if now - ts > days * 86400:
@@ -223,19 +232,31 @@ IMPLEMENTED_WRITE_PATHS = {
 }
 
 
-def _idempotent(request, key, fn):
+def _idempotent(request, key, fn, *, actor=None, request_body=None):
     if not isinstance(key, str) or not key.strip():
         raise HTTPException(400, "缺少 Idempotency-Key")
-    cache_key = (request.url.path, key)
+    request_hash = hashlib.sha256(json.dumps({
+        "actor": actor, "path": request.url.path,
+        "body": request_body,
+    }, ensure_ascii=False, sort_keys=True,
+       separators=(",", ":"), default=str).encode("utf-8")).hexdigest()
+    cache_key = (actor, request.url.path, key.strip())
     cache = request.app.state.idempotency
     lock = request.app.state.idempotency_lock
     with lock:
-        if cache_key in cache:
-            return copy.deepcopy(cache[cache_key])
-    result = fn()
-    with lock:
-        cache[cache_key] = copy.deepcopy(result)
-    return result
+        existing = cache.get(cache_key)
+        if existing is not None:
+            if existing["request_hash"] != request_hash:
+                raise HTTPException(409, "idempotency_conflict")
+            return copy.deepcopy(existing["result"])
+        # legacy/禁用写域在同一进程锁内执行+登记；生产复核不走这里，
+        # 而是用 BusinessEventStore 的跨重启权威幂等。
+        result = fn()
+        cache[cache_key] = {
+            "request_hash": request_hash,
+            "result": copy.deepcopy(result),
+        }
+        return result
 
 
 def _ledger_call(fn):
@@ -249,12 +270,22 @@ def _ledger_call(fn):
         raise HTTPException(400, "%s: %s" % (exc.code, exc.detail))
 
 
-def register_write_routes(app, *, principal_dep):
+def register_write_routes(app, *, principal_dep, review_command_service=None,
+                          enabled_capabilities=None, assignee_validator=None):
     repo = app.state.repository
     ledger = app.state.reviews_ledger
     findings = app.state.finding_store
     appeals = app.state.appeals
     gate = app.state.release_gate
+    enabled = (
+        set(IMPLEMENTED_WRITE_PATHS)
+        if enabled_capabilities is None
+        else set(enabled_capabilities)
+    )
+
+    def require_enabled(path):
+        if path not in enabled:
+            raise HTTPException(501, "capability_not_enabled")
 
     def case_or_404(case_id):
         case = repo.get_case(case_id)
@@ -263,7 +294,13 @@ def register_write_routes(app, *, principal_dep):
         return case
 
     def require_review(principal, case):
-        if not can_act(principal, "case.review", case):
+        effective = dict(case)
+        if review_command_service is not None:
+            live = review_command_service.authority.state(case.get("case_id"))
+            effective["assignee_id"] = live.get("assignee")
+            effective["actionable"] = live.get("status") in (
+                "unassigned", "released")
+        if not can_act(principal, "case.review", effective):
             raise HTTPException(403, "无权执行复核动作")
 
     def require_tenant(principal, obj, what="case"):
@@ -285,45 +322,163 @@ def register_write_routes(app, *, principal_dep):
                 return
         repo.takedown_tasks.append(task)
 
+    def run_review_command(*, request, principal, case_id, command,
+                           expected_version, payload, idempotency_key,
+                           legacy_fn):
+        if review_command_service is None:
+            return _idempotent(
+                request, idempotency_key, lambda: _ledger_call(legacy_fn),
+                actor=principal["id"],
+                request_body={"case_id": case_id, "command": command,
+                              "expected_version": expected_version,
+                              "payload": payload or {}})
+        try:
+            outcome = review_command_service.execute(
+                aggregate_id=case_id,
+                command=command,
+                actor={"principal_id": principal["id"],
+                       "tenant_id": principal["tenant"]},
+                expected_version=expected_version,
+                payload=payload or {},
+                idempotency_key=idempotency_key,
+            )
+        except Exception as exc:  # 领域错误在这里转成稳定 HTTP；未知异常继续抛
+            code = getattr(exc, "code", None)
+            if code in ("writer_lease_lost", "writer_lease_missing",
+                        "writer_lease_held"):
+                raise HTTPException(503, code)
+            if code in ("version_conflict", "already_claimed", "case_closed",
+                        "not_assignee", "not_primary", "primary_requires_adopt",
+                        "lease_expired", "lease_active", "not_claimed",
+                        "idempotency_conflict"):
+                raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
+            if code in ("draft_not_found",):
+                raise HTTPException(404, "%s: %s" % (code, getattr(exc, "detail", "")))
+            if code and (code.startswith("bad_") or code in
+                         ("idempotency_key_missing", "actor_missing")):
+                raise HTTPException(400, "%s: %s" % (code, getattr(exc, "detail", "")))
+            raise
+        response = dict(outcome["result"])
+        response.update({
+            "authority_snapshot": outcome["authority_snapshot"],
+            "reconcile_token": outcome["reconcile_token"],
+            "projection_lag": outcome["projection_lag"],
+            "replayed": outcome["replayed"],
+        })
+        return JSONResponse(content=response, status_code=outcome["http_status"])
+
     @app.post("/api/v1/cases/{id}/claim")
     def claim(id: str, request: Request, body: ClaimBody,
               principal=Depends(principal_dep),
               idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/cases/{id}/claim")
         case = case_or_404(id)
+        if review_command_service is not None:
+            review_command_service.expire_if_due(id)
         require_review(principal, case)
-        return _idempotent(request, idempotency_key,
-                           lambda: _ledger_call(
-                               lambda: ledger.claim(id, principal["id"])))
+        expected = None if review_command_service else 0
+        return run_review_command(
+            request=request, principal=principal, case_id=id, command="claim",
+            expected_version=expected, payload={}, idempotency_key=idempotency_key,
+            legacy_fn=lambda: ledger.claim(id, principal["id"]))
 
     @app.post("/api/v1/cases/{id}/unclaim")
     def unclaim(id: str, request: Request, body: VersionBody,
                 principal=Depends(principal_dep),
                 idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/cases/{id}/unclaim")
         case = case_or_404(id)
         require_review(principal, case)
-        return _idempotent(request, idempotency_key,
-                           lambda: _ledger_call(
-                               lambda: ledger.unclaim(id, principal["id"],
-                                                      body.version)))
+        return run_review_command(
+            request=request, principal=principal, case_id=id, command="unclaim",
+            expected_version=body.version, payload={}, idempotency_key=idempotency_key,
+            legacy_fn=lambda: ledger.unclaim(id, principal["id"], body.version))
 
     @app.post("/api/v1/cases/{id}/reassign")
     def reassign(id: str, request: Request, body: ReassignBody,
                  principal=Depends(principal_dep),
                  idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/cases/{id}/reassign")
         case = case_or_404(id)
         require_review(principal, case)
-        return _idempotent(request, idempotency_key,
-                           lambda: _ledger_call(
-                               lambda: ledger.reassign(id, principal["id"],
-                                                       body.version,
-                                                       body.assignee)))
+        if assignee_validator is not None and not assignee_validator(
+                body.assignee, case):
+            raise HTTPException(400, "assignee_not_eligible")
+        return run_review_command(
+            request=request, principal=principal, case_id=id, command="reassign",
+            expected_version=body.version, payload={"assignee": body.assignee},
+            idempotency_key=idempotency_key,
+            legacy_fn=lambda: ledger.reassign(
+                id, principal["id"], body.version, body.assignee))
 
     @app.post("/api/v1/cases/{id}/actions")
     def actions(id: str, request: Request, body: ActionBody,
                 principal=Depends(principal_dep),
                 idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/cases/{id}/actions")
         case = case_or_404(id)
         require_review(principal, case)
+
+        if review_command_service is not None:
+            if body.action == "save_draft":
+                draft = body.draft or {}
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="save_draft", expected_version=body.version,
+                    payload={
+                        "form": draft.get("form") or {},
+                        "notes": draft.get("notes") or "",
+                        "evidence_selections": draft.get("evidence_selections") or [],
+                        "references": draft.get("references") or [],
+                    },
+                    idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
+            if body.action == "submit":
+                if not isinstance(body.conclusion, dict):
+                    raise HTTPException(400, "submit 必须带 conclusion")
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="submit_review", expected_version=body.version,
+                    payload={"conclusion": body.conclusion},
+                    idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
+            if body.action == "heartbeat":
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="heartbeat", expected_version=body.version,
+                    payload={}, idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
+            if body.action == "reassign":
+                # actions 兼容入口与独立 /reassign 使用同一条持久命令。
+                if not isinstance(body.assignee, str) or not body.assignee.strip():
+                    raise HTTPException(400, "reassign 必须带 assignee")
+                if assignee_validator is not None and not assignee_validator(
+                        body.assignee, case):
+                    raise HTTPException(400, "assignee_not_eligible")
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="reassign", expected_version=body.version,
+                    payload={"assignee": body.assignee.strip()},
+                    idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
+            if body.action == "adopt_draft":
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="adopt_draft", expected_version=body.version,
+                    payload={"source_draft_id": body.source_draft_id},
+                    idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
+            if body.action == "reference_fragment":
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="reference_fragment", expected_version=body.version,
+                    payload={"source_draft_id": body.source_draft_id,
+                             "field_path": body.field_path,
+                             "fragment": body.fragment},
+                    idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
+            # finding confirm/reject 不在首批生产能力内
+            raise HTTPException(501, "capability_not_enabled")
 
         def run():
             current = ledger.get_case(id)["version"]
@@ -360,21 +515,26 @@ def register_write_routes(app, *, principal_dep):
                 raise HTTPException(409, "%s: %s" % (exc.code, exc.detail))
             return {"finding": rec}
 
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body=body.model_dump())
 
     @app.post("/api/v1/appeals")
     def create_appeal(request: Request, body: AppealCreate,
                       principal=Depends(principal_dep),
                       idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/appeals")
         require_tenant(principal, case_or_404(body.case_id))
         return _idempotent(
             request, idempotency_key,
-            lambda: appeals.open(body.case_id, principal["id"], body.reason))
+            lambda: appeals.open(body.case_id, principal["id"], body.reason),
+            actor=principal["id"], request_body=body.model_dump())
 
     @app.post("/api/v1/appeals/{id}/migrate")
     def migrate_appeal(id: str, request: Request,
                        principal=Depends(principal_dep),
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/appeals/{id}/migrate")
         try:
             appeal = appeals.get(id)
         except AppealError as exc:
@@ -386,12 +546,15 @@ def register_write_routes(app, *, principal_dep):
                 return appeals.migrate(id, principal["id"])
             except AppealError as exc:
                 raise HTTPException(exc.status, "%s: %s" % (exc.code, exc.detail))
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"appeal_id": id, "action": "migrate"})
 
     @app.post("/api/v1/appeals/{id}/withdraw")
     def withdraw_appeal(id: str, request: Request, body: AppealWithdraw,
                         principal=Depends(principal_dep),
                         idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/appeals/{id}/withdraw")
         try:
             appeal = appeals.get(id)
         except AppealError as exc:
@@ -403,12 +566,15 @@ def register_write_routes(app, *, principal_dep):
                 return appeals.withdraw(id, principal["id"], body.reason)
             except AppealError as exc:
                 raise HTTPException(exc.status, "%s: %s" % (exc.code, exc.detail))
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"appeal_id": id, **body.model_dump()})
 
     def takedown_action(action):
         def handler(id: str, request: Request,
                     principal=Depends(principal_dep),
                     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+            require_enabled("/api/v1/takedown-tasks/{id}/" + action)
             task = task_or_404(id)
             require_tenant(principal, task, "takedown task")
 
@@ -427,7 +593,9 @@ def register_write_routes(app, *, principal_dep):
                 new["version"] = int(new.get("version") or 0) + 1
                 save_task(new)
                 return new
-            return _idempotent(request, idempotency_key, run)
+            return _idempotent(
+                request, idempotency_key, run, actor=principal["id"],
+                request_body={"task_id": id, "action": action})
         return handler
 
     for action in ("start", "fail", "retry"):
@@ -438,6 +606,7 @@ def register_write_routes(app, *, principal_dep):
     def takedown_complete(id: str, request: Request, body: TakedownEvidence,
                           principal=Depends(principal_dep),
                           idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/takedown-tasks/{id}/complete")
         task = task_or_404(id)
         require_tenant(principal, task, "takedown task")
 
@@ -449,12 +618,15 @@ def register_write_routes(app, *, principal_dep):
             new["version"] = int(new.get("version") or 0) + 1
             save_task(new)
             return new
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"task_id": id, **body.model_dump()})
 
     @app.post("/api/v1/takedown-tasks/{id}/reassign")
     def takedown_reassign(id: str, request: Request, body: TakedownReassign,
                           principal=Depends(principal_dep),
                           idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/takedown-tasks/{id}/reassign")
         task = task_or_404(id)
         require_tenant(principal, task, "takedown task")
 
@@ -466,12 +638,15 @@ def register_write_routes(app, *, principal_dep):
             new["version"] = int(new.get("version") or 0) + 1
             save_task(new)
             return new
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"task_id": id, **body.model_dump()})
 
     @app.post("/api/v1/takedown-tasks/{id}/waive")
     def takedown_waive(id: str, request: Request, body: TakedownWaive,
                        principal=Depends(principal_dep),
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/takedown-tasks/{id}/waive")
         task = task_or_404(id)
         require_tenant(principal, task, "takedown task")
 
@@ -490,12 +665,15 @@ def register_write_routes(app, *, principal_dep):
             new["version"] = int(new.get("version") or 0) + 1
             save_task(new)
             return new
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"task_id": id, **body.model_dump()})
 
     @app.post("/api/v1/cases/{id}/release-decision")
     async def release_decision(id: str, request: Request, body: ReleaseDecisionBody,
                          principal=Depends(principal_dep),
                          idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/cases/{id}/release-decision")
         case = case_or_404(id)
         if body.decision not in ("sign", "reject"):
             raise HTTPException(400, "decision 必须是 sign/reject")
@@ -521,12 +699,15 @@ def register_write_routes(app, *, principal_dep):
                 raise HTTPException(400, "signature: %s" % exc)
             return {"signature": sig, "release": gate.state(id)}
 
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"case_id": id, **body.model_dump()})
 
     @app.post("/api/v1/cases/{id}/release-revoke")
     async def release_revoke(id: str, request: Request, body: ReleaseRevokeBody,
                        principal=Depends(principal_dep),
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
+        require_enabled("/api/v1/cases/{id}/release-revoke")
         case = case_or_404(id)
         if body.version != case.get("case_version"):
             raise HTTPException(409, "version_conflict: 案件版本已变化")
@@ -545,6 +726,8 @@ def register_write_routes(app, *, principal_dep):
                 raise HTTPException(400, "signature: %s" % exc)
             return {"release": out, "state": gate.state(id)}
 
-        return _idempotent(request, idempotency_key, run)
+        return _idempotent(
+            request, idempotency_key, run, actor=principal["id"],
+            request_body={"case_id": id, **body.model_dump()})
 
     return IMPLEMENTED_WRITE_PATHS

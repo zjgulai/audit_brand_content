@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "business-command-batch-v1.schema.json",
+  "title": "business-command-batch/v1 —— 工作台人工动作权威事件批次",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "command_id",
+    "authority_seq",
+    "prev_manifest_sha256",
+    "aggregate_type",
+    "aggregate_id",
+    "expected_version",
+    "result_version",
+    "actor",
+    "command",
+    "occurred_at",
+    "idempotency_key",
+    "request_sha256",
+    "events",
+    "result",
+    "reconcile_token"
+  ],
+  "properties": {
+    "schema_version": { "const": "business-command-batch/v1" },
+    "command_id": { "type": "string", "minLength": 1 },
+    "authority_seq": { "type": "integer", "minimum": 1 },
+    "prev_manifest_sha256": {
+      "type": ["string", "null"],
+      "minLength": 64,
+      "description": "首批为 null；其后为前一个 manifest 原始字节 SHA-256"
+    },
+    "aggregate_type": {
+      "type": "string",
+      "enum": ["review_case"]
+    },
+    "aggregate_id": { "type": "string", "minLength": 1 },
+    "expected_version": { "type": "integer", "minimum": 0 },
+    "result_version": { "type": "integer", "minimum": 1 },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal_id", "tenant_id"],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1 },
+        "tenant_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "command": {
+      "type": "string",
+      "enum": [
+        "claim",
+        "unclaim",
+        "reassign",
+        "heartbeat",
+        "expire_lease",
+        "save_draft",
+        "adopt_draft",
+        "reference_fragment",
+        "submit_review"
+      ]
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "idempotency_key": { "type": "string", "minLength": 1 },
+    "request_sha256": { "type": "string", "minLength": 64 },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "result": { "type": "object" },
+    "reconcile_token": { "type": "string", "minLength": 20 }
+  }
+}

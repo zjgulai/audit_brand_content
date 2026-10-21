@@ -75,16 +75,26 @@
   },
   {
    "verifier": "tools/verify_atomic_commit.py",
-   "asserts": "P-1 原子提交：六个崩溃点 / 恢复四态 / stale lock 清理与活 PID 锁保留（反向对照）",
+   "asserts": "P-1 原子提交：六个崩溃点 / 恢复四态 / stale lock 清理与活 PID 锁保留 / manifest 不覆盖 / 不可变对象同 hash 复用异 hash 拒绝 / artifact key 防路径穿越",
    "subjects": [
     "base/artifact_store.py"
    ]
   },
   {
    "verifier": "tools/verify_auth_session.py",
-   "asserts": "会话与 step-up：cookie 只含 opaque id / idle 30m+absolute 8h / 撤销立即失效 / step-up 单次消费",
+   "asserts": "会话与 step-up：opaque cookie / idle 30m+absolute 8h / 撤销立即失效 / OAuth state 浏览器绑定 / hashed step-up 原子单次消费 / generation 拒旧 DB / 独立低敏 auth+step-up 审计",
    "subjects": [
     "base/auth_session.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_backend_recovery.py",
+   "asserts": "权威备份/恢复：只收已提交 manifest+事件与长期审计，排除 session/projection/generation，坏 hash/夹带/半行拒绝，空目录恢复后重建 fresh 投影，失败不留半恢复",
+   "subjects": [
+    "base/backend_recovery.py",
+    "base/business_event_store.py",
+    "base/projection_store.py",
+    "base/projector.py"
    ]
   },
   {
@@ -94,6 +104,14 @@
     "dsh-browser-ext/panel/assets/index.js",
     "dsh-browser-ext/manifest.json",
     "ADR/ADR-0013-基座接口冻结与仓库入库分级.md"
+   ]
+  },
+  {
+   "verifier": "tools/verify_business_event_store.py",
+   "asserts": "业务权威事件：不可变 command batch、重启幂等、manifest/hash 腐败拒绝、崩溃孤儿恢复与 OS flock 单写者",
+   "subjects": [
+    "base/business_event_store.py",
+    "base/artifact_store.py"
    ]
   },
   {
@@ -116,9 +134,9 @@
   },
   {
    "verifier": "tools/verify_contracts.py",
-   "asserts": "三份 contracts/*.schema.json 的结构与正负样本校验（attempt-v1 / receipt-v1 / review-ir-v1）",
+   "asserts": "五份 contracts/*.schema.json 的结构与正负样本校验（attempt / receipt / review-ir / business-command-batch / projection-status）+ fresh seq/hash 恒等式",
    "subjects": [],
-   "dynamic": "三份 schema 名在源码 SCHEMAS 元组里列举、文件名运行时拼出（f\"{name}.schema.json\"），静态 subjects 无法逐字命中；运行期按该元组逐份加载并做正负样本"
+   "dynamic": "五份 schema 名在源码 SCHEMAS 元组里列举、文件名运行时拼出（f\"{name}.schema.json\"），静态 subjects 无法逐字命中；运行期按该元组逐份加载并做正负样本"
   },
   {
    "verifier": "tools/verify_control_points.py",
@@ -213,6 +231,14 @@
     "tools/feishu_index.py",
     "research/feishu/资源索引-v1.json",
     "research/feishu/可达清单.md"
+   ]
+  },
+  {
+   "verifier": "tools/verify_feishu_web_oauth_live.py",
+   "asserts": "真实独立飞书 OAuth tri-state 联调门：无低敏 evidence 退2，不把 fake 冒充真实通过；evidence 必含 reauth consent、step-up hash/single-use 与 session generation",
+   "subjects": [
+    "api/oauth.py",
+    "api/production_app.py"
    ]
   },
   {
@@ -332,6 +358,29 @@
    ]
   },
   {
+   "verifier": "tools/verify_production_app.py",
+   "asserts": "生产装配：fake OAuth/reauth、持久复核、CSRF/Origin、freshness/RYW、动态 ACL、health/readiness、重启、writer lease 与故障注入",
+   "subjects": [
+    "api/production_app.py",
+    "api/oauth.py",
+    "api/review_api.py",
+    "api/write_api.py",
+    "base/auth_session.py",
+    "base/principal_directory.py",
+    "base/review_command_service.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_projection_store.py",
+   "asserts": "业务投影：权威重建、无投影幽灵、seq+manifest 前缀/最终 hash、新鲜度/202/RYW、线程并发顺序与 lease 到期转手",
+   "subjects": [
+    "base/business_event_store.py",
+    "base/projection_store.py",
+    "base/projector.py",
+    "base/review_command_service.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_rbac.py",
    "asserts": "RBAC 与对象 ACL：角色能力 / 提交人仅自己 / DP3·DP4 tenant+product_line+assigned / SoD / 越权 403",
    "subjects": [
@@ -354,7 +403,7 @@
   },
   {
    "verifier": "tools/verify_release_gate.py",
-   "asserts": "T2-03/RL-1…RL-15 release_gate：pending_release→signed/rejected、signed→revoked/invalidated 状态机；签名绑定全字段；SoD；step-up 单次消费；五类失效与未使用 ref 不触发；重审 job 合并/继任/幂等；机器不可写 release_status；签名不可变",
+   "asserts": "T2-03/RL-1…RL-15 release_gate：状态机/全字段签名/SoD/五类失效/重审 job；step-up 原子单次消费，签名只存不可逆 ref 不存 bearer token；机器不可写 release_status；签名不可变",
    "subjects": [
     "base/release_gate.py"
    ]
@@ -392,11 +441,19 @@
   },
   {
    "verifier": "tools/verify_review_api.py",
-   "asserts": "T2-01 只读 API：OpenAPI 3.1；UIUX Appendix B 端点全覆盖；Pydantic 响应模型与 ReviewIR schema 对齐；无 session→401、越权→403、IT 读内容→403；/metrics 仅内部；状态只读落盘 IR 不计算；四条反向对照",
+   "asserts": "T2-01 只读 API：OpenAPI 3.1 / ReviewIR schema / session+principal 绑定 / 内容 ACL；通知、申诉、下线、grant、metrics 全按 tenant 过滤，orphan report 不泄漏；状态只读落盘 IR 不计算；正反对照",
    "subjects": [
     "api/review_api.py",
     "contracts/review-ir-v1.schema.json",
     "PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md"
+   ]
+  },
+  {
+   "verifier": "tools/verify_review_reducer.py",
+   "asserts": "生产复核 reducer：九种命令、lease 到期、草稿采纳/片段引用、失败不修改旧状态",
+   "subjects": [
+    "base/review_reducer.py",
+    "base/reviews_ledger.py"
    ]
   },
   {
@@ -487,8 +544,17 @@
    ]
   },
   {
+   "verifier": "tools/verify_web_auth.py",
+   "asserts": "独立飞书 Web OAuth 离线协议：authorize response_type/state/redirect/scope/prompt consent、v2 token、v1 user_info、tenant+open_id 与错误脱敏",
+   "subjects": [
+    "api/oauth.py",
+    "api/production_app.py",
+    "base/auth_session.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_write_api.py",
-   "asserts": "T2-02 写端点：claim/unclaim/reassign 接 reviews_ledger（409/403/Idempotency-Key）；actions 走 finding_store + derived_from；appeals 迁移权限；takedown 接 base/takedown；release-decision/revoke 501 占位不假成功；静态扫描不 import 判定实现；四条反向对照",
+   "asserts": "T2-02 写端点：legacy review/finding/appeal/takedown/release 编排与错误语义；Idempotency-Key 绑定 actor/path/body 且单进程原子；生产 capability 显式空集不回退全开，首批外写面 fail closed；API 不计算判定",
    "subjects": [
     "api/review_api.py",
     "api/write_api.py",
@@ -496,6 +562,35 @@
     "base/finding_store.py",
     "base/takedown.py"
    ]
+  },
+  {
+   "verifier": "tools/verify_authority_change.py",
+   "asserts": "权威源变更 → 重审入队（行 103 / RL-15）：AUTHORITY_KINDS 与 on_authority_changed",
+   "subjects": [
+    "base/authority_change.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_taxonomy.py",
+   "asserts": "`base/taxonomy.py` 的回归与门槛",
+   "subjects": [
+    "base/taxonomy.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_secret_patterns.py",
+   "asserts": "仓内文本凭据形态扫描（私钥块 / 云密钥 / Bearer / 读凭据路径），按形态不按名字",
+   "subjects": [
+    "tools/verify_secret_patterns.py"
+   ]
+  },
+  {
+   "verifier": "web/scripts/verify_manual_a11y.mjs",
+   "asserts": "人工无障碍证据门（TS-9 的另一半）：未签收项退 2（未测），不是绿也不是红",
+   "subjects": [
+    "web/a11y-manual-v1.json"
+   ],
+   "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
   }
  ]
 }

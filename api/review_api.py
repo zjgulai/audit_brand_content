@@ -184,32 +184,57 @@ class InMemoryRepository:
 
 
 class FileProjectionRepository(InMemoryRepository):
-    """从仓外投影目录只读加载 JSON；文件不存在则对应集合为空。"""
+    """从仓外投影目录加载 JSON；strict 模式坏/缺文件直接拒绝。"""
 
-    def __init__(self, root):
-        def load(name, default):
+    def __init__(self, root, *, strict=False):
+        def load(name, default, expected_type, *, required=False):
             path = os.path.join(root, name)
             try:
                 with open(path, encoding="utf-8") as f:
-                    return json.load(f)
-            except (OSError, ValueError):
+                    value = json.load(f)
+            except FileNotFoundError as exc:
+                if strict and required:
+                    raise RuntimeError("frozen_projection_missing:%s" % name) from exc
                 return default
+            except (OSError, ValueError) as exc:
+                if strict:
+                    raise RuntimeError("frozen_projection_unreadable:%s" % name) from exc
+                return default
+            if not isinstance(value, expected_type):
+                if strict:
+                    raise RuntimeError("frozen_projection_shape:%s" % name)
+                return default
+            return value
+
+        cases = load("cases.json", [], list, required=True)
+        if strict:
+            for index, case in enumerate(cases):
+                if not isinstance(case, dict):
+                    raise RuntimeError("frozen_projection_case_shape:%d" % index)
+                ir = case.get("ir")
+                stored_outcome = ir.get("decision") if isinstance(ir, dict) else None
+                required = (case.get("case_id"), case.get("tenant"),
+                            case.get("product_line"))
+                if (not all(isinstance(value, str) and value for value in required)
+                        or not isinstance(stored_outcome, dict)
+                        or not isinstance(stored_outcome.get("state"), str)):
+                    raise RuntimeError("frozen_projection_case_shape:%d" % index)
 
         super().__init__(
-            cases=load("cases.json", []),
-            reports=load("reports.json", []),
-            rules=load("rules.json", []),
-            control_points=load("control-points.json", []),
-            routing=load("routing.json", []),
-            notifications=load("notifications.json", []),
-            metrics=load("metrics.json", {}),
-            appeals=load("appeals.json", []),
-            release_pending=load("release-pending.json", []),
-            takedown_tasks=load("takedown-tasks.json", []),
-            signer_grants=load("signer-grants.json", []),
-            takedown_grants=load("takedown-grants.json", []),
-            sessions=load("sessions.json", []),
-            release_readiness=load("release-readiness.json", {}),
+            cases=cases,
+            reports=load("reports.json", [], list),
+            rules=load("rules.json", [], list),
+            control_points=load("control-points.json", [], list),
+            routing=load("routing.json", [], list),
+            notifications=load("notifications.json", [], list),
+            metrics=load("metrics.json", {}, dict),
+            appeals=load("appeals.json", [], list),
+            release_pending=load("release-pending.json", [], list),
+            takedown_tasks=load("takedown-tasks.json", [], list),
+            signer_grants=load("signer-grants.json", [], list),
+            takedown_grants=load("takedown-grants.json", [], list),
+            sessions=load("sessions.json", [], list),
+            release_readiness=load("release-readiness.json", {}, dict),
         )
 
 
@@ -225,6 +250,19 @@ def _ir_field(case, *keys):
             return None
         value = value.get(key)
     return value
+
+
+def _review_summary(value):
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: value.get(key)
+        for key in (
+            "case_id", "status", "assignee", "version", "claimed_at",
+            "last_activity", "lease_expires", "released_at",
+            "released_draft_id", "primary_draft_id",
+        )
+    }
 
 
 def _summary(case):
@@ -331,7 +369,11 @@ class AccessLog(object):
 
 def create_app(*, session_store=None, repository=None, principals=None,
                principal_provider=None, openapi_version="3.1.0",
-               reviews_ledger=None, finding_store=None, appeals=None,
+               reviews_ledger=None, review_read_store=None,
+               review_command_service=None, enabled_write_capabilities=None,
+               review_freshness_provider=None, case_state_provider=None,
+               review_assignee_validator=None,
+               session_cookie_name="session", finding_store=None, appeals=None,
                release_gate=None, app_env=None,
                allow_simulated_identity=None, access_log_path=None):
     store = session_store or SessionStore(
@@ -382,7 +424,9 @@ def create_app(*, session_store=None, repository=None, principals=None,
     app.state.app_env = resolved_env
     app.state.allow_simulated_identity = allow_simulated_identity
     app.state.access_log = AccessLog(access_log_path)
-    repo_ledger = app.state.reviews_ledger
+    repo_ledger = review_read_store or app.state.reviews_ledger
+    app.state.review_command_service = review_command_service
+    app.state.session_cookie_name = session_cookie_name
 
     @app.exception_handler(HTTPException)
     async def _http_error(request: Request, exc: HTTPException):
@@ -397,8 +441,11 @@ def create_app(*, session_store=None, repository=None, principals=None,
         )
 
     async def session_dep(request: Request):
-        session = request.app.state.session_store.get_session(
-            request.cookies.get("session"))
+        try:
+            session = request.app.state.session_store.get_session(
+                request.cookies.get(request.app.state.session_cookie_name))
+        except Exception as exc:
+            raise HTTPException(503, "session_unavailable") from exc
         if not session:
             raise HTTPException(401, "缺少或无效 session")
         return session
@@ -410,8 +457,11 @@ def create_app(*, session_store=None, repository=None, principals=None,
             env=request.app.state.app_env)
 
     def principal_dep(request: Request, session=Depends(session_dep)):
-        principal = request.app.state.principal_provider(
-            session["principal"], session["tenant"])
+        try:
+            principal = request.app.state.principal_provider(
+                session["principal"], session["tenant"])
+        except Exception as exc:
+            raise HTTPException(503, "principal_directory_unavailable") from exc
         if not principal:
             raise HTTPException(401, "无法解析 principal")
 
@@ -436,6 +486,10 @@ def create_app(*, session_store=None, repository=None, principals=None,
         if tenant_id != session.get("tenant"):
             _audit_rejection(request, principal, "identity_tenant_mismatch")
             raise HTTPException(403, "身份 tenant_id 与 session 不一致")
+        if (session.get("authz_version") is not None
+                and session.get("authz_version") != principal.get("authz_version")):
+            _audit_rejection(request, principal, "identity_authorization_changed")
+            raise HTTPException(401, "主体授权已变化，请重新登录")
         return principal
 
     def internal_dep(principal=Depends(principal_dep)):
@@ -443,14 +497,29 @@ def create_app(*, session_store=None, repository=None, principals=None,
             raise HTTPException(403, "仅内部角色可读")
         return principal
 
+    def effective_case(case):
+        value = dict(case)
+        if case_state_provider is not None:
+            live = case_state_provider(case.get("case_id"))
+            if isinstance(live, dict):
+                value["assignee_id"] = live.get("assignee")
+                value["actionable"] = live.get("status") in (
+                    "unassigned", "released")
+        return value
+
     def require_read(principal, case):
-        if not can_read_content(principal, case):
+        if not can_read_content(principal, effective_case(case)):
             raise HTTPException(403, "无权读取该案件内容")
+
+    def require_review_fresh():
+        if review_freshness_provider is not None:
+            review_freshness_provider()
 
     @app.get("/api/v1/cases", response_model=List[CaseSummary])
     def list_cases(principal=Depends(principal_dep)):
-        return [_summary(c) for c in repo.list_cases()
-                if can_read_content(principal, c)]
+        require_review_fresh()
+        return [_summary(effective_case(c)) for c in repo.list_cases()
+                if can_read_content(principal, effective_case(c))]
 
     @app.get("/api/v1/cases/{id}", response_model=CaseDetail)
     def get_case(id: str, principal=Depends(principal_dep)):
@@ -458,27 +527,29 @@ def create_app(*, session_store=None, repository=None, principals=None,
         if case is None:
             raise HTTPException(404, "案件不存在")
         require_read(principal, case)
+        require_review_fresh()
         return {"case_id": id, "ir": case["ir"],
-                "review": repo_ledger.get_case(id)}
+                "review": _review_summary(repo_ledger.get_case(id))}
 
     @app.get("/api/v1/queue", response_model=List[CaseSummary])
     def queue(principal=Depends(principal_dep)):
-        return [_summary(c) for c in repo.list_cases()
-                if can_read_content(principal, c)
+        require_review_fresh()
+        return [_summary(effective_case(c)) for c in repo.list_cases()
+                if can_read_content(principal, effective_case(c))
                 and _ir_state(c) in ("REVIEW", "待自决")]
 
     @app.get("/review-api/queue", response_model=List[CaseSummary])
     def review_api_queue(principal=Depends(principal_dep)):
         """联调别名：只读列出所有可读案件，不改任何状态。"""
-        return [_summary(c) for c in repo.list_cases()
-                if can_read_content(principal, c)]
+        return [_summary(effective_case(c)) for c in repo.list_cases()
+                if can_read_content(principal, effective_case(c))]
 
     @app.get("/api/v1/reports", response_model=List[ReportSummary])
     def list_reports(principal=Depends(principal_dep)):
         out = []
         for report in repo.list_reports():
             case = repo.get_case(report.get("case_id"))
-            if case is None or can_read_content(principal, case):
+            if case is not None and can_read_content(principal, effective_case(case)):
                 out.append(_report_summary(report))
         return out
 
@@ -488,8 +559,9 @@ def create_app(*, session_store=None, repository=None, principals=None,
         if report is None:
             raise HTTPException(404, "报告不存在")
         case = repo.get_case(report.get("case_id"))
-        if case is not None:
-            require_read(principal, case)
+        if case is None:
+            raise HTTPException(404, "报告缺少可授权案件")
+        require_read(principal, case)
         return _report_summary(report)
 
     @app.get("/api/v1/rules")
@@ -511,16 +583,20 @@ def create_app(*, session_store=None, repository=None, principals=None,
         #   于是 `None in (None, uid)` 恒真：任何人登录都能拿到全部通知。
         #   code=0、字段读得出、没有任何东西会红 —— 这正是 K-02 的形状。
         #   回归断言在 tools/verify_review_api.py 的 C6。
+        tenant = principal.get("tenant")
         return [n for n in repo.notifications
-                if n.get("recipient") in (None, principal.get("id"))]
+                if n.get("tenant") == tenant
+                and n.get("recipient") in (None, principal.get("id"))]
 
     @app.get("/api/v1/appeals")
     def appeals(principal=Depends(principal_dep)):
-        return repo.appeals
+        tenant = principal.get("tenant")
+        return [row for row in repo.appeals if row.get("tenant") == tenant]
 
     @app.get("/api/v1/release/pending")
     def release_pending(principal=Depends(principal_dep)):
-        return repo.release_pending
+        tenant = principal.get("tenant")
+        return [row for row in repo.release_pending if row.get("tenant") == tenant]
 
     @app.get("/api/v1/cases/{id}/release-readiness")
     def release_readiness(id: str, principal=Depends(principal_dep)):
@@ -532,25 +608,38 @@ def create_app(*, session_store=None, repository=None, principals=None,
 
     @app.get("/api/v1/takedown-tasks")
     def takedown_tasks(principal=Depends(principal_dep)):
-        return repo.takedown_tasks
+        tenant = principal.get("tenant")
+        return [row for row in repo.takedown_tasks if row.get("tenant") == tenant]
 
     @app.get("/api/v1/admin/signer-grants")
-    def signer_grants(_=Depends(internal_dep)):
-        return repo.signer_grants
+    def signer_grants(principal=Depends(internal_dep)):
+        tenant = principal.get("tenant")
+        return [row for row in repo.signer_grants if row.get("tenant") == tenant]
 
     @app.get("/api/v1/admin/takedown-grants")
-    def takedown_grants(_=Depends(internal_dep)):
-        return repo.takedown_grants
+    def takedown_grants(principal=Depends(internal_dep)):
+        tenant = principal.get("tenant")
+        return [row for row in repo.takedown_grants if row.get("tenant") == tenant]
 
     @app.get("/api/v1/admin/sessions")
-    def sessions(_=Depends(internal_dep)):
-        return repo.sessions
+    def sessions(request: Request, principal=Depends(internal_dep)):
+        if request.app.state.app_env == "production":
+            raise HTTPException(404, "not_found")
+        tenant = principal.get("tenant")
+        return [row for row in repo.sessions if row.get("tenant") == tenant]
 
     @app.get("/metrics")
-    def metrics(_=Depends(internal_dep)):
-        return repo.metrics
+    def metrics(principal=Depends(internal_dep)):
+        tenant = principal.get("tenant")
+        if isinstance(repo.metrics, dict) and tenant in repo.metrics:
+            return repo.metrics[tenant]
+        return {}
 
-    implemented = register_write_routes(app, principal_dep=principal_dep)
+    implemented = register_write_routes(
+        app, principal_dep=principal_dep,
+        review_command_service=review_command_service,
+        enabled_capabilities=enabled_write_capabilities,
+        assignee_validator=review_assignee_validator)
 
     def placeholder(request: Request, _principal=Depends(principal_dep)):
         if ("/release-decision" in request.url.path
@@ -584,6 +673,3 @@ def create_app(*, session_store=None, repository=None, principals=None,
                     method.lower()))
 
     return app
-
-
-app = create_app()

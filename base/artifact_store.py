@@ -19,6 +19,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import time
 
@@ -58,10 +59,11 @@ class ArtifactStore(object):
         self.ir = os.path.join(self.root, "ir")
         self.receipts = os.path.join(self.root, "receipts")
         self.reports = os.path.join(self.root, "reports")
+        self.events = os.path.join(self.root, "events")
         self.manifests = os.path.join(self.root, "manifests")
         self.locks = os.path.join(self.root, "locks")
         for d in (self.staging, self.blobs, self.ir, self.receipts,
-                  self.reports, self.manifests, self.locks):
+                  self.reports, self.events, self.manifests, self.locks):
             os.makedirs(d, exist_ok=True)
         self._assert_same_fs()
         self._clean_stale_locks()
@@ -175,7 +177,14 @@ class ArtifactStore(object):
                 pass
         self._lock_path = None
 
+    @staticmethod
+    def _safe_key(key):
+        if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", key):
+            raise ValueError("artifact key 只允许 [A-Za-z0-9._-]：%r" % (key,))
+        return key
+
     def _final_path(self, kind, key, data):
+        key = self._safe_key(key)
         if kind == "blobs":
             return os.path.join(self.blobs, _sha256(data))
         if kind == "ir":
@@ -184,14 +193,24 @@ class ArtifactStore(object):
             return os.path.join(self.receipts, key + ".json")
         if kind == "reports":
             return os.path.join(self.reports, key + ".md")
+        if kind == "events":
+            return os.path.join(self.events, key + ".json")
         raise ValueError("unknown artifact kind: %s" % kind)
 
-    def commit(self, run_id, artifacts, crash_at=None, hard_crash_at=None):
+    def commit(self, run_id, artifacts, crash_at=None, hard_crash_at=None,
+               manifest_extra=None):
         """提交一次运行的全部产物；返回 manifest dict。
+
+        `manifest_extra` 只允许补充非保留元数据；用于 authority_seq / prev hash。
+        已存在 manifest 一律拒绝，防止同 run_id 覆盖历史。
 
         crash_at=1..5 为进程内故障注入（抛 SimulatedCrash）；
         hard_crash_at=4/5 在关键点直接 os._exit(9)（真实进程崩溃，跳过 finally）。
         """
+        run_id = self._safe_key(run_id)
+        mfinal = os.path.join(self.manifests, run_id + ".json")
+        if os.path.exists(mfinal):
+            raise FileExistsError("manifest 已存在，不许覆盖：%s" % run_id)
         self._lock(run_id)
         staging_run = os.path.join(self.staging, run_id)
         os.makedirs(staging_run, exist_ok=True)
@@ -212,7 +231,17 @@ class ArtifactStore(object):
                 final = self._final_path(a["kind"], a["key"], a["data"])
                 a["_final"] = final
                 os.makedirs(os.path.dirname(final), exist_ok=True)
-                os.replace(a["_tmp"], final)
+                digest = _sha256(a["data"])
+                if os.path.exists(final):
+                    with open(final, "rb") as f:
+                        existing = _sha256(f.read())
+                    if existing != digest:
+                        raise FileExistsError(
+                            "不可变产物已存在且内容不同：%s" %
+                            os.path.relpath(final, self.root))
+                    os.unlink(a["_tmp"])
+                else:
+                    os.replace(a["_tmp"], final)
                 self._fsync_dir(os.path.dirname(final))
                 if crash_at == 2 and i == 0:
                     raise SimulatedCrash("rename_half")
@@ -230,6 +259,13 @@ class ArtifactStore(object):
                 "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                 "entries": entries,
             }
+            if manifest_extra is not None:
+                if not isinstance(manifest_extra, dict):
+                    raise TypeError("manifest_extra 必须是 dict")
+                reserved = set(manifest) & set(manifest_extra)
+                if reserved:
+                    raise ValueError("manifest_extra 不许覆盖保留字段：%s" % sorted(reserved))
+                manifest.update(manifest_extra)
             mtmp = os.path.join(self.manifests, run_id + ".json.tmp")
             with open(mtmp, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, sort_keys=True)
@@ -350,7 +386,8 @@ class ArtifactStore(object):
                         other.add(os.path.normpath(rel))
 
         actual = {}
-        for base in (self.blobs, self.ir, self.receipts, self.reports):
+        for base in (self.blobs, self.ir, self.receipts, self.reports,
+                     self.events):
             for dirpath, _dirnames, filenames in os.walk(base):
                 for fn in filenames:
                     path = os.path.join(dirpath, fn)
@@ -412,12 +449,13 @@ class ArtifactStore(object):
         if os.path.exists(mtmp):
             return "uncommitted", "manifest.tmp remains"
 
-        # 多 run 共用 blobs/：只有**没有被任何已提交 manifest 引用**的 blob 才是垃圾。
-        # 旧实现「见到任何 blob 就 garbage」，会把别的 run 的已提交产物误判成垃圾。
+        # 多 run 共用内容目录：只有**没有被任何已提交 manifest 引用**的对象才是垃圾。
         referenced = self._committed_paths()
-        for dirpath, _dirnames, filenames in os.walk(self.blobs):
-            for fn in filenames:
-                rel = os.path.relpath(os.path.join(dirpath, fn), self.root)
-                if os.path.normpath(rel) not in referenced:
-                    return "garbage", "unreferenced blob: %s" % rel
+        for base in (self.blobs, self.ir, self.receipts, self.reports,
+                     self.events):
+            for dirpath, _dirnames, filenames in os.walk(base):
+                for fn in filenames:
+                    rel = os.path.relpath(os.path.join(dirpath, fn), self.root)
+                    if os.path.normpath(rel) not in referenced:
+                        return "garbage", "unreferenced object: %s" % rel
         return "uncommitted", "nothing committed"
