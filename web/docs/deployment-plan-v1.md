@@ -83,17 +83,17 @@ DEPLOY-01 为用户提供的机房服务器，域名用于 HTTPS 工作台。
 | ID | 缺口与证据 | 完成判据 | 归属 |
 |---|---|---|---|
 | D-ENV | DEPLOY-01 的 OS/网络/DNS/TLS/权限均未核 | 授权后只读采集环境清单，确认入口与 SSH 主机指纹；不能用本机读数顶替 | 用户/运维；未执行 |
-| D-AUTH | 默认 `create_app()` 的主体映射为空；真实 SSO 回调尚未装配。不是匿名放行：缺主体字段会 401 | 真 IdP 登录、正确 tenant/open_id、撤销/超时、403、Secure+HttpOnly cookie、CSRF/Origin 与回调校验的正反对照 | 后端未派 |
+| D-AUTH | **本地生产装配已补**：独立飞书 Web OAuth（登录 + 独立 reauth callback）、tenant+open_id、本地主体目录热撤销、opaque session、Origin+CSRF、浏览器绑定与 hashed/single-use step-up 均有 fake/离线正反对照；真实独立应用尚未创建 | 真实 IdP 的两个 redirect allowlist（`/auth/callback`、`/auth/reauth/callback`）、最小 scope、`prompt=consent`、HTTPS cookie 与 tenant/open_id 需单独联调；live evidence 缺失时门退 2 | 后端本地门通过；真实飞书未测 |
 | D-DEV | **Web 侧已修**：生产 bundle 不含开发身份/写模块；dev wrapper 需显式 dev+opt-in 且只接 loopback；切身份隐藏旧内容并撤销旧 session | 网关仍须拒绝 `/dev/*`；真实 SSO 独立验收 | Web 生产边界 9/9（含坏样本反向对照）+ dev入口8/8 + 身份隔离通过；网关/后端待派 |
-| D-WEB-WRITE | **开发验收链已修**：每个意图传 Idempotency-Key，使用真实台账 version；页面真实完成 claim→draft→submit→GET，版本 0→1→2→3、草稿 ID 与 closed 回读 | 仅说明临时内存台账链可用；正式持久化、并发幂等、重启恢复与草稿/formal 全文 GET 仍须后端闭环 | Web 完成开发验收，生产保持只读 |
-| D-LEDGER | 默认 review 台账、申诉、幂等为内存；只给 finding/session 配文件不能解决全链 | 重启后恢复已确认写入；并发独占、幂等 actor/请求绑定与原子去重；正式装配不退回内存默认 | 后端未派 |
+| D-WEB-WRITE | **开发链 + 首批生产复核链已补**：每个意图带 Idempotency-Key；生产 claim/unclaim/reassign/heartbeat、draft save/adopt/reference、submit 走仓外不可变 command batch + manifest，SQLite 只作投影；重启后全文可回读 | finding confirm/reject、appeal、takedown、release/sign/revoke 仍明确 501；不得因路由存在而开放 | 本地临时仓外目录通过，未部署 |
+| D-LEDGER | review 权威已改为不可变文件+manifest；actor/tenant/key/request hash 幂等，OS `flock` 单写者，进程内 authority+projection 单飞；崩溃孤儿与并发均有反向对照 | 目标卷/容器 UID/GID、磁盘故障与真实负载仍须部署批验证；其余写域迁移前继续关闭 | 首批复核台账本地闭合 |
 | D-FINDING | `FindingStore(path)` 有 JSONL 重放能力，但默认为空；`GET case` 读启动加载的投影，不读新写 store | 真实权威数据正常初始化→GET candidate→confirm/reject→权威追加→投影重建→GET 新版本；坏投影能重建，旧 IR 不改 | 后端未派 |
-| D-PROJECTION | `FileProjectionRepository` 启动加载；没有保证变更可见的生产装配 | source/projection 版本可对拍；滞后必须可观测，不返回旧值假装新鲜；丢投影只靠权威记录可恢复 | 后端未派 |
-| D-TEST | A5 已带有效幂等键并核对精确错误；A7 真运行 13 项夹具自证；新增生产 bundle、dev wrapper、真实写链和身份切换行为测试 | 仍需生产认证、持久化、服务重启/并发下的写后回读与恢复测试；当前测试只覆盖临时单进程内存台账 | Web 本地门已补，后端门未派 |
+| D-PROJECTION | **本地生产投影已补**：SQLite WAL 逐批投影，`seq + manifest hash` 新鲜度、前缀链、202 lag、503 stale GET、绑定人/案的 read-your-write、在线 reconcile、删除后全量重建均有执行点 | 目标环境的磁盘/权限/负载与容器重建仍未测；SQLite 不进业务备份 | 本地 21 项投影自证通过 |
+| D-TEST | Web 门 + 后端生产装配门已补：本地 claim→draft→submit→重启、两线程/两进程、投影滞后、身份/CSRF/reauth、备份恢复、health/readiness 故障注入；另有真实 uvicorn HTTP smoke | fake/离线协议只证明接线；真实飞书、目标机、容器、TLS、负载与长稳仍单列未测 | 本地后端门通过；部署门未闭 |
 | D-STATE | 依据缺失时 `EvidenceItem` 仍默认 ok；覆盖非 partial 默认 pass 样式；当前规范版本展示不证明案件实际使用过该版本 | 未测/缺失不呈通过；每个 badge 取后端状态；区分“当前规范参考”与“案件使用的规则快照”，旧案不冒充按最新规范判定 | Web 下一批，未修 |
-| D-HEALTH | 没有服务级 health/readiness 正式探针；案件 release-readiness 不能代替服务 readiness | 提案 `/healthz`（存活）与 `/readyz`（身份/数据/投影可用），锁门/重启/磁盘满/恢复正反验证；探针不泄露内容 | 部署/后端未派 |
+| D-HEALTH | **本地正式入口已补**：`/healthz` 仅固定存活；`/readyz` 真探配置、权威链、seq/hash 投影、session DB、OS writer lease、0700 与主体目录，响应低敏；uvicorn 进程级 HTTP smoke 已过 | 容器重启策略、磁盘满、目标 UID/GID 与双容器 writer 仍须目标环境实测 | 本地门通过；TS-15 仍未测 |
 | D-MEDIA | 容器 OCR/ASR 基线未完成；macOS Vision/Speech 与 launchd 不可直接搬 Linux | 容器真实中英素材 benchmark，许可证/隐私/时码/bbox/latency/memory 齐；未覆盖模态继续未审查 | 多模态未派 |
-| D-RELEASE | 人级签发、step-up/nonce 与恢复/撤销尚未端到端验收；本 Web 无签发入口 | 五标签不等于发布许可；唯一受控入口、人显式确认、SoD 与一次性 token 并发消费拒绝的实测 | 独立批次，首批关闭 |
+| D-RELEASE | release gate/SoD/nonce/5分钟 single-use step-up 的领域与 API 自证已过；step-up 仅存 hash，签名只存不可逆 ref，独立 reauth 使用官方 `prompt=consent` | **首批生产 capability 仍关闭 sign/revoke**；真实飞书 consent 不能夸大为重新输入账号凭据，live evidence 与 Web 签发 UI 未完成前不开放 | 独立后续批次，当前 501 |
 
 以上表中标“待实现”的仍是上线门；D-DEV、D-WEB-WRITE 与 D-TEST 的**本地 Web 执行器已新增并实跑**，其余不能写成已存在的保护。
 端点/函数已有实现、本地单进程验收、生产装配与可靠性闭环是四件事，不能互相作证。
@@ -178,16 +178,21 @@ DEPLOY-01 为用户提供的机房服务器，域名用于 HTTPS 工作台。
 | 目标服务器及公网入口 | **未测**；未连接、未解析域名、未探测端口 |
 | 当前规范 JSON | `--check` rc=0、`--selftest` 9/9；当前页面读 `v1.1 / 4a96880b0cf8` |
 | 本地完整 Web 联调 | **本轮实跑 rc=0**：11 阶段；生产 bundle 9/9（正常与 hostile-build 双跑）、dev fail-closed 8/8、写链 version 0→1→2→3、无障碍40项0违规、390×844无横向溢出且控件≥44px、切片15/15、身份隔离/旧session撤销通过 |
-| API/前端/运行约束 | Web读写为临时单进程验收；后端持久化/正式认证/投影/多worker仍仅静态审查，不是生产端到端验收 |
-| 容器媒体/恢复/负载/TLS/认证 | **未测** |
+| API/前端/运行约束 | Web 本地写链与后端首批复核生产装配均已在临时仓外目录实跑；固定单 worker + OS writer lease，其他人工写域继续 501 |
+| 后端持久化/认证/投影/恢复 | **本地通过**：权威 11/11、投影 21/21、reducer 15/15、session 39/39、OAuth 离线 8/8、生产装配 52/52、恢复 14/14；真实飞书 live gate 无 evidence 时退 2 |
+| 容器媒体/负载/TLS/真实认证 | **未测**；TS-15、目标机、DNS/TLS、真实飞书两个 callback/scope/consent 不因本地绿而闭合 |
 | 官方部署文档查询 | 本轮 Context7 超时、官方网页不可读；未据此声称远程配置已验证 |
 
 未来验证入口（只登记，不自动执行）：
 
 - Web：`bash web/scripts/dev-up.sh`；当前 D-WEB-WRITE/D-TEST 的本地单进程门已实跑，生产持久化/认证/投影门仍须后端补齐后重验。
 - 规范：`python3 tools/gen_taxonomy_json.py --check` 与 `--selftest`。
-- 后端：`tools/verify_review_api.py`、`verify_write_api.py`、`verify_api_integration.py`、
-  `verify_finding_store.py`、`verify_release_gate.py`、`verify_notifications.py`。
+- 后端：`.venv/bin/python tools/verify_business_event_store.py`、`verify_projection_store.py`、
+  `verify_review_reducer.py`、`verify_auth_session.py`、`verify_web_auth.py`、
+  `verify_production_app.py`、`verify_backend_recovery.py`；真实飞书：
+  `verify_feishu_web_oauth_live.py`（无单独授权 evidence 时应退 2）。
+- 离线运维：`.venv/bin/python tools/review_backend_admin.py {backup|restore|rebuild}`；
+  session/projection/generation 不进业务备份，access/auth/step-up 长期审计可恢复。
 - 总验收：`tools/verify_acceptance_run.py` 与 `tests/acceptance/verifier_map.json`；退 2 必须报未测，不能报通过。
 - 发布治理：`tools/verify_download_governance.py` 与 `tools/verify_depad.py`。
 
@@ -205,3 +210,29 @@ DEPLOY-01 为用户提供的机房服务器，域名用于 HTTPS 工作台。
 - `base/reviews_ledger.py:70–83`、`api/write_api.py:100–104,226–238`：内存台账、申诉与幂等。
 - `Playbook/内容审查Agent-产品Playbook-v1.1.md:1252–1302`：运行时、锁依赖、Compose 与 CPU 媒体合同。
 - `web/docs/handoff-4b.md`：确认读写断层与旧映射假设；本文件 §5 是并行任务的更新收口。
+
+---
+
+## 11. 批次 0 前端门禁（2026-10-21）
+
+本地新增的门（**不改变部署形态，也不新增运行时依赖**）：
+
+```bash
+cd web
+npm run verify:static     # 设计 token（DT-1…DT-8）；当前退 2：tokens.css/Button/icon.tsx 未建
+npm run verify:build      # build + F11 体积预算 + 生产边界门；当前退 2：无 vite manifest
+npm run verify:a11y:manual # TS-9 人工项；9 项全部 not_run → 退 2
+npm run verify:visual     # 视觉基线；没有 visual 段 → 退 2
+```
+
+**部署前必须知道的三件事：**
+
+1. **退 2 不是通过。** 体积预算要等 Stage 1 的 `build.manifest`、人工 a11y 要等 Stage 7 签收，
+   在那之前它们只会退 2。不要把 CI 里的 2 配成「忽略」。
+2. **已知红 A2d 未修**：缺 `authority_state` 的 finding 仍显示「可核」（Stage 5 / T-WEB-05）。
+   它不影响部署形态，但**影响「未测不得呈通过」这条产品铁律** —— 上线前必须关闭。
+3. 两条 a11y waiver（W-005 非文本对比、W-006 `/taxonomy` 1280×720 溢出 6px）
+   到期日都是 2026-11-30；过期后 `a11y_check.mjs` 会退 1。
+
+本节之前的后端装配读数由后端批次写入，与本节不是同一批改动。
+
