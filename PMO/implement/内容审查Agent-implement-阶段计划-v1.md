@@ -180,7 +180,7 @@ python3 tools/verify_depad.py                # 无 +4096 填充
 | T0-08 沙箱（G-5） | ✅ **通过** | `base/sandbox.py`（8,198B）+ `tools/verify_sandbox.py`（9,116B）；实跑 **11/11，rc=0**，含四条反向对照（去 CPU 限制 / 去超时 / 去 cwd 隔离 / 正常样本防全拦）；超限与普通失败可区分 |
 | T0-05 outbox | ✅ **通过（含两轮对抗审查，38/38）** | `tools/agent/outbound.mjs` + `outbound.test.mjs`；实跑 **21/21**，含「同一 id 只发一次 / 卡片+文本只发一次 / reply 不重发 / proactive 重发 / 缺 id 拒发」，**未发真消息** |
 | T0-06 durable inbox | ✅ **通过（含两轮对抗审查，29/29）** | `tools/agent/inbox.mjs` + `inbox.test.mjs`；实跑 **12/12**，含重复投递只处理一次、处理中崩溃续传、坏游标保守回退（宁可重放不跳过） |
-| T0-10 验收执行器 | ✅ **通过（含 T0-10b 加固）** | `tools/verify_acceptance_run.py` + 自测；实跑 **0 passed / 0 failed / 136 untested，rc=2**（正确：无执行点不许报通过）；自测 **6/6**，含「命令经 T0-08 沙箱执行」与「去掉 cwd 隔离 → 仓内出现文件」反向对照 |
+| T0-10 验收执行器 | ✅ **通过（含 T0-10b 加固）** | `tools/verify_acceptance_run.py` + 自测；实跑 **108 passed / 0 failed / 28 untested，rc=2**（未测 28 条全部是「缺执行点」，不是跑不过；2026-10-21 分诊：**可补 0 / 需新建 24 / 不该在此层 4**，逐条见 `tests/acceptance/untested-triage.md`）；自测 **6/6**，含「命令经 T0-08 沙箱执行」与「去掉 cwd 隔离 → 仓内出现文件」反向对照 |
 
 ---
 
@@ -269,17 +269,17 @@ G-5 组件可用（OS 级加固作为 T0-08b 并行）；G-4/G-6 的剩余项在
 
 | # | 位置 | 问题 | 修法要点 | 归属 | 状态 |
 |---|---|---|---|---|---|
-| SR-ADV1 | `submission_router.py:122-127` | 文档类型走非飞书链接未被拒（无用例覆盖） | 补 content_type=文档 + 群消息/free_text → rejected_unsupported | 6d | 待修 |
-| SR-ADV2 | `submission_router.py:291` | 同 submission_id 重试序号可恒为 1 | 补同 id 连续 submit 两次断言 attempt_id 不同 | 6d | 待修 |
+| SR-ADV1 | `submission_router.py:122-127` | 文档类型走非飞书链接未被拒（无用例覆盖） | 补 content_type=文档 + 群消息/free_text → rejected_unsupported | 6d | **已修 ✅**（2026-10-21 实测 40/40；`--controls` 4/4，删守卫→唯一红是 SR-ADV1） |
+| SR-ADV2 | `submission_router.py:291` | 同 submission_id 重试序号可恒为 1 | 补同 id 连续 submit 两次断言 attempt_id 不同 | 6d | **已修 ✅**（同上；把 `seq=?+1` 改成 `seq=1` → 唯一红是 SR-ADV2） |
 | JD-ADV1 | `job_dispatcher.py:257` | _stale() 死 PID 锁清理无用例覆盖 | 补死锁清理成功 + 活锁保留两条用例 | cleanup | **已修** ✅ |
 | JD-ADV2 | `job_dispatcher.py:430-431` | commit_failed 退路可绕过（未模拟 commit 失败） | mock store.commit 抛异常，断言 outcome=commit_failed | cleanup | **已修** ✅ |
 | JD-ADV3 | `job_dispatcher.py:149-150` | external_label 校验可绕过；run_state=OK 时 None 被放行 | 按 Playbook §3.3.2 改五值校验 + D 段补拒收断言 | cleanup | **已修** ✅ |
 | VC-1d | `attempt-v1.schema.json:66` | rejected_unsupported 允许带 receipt_id（漏负样本） | 补 rejected+receipt_id 与 failed+receipt_id 两条负样本 | 0e | 待修 |
 | VC-1e | `verify_contracts.py:175` | `unsupported_keywords()` 不递归 `allOf` | 递归遍历 allOf 列表元素 | 0e | 待修 |
-| VC-B1..B4 | `verify_contracts.py:300-352` | 行为断言与 schema 零连接（`rc` 赋值不用） | 真读 contracts/ 或改名 helper 单测并剔出契约验收 | 0e | 待修 |
-| FS-ADV1 | `finding_store.py:77-81` | `REQUIRED_KEYS` 死常量，`quote`/`derived_from` 未校验 | 接上校验 + 两条负样本 | 0e | 待修 |
-| FS-ADV2 | `finding_store.py:300` | `active()` 从未被测试（改恒返 [] 仍绿） | 补四态过滤用例 | 0e | 待修 |
-| FS-ADV3 | `finding_store.py` | M1（semantic 直接 confirmed 须 `confirmed_by_rule_class=True`）未实现 | 补守卫 + 正反断言 | 0e | 待修 |
+| VC-B1..B4 | `verify_contracts.py:300-352` | 行为断言与 schema 零连接（`rc` 赋值不用） | 真读 contracts/ 或改名 helper 单测并剔出契约验收 | 0e | **已修 ✅**（2026-10-21 实测 78 项全过，行为断言段在 `:407` 起） |
+| FS-ADV1 | `finding_store.py:77-81` | `REQUIRED_KEYS` 死常量，`quote`/`derived_from` 未校验 | 接上校验 + 两条负样本 | 0e | **已修 ✅**（`:126` 已 `for k in REQUIRED_KEYS`；删迭代→红 ADV1b） |
+| FS-ADV2 | `finding_store.py:300` | `active()` 从未被测试（改恒返 [] 仍绿） | 补四态过滤用例 | 0e | **已修 ✅**（`active()` 恒返 `[]` → 红 ADV2） |
+| FS-ADV3 | `finding_store.py` | M1（semantic 直接 confirmed 须 `confirmed_by_rule_class=True`）未实现 | 补守卫 + 正反断言 | 0e | **已修 ✅**（`:181-188` 守卫 + ADV3a/b/c；去掉守卫→红 ADV3a+3b） |
 
 **委托方裁定（2026-10-18 晚）**：`commit_failed` outcome **保留并写入规格**（job_dispatcher 五态之一，表达「worker 成功但产物落盘失败」）。
 
