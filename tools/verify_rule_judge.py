@@ -11,7 +11,7 @@
   D **反向对照**：未知码、deprecated 码、severity 写成 P 值、quote 与切片不符 —— 必须红。
   E **不是恒拒/恒过**：正常文本有命中；无关文本 0 命中；禁用规则不产命中。
   F **规则守卫**：exclude_patterns 只删重叠 span；require_context 是 OR 前置；
-    三类表达式都在装载时预编译；当前真实 enabled 规则输出零变化。
+    四组匹配器都在装载时用非空样本证明已预编译；当前真实 enabled 规则输出零变化。
 
 ## 退出码
 
@@ -317,10 +317,10 @@ def main():
         after_hit_count += len(after)
         before_bytes = json.dumps(
             {"unit_id": unit_value["unit_id"], "hits": before},
-            ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         after_bytes = json.dumps(
             {"unit_id": unit_value["unit_id"], "hits": after},
-            ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         before_digest.update(before_bytes + b"\n")
         after_digest.update(after_bytes + b"\n")
         if before_bytes != after_bytes:
@@ -341,8 +341,9 @@ def main():
     exclude_rule = copy.deepcopy(base_rule)
     exclude_rule["rule_key"] = "T.x.exclude"
     exclude_rule["match"] = {
-        "keywords": ["clinical"], "patterns": [],
+        "keywords": ["clinical"], "patterns": [r"__pattern_probe__$"],
         "exclude_patterns": [r"clinical\s+(trial|study)"],
+        "require_context": ["clinical"],
     }
     ex_judge = RuleJudge(reg, write_rules("exclude.json", [exclude_rule]))
     T("F3 只含被排除片段 → 0 命中",
@@ -353,6 +354,17 @@ def main():
     T("F4 同文被排除片段 + 真命中 → 只保留真命中",
       len(ex_hits) == 1 and ex_hits[0]["quote"] == "clinical"
       and ex_hits[0]["start"] == mixed_text.rfind("clinical"), repr(ex_hits))
+
+    partial_rule = copy.deepcopy(base_rule)
+    partial_rule["rule_key"] = "T.x.partial-overlap"
+    partial_rule["match"] = {
+        "keywords": [], "patterns": [r"clinical benefit"],
+        "exclude_patterns": [r"benefit claim"],
+    }
+    partial_judge = RuleJudge(reg, write_rules("partial_overlap.json", [partial_rule]))
+    T("F4b exclude 与候选只有部分重叠 → 候选仍被删除",
+      partial_judge.judge("clinical benefit claim") == [],
+      repr(partial_judge.judge("clinical benefit claim")))
 
     context_rule = copy.deepcopy(base_rule)
     context_rule["rule_key"] = "T.x.context"
@@ -365,13 +377,17 @@ def main():
     ctx_hits = ctx_judge.judge("Postpartum slim design")
     T("F6 命中任一 context 字面词 → 主规则命中",
       len(ctx_hits) == 1 and ctx_hits[0]["quote"].lower() == "slim", repr(ctx_hits))
+    second_ctx_hits = ctx_judge.judge("belly band slim design")
+    T("F6b 只命中 context 列表第二项也通过（OR，不是 AND）",
+      len(second_ctx_hits) == 1 and second_ctx_hits[0]["quote"].lower() == "slim",
+      repr(second_ctx_hits))
 
     compiled = ex_judge.rules[0]
-    T("F7 keywords/patterns/exclude/context 均在装载时预编译",
-      all(isinstance(rx, re.Pattern) for name in (
-          "keywords", "patterns", "exclude_patterns", "require_context")
-          for rx in compiled[name]), repr({k: len(compiled[k]) for k in compiled
-                                           if isinstance(compiled[k], list)}))
+    T("F7 keywords/patterns/exclude/context 均用非空样本在装载时预编译",
+      all(compiled[name] and all(isinstance(rx, re.Pattern) for rx in compiled[name])
+          for name in ("keywords", "patterns", "exclude_patterns", "require_context")),
+      repr({name: len(compiled[name]) for name in (
+          "keywords", "patterns", "exclude_patterns", "require_context")}))
 
     for name, mutate, marker in (
         ("exclude 非数组", lambda rule: rule["match"].update(

@@ -492,7 +492,7 @@
   },
   {
    "verifier": "tools/verify_rule_judge.py",
-   "asserts": "control_points + rule_judge：只收 active 码 / P0 字面命中 / quote==切片 / severity 必须 L*；exclude_patterns 只删重叠 span，require_context 作 OR 前置；装载时预编译；427 个真实 ContentUnit 接线前后逐输出对拍及正反行为样本",
+   "asserts": "control_points + rule_judge：只收 active 码 / P0 字面命中 / quote==切片 / severity 必须 L*；exclude_patterns 只删重叠 span（含部分重叠反例），require_context 作 OR 前置；四组匹配器以非空样本证明装载时预编译；427 个真实 ContentUnit 接线前后稳定 JSON 字节流逐输出对拍及正反行为样本",
    "subjects": [
     "base/control_points.py",
     "base/rule_judge.py",
