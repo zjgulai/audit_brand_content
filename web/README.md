@@ -157,12 +157,35 @@ bash web/scripts/dev-up.sh
 
 `dev-up.sh` 第 9 步会跑它，失败非零。
 
-**当前读数**：40 项检查 / 0 违规；另有 390×844 页面断言：队列/详情无横向溢出，队列行与主要控件 ≥44px（以脚本实跑为准）。
+**当前读数**（2026-10-21，批次 0）：**48 项检查 / 0 违规 / 8 条 WAIVED**
+（7 条非文本对比 + 1 条 `/taxonomy` 1280×720 横向溢出 6px，见 `web/a11y-waivers-v1.json`；
+每条有 owner + 到期日 + 票）。复现：`bash web/scripts/dev-up.sh` 的 [9/11]。
 **修复前（三页时）**：30 项 / 9 违规 —— 每页各 3 项：缺 skip-link、无 `:focus-visible` 规则、聚焦元素无可见轮廓。
 
 **明确未测（必须人工）**：键盘全流程、读屏语义与焦点顺序、动态内容播报、
 200% 缩放 / reflow、`prefers-reduced-motion`、文本覆盖图片/渐变时的对比、真实用户测试。
 自动对比度是近似计算，不等同于完整 WCAG 审计。
+这些项在 `web/a11y-manual-v1.json` 里逐条登记，`npm run verify:a11y:manual` 对未签收退 2。
+
+## 门禁（批次 0 · 2026-10-21）
+
+`web/scripts/gate.sh` 是静态/构建门的**唯一入口**；`package.json` 只调它。
+
+```bash
+npm run verify:static        # DT-1…DT-8（设计 token）
+npm run verify:build         # build + F11 体积预算 + 生产边界门
+npm run verify:tokens        # 只跑 DT
+npm run verify:budget        # 只跑 F11
+npm run verify:visual        # 视觉基线（需要服务器）
+npm run verify:a11y:manual   # TS-9 人工项签收台账
+```
+
+**退出码一律 0/1/2**：0 全绿，1 有红，**2 = 有未测（不是通过，也不是红）**。
+每个新脚本都输出固定契约 `{ok, reds[], untested[], waived[], details[]}`，且**每次主检查
+都真跑反向对照**（不是只在 `--selftest` 里跑）。
+
+批次 0 的当前状态与「为什么有些是未测、有些是已知红」见
+[`docs/frontend-baseline-v1.md`](docs/frontend-baseline-v1.md)。
 
 ## 构建
 

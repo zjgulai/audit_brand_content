@@ -1,0 +1,25 @@
+{
+ "schema_version": 1,
+ "$note": "无障碍 known-red 的登记表（不是依赖 policy 的 waiver）。每条必须有 rule/owner/expires/ticket；过期即红，不允许静默通过。方案 §6.8 W-005 落在本文件。",
+ "waivers": [
+  {
+   "id": "W-005",
+   "rule": "non-text-contrast",
+   "selector": "button, input, select, textarea, .queue__filter",
+   "reason": "控件边框用 hsl(var(--border))，与白底对比 1.39:1，低于 WCAG 2.2 AA 非文本对比 3:1。Stage 2 拆出 --input 后转绿。",
+   "owner": "audit-multi-content-1d（web owner）",
+   "expires": "2026-11-30",
+   "ticket": "T-WEB-02"
+  },
+  {
+   "id": "W-006",
+   "rule": "reflow-overflow",
+   "page": "/taxonomy",
+   "viewport": "desktop-1280x720",
+   "reason": "分类规范页在 1280×720 下 scrollWidth 1286 > innerWidth 1280（横向溢出 6px）。web/src 在批次 0 冻结（方案 L887），页面迁移在 Stage 5 修。",
+   "owner": "audit-multi-content-1d（web owner）",
+   "expires": "2026-11-30",
+   "ticket": "T-WEB-05"
+  }
+ ]
+}

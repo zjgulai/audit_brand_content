@@ -21,6 +21,11 @@ const expectCase = arg("case", "case-smoke");
 const expectReport = arg("report", "report-smoke");
 const shots = arg("screenshots", "");
 const enableDevIdentity = arg("enable-dev-identity", "0") === "1";
+// ★ 批次 0（方案 L1388）：1280×720 与 400% reflow（320 CSS px）是**显式开关**。
+//   默认关 —— 这两个视口属于 Stage 7 的收口门，打开前不让它们改变现有联调结论。
+//   自动 a11y 侧的同类检查在 a11y_check.mjs（Stage 0 已默认跑）。
+const wantDesktop = process.argv.includes("--desktop");
+const wantReflow = process.argv.includes("--reflow");
 const debugPort = Number(arg("debug-port", "9334"));
 const chrome =
   process.env.CHROME_BIN ||
@@ -289,8 +294,33 @@ async function main() {
     Boolean(caseMobile?.noOverflow) &&
     Boolean(caseMobile?.actionButtonsMin44);
 
+  // ── 可选：1280×720 与 320px reflow（--desktop / --reflow）───────────────
+  const viewportChecks = {};
+  for (const [flagOn, w, h, key] of [
+    [wantDesktop, 1280, 720, "desktop-1280x720"],
+    [wantReflow, 320, 800, "reflow-320"],
+  ]) {
+    if (!flagOn) continue;
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      width: w, height: h, deviceScaleFactor: 1, mobile: w < 600,
+    });
+    const rows = [];
+    for (const p of ["/queue", `/cases/${expectCase}`]) {
+      await cdp.send("Page.navigate", { url: `${base}${p}` });
+      await waitBody(p === "/queue" ? expectCase : "证据链");
+      rows.push(await evalValue(`({
+        page: ${JSON.stringify(p)},
+        noOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+      })`));
+    }
+    viewportChecks[key] = { ok: rows.every((r) => r && r.noOverflow), rows };
+  }
+  const viewportOk = Object.values(viewportChecks).every((v) => v.ok);
+
   const result = {
-    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk,
+    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk && viewportOk,
     queue: { ok: queueOk, shot: queueShot, body: queueBody.slice(0, 500) },
     case: {
       ok: caseOk,
@@ -317,6 +347,7 @@ async function main() {
       viewport: "390x844",
       queue: queueMobile,
       case: caseMobile,
+      ...viewportChecks,
     },
   };
   console.log(JSON.stringify(result, null, 2));

@@ -207,6 +207,76 @@ def build_cases() -> list[dict]:
     return cases
 
 
+def build_edge_cases() -> list[dict]:
+    """A2 的两条 DOM 夹具（方案 §7.2「A2 的具体改法」）。
+
+    它们刻意**只有一条 finding**，且 `authority_state` 分别是 `None` 与 `"ok"`：
+      * missing：页面必须显示「未测」，**不显示「可核」**；
+      * ok：页面必须显示「可核」，**不显示「未测」**。
+    旧的 `?? "ok"` 默认会让 missing 显示「可核」—— 这两条正是让那个 bug 变红的夹具。
+    """
+    out = []
+    for case_id, auth in (("case-edge-missing-authority", None),
+                          ("case-edge-authority-ok", "ok")):
+        idx = case_id
+        finding = {
+            "finding_id": "f-%s" % _hash16(SEED, idx, 0),
+            "control_code": "H01",
+            "status": "candidate",
+            "severity": "L3",
+            "produced_by": "rule",
+            "rule_key": "fixture.edge.%s" % ("missing" if auth is None else "ok"),
+            "detected_by": "P0",
+            "derived_from": None,
+            "confirmed_by_rule_class": False,
+            "quote": "边界夹具：%s" % ("缺依据字段" if auth is None else "依据可核"),
+            "location": {"type": "text", "start": 0, "end": 10},
+            "authority_ref": [],
+            "rule_snapshot": "rs-fixture-1",
+            "kb_snapshot": "kb-fixture-1",
+            "authority_state": auth,
+            "rule_conflict": False,
+            "resolution_detail": {
+                "refs": [],
+                "reason": None if auth is not None else "夹具：authority_state 显式缺失",
+            },
+        }
+        out.append({
+            "case_id": case_id,
+            "tenant": "t1",
+            "product_line": "pump",
+            "submitter_id": "u_sub_0",
+            "final_reviewer_id": "u_dp3",
+            "assignee_id": "u_dp3",
+            "actionable": True,
+            "sample": True,
+            "ir": {
+                "ir_id": "ir-%s" % _hash16(SEED, idx, "ir"),
+                "ir_version": "v1",
+                "source_ir_version": "v1",
+                "content_unit_ref": {"unit_id": "cu-%s" % _hash16(SEED, idx, "cu"),
+                                     "kind": "free_text"},
+                "findings": [finding],
+                "decision": {"state": "REVIEW", "layer": "DP3",
+                             "release_status": "待放行", "obligations": []},
+                "coverage": {
+                    "coverage_state": "full",
+                    "modalities_evaluated": ["free_text"],
+                    "rules_version": json.dumps({"fingerprint": "ffffffffffffffff",
+                                                 "version": "rs-fixture"}),
+                    "control_points_applied": ["H01"],
+                    "not_evaluated_reason": [],
+                },
+                "receipt_ref": "rcpt-%s" % _hash16(SEED, idx, "rcpt"),
+                "rule_snapshot": "rs-fixture-1",
+                "kb_snapshot": "kb-fixture-1",
+                "control_points_version": "cp-fixture-1",
+                "created_at": "2026-10-21T00:00:00Z",
+            },
+        })
+    return out
+
+
 def build_reports(cases: list[dict]) -> list[dict]:
     out = []
     for i, case in enumerate(cases):
@@ -356,6 +426,27 @@ def selftest() -> int:
                           0 < len(reports) < len(cases),
                           "%d/%d" % (len(reports), len(cases))))
 
+    # T10 / T11 · A2 的两条 DOM 夹具（--edge）
+    edge = build_edge_cases()
+    by_id = {c["case_id"]: c for c in edge}
+    want_missing = by_id.get("case-edge-missing-authority")
+    want_ok = by_id.get("case-edge-authority-ok")
+    auth_of = lambda c: (c or {}).get("ir", {}).get("findings", [{}])[0].get("authority_state")
+    results.append(_check(
+        "T10 边界夹具两条都在，authority_state 分别是 None 与 ok",
+        len(edge) == 2 and auth_of(want_missing) is None and auth_of(want_ok) == "ok",
+        "缺一条或取值不对 —— A2 会失去成对对照"))
+    # T11 反向对照：把 missing 强行改成 ok，判据必须能分辨（否则两条夹具长得一样）
+    tampered_edge = json.loads(json.dumps(edge))
+    for c in tampered_edge:
+        if c["case_id"] == "case-edge-missing-authority":
+            c["ir"]["findings"][0]["authority_state"] = "ok"
+    results.append(_check(
+        "T11 反向对照：missing 夹具改成 ok 后与 ok 夹具不再可区分",
+        auth_of(next(c for c in tampered_edge
+                     if c["case_id"] == "case-edge-missing-authority")) == "ok",
+        "反向样本没有真的改到字段"))
+
     ok = all(results)
     print("\n%s  %d/%d 项通过" % ("✅" if ok else "❌", sum(results), len(results)))
     return 0 if ok else 1
@@ -366,6 +457,8 @@ def main() -> int:
     ap.add_argument("--out")
     ap.add_argument("--merge", action="store_true",
                     help="与 out 目录里已有的 cases.json / reports.json 合并（保留 smoke 的真实案件）")
+    ap.add_argument("--edge", action="store_true",
+                    help="额外写入 A2 的两条边界夹具（case-edge-missing-authority / case-edge-authority-ok）")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -377,6 +470,8 @@ def main() -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     cases = build_cases()
+    if args.edge:
+        cases = cases + build_edge_cases()
     reports = build_reports(cases)
 
     if args.merge:

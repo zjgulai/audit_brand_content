@@ -262,3 +262,32 @@ hit 使用 `rule_key` / `parent_rule`；`base/rule_judge.py` 的 P0 路径另产
 
 部署准备、当前 Web 写请求及生产装配缺口见 [部署准备方案 v1](deployment-plan-v1.md)。
 本次只整理部署文档，不部署、不连接服务器。
+
+---
+
+## 八、批次 0 交接（2026-10-21，web owner：audit-multi-content-1d）
+
+批次 0 只做「冻结、基线、门禁修复」，**不装任何依赖、不改 `web/src/**`、不改 `dev-up.sh`**。
+
+**新增的门与入口**（详见 `web/README.md`「门禁（批次 0）」与 `web/docs/frontend-baseline-v1.md`）：
+
+- `scripts/gate.sh` 是 `verify:static` / `verify:build` 的唯一入口；新检查器都必须经它调用，
+  否则就是一句承诺（方案 L1318）。
+- `check_design_tokens.mjs`（DT-1…DT-8）、`check_bundle_budget.mjs`（F11）、
+  `check_visual.mjs`（视觉基线）、`verify_manual_a11y.mjs`（TS-9 人工项）。
+- 退 2 是常态：`tokens.css` / `Button` / `icon.tsx` / `vite manifest` 都还没建，
+  对应判据报**未测**，不报绿。
+
+**你接手时最该看的一条已知红：A2d。**
+
+- `seed_fixture.py --edge` 造了两条夹具：`case-edge-missing-authority`（`authority_state: null`）
+  与 `case-edge-authority-ok`（`"ok"`）。
+- 用 `check_review_slice.mjs --require-edge` 跑：**A2d 红**（缺字段的 finding 显示「可核」，
+  因为 `CaseDetailPage.tsx:101` 的 `?? "ok"`），A2e 绿。
+- `web/src/**` 在批次 0 冻结，修复属 Stage 5（T-WEB-05）。**这条红不要用改断言的方式消掉** ——
+  它是 D-STATE 那个病的直接证据。
+- `dev-up.sh` 不 seed `--edge`，所以日常 [10/11] 看不到 A2d；那是**未验证**，不是绿。
+
+**回退**：`web/docs/frontend-baseline-v1.md` §5 逐文件写了回退办法（含方案 L934 漏掉的
+`package.json` / `README.md` / `handoff-4b.md` / `deployment-plan-v1.md`）。
+

@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node scripts/check_production_bundle.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:static": "bash scripts/gate.sh --stage static",
+    "verify:build": "npm run build && bash scripts/gate.sh --stage build",
+    "verify:visual": "node scripts/check_visual.mjs --check",
+    "verify:a11y:manual": "node scripts/verify_manual_a11y.mjs",
+    "verify:tokens": "node scripts/check_design_tokens.mjs --check",
+    "verify:budget": "node scripts/check_bundle_budget.mjs --dir dist"
   },
   "dependencies": {
     "react": "^19.0.0",

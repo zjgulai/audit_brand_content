@@ -37,6 +37,29 @@ const pages = arg(
 const outFile = arg("out", "");
 const debugPort = Number(arg("debug-port", "9335"));
 const enableDevIdentity = arg("enable-dev-identity", "0") === "1";
+const mode = arg("mode", "auto");            // auto（Stage 0–6）| full（Stage 7，要求人工项签收）
+if (mode !== "auto" && mode !== "full") {
+  console.error(`未知 --mode：${mode}（只支持 auto | full）`);
+  process.exit(2);
+}
+const WEB = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const waiversPath = path.resolve(WEB, arg("waivers", "a11y-waivers-v1.json"));
+const today = new Date().toISOString().slice(0, 10);
+let waiverDoc = { waivers: [] };
+try {
+  waiverDoc = JSON.parse(fs.readFileSync(waiversPath, "utf8"));
+} catch (e) {
+  if (mode === "full") {
+    console.error(`⚠ 未测：waiver 文件读不出（${waiversPath}）：${e.message}`);
+    process.exit(2);
+  }
+}
+const expiredWaivers = (waiverDoc.waivers || []).filter((w) => w.expires && w.expires < today);
+const liveWaivers = (waiverDoc.waivers || []).filter((w) => !w.expires || w.expires >= today);
+const waiverSelectors = liveWaivers
+  .filter((w) => w.rule === "non-text-contrast")
+  .map((w) => w.selector)
+  .filter(Boolean);
 const chrome =
   process.env.CHROME_BIN ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -104,10 +127,11 @@ function connect(url) {
   });
 }
 
-const AUDIT = String.raw`
-(() => {
+const AUDIT_FN = String.raw`
+((waivers) => {
   const checks = [];
   const violations = [];
+  const waived = [];
   const unmeasured = [];
   const v = (kind, detail) => violations.push({ kind, ...detail });
 
@@ -199,6 +223,31 @@ const AUDIT = String.raw`
     unmeasured.push("页面没有可聚焦元素");
   }
 
+  checks.push("non-text-contrast");
+  const ntc = [...document.querySelectorAll("button,input,select,textarea,.queue__filter")]
+    .filter((el) => !el.disabled);
+  let ntcChecked = 0;
+  for (const el of ntc) {
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") continue;
+    if (parseFloat(cs.borderTopWidth) === 0) continue;
+    const bc = parseColor(cs.borderTopColor);
+    if (!bc || bc[3] === 0) continue;
+    const bg = bgOf(el);
+    if (bg.image) { unmeasured.push("控件边框背景为图片/渐变：" + el.tagName); continue; }
+    const r = ratio(bc, bg.color);
+    ntcChecked++;
+    if (r < 3) {
+      const isWaived = (waivers || []).some((sel) => {
+        try { return el.matches(sel); } catch { return false; }
+      });
+      const rec = { kind: "non-text-contrast", tag: el.tagName,
+        cls: String(el.className || ""), ratio: Math.round(r * 100) / 100, need: 3 };
+      if (isWaived) waived.push(rec); else v("non-text-contrast", rec);
+    }
+  }
+  checks.push("non-text-contrast-elements:" + ntcChecked);
+
   checks.push("color-contrast");
   function parseColor(s) {
     const m = String(s).match(/rgba?\(([^)]+)\)/);
@@ -281,6 +330,7 @@ const AUDIT = String.raw`
 
   return {
     checks: checks.length,
+    waived,
     checkNames: checks,
     violations,
     unmeasured,
@@ -293,7 +343,7 @@ const AUDIT = String.raw`
       contrastChecked,
     },
   };
-})()
+})
 `;
 
 async function main() {
@@ -347,7 +397,7 @@ async function main() {
     await cdp.send("Page.navigate", { url: base + p });
     await sleep(1200);
     const r = await cdp.send("Runtime.evaluate", {
-      expression: AUDIT,
+      expression: "(" + AUDIT_FN + ")(" + JSON.stringify(waiverSelectors) + ")",
       returnByValue: true,
     });
     const value = r?.result?.value ?? { violations: [{ kind: "audit-failed" }], checks: 0 };
@@ -355,13 +405,72 @@ async function main() {
     totalChecks += value.checks || 0;
     results.push({ page: p, ...value });
   }
+  // ── 1280×720 与 400% reflow（320 CSS px）：方案 §7.2 a11y 段 ──────────
+  const reflow = [];
+  const reflowWaived = [];
+  for (const [w, h, label] of [[1280, 720, "desktop-1280x720"], [320, 800, "reflow-320"]]) {
+    await cdp.send("Emulation.setDeviceMetricsOverride", {
+      width: w, height: h, deviceScaleFactor: 1, mobile: w < 600,
+    });
+    for (const p of pages) {
+      await cdp.send("Page.navigate", { url: base + p });
+      await sleep(900);
+      const r = await cdp.send("Runtime.evaluate", {
+        expression: "({sw:document.documentElement.scrollWidth, iw:window.innerWidth})",
+        returnByValue: true,
+      });
+      const val = r?.result?.value ?? {};
+      const good = Number(val.sw) <= Number(val.iw);
+      reflow.push({ viewport: label, page: p, ok: good, scrollWidth: val.sw, innerWidth: val.iw });
+      if (!good) {
+        const rec = { kind: "reflow-overflow", page: p, viewport: label,
+          scrollWidth: val.sw, innerWidth: val.iw };
+        const wv = liveWaivers.find((x) =>
+          x.rule === "reflow-overflow" &&
+          (!x.page || x.page === p) &&
+          (!x.viewport || x.viewport === label));
+        if (wv) reflowWaived.push({ id: wv.id, ...rec });
+        else {
+          totalViolations += 1;
+          results.push({ page: p, violations: [rec], checks: 0, waived: [] });
+        }
+      }
+    }
+  }
+  await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => {});
+
   cdp.close();
+
+  // ── full：要求 TS-9 人工项全部签收；缺失 → 未测（退 2）─────────────────
+  let manual = null;
+  if (mode === "full") {
+    const mf = path.resolve(WEB, "a11y-manual-v1.json");
+    try {
+      const doc = JSON.parse(fs.readFileSync(mf, "utf8"));
+      const accept = new Set(doc.accept_status || ["signed", "done"]);
+      const items = doc.items || [];
+      const notSigned = items.filter((it) =>
+        !accept.has(String(it.status || "")) ||
+        ["evidence", "owner", "date"].some((k) => !String(it[k] || "").trim()));
+      manual = { ok: notSigned.length === 0, total: items.length,
+        untested: notSigned.map((it) => it.item) };
+    } catch (e) {
+      manual = { ok: false, total: 0, untested: [`台账读不出：${e.message}`] };
+    }
+  }
 
   const out = {
     ok: totalViolations === 0,
     pages: results,
     totalViolations,
     totalChecks,
+    mode,
+    waived: results.flatMap((r) => r.waived || []).concat(reflowWaived),
+    waivedExpired: expiredWaivers.map((w) => w.id),
+    reflow,
+    manual,
+    reds: totalViolations > 0 ? [`${totalViolations} 处违规`] : [],
+    untested: mode === "full" && manual && !manual.ok ? manual.untested : [],
     unmeasured: [
       "键盘全流程（人工）",
       "读屏语义与焦点顺序（人工）",
@@ -374,7 +483,16 @@ async function main() {
   };
   if (outFile) fs.writeFileSync(outFile, JSON.stringify(out, null, 2) + "\n");
   console.log(JSON.stringify(out, null, 2));
-  return totalViolations === 0 ? 0 : 1;
+  if (totalViolations > 0) return 1;
+  if (expiredWaivers.length) {
+    console.error(`❌ 有 ${expiredWaivers.length} 条 waiver 已过期：${expiredWaivers.map((w) => w.id).join(", ")}`);
+    return 1;
+  }
+  if (mode === "full" && manual && !manual.ok) {
+    console.error(`⚠ 未测：人工项未签收 ${manual.untested.length} 条 —— full 模式退 2`);
+    return 2;
+  }
+  return 0;
 }
 
 let rc = 2;

@@ -1,0 +1,28 @@
+{
+ "schema_version": 1,
+ "$note": "web 体积预算。批次 0 只记录基线，不锁定新数字；锁定前用「基线 + 每批批准增量」。单位一律是 gzip 字节。来源：PMO/audit/前端设计系统与依赖治理-优化方案-v1.1-20261021.md §6.9。",
+ "unit": "bytes_gzip",
+ "baseline": {
+  "date": "2026-10-21",
+  "measured_by": "npm run build && python3 逐文件 gzip -9",
+  "initial_js": 120141,
+  "total_js": 120141,
+  "css": 2535,
+  "route_js": null,
+  "manifest": false,
+  "$manifest_note": "vite.config.ts 在批次 0 不改（方案 L887「不动」）；manifest:true 是 Stage 1 的事。没有 manifest 时 check_bundle_budget.mjs 一律退 2（未测），不拿 dist/assets 猜。"
+ },
+ "limits": {
+  "initial_js": 170000,
+  "total_js": 240000,
+  "css": 20000,
+  "route_js": 80000
+ },
+ "stage_allowance": {
+  "$note": "方案 §6.9：锁定前的每批批准增量（字节）。阶段 3 要求净下降，不在这里给增量。",
+  "2": {"initial_js": 20480},
+  "4": {"initial_js": 15360},
+  "5": {"initial_js": 15360}
+ },
+ "source": "PMO/audit/前端设计系统与依赖治理-优化方案-v1.1-20261021.md §6.9"
+}

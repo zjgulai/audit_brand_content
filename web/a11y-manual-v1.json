@@ -1,0 +1,80 @@
+{
+ "schema_version": 1,
+ "$note": "TS-9 人工无障碍项的签收台账。批次 0 只建表、全部 not_run；verify_manual_a11y.mjs 对它退 2（未测），Stage 7 才接进 dev-up。字段固定 item/status/evidence/owner/date。",
+ "items": [
+  {
+   "item": "keyboard-flow",
+   "label": "键盘全流程（不靠鼠标走完队列→详情→报告→分类规范）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "screen-reader-semantics",
+   "label": "读屏语义与可访问名称（VoiceOver/NVDA）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "focus-order",
+   "label": "焦点顺序与可见焦点（含对话框/抽屉）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "dynamic-announcements",
+   "label": "动态内容播报（异步加载、错误、状态变化）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "zoom-200",
+   "label": "200% 文本缩放不破版、不截断",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "reflow-400",
+   "label": "400% 缩放 / 320 CSS px 重排（无横向滚动）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "reduced-motion",
+   "label": "prefers-reduced-motion 下动画全部关闭",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "text-over-image-contrast",
+   "label": "文本覆盖图片/渐变时的对比度（自动检查跳过）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "real-user-test",
+   "label": "真实用户/辅助技术用户测试",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  }
+ ],
+ "accept_status": ["signed", "done"],
+ "$accept_note": "status ∈ accept_status 且 evidence/owner/date 三项非空才算签收；其余一律算未测（退 2），不算红，也不算通过。"
+}

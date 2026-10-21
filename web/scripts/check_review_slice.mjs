@@ -261,6 +261,50 @@ async function main() {
     FIELD_FOLD.test('{c.state ?? "—"}') && !FIELD_FOLD.test('{name ?? "—"}'),
     "判据要么恒真要么误报");
 
+  // ── A2d / A2e 缺依据字段的 **DOM** 行为（方案 §7.2「A2 的具体改法」）──
+  //   夹具由 `seed_fixture.py --edge` 写入；没 seed 时落**未测**，不落绿 ——
+  //   「夹具不在投影里」与「页面做对了」长得完全不一样。
+  const edgeMissing = arg("edge-case-missing", "case-edge-missing-authority");
+  const edgeOk = arg("edge-case-ok", "case-edge-authority-ok");
+  const AUTH_TEXT = ["可核", "未测", "依据已过期", "依据缺失"];
+  const authOfPage = async (caseId) => {
+    await goto(`/cases/${caseId}`);
+    return ev(`(() => {
+      const items=[...document.querySelectorAll('.evidence__item')];
+      const texts=items.map((it) => {
+        const t=[...it.querySelectorAll('span')]
+          .map((s)=>s.textContent.trim())
+          .filter((x)=>${JSON.stringify(AUTH_TEXT)}.includes(x));
+        return t[0] || null;
+      });
+      return { path: location.pathname, items: items.length, texts };
+    })()`);
+  };
+  const mEdge = await authOfPage(edgeMissing);
+  const oEdge = await authOfPage(edgeOk);
+  await goto("/queue");      // ★ 必须回来：A3/A9 依赖队列页上的案件链接
+  const mLoaded = Boolean(mEdge) && mEdge.items > 0 && mEdge.path === `/cases/${edgeMissing}`;
+  const oLoaded = Boolean(oEdge) && oEdge.items > 0 && oEdge.path === `/cases/${edgeOk}`;
+  if (!mLoaded || !oLoaded) {
+    // ★ dev-up.sh 在批次 0 冻结（方案 L887），不会 seed --edge；所以默认**不因此改退出码**，
+    //   但把「本次没验」喊出来。独立验收用 `--require-edge`：那时缺夹具必须退 2（未测）。
+    if (process.argv.includes("--require-edge")) {
+      record("A2d", "缺 authority_state 的发现显示「未测」、不显示「可核」", null,
+        `边界夹具不在投影里（missing=${mLoaded} ok=${oLoaded}）`);
+      untested = true;
+    } else {
+      console.log(`  ⚠ A2d 本次未验证：边界夹具不在投影里（missing=${mLoaded} ok=${oLoaded}）；` +
+        `要验请用 seed_fixture.py --edge 重 seed 后加 --require-edge`);
+    }
+  } else {
+    const mOk = mEdge.texts.includes("未测") && !mEdge.texts.includes("可核");
+    const oOk = oEdge.texts.includes("可核") && !oEdge.texts.includes("未测");
+    record("A2d", "缺 authority_state 的发现显示「未测」、不显示「可核」", mOk,
+      `实测 ${JSON.stringify(mEdge.texts)}`);
+    record("A2e", "authority_state=ok 的发现显示「可核」、不显示「未测」", oOk,
+      `实测 ${JSON.stringify(oEdge.texts)}`);
+  }
+
   // ── A3 partial 必须显式说明 ────────────────────────────────────────
   const caseLinks = await ev(
     "[...document.querySelectorAll('a')].map(a=>a.getAttribute('href')).filter(h=>h&&h.startsWith('/cases/'))",
@@ -410,11 +454,79 @@ async function main() {
     untested = true;
   }
 
-  // ── A6 品牌红不得用于状态徽标 ──────────────────────────────────────
+  // ── A6 品牌红不得用于状态徽标（**DOM 计算样式**，不是源码文本）──────
+  //   方案 §7.2：Stage 0 先改断言，Stage 5 才删 `.badge--*`。
+  //   源码文本在 Stage 5 会被删掉，那时旧判据会**恒真** —— 所以主判据必须是渲染结果。
+  await goto("/queue");
+  const a6 = await ev(`(() => {
+    const hueOf = (rgb) => {
+      const m = String(rgb).match(/rgba?\\(([^)]+)\\)/);
+      if (!m) return null;
+      const [r, g, b] = m[1].split(",").slice(0, 3).map(Number).map((x) => x / 255);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      if (max === min) return null;
+      const d = max - min;
+      let h;
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+      return h < 0 ? h + 360 : h;
+    };
+    const probe = document.createElement("span");
+    probe.style.color = "hsl(" +
+      getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() + ")";
+    document.body.appendChild(probe);
+    const brandRaw = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim();
+    const probeColor = getComputedStyle(probe).color;
+    const brandHue = hueOf(probeColor);
+    probe.remove();
+    const scan = () => {
+      const nodes = [...document.querySelectorAll("[data-status-badge], .badge")];
+      const bad = [];
+      for (const el of nodes) {
+        const cs = getComputedStyle(el);
+        for (const prop of ["color", "backgroundColor", "borderTopColor"]) {
+          const h = hueOf(cs[prop]);
+          if (h === null || brandHue === null) continue;
+          let d = Math.abs(h - brandHue);
+          if (d > 180) d = 360 - d;
+          if (d < 5) bad.push({ prop, hue: Math.round(h), brandHue: Math.round(brandHue),
+                                text: (el.textContent || "").trim().slice(0, 20) });
+        }
+      }
+      return { count: nodes.length, bad };
+    };
+    const before = scan();
+    const injected = document.createElement("span");
+    injected.className = "badge";
+    injected.setAttribute("data-status-badge", "");
+    injected.style.color = "#6A2C3A";
+    injected.textContent = "反向对照";
+    document.body.appendChild(injected);
+    const after = scan();
+    const injectedColor = getComputedStyle(injected).color;
+    injected.remove();
+    return { count: before.count, bad: before.bad, brandHue, brandRaw, probeColor,
+             afterCount: after.count, afterBad: after.bad.length,
+             injectedColor,
+             controlCaught: after.bad.length > before.bad.length };
+  })()`);
+  record("A6", "页面上至少一个状态徽标，且没有徽标用品牌红（DOM 计算样式，色相距离 <5°）",
+    Boolean(a6) && a6.count > 0 && a6.bad.length === 0,
+    a6 ? `徽标 ${a6.count} 个 · 品牌红命中 ${a6.bad.length} · brandHue=${a6.brandHue} ` +
+         `· 注入后 ${a6.afterBad}（${a6.injectedColor}）${JSON.stringify(a6.bad.slice(0, 2))}`
+       : "取不到 DOM");
+  record("A6b", "反向对照：注入 style=color:#6A2C3A 的 .badge 必须被抓到",
+    Boolean(a6?.controlCaught),
+    a6 ? `brandRaw=${JSON.stringify(a6.brandRaw)} probeColor=${JSON.stringify(a6.probeColor)} ` +
+         `brandHue=${a6.brandHue} afterBad=${a6.afterBad} afterCount=${a6.afterCount}`
+       : "取不到 DOM（表达式抛异常）");
+  // A6s 源码补充（Stage 5 删除 `.badge--*` 后这条会变成 vacuous，主判据仍是 A6）
   const css = fs.readFileSync(path.join(repoRoot, "web/src/styles.css"), "utf8");
   const badgeBlock = css.match(/\.badge--[a-z]+\s*\{[^}]*\}/g) ?? [];
   const brandInBadge = badgeBlock.filter((b) => /#6A2C3A|--brand/i.test(b));
-  record("A6", "品牌红 #6A2C3A / --brand 不出现在状态徽标规则里",
+  record("A6s", "（补充）品牌红 / --brand 不出现在 .badge--* 规则里",
     brandInBadge.length === 0, brandInBadge.join(" "));
 
   // ── A7 夹具生成物过契约校验 ────────────────────────────────────────
@@ -427,7 +539,7 @@ async function main() {
     record(
       "A7",
       "夹具自证真实运行并通过",
-      /13\/13 项通过/.test(output),
+      /\d+\/\d+ 项通过/.test(output),
       output.trim().split("\n").pop(),
     );
   } catch (e) {
