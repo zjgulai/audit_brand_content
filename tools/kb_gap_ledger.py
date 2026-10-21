@@ -106,6 +106,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
                                 "research", "kb"))
 import load  # noqa: E402
 
+_TOOLS = os.path.dirname(os.path.abspath(__file__))
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import bj_today  # noqa: E402
+
 REPO = load.REPO
 KB = load.KB
 LEDGER_PATH = os.path.join(KB, "缺口账-v1.jsonl")
@@ -135,9 +140,8 @@ FIELDS = ("库", "条目ID", "通道", "原因码", "首次出现", "次数", "�
 
 
 def today_bj():
-    """北京时间日历日。与 `verify_pending.py` 的 `BJ` 同一口径。"""
-    return (datetime.datetime.now(datetime.timezone.utc)
-            + datetime.timedelta(hours=8)).date().isoformat()
+    """北京时间日历日。**委托 `tools/bj_time.py`** —— 不再自己算。"""
+    return bj_today().isoformat()
 
 
 # ── 通道活性自证 ─────────────────────────────────────────────────────

@@ -38,6 +38,10 @@ ROOT = Path(__file__).resolve().parent.parent
 #   所以没有这一行；C-78 的数量口径检查要读 base 的纯函数，补上。
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+_TOOLS = str(ROOT / "tools")
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import bj_today  # noqa: E402
 
 TABLE = ROOT / "research" / "governance" / "control-points-v1.json"
 ROUTING = ROOT / "research" / "governance" / "routing-v1.json"
@@ -446,7 +450,7 @@ def fp_evidence_problems(rule, today=None):
         if _blank(ev.get(k)):
             bad.append(f"{rk}: evidence 缺 {k}")
 
-    today = today or _dt.date.today()
+    today = today or bj_today()
     raw = str(ev.get("measured_at") or "").strip()
     try:
         d = _dt.date.fromisoformat(raw)

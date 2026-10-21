@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 
 # research/kb/load.py → 上溯三层才是仓库根
@@ -38,7 +39,11 @@ KB = os.path.join(REPO, "research", "kb")
 EVIDENCE = os.path.join(KB, "_evidence")
 LATEST = os.path.join(EVIDENCE, "LATEST.json")
 
-CST = timezone(timedelta(hours=8))
+# ★ 「今天」与 +08:00 只有一处来源：tools/bj_time.py（2026-10-21 统一）。
+_TOOLS = os.path.join(REPO, "tools")
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import BJ as CST, bj_today  # noqa: E402
 
 # 表性质分类。这里只放**结构性事实**（这张表是什么），不放业务判断。
 # 单张表的纳入/排除与字段映射写在 schema-v1.json 里，便于评审。
@@ -133,7 +138,8 @@ def as_date(v):
 
 
 def today():
-    return datetime.now(CST).strftime("%Y-%m-%d")
+    """北京时间日历日。**委托 `tools/bj_time.py`** —— 不再自己取墙钟。"""
+    return bj_today().isoformat()
 
 
 def basis_date(snap=None):

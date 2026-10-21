@@ -72,6 +72,11 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_TOOLS = os.path.dirname(os.path.abspath(__file__))
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import bj_today  # noqa: E402
+
 SKEL = os.path.join(REPO, "research", "governance", "skeleton")
 KB = os.path.join(REPO, "research", "kb")
 
@@ -213,7 +218,7 @@ def main() -> int:
 
     new = derived_rows()
     old = load_ledger()
-    today = a.today or __import__("datetime").date.today().isoformat()
+    today = a.today or bj_today().isoformat()
 
     if a.rebuild:
         rows, dropped = merge(old, new, today)
