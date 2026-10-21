@@ -11,6 +11,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config, attachmentDir } from './config.mjs';
 import { appendLifecycle } from './attachment_lifecycle.mjs';
+import {
+  runImageJudgment, summarizeImageJudgment, compactJudgment,
+} from './image_judgment.mjs';
 import { beijingString } from './timefmt.mjs';
 
 export const client = new Lark.Client({
@@ -303,6 +306,8 @@ const TEXT_ATTACHMENT_EXT = new Set([
 
 /** 单次最多读入的字节数（不是飞书上限；是为了不把上下文撑爆）。 */
 export const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
+/** 图片走 OCR + 判定，体积上限比文本宽；仍远低于飞书 100MB。 */
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 /** 单次最多拼进上下文的字符数。超了必须**说出来**，不许静默截断。 */
 export const MAX_ATTACHMENT_CHARS = 40_000;
 
@@ -380,6 +385,8 @@ export async function downloadMessageResource({
  */
 export async function ingestAttachment(msg, {
   maxBytes = MAX_ATTACHMENT_BYTES, maxChars = MAX_ATTACHMENT_CHARS,
+  // ★ 测试注入点：默认走 base 的唯一图片判定入口；测试用桩证明它真的被调用。
+  judgeImage = runImageJudgment,
 } = {}) {
   const a = parseAttachment(msg);
   const name = a.fileName || (a.type === 'image' ? '（图片）' : '（未命名附件）');
@@ -436,7 +443,8 @@ export async function ingestAttachment(msg, {
              reply: `附件「${name}」的消息里没有 file_key —— 我拿不到下载地址。`
                   + '这是这条事件的内容问题，不是权限问题。' });
   }
-  if (!isTextAttachment(a.fileName)) {
+  const isImage = a.type === 'image';
+  if (!isImage && !isTextAttachment(a.fileName)) {
     return finish('unsupported_type', { reason: 'attachment_type_unparsed', ...baseMeta,
              reply: `附件「${name}」我收到了，但这类文件的内容解析**这条链路还没接上**。`
                   + '这是能力边界，不是权限问题，也不是「不让下载」—— 下载是允许的。\n'
@@ -456,19 +464,62 @@ export async function ingestAttachment(msg, {
     try { fs.chmodSync(root, 0o700); } catch { /* 改不动权限时仍继续；DG-2 会报 */ }
     // mkdtemp 默认 0700；文件名不用用户给的名字（避免路径穿越），只保留扩展名。
     dir = fs.mkdtempSync(path.join(root, 'msg-'));
-    const dest = path.join(dir, `attachment${path.extname(a.fileName).toLowerCase()}`);
+    const effectiveMax = isImage ? MAX_IMAGE_BYTES : maxBytes;
+    const ext = isImage ? '.img' : path.extname(a.fileName).toLowerCase();
+    const dest = path.join(dir, `attachment${ext}`);
     const got = await downloadMessageResource({
-      messageId: msg.message_id, fileKey: a.fileKey, type: a.type, destPath: dest, maxBytes,
+      messageId: msg.message_id, fileKey: a.fileKey, type: a.type, destPath: dest,
+      maxBytes: effectiveMax,
     });
     if (!got.written) {
+      if (isImage) {
+        const summary = `图片未审查（DP0）：文件超过读取上限（${got.size ?? '大小未知'} 字节），`
+          + '没有下载/判定。这是未审查，不是「附件不支持」。';
+        return finish('image_judge_failed', { reason: 'image_too_large', ...baseMeta,
+          size: got.size ?? null, parse_status: 'failed', failure_kind: 'too_large',
+          summary, reply: summary });
+      }
       return finish('too_large', { reason: 'attachment_too_large', ...baseMeta, size: got.size ?? null,
                reply: `附件「${name}」有 ${got.size ?? '（大小未知）'} 字节，超过我这次能读入的上限 `
                     + `${maxBytes} 字节。**我没有读它**，也没有截断后冒充全文。`
                     + '要审的话，请给一段更小的文件，或只把关键部分贴过来。' });
     }
     if (!got.size) {
+      if (isImage) {
+        const summary = '图片未审查（DP0）：文件是空的（0 字节），没有进入判定。'
+          + '这是未审查，不是「附件不支持」。';
+        return finish('image_judge_failed', { reason: 'image_empty', ...baseMeta,
+          parse_status: 'failed', failure_kind: 'empty_file', summary, reply: summary });
+      }
       return finish('empty', { reason: 'attachment_empty', ...baseMeta,
                reply: `附件「${name}」取到了，但文件是空的（0 字节）。` });
+    }
+    if (isImage) {
+      // ★ 图片判定：把**下载后的本地路径**交给 base 的唯一入口（RuleJudge + Orchestrator）。
+      //   这里不实现 OCR/判定；失败也返回 judgment（未审查/DP0），不是 None。
+      //   finish() 在判定完成后删除本次临时目录，台账记 deleted 的实际结果。
+      let judged;
+      try {
+        judged = await judgeImage({
+          filePath: dest, messageId: msg.message_id,
+          pageUri: `feishu:message:${msg.message_id}`,
+        });
+      } catch (e) {
+        judged = { ok: false, error: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
+      }
+      const summary = summarizeImageJudgment(judged);
+      // ★ 没有 unit 不能当成成功：缺 unit = 未审查，不是「判定通过」。
+      const parseStatus = judged.unit?.parse_status ?? 'failed';
+      const status = judged.ok && parseStatus !== 'failed' ? 'image_judged' : 'image_judge_failed';
+      return finish(status, {
+        reason: status, ...baseMeta, size: got.size,
+        image_status: judged.row_status ?? null,
+        parse_status: parseStatus,
+        failure_kind: judged.unit?.failure_kind ?? (judged.ok ? null : 'runner_error'),
+        judgment: compactJudgment(judged.judgment),
+        summary, reply: summary,
+        ...(judged.ok ? {} : { error: judged.error ?? 'unknown' }),
+      });
     }
     const buf = fs.readFileSync(dest);
     if (buf.includes(0)) {
@@ -485,6 +536,13 @@ export async function ingestAttachment(msg, {
       size: got.size, chars: [...text].length, truncated, text,
     });
   } catch (e) {
+    if (isImage) {
+      const summary = `图片未审查（DP0）：没取到文件（${e?.message ?? e}）。\n`
+        + '这是未审查，不是「附件不支持」，也不是「图片里没有内容」。';
+      return finish('image_judge_failed', { reason: 'image_download_failed', ...baseMeta,
+        error: e?.message ?? String(e), parse_status: 'failed',
+        failure_kind: 'download_failed', summary, reply: summary });
+    }
     return finish('download_failed', { reason: 'attachment_download_failed', ...baseMeta,
              error: e?.message ?? String(e),
              reply: `附件「${name}」我这边**没取到**（${e?.message ?? e}）。\n`

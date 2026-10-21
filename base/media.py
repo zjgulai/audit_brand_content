@@ -402,7 +402,7 @@ def row_to_unit(row: dict, page_uri: str) -> dict:
             raw_input, covers=covers, does_not_cover=does_not_cover,
             parse_status="ok")
     else:
-        if status == "ok":
+        if status in ("ok", "empty"):
             failure_kind, reason = "empty", "OCR 成功完成，但没有识别出可读正文"
         elif status == "degenerate":
             failure_kind, reason = "empty", "OCR 解码到退化占位图，没有可读正文"
@@ -1538,8 +1538,9 @@ def cmd_report(design: str = "uniform") -> int:
     print("=" * 78)
     return 0
 
-def cmd_judge_image(path: str, as_json: bool = False) -> int:
-    result = judge_image_file(path)
+def cmd_judge_image(path: str, as_json: bool = False,
+                    uri: str | None = None) -> int:
+    result = judge_image_file(path, uri=uri)
     summary = {
         "unit_id": result["unit"]["unit_id"],
         "parse_status": result["unit"].get("parse_status", "ok"),
@@ -1589,6 +1590,8 @@ def main() -> int:
     g.add_argument("--report", action="store_true")
     g.add_argument("--judge-samples", nargs="?", type=int, const=0, metavar="N",
                    help="盘上图片样本走 ContentUnit→RuleJudge/Orchestrator；N=0 表示全量")
+    g.add_argument("--judge-image", metavar="PATH",
+                   help="本地位图真跑 OCR→ContentUnit→RuleJudge/Orchestrator")
     g.add_argument("--reattach-weights", action="store_true",
                    help="把入样权重补回盘上样本（重算 + 逐行断言后才写）")
     g.add_argument("--reclassify", action="store_true",
@@ -1601,7 +1604,9 @@ def main() -> int:
                          "alt-biased=B1 的病例对照设计，只用于量偏差")
     ap.add_argument("--seed", type=int, default=0, help="uniform 设计的随机种子（可复现）")
     ap.add_argument("--json", action="store_true",
-                    help="配合 --judge-samples：只输出机器可读聚合 JSON")
+                    help="配合 --judge-samples/--judge-image：只输出机器可读聚合 JSON")
+    ap.add_argument("--uri", default=None,
+                    help="配合 --judge-image：稳定来源 URI（例如 feishu-message:<id>）")
     ap.add_argument("--pages", type=int, default=0, help="配合 --reattach-weights：当初抽了几个页面")
     ap.add_argument("--per-page-n", type=int, default=0, dest="per_page_n",
                     help="配合 --reattach-weights：当初每页抽几张")
@@ -1612,6 +1617,8 @@ def main() -> int:
         return cmd_report(a.design)
     if a.judge_samples is not None:
         return cmd_judge_samples(a.design, a.judge_samples, a.json)
+    if a.judge_image:
+        return cmd_judge_image(a.judge_image, a.json, a.uri)
     if a.reattach_weights:
         return cmd_reattach_weights(a.design, a.pages, a.per_page_n, a.seed, a.dry)
     if a.reclassify:

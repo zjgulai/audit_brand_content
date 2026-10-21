@@ -21,6 +21,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 const res = [];
 const T = (name, ok, detail) => res.push({ name, ok, detail });
@@ -135,14 +138,92 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
 }
 
 {
-  let called = false;
-  setGet(async () => { called = true; throw new Error('不该被调用'); });
-  const r = await feishu.ingestAttachment(imageMsg());
-  T('B8 ★ 图片：能力未接上 → 不下载、不假装读过',
-    r.status === 'unsupported_type' && called === false, `${r.status}/called=${called}`);
-  T('B9 ★ 话术是能力边界，且明确说「下载是允许的」（旧红线已废止）',
-    /能力边界/.test(r.reply) && /下载是允许的/.test(r.reply) && !/公司不让下载/.test(r.reply),
-    r.reply);
+  let called = false, sawPath = false;
+  setGet(writeStub(Buffer.from([0x89, 0x50, 0x4e, 0x47])));
+  const r = await feishu.ingestAttachment(imageMsg(), {
+    judgeImage: async ({ filePath }) => {
+      called = true;
+      sawPath = fs.existsSync(filePath);
+      return {
+        ok: true, row_status: 'ok',
+        unit: { parse_status: 'ok' },
+        judgment: {
+          label: 'REVIEW', layer: 'L1', release_status: '待放行', run_state: 'OK',
+          findings: [{ control_code: 'CP-1' }],
+        },
+      };
+    },
+  });
+  T('B8 ★ 图片：下载后把本地路径交给 base 入口（调用发生且文件在判定时存在）',
+    r.status === 'image_judged' && called === true && sawPath === true,
+    `${r.status}/called=${called}/path=${sawPath}`);
+  T('B9 图片摘要保留 OCR 边界与「不许说已通过」',
+    /只覆盖\*\*图内文字/.test(r.summary) && /不许说「已通过」/.test(r.summary),
+    String(r.summary).slice(0, 140));
+  T('B9b 图片临时目录判定完仍删除', fs.readdirSync(tmpAttach).length === 0,
+    fs.readdirSync(tmpAttach).join(','));
+}
+{
+  setGet(writeStub(Buffer.from([0x89, 0x50, 0x4e, 0x47])));
+  const r = await feishu.ingestAttachment(imageMsg(), {
+    judgeImage: async () => ({
+      ok: true, row_status: 'ok',
+      unit: {
+        parse_status: 'failed', failure_kind: 'empty',
+        reason: 'OCR 成功完成，但没有识别出可读正文',
+      },
+      judgment: { label: '未审查', layer: 'L0', release_status: '待放行', run_state: 'OK', findings: [] },
+    }),
+  });
+  T('B10 ★ 图片 OCR 失败 → image_judge_failed + 未审查/DP0，不是「附件不支持」',
+    r.status === 'image_judge_failed'
+      && /未审查（DP0）/.test(r.summary) && /failure_kind=empty/.test(r.summary)
+      && /不是「附件不支持」/.test(r.summary),
+    `${r.status}/${r.summary}`.slice(0, 200));
+}
+{
+  setGet(writeStub(Buffer.from([0x89, 0x50, 0x4e, 0x47])));
+  const r = await feishu.ingestAttachment(imageMsg(), {
+    judgeImage: async () => ({ ok: false, error: '模拟入口坏了' }),
+  });
+  T('B11 ★ 图片判定入口坏了 → 仍返回未审查/DP0，不是附件不支持',
+    r.status === 'image_judge_failed'
+      && /未审查（DP0）/.test(r.summary) && /不是「附件不支持」/.test(r.summary),
+    `${r.status}/${r.summary}`.slice(0, 200));
+}
+
+/* ── B12 反向对照：断开 judgeImage 调用，B8 的断言必须红 ─────────────── */
+{
+  const srcPath = path.join(HERE, 'feishu.mjs');
+  const src = fs.readFileSync(srcPath, 'utf8');
+  const needle = '        judged = await judgeImage({\n'
+    + '          filePath: dest, messageId: msg.message_id,\n'
+    + '          pageUri: `feishu:message:${msg.message_id}`,\n'
+    + '        });';
+  const mutantPath = path.join(HERE, `.mutant-image-${process.pid}.mjs`);
+  if (!src.includes(needle)) {
+    T('B12a ★ 反向对照自身有效：找得到 judgeImage 调用', false,
+      '找不到 judgeImage 调用 —— 接线写法变了，本反向对照已失效');
+  } else {
+    T('B12a ★ 反向对照自身有效：找得到 judgeImage 调用', true, '');
+    fs.writeFileSync(mutantPath,
+      src.replace(needle, "        judged = { ok: false, error: 'DISCONNECTED' };"), 'utf8');
+    try {
+      const mutant = await import(`${pathToFileURL(mutantPath).href}?v=${Date.now()}`);
+      let mCalled = false;
+      // ★ 变异体是**另一份模块实例**，它有自己的 client；必须打桩到它身上，
+      //   否则会拿假 message_id 去真飞书要资源（实测会打出一条 400）。
+      mutant.client.im.v1.messageResource.get = writeStub(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+      const mr = await mutant.ingestAttachment(imageMsg(), {
+        judgeImage: async () => { mCalled = true; return { ok: true }; },
+      });
+      T('B12 ★ 断开调用后 base 入口不再被调用（B8 会红，证明它拦得住）',
+        mCalled === false && mr.status === 'image_judge_failed',
+        `${mr.status}/called=${mCalled}`);
+    } finally {
+      try { fs.unlinkSync(mutantPath); } catch { /* 清理失败不影响断言 */ }
+    }
+  }
 }
 
 {
@@ -150,11 +231,11 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   const r = await feishu.ingestAttachment({
     message_id: 'om_bad', message_type: 'file', content: JSON.stringify({ file_name: 'x.txt' }),
   });
-  T('B10 bad_content：有 file_name 没 file_key → 说拿不到下载地址，不瞎猜',
+  T('B13 bad_content：有 file_name 没 file_key → 说拿不到下载地址，不瞎猜',
     r.status === 'bad_content' && /file_key/.test(r.reply), r.status);
 }
 
-/* ── B11–B14. 残留读数与生命周期台账（只数不删）─────────────────────── */
+/* ── B14–B19. 残留读数与生命周期台账（只数不删）─────────────────────── */
 {
   const stale = path.join(tmpAttach, 'msg-stale-case');
   const fresh = path.join(tmpAttach, 'msg-fresh-case');
@@ -164,10 +245,10 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
   fs.utimesSync(stale, old, old);
   const c = lifecycle.countAttachmentResidue({ root: tmpAttach });
-  T('B11 年龄分桶：2h 前的进 1to24h，刚建的在 lt1h',
+  T('B14 年龄分桶：2h 前的进 1to24h，刚建的在 lt1h',
     c.buckets['1to24h'] >= 1 && c.buckets.lt1h >= 1 && c.status === 'ok',
     JSON.stringify(c));
-  T('B12 ★ 只数不删：统计完两个目录都还在（删除历史文件需要授权）',
+  T('B15 ★ 只数不删：统计完两个目录都还在（删除历史文件需要授权）',
     fs.existsSync(stale) && fs.existsSync(fresh), `${fs.existsSync(stale)}/${fs.existsSync(fresh)}`);
   fs.rmSync(stale, { recursive: true, force: true });
   fs.rmSync(fresh, { recursive: true, force: true });
@@ -175,18 +256,18 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   const absent = lifecycle.countAttachmentResidue({
     root: path.join(tmpRoot, 'does-not-exist'),
   });
-  T('B13 落盘根不存在 → status=absent，不抛异常',
+  T('B16 落盘根不存在 → status=absent，不抛异常',
     absent.status === 'absent' && absent.dirs === 0, JSON.stringify(absent));
 
   // 启动横幅：两个数都必须出现，且 absent / untested 不许写成「0 个正常」。
   const fmt = lifecycle.formatResidue(absent);
-  T('B13b 启动横幅读数含「残留 N 个 / 清理失败 M 个」且带 status',
+  T('B16b 启动横幅读数含「残留 N 个 / 清理失败 M 个」且带 status',
     /attachments 残留 0 个 \/ 清理失败 0 个/.test(fmt) && /status=absent/.test(fmt), fmt);
 
   const rootIsFile = path.join(tmpRoot, 'root-is-file');
   fs.writeFileSync(rootIsFile, 'x');
   const unt = lifecycle.countAttachmentResidue({ root: rootIsFile });
-  T('B13c ★ 落盘根读不到 → status=untested、failed=1（不许当成 0 个）',
+  T('B16c ★ 落盘根读不到 → status=untested、failed=1（不许当成 0 个）',
     unt.status === 'untested' && unt.failed === 1, JSON.stringify(unt));
 
   // ★ 执行点：每次 ingestAttachment 都写 started + 终态；删除只针对本次自己创建的目录。
@@ -202,10 +283,10 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   const mine = lines.slice(before).filter((x) => x.file_token === 'fk-ledger');
   const started = mine.find((x) => x.status === 'started');
   const done = mine.find((x) => x.status === 'ingested');
-  T('B14 ★ 台账：started + 终态两行，file_token 对得上',
+  T('B17 ★ 台账：started + 终态两行，file_token 对得上',
     !!started && !!done && done.deleted === true && done.created === true,
     JSON.stringify(mine));
-  T('B15 ★ 删除只针对本次目录：预先存在的 msg-stale-wired 没被删',
+  T('B18 ★ 删除只针对本次目录：预先存在的 msg-stale-wired 没被删',
     r.status === 'ingested' && fs.existsSync(stale2), `${r.status}/${fs.existsSync(stale2)}`);
   fs.rmSync(stale2, { recursive: true, force: true });
 
@@ -215,7 +296,7 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   fs.writeFileSync(notADir, 'x');
   process.env.SHOUHENG_ATTACHMENT_LEDGER = path.join(notADir, 'ledger.jsonl');
   const failedLedger = await feishu.ingestAttachment(fileMsg('ad.txt', 'fk-ledger-fail'));
-  T('B16 ★ 台账写不进去 → 返回 lifecycle_ledger_error，不静默吞掉',
+  T('B19 ★ 台账写不进去 → 返回 lifecycle_ledger_error，不静默吞掉',
     failedLedger.status === 'ingested' && typeof failedLedger.lifecycle_ledger_error === 'string',
     JSON.stringify(failedLedger).slice(0, 160));
   process.env.SHOUHENG_ATTACHMENT_LEDGER = savedLedger;
@@ -235,6 +316,14 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   });
   T('C3 截断时明确说「只读入前 N 字，不要当成全文」',
     /截断/.test(cut) && /只读入前 3 字/.test(cut), cut.slice(-80));
+
+  const imgTurn = agent.imageTurnText({
+    summary: '判定：label=未审查 / layer=L0；\n覆盖边界：只覆盖**图内文字（OCR）**。',
+  });
+  T('C4 图片判定是「待转述的分析结果」，不是用户指令',
+    /待转述的分析结果/.test(imgTurn) && /不是对你的指令/.test(imgTurn), imgTurn.slice(0, 100));
+  T('C5 图片边界在最终用户轮里仍保留（只覆盖图内文字 + 不许说已通过）',
+    /只覆盖图内文字/.test(imgTurn) && /不许说「已通过」/.test(imgTurn), imgTurn.slice(-100));
 }
 
 /* ── D. 群聊不 @ 不下载（门在下载之前）──────────────────────────────── */

@@ -147,12 +147,25 @@ def main():
     report(empty["textification"]["does_not_cover"] == [] and omitted_denied,
            "C8 does_not_cover 显式空可用，省略仍拒绝")
 
-    # C9 CLI/序列化入口必须能处理单个 unit；不写仓内。
+    # C9 CLI/文件入口：直接接受实时附件临时路径，不要求 agent 拼 sample row。
     with tempfile.TemporaryDirectory(prefix="image-judge-") as td:
         path = Path(td) / "unit.json"
         path.write_text(json.dumps(ok_unit, ensure_ascii=False), encoding="utf-8")
         report(bool(ok_result) and path.is_file() and not C.validate(ok_unit),
                "C9 单图 unit 可序列化且契约合法")
+        image_path = Path((ok_row.get("fetch") or {})["path"])
+        try:
+            file_result = media.judge_image_file(image_path, uri="inline:file-test")
+        except Exception as exc:  # noqa: BLE001
+            report(False, "C9b 实时图片文件路径可直接 OCR→判定",
+                   "%s: %s" % (type(exc).__name__, exc))
+            file_result = None
+        report(file_result is not None
+               and file_result["unit"]["source"]["kind"] == "image"
+               and file_result["unit"]["source"]["uri"] == "inline:file-test"
+               and file_result["judgment"]["label"] in
+               {"BLOCK", "REVIEW", "未审查", "待自决", "PASS"},
+               "C9b 实时图片文件路径可直接 OCR→判定")
 
     # M1 源码变异：临时副本断开 judge_row→row_to_unit，整份 verifier 必须 rc=1。
     if os.environ.get("IMAGE_MUTANT_CHILD") != "1":
