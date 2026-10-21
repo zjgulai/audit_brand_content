@@ -77,6 +77,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -612,10 +613,93 @@ def selftest(verbose: bool = True) -> list[str]:
     print("\n[6] 真源面：与磁盘上的实际制品对得上")
     n_rules = len(json.loads((SK / "_data" / "rules_raw.json").read_text(encoding="utf-8")))
     n_wl = len(json.loads((SK / "whitelist-v1.json").read_text(encoding="utf-8"))["words"])
-    n_cg = len(json.loads((SK / "context-guards-v1.json").read_text(encoding="utf-8"))["words"])
-    check("本地制品条数与登记表所指一致：规则 %d · 白名单 %d · 守卫 %d"
-          % (n_rules, n_wl, n_cg), n_rules == 21 and n_wl == 30 and n_cg == 85,
-          "与飞书实测的 21 / 30 / 85 一致")
+    _cg_doc = json.loads((SK / "context-guards-v1.json").read_text(encoding="utf-8"))
+    n_cg = len(_cg_doc["words"])
+    _cg_stats = (_cg_doc.get("stats") or {}).get("guards")
+
+    # ★★ 2026-10-21 改：这条断言原先写死 `n_cg == 85`，判据是「与飞书实测的
+    #   21 / 30 / 85 一致」。**但 85 是 2026-09-17 的世界**，此后守卫表被两次裁定改过：
+    #     · 09-23 Q25：`treat yourself` 等 3 词移入 `$non_claims`（准入过滤），
+    #                  `or cure` / `or treat` 移入 `$admission_pending`（等法务裁定）
+    #     · 09-24 Q46：本表被定为**手工维护的契约**，不再是飞书投影
+    #   → 现在真实值是 **81**，而断言仍在跟 85 比，于是天天红。
+    #
+    #   ★ 为什么不直接把 85 改成 81：那会把它变成一个**没有依据的硬编码值** ——
+    #     下次再有一词移出，它又会红，而读的人只会看到「数字不对」，看不出
+    #     「这一词是被哪条裁定移出去的」。
+    #   ★ 改成两条，判据从「总数等于某个历史值」变成「**每个差异都有出处**」：
+    #     ① 表自己和自己对得上：`len(words) == stats.guards`
+    #        —— 这条随裁定变化而变化，不会过期。
+    #     ② 现有 81 个词与飞书快照的差额，必须**恰好**等于两条裁定移出的那几项。
+    #        差额不在这个名单里 → 红（说明有人悄悄删/加了词，没人裁过）。
+    check("守卫表自述一致：words 数 == stats.guards",
+          _cg_stats is not None and n_cg == _cg_stats,
+          "words %d / stats.guards %s" % (n_cg, _cg_stats))
+
+    _CG_MOVED_BY_RULING = sorted(
+        {str(x.get("phrase") or x.get("word") or x).strip()
+         for x in ((_cg_doc.get("$non_claims") or {}).get("entries") or [])}
+        | {str(x.get("phrase") or x.get("word") or x).strip()
+           for x in ((_cg_doc.get("$admission_pending") or {}).get("items") or [])}
+        # ★ 第三类：`$false_negative_words`（Q24）—— 旧规则 `豁免词` 里那些
+        #   **本身就是该抓的主张**的词（`乳腺炎治疗设备` 就是 H02 要抓的那个主张）。
+        #   它们不在守卫表里，也不该在；但它们**在飞书推导里**，所以必须从「应当有」里减掉，
+        #   否则会被报成「应有却缺」。
+        #   ★ 这一格是我第一版判据漏掉的：只算了前两类，于是 `乳腺炎治疗设备`
+        #     被误报成缺失。**判据必须逐种认账**，少认一类就会把已登记的类别报成事故。
+        | {str(x.get("word") or x.get("phrase") or x).strip()
+           for x in ((_cg_doc.get("$false_negative_words") or {}).get("items") or [])}
+    )
+    _live_p = EVID / "rulelib-live.json"
+    if not _live_p.exists():
+        check("守卫表现有词与飞书快照的差额都指得出裁定", False,
+              "⚠ 未测：%s 不在盘上，无法核对差额（未测不是通过）" % _live_p.name)
+    else:
+        _live = json.loads(_live_p.read_text(encoding="utf-8"))
+        _live_words, _seen = set(), set()
+        for _r in _live:
+            _v = _r.get("豁免词")
+            if not _v:
+                continue
+            _parts = ([str(x) for x in _v] if isinstance(_v, list)
+                      else re.split(r"[,，;；\n、]", str(_v)))
+            for _p in _parts:
+                _p = _p.strip()
+                if _p and _p not in _seen:
+                    _seen.add(_p)
+                    _live_words.add(_p)
+        _wl_words = {str(w.get("word") if isinstance(w, dict) else w).strip()
+                     for w in json.loads((SK / "whitelist-v1.json")
+                                         .read_text(encoding="utf-8"))["words"]}
+        _local_words = {str(w.get("word") if isinstance(w, dict) else w).strip()
+                        for w in _cg_doc["words"]}
+        # ★ 本地词有三种合法出处，判据必须**逐种认账**，否则会把已登记的类别报成「无法解释」：
+        #   ① 现网豁免词 − 白名单（推导规则本来算出来的那批）
+        #   ② 两条裁定移出的（Q25：$non_claims 的 3 词 + $admission_pending 的 2 词）
+        #      —— 它们**不在**本地表里，所以是从「应当有」里减掉
+        #   ③ 表里 `source` 写明「骨架独有（现网豁免词未登记）」的 5 词
+        #      —— 这批是骨架期补进来的，现网从来没有；实测 76 词标「现网」、5 词标「骨架独有」
+        _skeleton_only = {str(w.get("word") if isinstance(w, dict) else w).strip()
+                          for w in _cg_doc["words"]
+                          if isinstance(w, dict)
+                          and "骨架独有" in str(w.get("source") or "")}
+        # 应当出现在本地表里的 = 飞书推导 − 白名单 − 裁定移出 + 骨架独有
+        _expected = (_live_words - _wl_words - set(_CG_MOVED_BY_RULING)
+                     ) | _skeleton_only
+        _unexplained_out = sorted(_local_words - _expected)   # 本地有、一条出处都对不上
+        _unexplained_in = sorted(_expected - _local_words)    # 应有却没有
+        check("守卫表每个词都指得出出处（现网推导 / 裁定移出 / 骨架独有）",
+              not _unexplained_out and not _unexplained_in,
+              "现网推导 %d · 裁定移出 %d 项 %s · 骨架独有 %d 项 %s · 本地 %d 词 · "
+              "无出处多出 %s · 应有却缺 %s"
+              % (len(_live_words - _wl_words), len(_CG_MOVED_BY_RULING),
+                 _CG_MOVED_BY_RULING[:3], len(_skeleton_only),
+                 sorted(_skeleton_only)[:3], len(_local_words),
+                 _unexplained_out[:4], _unexplained_in[:4]))
+
+    check("规则数与白名单数与登记表所指一致：规则 %d · 白名单 %d"
+          % (n_rules, n_wl), n_rules == 21 and n_wl == 30,
+          "与飞书实测的 21 / 30 一致（守卫数见上一条，**不再写死**）")
     live = EVID / "rulelib-live.json"
     check("飞书拉取的原始快照在盘上（rulelib-live.json）", live.exists(),
           "%d 条" % len(json.loads(live.read_text(encoding="utf-8"))) if live.exists() else "")
