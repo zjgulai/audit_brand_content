@@ -86,6 +86,38 @@ def judge(size: int | None, *, budget: int = BUDGET, lesson: int = LESSON) -> tu
     return 0, f'{size} 字节 · 余量 {margin}（{tail}）'
 
 
+def _stat_size(path: str) -> int | None:
+    """**外部** `stat` 的读数。取不到返回 None（未测），不当成 0 或真实值。
+
+    ★ 为什么要绕出去调 `stat`：本环境里 Python 写的 `.md` / `.sh` 会进填充态，
+      `os.path.getsize`（逻辑视图）返回真实字节数，而外部 `stat` 多 4096。
+      两个读数都可能是注入方看到的那个，所以两个都要报；判定用较大的那个。
+    """
+    import subprocess
+    cmd = (['stat', '-f', '%z', path] if sys.platform == 'darwin'
+           else ['stat', '-c', '%s', path])
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+    except Exception:  # noqa: BLE001
+        return None
+    if out.returncode != 0:
+        return None
+    try:
+        return int(out.stdout.strip())
+    except ValueError:
+        return None
+
+
+def sizes(path: str) -> tuple[int, int | None]:
+    """(真实字节数, 外部 stat 字节数)。stat 取不到时第二个是 None。"""
+    return os.path.getsize(path), _stat_size(path)
+
+
+def effective_size(real: int, stat: int | None) -> int:
+    """判定用的字节数：**取较大者**。注入方可能按 stat 看，就按 stat 算余量。"""
+    return real if stat is None else max(real, stat)
+
+
 def read_text(path: str) -> str | None:
     try:
         with open(path, encoding='utf-8') as f:
@@ -102,9 +134,19 @@ def check(target: str) -> tuple[int, list[tuple[str, bool, str]]]:
     if tgt is None:
         rows.append(('B1 能读到目标文件', False, f'读不到 {target} → 未测'))
         return 2, rows
-    size = os.path.getsize(target)
+    real, stat = sizes(target)
+    if stat is None:
+        rows.append(('B1 预算与余量', False,
+                     f'real {real}B · ⚠ 外部 stat 读数取不到 —— 无法确认填充态，未测'))
+        return 2, rows
+    size = effective_size(real, stat)
     code, why = judge(size)
-    rows.append(('B1 预算与余量', code == 0, why))
+    detail = (f'{os.path.basename(target)} {real}B（stat {stat}B）'
+              f' · 余量：按 real {BUDGET - real} / 按 stat {BUDGET - stat}'
+              f'（判定用 {BUDGET - size}）')
+    if code != 0:
+        detail += ' · ' + why
+    rows.append(('B1 预算与余量', code == 0, detail))
     if code == 2:
         return 2, rows
 
@@ -174,6 +216,24 @@ def controls() -> int:
     good = code == 1 and real == BUDGET + 1
     ok &= good
     print(f'  {"✅" if good else "❌"} 行为级：造一个 {real} 字节的文件 → 判定退 {code}（要 1）')
+
+    # ★ 填充态对照：Python 写 .md → 外部 stat 应比真实多 4096；
+    #   判定必须用较大的那个。造不出填充态就**明说未测**，不假装验过。
+    pad = os.path.join(tmpdir, 'padprobe.md')
+    with open(pad, 'w', encoding='utf-8') as f:
+        f.write('x' * 10000)
+    real_p, stat_p = sizes(pad)
+    if stat_p is None:
+        print('  ⚠ 未测：外部 stat 读数取不到 —— 填充态对照没跑')
+        return 2
+    if stat_p <= real_p:
+        print(f'  ⚠ 未测：本环境没有复现填充态（real={real_p} stat={stat_p}）—— 这条对照没跑')
+        return 2
+    good = (effective_size(real_p, stat_p) == stat_p
+            and stat_p == real_p + 4096)
+    ok &= good
+    print(f'  {"✅" if good else "❌"} 填充态：real={real_p} stat={stat_p} '
+          f'→ 判定用 {effective_size(real_p, stat_p)}（必须是 stat）')
     return 0 if ok else 1
 
 
