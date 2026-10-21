@@ -620,6 +620,14 @@
     "web/a11y-manual-v1.json"
    ],
    "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
+  },
+  {
+   "verifier": "tools/verify_model_selection.py",
+   "asserts": "S1–S8 选型依据与 magpie 实时清单一致：vod/tokenhub 无 embedding 与 rerank、ASR 计数、glm-5.3-flash 无 audio 但有 video（按 id×provider 核）、音画对齐候选同时含 audio+video 且出现在 vod、两网关清单无价格元数据、可索引规模（字节+文件数双断言）。清单缺失判未测退 2；--controls 12 项（含 80/420 两端文件数与 0.1× 字节）",
+   "subjects": [
+    "PMO/implement/多模态与向量模型-选型-20261021.md"
+   ],
+   "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
   }
  ]
 }
