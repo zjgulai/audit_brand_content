@@ -87,16 +87,20 @@ import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from urllib.parse import quote, urlencode, urlparse
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_TOOLS = os.path.dirname(os.path.abspath(__file__))
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import BJ as CST  # noqa: E402
+
 OUT_DIR = os.path.join(REPO, "research", "feishu")
 INDEX_JSON = os.path.join(OUT_DIR, "资源索引-v1.json")
 INDEX_MD = os.path.join(OUT_DIR, "资源索引.md")
 CRED = os.path.expanduser("~/.dsh/credentials/shouheng-lark.json")
 BASE = "https://open.feishu.cn/open-apis"
-CST = timezone(timedelta(hours=8))
 
 # ---------------------------------------------------------------- 口径（改这里）
 

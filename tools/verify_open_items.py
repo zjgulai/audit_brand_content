@@ -50,6 +50,11 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+_TOOLS = str(Path(__file__).resolve().parent)
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import bj_today  # noqa: E402
+
 QUEUE = REPO / "research" / "governance" / "skeleton" / "legal-decisions-v1.json"
 
 #: 棘轮：现状值。**2026-09-22 实测**（`python3 tools/verify_open_items.py` 自己算出来的）：
@@ -175,7 +180,7 @@ def controls() -> int:
 def main(argv: list[str]) -> int:
     if "--controls" in argv:
         return controls()
-    today = dt.date.today()
+    today = bj_today()
     for a in argv:
         if a.startswith("--today="):
             today = dt.date.fromisoformat(a.split("=", 1)[1])

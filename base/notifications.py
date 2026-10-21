@@ -44,11 +44,16 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-BJT = timezone(timedelta(hours=8))
+# ★ 「今天」与 +08:00 只有一处来源：tools/bj_time.py（2026-10-21 统一）。
+_TOOLS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools")
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import BJ as BJT, bj_today  # noqa: E402
 
 # ── 通知类型 ────────────────────────────────────────────
 TYPES = frozenset({"invalidation", "auto_rereview", "takedown",
@@ -84,7 +89,7 @@ class NotificationError(Exception):
 
 def bj_date(ts: datetime | float | None = None) -> str:
     if ts is None:
-        dt = datetime.now(BJT)
+        return bj_today().isoformat()
     elif isinstance(ts, (int, float)):
         dt = datetime.fromtimestamp(ts, BJT)
     else:

@@ -44,6 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import load        # noqa: E402
 import kb_facts    # noqa: E402
+from bj_time import bj_today  # noqa: E402
 
 OUT = os.path.join(load.KB, "缺口-v1.json")
 
@@ -667,7 +668,7 @@ def check_due(doc, today=None):
         1 = 登记与重算不一致（漂移，见 main）
         2 = 有承诺逾期未交付
     """
-    today = today or date.today()
+    today = today or bj_today()
     overdue = []
     for g in doc["gaps"]:
         c = g.get("承诺")

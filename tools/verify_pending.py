@@ -52,8 +52,14 @@ import re
 import shutil
 import sys
 import tempfile
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from pathlib import Path
+
+# ★ 「今天」只有一处来源：tools/bj_time.py（2026-10-21 统一）。
+_TOOLS = str(Path(__file__).resolve().parent)
+if _TOOLS not in sys.path:
+    sys.path.insert(0, _TOOLS)
+from bj_time import BJ, bj_today  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 LIST_PATH = REPO / "PMO" / "待收清单-v1.json"
@@ -61,8 +67,6 @@ EVENT_LOG = REPO / "PMO" / "logs" / "ws_events.jsonl"
 # 外发台账：我们自己发出去的消息落在这里（判据与写入在 tools/agent/outbound.mjs）。
 # 与 EVENT_LOG 是一对 —— 一个是「听进来的」，一个是「说出去的」，宁可都缺，不可只有一个。
 OUTBOUND_LOG = REPO / "PMO" / "logs" / "ws_outbound.jsonl"
-
-BJ = timezone(timedelta(hours=8))
 
 ALLOWED_性质 = {"承诺", "条件承诺", "我方待问"}
 ALLOWED_状态 = {"open", "partial", "done", "dropped"}
@@ -72,10 +76,6 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # 承诺类必须指得出上游原话；这两组互为反面
 承诺类 = {"承诺", "条件承诺"}
-
-
-def bj_today() -> date:
-    return datetime.now(BJ).date()
 
 
 def _squash(s: str) -> str:
