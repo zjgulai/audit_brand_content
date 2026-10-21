@@ -306,14 +306,37 @@ def main():
     from contract import units_from_corpus
     ads, pages = units_from_corpus()
     changed = []
+    before_hit_count = 0
+    after_hit_count = 0
+    before_digest = hashlib.sha256()
+    after_digest = hashlib.sha256()
     for unit_value in ads + pages:
         before = legacy_hits(unit_value["text"])
         after = judge.judge(unit_value)
-        if before != after:
+        before_hit_count += len(before)
+        after_hit_count += len(after)
+        before_bytes = json.dumps(
+            {"unit_id": unit_value["unit_id"], "hits": before},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        after_bytes = json.dumps(
+            {"unit_id": unit_value["unit_id"], "hits": after},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        before_digest.update(before_bytes + b"\n")
+        after_digest.update(after_bytes + b"\n")
+        if before_bytes != after_bytes:
             changed.append(unit_value["unit_id"])
-    T("F2 接线前后 427 个真实 ContentUnit 命中集合逐条相等",
-      not changed and len(ads) + len(pages) == 427,
-      "changed=%r total=%d" % (changed[:3], len(ads) + len(pages)))
+    before_sha = before_digest.hexdigest()
+    after_sha = after_digest.hexdigest()
+    zero_change_detail = (
+        "units=%d before_hits=%d after_hits=%d changed_units=%d "
+        "before_sha256=%s after_sha256=%s" %
+        (len(ads) + len(pages), before_hit_count, after_hit_count, len(changed),
+         before_sha, after_sha))
+    T("F2 接线前后真实 ContentUnit 输出逐字节相等",
+      not changed and len(ads) + len(pages) == 427
+      and before_hit_count == after_hit_count and before_sha == after_sha,
+      zero_change_detail + " changed=%r" % changed[:3])
+    print("  · F2 零变化读数：%s" % zero_change_detail)
 
     exclude_rule = copy.deepcopy(base_rule)
     exclude_rule["rule_key"] = "T.x.exclude"
