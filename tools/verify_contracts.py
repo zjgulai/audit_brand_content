@@ -41,7 +41,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACTS = ROOT / "contracts"
 
-SCHEMAS = ("attempt-v1", "receipt-v1", "review-ir-v1")
+SCHEMAS = (
+    "attempt-v1",
+    "receipt-v1",
+    "review-ir-v1",
+    "business-command-batch-v1",
+    "projection-status-v1",
+)
 
 DATE_TIME_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$"
@@ -267,6 +273,43 @@ def samples() -> dict:
         "control_points_version": "cp-2026-10-18-v2",
         "created_at": "2026-10-18T10:00:00Z",
     }
+    good_command = {
+        "schema_version": "business-command-batch/v1",
+        "command_id": "cmd-1",
+        "authority_seq": 1,
+        "prev_manifest_sha256": None,
+        "aggregate_type": "review_case",
+        "aggregate_id": "case-1",
+        "expected_version": 0,
+        "result_version": 1,
+        "actor": {"principal_id": "ou-reviewer", "tenant_id": "t1"},
+        "command": "claim",
+        "occurred_at": "2026-10-20T10:00:00Z",
+        "idempotency_key": "idem-1",
+        "request_sha256": "a" * 64,
+        "events": [{"type": "review.claimed", "version": 1}],
+        "result": {"status": "claimed", "version": 1},
+        "reconcile_token": "reconcile-token-000001",
+    }
+    good_projection = {
+        "schema_version": "projection-status/v1",
+        "status": "fresh",
+        "authority": {
+            "seq": 1,
+            "manifest_sha256": "b" * 64,
+            "committed_at": "2026-10-20T10:00:00Z",
+        },
+        "projection": {
+            "applied_seq": 1,
+            "manifest_sha256": "b" * 64,
+            "schema_version": 1,
+            "rebuilt_at": "2026-10-20T10:00:01Z",
+        },
+        "lag_commits": 0,
+        "lag_seconds": 0,
+        "last_error_code": None,
+        "reconcile_token": None,
+    }
     return {
         "attempt-v1": [
             ("好样本（accepted）", good_attempt, True),
@@ -327,6 +370,28 @@ def samples() -> dict:
                 **good_ir["decision"], "state": "未审查"}, "content_unit_ref": {
                 "unit_id": "u-1", "kind": "landing_page", "parse_status": "failed"}}, False),
             ("缺必填 receipt_ref", {k: v for k, v in good_ir.items() if k != "receipt_ref"}, False),
+        ],
+        "business-command-batch-v1": [
+            ("好样本", good_command, True),
+            ("缺 actor", {k: v for k, v in good_command.items() if k != "actor"}, False),
+            ("actor 缺 tenant", {**good_command, "actor": {"principal_id": "ou-reviewer"}}, False),
+            ("authority_seq=0", {**good_command, "authority_seq": 0}, False),
+            ("expected_version=-1", {**good_command, "expected_version": -1}, False),
+            ("未知 command", {**good_command, "command": "sign"}, False),
+            ("缺 request_sha256", {k: v for k, v in good_command.items() if k != "request_sha256"}, False),
+            ("额外字段", {**good_command, "secret": "no"}, False),
+        ],
+        "projection-status-v1": [
+            ("好样本", good_projection, True),
+            ("未知 status", {**good_projection, "status": "ok"}, False),
+            ("authority seq 负数", {**good_projection, "authority": {
+                **good_projection["authority"], "seq": -1}}, False),
+            ("projection applied_seq 负数", {**good_projection, "projection": {
+                **good_projection["projection"], "applied_seq": -1}}, False),
+            ("lag_commits 负数", {**good_projection, "lag_commits": -1}, False),
+            ("缺 last_error_code", {k: v for k, v in good_projection.items()
+                                      if k != "last_error_code"}, False),
+            ("额外路径泄漏字段", {**good_projection, "data_path": "/secret"}, False),
         ],
     }
 
@@ -496,6 +561,29 @@ def check_behavior(schemas: dict) -> list:
        "rule_key 按 produced_by 逐条分流"
        + ("" if not rk_bad else f"；{len(rk_bad)} 项不符：" + "、".join(rk_bad))
        + ("" if item_allof else "（findings.items.allOf 缺失 —— 条件被挪到顶层了？）"))
+
+    # ── B-6 projection fresh 恒等式：字段合法还不够 ──
+    ps = schemas.get("projection-status-v1") or {}
+    good_ps = samples().get("projection-status-v1", [])[0][1]
+
+    def projection_consistent(value) -> bool:
+        if not isinstance(value, dict):
+            return False
+        authority = value.get("authority") or {}
+        projection = value.get("projection") or {}
+        if value.get("status") == "fresh":
+            return (authority.get("seq") == projection.get("applied_seq")
+                    and authority.get("manifest_sha256") ==
+                    projection.get("manifest_sha256")
+                    and value.get("lag_commits") == 0
+                    and value.get("last_error_code") is None)
+        return True
+
+    bad_ps = {**good_ps,
+              "projection": {**good_ps["projection"], "manifest_sha256": "c" * 64}}
+    ok("B-6", bool(ps) and projection_consistent(good_ps)
+       and not projection_consistent(bad_ps),
+       "fresh 必须 authority.seq/hash == projection.applied_seq/hash 且 lag=0；坏样本须 False")
 
     return out
 

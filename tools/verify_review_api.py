@@ -133,10 +133,17 @@ def main():
         {"case_id": "case-other", "tenant": "t1", "product_line": "pump",
          "submitter_id": "u_other", "final_reviewer_id": "u_dp3",
          "assignee_id": "u_dp3", "actionable": True, "ir": ir("ir-2")},
+        {"case_id": "case-t2", "tenant": "t2", "product_line": "pump",
+         "submitter_id": "u_t2", "final_reviewer_id": "u_t2_final",
+         "assignee_id": "u_t2_dp3", "actionable": True, "ir": ir("ir-t2")},
     ]
     reports = [{
         "report_id": "rep-1", "case_id": "case-own", "ir_id": "ir-1",
         "url": "https://example.test/reports/ir-1.md",
+        "published_at": "2026-10-19T00:00:00Z",
+    }, {
+        "report_id": "rep-orphan", "case_id": "missing-case", "ir_id": "ir-x",
+        "url": "https://example.test/reports/orphan.md",
         "published_at": "2026-10-19T00:00:00Z",
     }]
     repo = InMemoryRepository(
@@ -144,11 +151,23 @@ def main():
         rules=[{"rule_id": "R-1", "version": "rules-v1"}],
         control_points=[{"control_code": "H01", "judge_type": "literal"}],
         routing=[{"control_code": "H01", "owner": "dp3"}],
-        notifications=[{"notification_id": "n-1", "recipient": "u_sub",
-                        "type": "formal_submit", "unread": True}],
-        metrics={"cases": 2},
-        appeals=[], release_pending=[], takedown_tasks=[],
-        signer_grants=[], takedown_grants=[], sessions=[],
+        notifications=[
+            {"notification_id": "n-1", "recipient": "u_sub", "tenant": "t1",
+             "type": "formal_submit", "unread": True},
+            {"notification_id": "n-t2", "recipient": None, "tenant": "t2",
+             "type": "broadcast", "unread": True},
+        ],
+        metrics={"t1": {"cases": 2}, "t2": {"cases": 99}},
+        appeals=[{"appeal_id": "a-t1", "tenant": "t1"},
+                 {"appeal_id": "a-t2", "tenant": "t2", "reason": "secret"}],
+        release_pending=[],
+        takedown_tasks=[{"task_id": "td-t1", "tenant": "t1"},
+                        {"task_id": "td-t2", "tenant": "t2", "url": "secret"}],
+        signer_grants=[{"id": "sg-t1", "tenant": "t1"},
+                       {"id": "sg-t2", "tenant": "t2"}],
+        takedown_grants=[{"id": "tg-t1", "tenant": "t1"},
+                         {"id": "tg-t2", "tenant": "t2"}],
+        sessions=[],
         release_readiness={"case-own": {"ready": True}},
     )
     principals = {
@@ -231,6 +250,26 @@ def main():
     other = [n.get("notification_id") for n in (body or [])]
     report(st == 200 and "n-1" not in other,
            "C6 ★ 通知负样本：别人的通知看得到 = 越权", "%s %r" % (st, body))
+    report("n-t2" not in mine and "n-t2" not in other,
+           "C6b 跨 tenant broadcast 通知不可见", repr((mine, other)))
+
+    st, body = call(app, "GET", "/api/v1/appeals", cookie=coord)
+    report(st == 200 and [row["appeal_id"] for row in body] == ["a-t1"],
+           "C6c appeals 按 tenant 过滤", repr(body))
+    st, body = call(app, "GET", "/api/v1/takedown-tasks", cookie=coord)
+    report(st == 200 and [row["task_id"] for row in body] == ["td-t1"],
+           "C6d takedown tasks 按 tenant 过滤", repr(body))
+    st, signer_rows = call(app, "GET", "/api/v1/admin/signer-grants", cookie=coord)
+    st2, takedown_rows = call(app, "GET", "/api/v1/admin/takedown-grants", cookie=coord)
+    report(st == 200 and st2 == 200
+           and [row["id"] for row in signer_rows] == ["sg-t1"]
+           and [row["id"] for row in takedown_rows] == ["tg-t1"],
+           "C6e admin grants 按 tenant 过滤", repr((signer_rows, takedown_rows)))
+    st, body = call(app, "GET", "/api/v1/reports", cookie=coord)
+    report(st == 200 and "rep-orphan" not in [row["report_id"] for row in body],
+           "C6f orphan report 不向任何人泄漏", repr(body))
+    st, _ = call(app, "GET", "/api/v1/reports/rep-orphan", cookie=coord)
+    report(st == 404, "C6g orphan report 详情 404", str(st))
 
     # ── C-103 只读入口：写请求 403 + JSONL 审计；GET 不记日志 ──────
     audit_dir = tempfile.mkdtemp(prefix="review_api_audit_")

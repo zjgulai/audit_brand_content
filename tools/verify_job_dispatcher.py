@@ -310,12 +310,34 @@ def main():
     store = new_store("timeout")
     disp = new_disp("timeout", store)
     tmarker = os.path.join(TMP, "timeout_marker")
-    w = worker("w_timeout.py", (
-        "open(%r, 'a').write('start\\n')\ntime.sleep(5)\nopen(%r, 'a').write('end\\n')\n"
-    ) % (tmarker, tmarker))
+    # ★ 2026-10-21 修：B4d 曾经**真的偶发** —— 干净检出上连跑 8 次翻转 4 次。
+    #   本用例的 timeout=0.4s，而 worker 是 `python -c` 脚本：**解释器冷启动实测
+    #   0.9–1.2 秒**才写出第一行（本机 5 次实测 0.899/1.228/1.158/1.216/1.174s）。
+    #   于是 worker 常常还没写出 `start` 就被 SIGKILL 杀掉，tmarker 是空的 ——
+    #   B4d 断言 `lines(tmarker) == ["start"]` 就随机失败。
+    #
+    #   **它测的其实是「解释器启动有多快」，不是「超时会不会杀掉进程」。**
+    #   机器越慢/越冷/越忙越红，CI 上尤其。这正是「在 CI 上偶发」的典型形状。
+    #
+    #   修法不是把超时调大（那只是把阈值挪到另一个魔法数字，换台更慢的机器照样翻），
+    #   而是**让 worker 不再依赖解释器冷启动**：用 `/bin/sh` 写 marker（实测
+    #   0.026–0.043s，比 python 快约 30 倍），再 `sleep 5` 长时间阻塞。
+    #   这样 0.4s 的余量是 10 倍以上，而「超时杀掉进程」这件事一点没变弱 ——
+    #   B4b（signal=9）、B4c（<3s）、B4e（不 commit）都原样保留。
+    #
+    #   ★ 反向对照仍在：若把 timeout 改成 30s，sleep 会跑完、`echo end` 执行，
+    #     tmarker 变成 ["start","end"]，B4d 必然红 —— 所以它仍然能证明
+    #     「超时真的阻止了 worker 跑完」，而不是一句恒真的断言。
+    #     ★★ 这里**不能写 `exec sleep 5`** —— 我第一版就是这么写的，反向对照当场
+    #     抓到了：`exec` 用 sleep 替换掉 sh 进程，`echo end` 那一行永远不执行，
+    #     于是无论 timeout 多大 B4d 都不会红，**判据退化成恒真**。
+    #     （这是 AGENTS.md §2.4「名字出现过 ≠ 拦得住」的同一个形状，出现在修它的补丁里。）
+    w = os.path.join(TMP, "w_timeout.sh")
+    with open(w, "w", encoding="utf-8") as f:
+        f.write("echo start >> %s\nsleep 5\necho end >> %s\n" % (tmarker, tmarker))
     t0 = time.time()
     rec = disp.run(case_id="case_to", submission_id="s", run_id="RUN_TO",
-                   command=[sys.executable, w], timeout=0.4)
+                   command=["/bin/sh", w], timeout=0.4)
     elapsed = time.time() - t0
     T("B4a 超时 → timeout", rec.get("outcome") == "timeout", json.dumps(rec, ensure_ascii=False))
     T("B4b 超时后进程被 SIGKILL（signal=9）", rec.get("signal") == 9

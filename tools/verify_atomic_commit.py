@@ -260,7 +260,7 @@ def main():
         with open(os.path.join(store15.blobs, "deadbeef"), "wb") as f:
             f.write(b"orphan")
         state, detail = store15.recover("run-B")
-        report(state == "garbage" and "unreferenced blob" in str(detail),
+        report(state == "garbage" and "unreferenced object: blobs/" in str(detail),
                "C15 多 run + 真孤儿 blob → garbage",
                "state=%s %s" % (state, detail))
     finally:
@@ -409,6 +409,55 @@ def main():
     finally:
         shutil.rmtree(root24, ignore_errors=True)
 
+    # C25 同 run_id 二次提交必须拒绝（manifest 不可变）
+    root25 = tempfile.mkdtemp(prefix="manifest-immutable-")
+    try:
+        store25 = ArtifactStore(root25)
+        store25.commit("run-once", _artifacts())
+        try:
+            store25.commit("run-once", _artifacts())
+            rejected = False
+        except FileExistsError:
+            rejected = True
+        report(rejected, "C25 同 run_id 二次提交拒绝", "")
+    finally:
+        shutil.rmtree(root25, ignore_errors=True)
+
+    # C26 同最终路径异内容必须拒绝，不得 os.replace 覆盖
+    root26 = tempfile.mkdtemp(prefix="object-immutable-")
+    try:
+        store26 = ArtifactStore(root26)
+        store26.commit("run-a", [{"kind": "events", "key": "cmd-1", "data": b"one"}])
+        try:
+            store26.commit("run-b", [{"kind": "events", "key": "cmd-1", "data": b"two"}])
+            rejected = False
+        except FileExistsError:
+            rejected = True
+        event_path = os.path.join(store26.events, "cmd-1.json")
+        if os.path.isfile(event_path):
+            with open(event_path, "rb") as f:
+                unchanged = f.read() == b"one"
+        else:
+            unchanged = False
+        report(rejected and unchanged,
+               "C26 同路径异内容拒绝且旧对象不变", "")
+    finally:
+        shutil.rmtree(root26, ignore_errors=True)
+
+    # C27 artifact key 路径穿越拒绝
+    root27 = tempfile.mkdtemp(prefix="artifact-key-")
+    try:
+        store27 = ArtifactStore(root27)
+        try:
+            store27.commit("run-safe", [{"kind": "events", "key": "../escape", "data": b"x"}])
+            rejected = False
+        except ValueError:
+            rejected = True
+        report(rejected and not os.path.exists(os.path.join(root27, "escape.json")),
+               "C27 artifact key 路径穿越拒绝", "")
+    finally:
+        shutil.rmtree(root27, ignore_errors=True)
+
     # R1 测试注入（不改生产函数）：跳过产物提升，只 rename manifest
     rootR = tempfile.mkdtemp(prefix="manifest-only-")
     try:
@@ -417,7 +466,8 @@ def main():
 
         def fake_replace(src, dst):
             d = os.path.abspath(os.path.dirname(dst))
-            if d in (storeR.blobs, storeR.ir, storeR.receipts, storeR.reports):
+            if d in (storeR.blobs, storeR.ir, storeR.receipts,
+                      storeR.reports, storeR.events):
                 return None  # 故意不提升
             return real_replace(src, dst)
 
@@ -438,9 +488,12 @@ def main():
             src_path = os.path.join(REPO_ROOT, "base", "artifact_store.py")
             with open(src_path, encoding="utf-8") as f:
                 src = f.read()
-            needle = '                os.replace(a["_tmp"], final)\n'
+            needle = ('                else:\n'
+                      '                    os.replace(a["_tmp"], final)\n')
             mutated = src.replace(
-                needle, "                pass  # MUTATION: promotion disabled\n")
+                needle,
+                '                else:\n'
+                '                    os.unlink(a["_tmp"])  # MUTATION: promotion disabled\n')
             if mutated == src:
                 report(False, "M-1 无法构造产物提升变异", "needle not found")
             else:

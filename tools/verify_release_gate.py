@@ -149,6 +149,9 @@ def main():
     # ── B 签发绑定全字段 ────────────────────────────────────────────
     T("B1 签名包含全部绑定字段", set(SIGNATURE_FIELDS) <= set(sig), str(sorted(set(SIGNATURE_FIELDS) - set(sig))))
     T("B2 validate_signature 对真签名零错误", validate_signature(sig) == [], str(validate_signature(sig)))
+    T("B2b 签名只存不可逆 step-up ref，不存 bearer token",
+      sig["step_up_ref"].startswith("stepup:") and sig["step_up_ref"] != tk
+      and tk not in json.dumps(sig, ensure_ascii=False), str(sig["step_up_ref"]))
     for field in ("case_version", "ir_id", "raw_sha256", "rule_snapshot_hash",
                   "used_authority_refs", "conflict_table_version",
                   "media_fingerprints_root_hash", "signature_version"):

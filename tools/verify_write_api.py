@@ -474,6 +474,24 @@ def main():
     report("gate.sign(" in sources[1] and "gate.revoke(" in sources[1],
            "C5 release 只走 ReleaseGate", "")
 
+    # C7 capability allowlist：显式空集合必须全关；不能用 `or defaults` 回退全开。
+    empty_app = create_app(
+        session_store=store, repository=repo, principals=principals,
+        finding_store=fs, appeals=AppealStore(), enabled_write_capabilities=set())
+    disabled_paths = [
+        ("/api/v1/cases/case-1/claim", {}),
+        ("/api/v1/appeals", {"case_id": "case-1", "reason": "x"}),
+        ("/api/v1/takedown-tasks/t-1/start", {}),
+        ("/api/v1/cases/case-release/release-decision",
+         {"decision": "sign", "version": 1}),
+    ]
+    disabled_results = [
+        call(empty_app, "POST", path, sub, "EMPTY-%d" % i, body=body)[0]
+        for i, (path, body) in enumerate(disabled_paths)
+    ]
+    report(disabled_results == [501] * len(disabled_results),
+           "C7 显式空 capability 集合不回退全开", repr(disabled_results))
+
     print("----------------------------------------")
     if failed == 0:
         print("✅ %d/%d 全过" % (passed, passed + failed))
