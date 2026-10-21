@@ -4,7 +4,8 @@
 
 ## 职责边界（技术方案 §2 #6）
 
-  - 读规则快照的**字面部分**（keywords / patterns），对 ContentUnit.text 做匹配；
+  - 读规则快照的**字面部分**（keywords / patterns / exclude_patterns /
+    require_context），对 ContentUnit.text 做匹配；
   - 每条命中：`control_code / rule_key / start / end / quote / severity / detected_by`；
   - `detected_by` 恒为 `P0`（检测层：正则/关键词 —— **不是严重度**）；
   - `severity` 恒为规则快照里的 `L0–L5`；
@@ -20,7 +21,10 @@
 
 ## 口径
 
-  - 关键词按 `re.IGNORECASE` 字面匹配；pattern 按快照原样编译（同样忽略大小写）。
+  - 关键词与 require_context 按 `re.IGNORECASE` 字面匹配；pattern / exclude_patterns
+    按快照原样编译（同样忽略大小写）。
+  - require_context 是规则级 OR 前置条件；exclude_patterns 只删除与其区间重叠的
+    候选 span，同一文本里其他真命中仍保留。
   - 同一条规则内，重叠匹配只保留「起点最早、同起点最长」的那一个；
     不同规则之间不去重（它们属于不同控制点，各自都是独立命中）。
   - 快照只读：构造时算 `rule_snapshot_sha256`，运行期不写回。
@@ -80,18 +84,38 @@ def _compile_rule(rule, registry):
         raise InvalidRuleSnapshot("%s: match 缺失或不是对象" % rule_key)
     keywords = match.get("keywords", [])
     patterns = match.get("patterns", [])
+    exclude_patterns = match.get("exclude_patterns", [])
+    require_context = match.get("require_context", [])
     if not isinstance(keywords, list) or not all(isinstance(k, str) and k for k in keywords):
         raise InvalidRuleSnapshot("%s: match.keywords 必须是字符串数组" % rule_key)
     if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
         raise InvalidRuleSnapshot("%s: match.patterns 必须是字符串数组" % rule_key)
+    if not isinstance(exclude_patterns, list) or not all(
+            isinstance(p, str) and p for p in exclude_patterns):
+        raise InvalidRuleSnapshot(
+            "%s: match.exclude_patterns 必须是非空字符串数组" % rule_key)
+    if not isinstance(require_context, list) or not all(
+            isinstance(item, str) and item for item in require_context):
+        raise InvalidRuleSnapshot(
+            "%s: match.require_context 必须是非空字符串数组" % rule_key)
 
     kw_res = [re.compile(re.escape(k), re.IGNORECASE | re.UNICODE) for k in keywords]
-    pat_res = []
-    for p in patterns:
-        try:
-            pat_res.append(re.compile(p, re.IGNORECASE | re.UNICODE))
-        except re.error as e:
-            raise InvalidRuleSnapshot("%s: pattern 编译失败（%s）：%r" % (rule_key, e, p))
+    ctx_res = [re.compile(re.escape(item), re.IGNORECASE | re.UNICODE)
+               for item in require_context]
+
+    def compile_patterns(values, field):
+        compiled = []
+        for value in values:
+            try:
+                compiled.append(re.compile(value, re.IGNORECASE | re.UNICODE))
+            except re.error as exc:
+                raise InvalidRuleSnapshot(
+                    "%s: %s 编译失败（%s）：%r" %
+                    (rule_key, field, exc, value)) from exc
+        return compiled
+
+    pat_res = compile_patterns(patterns, "pattern")
+    exclude_res = compile_patterns(exclude_patterns, "exclude_pattern")
 
     return {
         "rule_key": rule_key,
@@ -99,6 +123,8 @@ def _compile_rule(rule, registry):
         "severity": severity,
         "keywords": kw_res,
         "patterns": pat_res,
+        "exclude_patterns": exclude_res,
+        "require_context": ctx_res,
     }
 
 
@@ -148,6 +174,14 @@ class RuleJudge(object):
             code = rule["control_code"]
             if allow is not None and code not in allow:
                 continue
+            if rule["require_context"] and not any(
+                    rx.search(text) for rx in rule["require_context"]):
+                continue
+            excluded = [
+                (match.start(), match.end())
+                for rx in rule["exclude_patterns"] for match in rx.finditer(text)
+                if match.end() > match.start()
+            ]
             spans = []
             for rx in rule["keywords"]:
                 for m in rx.finditer(text):
@@ -157,6 +191,12 @@ class RuleJudge(object):
                 for m in rx.finditer(text):
                     if m.end() > m.start():
                         spans.append((m.start(), m.end()))
+            # 排除式只删除与其区间重叠的候选 span，不删除整条规则。
+            spans = [
+                (start, end) for start, end in spans
+                if not any(start < ex_end and ex_start < end
+                           for ex_start, ex_end in excluded)
+            ]
             # 同规则内去重叠：起点最早优先；同起点取最长。
             spans = sorted(set(spans), key=lambda se: (se[0], -(se[1] - se[0])))
             chosen = []

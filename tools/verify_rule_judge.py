@@ -10,6 +10,8 @@
   C **边界**：只产命中，不产 candidate / state / layer / obligations；不写回执、不查依据。
   D **反向对照**：未知码、deprecated 码、severity 写成 P 值、quote 与切片不符 —— 必须红。
   E **不是恒拒/恒过**：正常文本有命中；无关文本 0 命中；禁用规则不产命中。
+  F **规则守卫**：exclude_patterns 只删重叠 span；require_context 是 OR 前置；
+    三类表达式都在装载时预编译；当前真实 enabled 规则输出零变化。
 
 ## 退出码
 
@@ -24,9 +26,11 @@
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -253,6 +257,115 @@ def main():
     # D9 HIT_FIELDS 恰好与判据里的字段表一致（名字出现过 ≠ 拦得住）
     T("D9 HIT_FIELDS 与判据表一致", set(HIT_FIELDS) == EXPECTED_HIT_FIELDS,
       str(sorted(HIT_FIELDS)))
+
+    # ── F exclude/context 守卫 + 真实语料零变化 ────────────────────────
+    raw_rules = json.load(open(RULES_PATH, encoding="utf-8"))["rules"]
+    guarded = [row for row in raw_rules
+               if (row.get("match") or {}).get("exclude_patterns")
+               or (row.get("match") or {}).get("require_context")]
+    T("F1 真实快照恰有 5 条 guard 规则，且全部 disabled",
+      len(guarded) == 5 and all(row.get("enabled") is False for row in guarded),
+      repr([(row.get("rule_key"), row.get("enabled")) for row in guarded]))
+
+    # 旧匹配语义（只 keywords/patterns），限定当前真正装载的 enabled 非 permit 规则。
+    # guard 五条全 disabled 时，新旧输出必须逐条相等。
+    def legacy_hits(text_value, allow=None):
+        rows = []
+        for raw_rule in raw_rules:
+            if raw_rule.get("enabled") is False or raw_rule.get("modality") == "permit":
+                continue
+            if allow is not None and raw_rule.get("parent_rule") not in allow:
+                continue
+            match = raw_rule.get("match") or {}
+            spans = []
+            for keyword in match.get("keywords") or []:
+                spans.extend((m.start(), m.end()) for m in
+                             re.compile(re.escape(keyword), re.I | re.U).finditer(text_value)
+                             if m.end() > m.start())
+            for pattern in match.get("patterns") or []:
+                spans.extend((m.start(), m.end()) for m in
+                             re.compile(pattern, re.I | re.U).finditer(text_value)
+                             if m.end() > m.start())
+            spans = sorted(set(spans), key=lambda item: (item[0], -(item[1] - item[0])))
+            chosen, last_end = [], -1
+            for start, end in spans:
+                if start < last_end:
+                    continue
+                chosen.append((start, end))
+                last_end = end
+            for start, end in chosen:
+                rows.append({
+                    "control_code": raw_rule["parent_rule"],
+                    "rule_key": raw_rule["rule_key"],
+                    "start": start, "end": end, "quote": text_value[start:end],
+                    "severity": raw_rule["severity"], "detected_by": "P0",
+                })
+        rows.sort(key=lambda h: (h["start"], h["control_code"], h["rule_key"], h["end"]))
+        return rows
+
+    from contract import units_from_corpus
+    ads, pages = units_from_corpus()
+    changed = []
+    for unit_value in ads + pages:
+        before = legacy_hits(unit_value["text"])
+        after = judge.judge(unit_value)
+        if before != after:
+            changed.append(unit_value["unit_id"])
+    T("F2 接线前后 427 个真实 ContentUnit 命中集合逐条相等",
+      not changed and len(ads) + len(pages) == 427,
+      "changed=%r total=%d" % (changed[:3], len(ads) + len(pages)))
+
+    exclude_rule = copy.deepcopy(base_rule)
+    exclude_rule["rule_key"] = "T.x.exclude"
+    exclude_rule["match"] = {
+        "keywords": ["clinical"], "patterns": [],
+        "exclude_patterns": [r"clinical\s+(trial|study)"],
+    }
+    ex_judge = RuleJudge(reg, write_rules("exclude.json", [exclude_rule]))
+    T("F3 只含被排除片段 → 0 命中",
+      ex_judge.judge("clinical trial") == [],
+      repr(ex_judge.judge("clinical trial")))
+    mixed_text = "clinical trial；另一处 clinical benefit"
+    ex_hits = ex_judge.judge(mixed_text)
+    T("F4 同文被排除片段 + 真命中 → 只保留真命中",
+      len(ex_hits) == 1 and ex_hits[0]["quote"] == "clinical"
+      and ex_hits[0]["start"] == mixed_text.rfind("clinical"), repr(ex_hits))
+
+    context_rule = copy.deepcopy(base_rule)
+    context_rule["rule_key"] = "T.x.context"
+    context_rule["match"] = {
+        "keywords": ["slim"], "patterns": [],
+        "require_context": ["postpartum", "belly band"],
+    }
+    ctx_judge = RuleJudge(reg, write_rules("context.json", [context_rule]))
+    T("F5 缺全部 context 词 → 0 命中", ctx_judge.judge("slim design") == [], "")
+    ctx_hits = ctx_judge.judge("Postpartum slim design")
+    T("F6 命中任一 context 字面词 → 主规则命中",
+      len(ctx_hits) == 1 and ctx_hits[0]["quote"].lower() == "slim", repr(ctx_hits))
+
+    compiled = ex_judge.rules[0]
+    T("F7 keywords/patterns/exclude/context 均在装载时预编译",
+      all(isinstance(rx, re.Pattern) for name in (
+          "keywords", "patterns", "exclude_patterns", "require_context")
+          for rx in compiled[name]), repr({k: len(compiled[k]) for k in compiled
+                                           if isinstance(compiled[k], list)}))
+
+    for name, mutate, marker in (
+        ("exclude 非数组", lambda rule: rule["match"].update(
+            {"exclude_patterns": "clinical"}), "exclude_patterns"),
+        ("context 含非字符串", lambda rule: rule["match"].update(
+            {"require_context": [1]}), "require_context"),
+        ("exclude 坏正则", lambda rule: rule["match"].update(
+            {"exclude_patterns": ["("]}), "exclude_pattern"),
+    ):
+        bad_rule = copy.deepcopy(base_rule)
+        mutate(bad_rule)
+        try:
+            RuleJudge(reg, write_rules("bad_guard_%s.json" % marker, [bad_rule]))
+            rejected = False
+        except Exception as exc:  # noqa: BLE001
+            rejected = marker in str(exc)
+        T("F8 %s → 装载拒绝" % name, rejected, "")
 
     # ── 结论 ────────────────────────────────────────────────────────
     for f in fails:
