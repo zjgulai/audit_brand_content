@@ -444,13 +444,89 @@ _MEDIA_HINTS: Dict[str, Tuple[str, ...]] = {
 }
 
 
-def _declared_media(media: Mapping[str, Any]) -> Tuple[str, ...]:
-    """从已归一化的 media 描述里读出「调用方声明了哪些介质」。"""
-    blob = " ".join(
-        str(media.get(field) or "") for field in ("kind", "mime")
-    ).lower()
-    if not blob.strip():
+# `application/*` 里少数几个**确实是媒体容器**的 subtype。
+# 只列这几个是刻意的：`application/*` 默认不是介质，
+# 逐个点名比「猜哪些像媒体」安全得多 —— 后者会把
+# `application/vnd.oasis.opendocument.image` 这种带 "image" 的文档一起认进来。
+_APPLICATION_CONTAINERS: Dict[str, str] = {
+    "mp4": "video",          # MP4 容器（application/mp4）
+    "x-m4a": "audio",        # M4A 音频容器
+    "x-matroska": "video",   # MKV
+    "ogg": "video",          # Ogg 容器，默认按视频（纯音频请用 audio/ogg）
+}
+
+
+def _media_from_mime(value: str) -> Tuple[str, ...]:
+    """按 **MIME 主类型**判断一个 `type/subtype` 串属于哪种介质。
+
+    这是「两段判据」的第一段，**有斜杠的串只走这一段**，不再退回子串匹配。
+
+    ★ 为什么必须只走这一段（2026-10-21 实测）：
+      `audio/mp4` 是 **M4A / iPod 音频的标准 MIME**。它的主类型已经说死了
+      「这是音频」，subtype 里的 `mp4` 只是**容器名**。
+      而按整串做子串匹配时，`mp4` 命中了 video 的 hint，于是被认成「音频 + 视频」
+      —— 一个纯音频文件因此通过了 `av_alignment`（要求 video+audio）的介质闸门，
+      provider 被真的调用了一次。不报错，返回一个「看起来分析过了」的结果。
+
+    同理：
+      `application/x-gift`            含子串 `gif`  → 被认成 image
+      `text/x-voice-transcript`       含子串 `voice` → 被认成 audio
+      `application/x-image`           含子串 `image` → 被认成 image
+    """
+    raw = value.strip().lower()
+    if "/" not in raw:
         return ()
+    mime = raw.split(";", 1)[0].strip()          # 去掉 `; charset=...` 之类的参数
+    if "/" not in mime:
+        return ()
+    major, _sep, subtype = mime.partition("/")
+    major, subtype = major.strip(), subtype.strip()
+    if major in ("image", "video", "audio"):
+        return (major,)
+    if major == "application":
+        medium = _APPLICATION_CONTAINERS.get(subtype)
+        return (medium,) if medium else ()
+    # text/* / multipart/* / font/* / model/* / 其它 —— 都不是我们要的介质
+    return ()
+
+
+def _declared_media(media: Mapping[str, Any]) -> Tuple[str, ...]:
+    """从已归一化的 media 描述里读出「调用方声明了哪些介质」。
+
+    **两段判据**（2026-10-21 改，起因见 `_media_from_mime` 的说明）：
+
+      第一段：任何含 `/` 的值 → 按 MIME 主类型判（`_media_from_mime`）。
+              这一段是**权威的**：只要它给出结论，就不再走第二段。
+      第二段：只有在第一段**一无所获**时，才对**不含 `/` 的裸串**
+              （`"mp4"` / `"png"` / `"图片"`）做子串匹配。
+
+    ★ 两段都不能少，各守一个方向：
+      * 只有第二段（旧实现）→ `audio/mp4` 被认成音频+视频（**已实测可放行**）；
+      * 只有第一段 → 裸扩展名 `"mp4"` / 中文 `"图片"` 全部认不出，
+        而那 9 条**现在是全对的**，退化就是回归。
+    """
+    values = [
+        str(media.get(field) or "").strip()
+        for field in ("kind", "mime")
+    ]
+    values = [v for v in values if v]
+    if not values:
+        return ()
+
+    # ── 第一段：MIME 主类型（权威）──
+    from_mime = set()
+    for value in values:
+        from_mime.update(_media_from_mime(value))
+    if from_mime:
+        return tuple(sorted(from_mime))
+
+    # ── 第二段：裸串的子串匹配（只在第一段一无所获时）──
+    bare = [v for v in values if "/" not in v]
+    if not bare:
+        # 有斜杠但主类型判不出（如 application/json）—— 明确地「不是介质」，
+        # 不许退回子串匹配，否则 application/x-gift 会从这条路溜进来。
+        return ()
+    blob = " ".join(bare).lower()
     found = []
     for medium, hints in _MEDIA_HINTS.items():
         if any(hint in blob for hint in hints):

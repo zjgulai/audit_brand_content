@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import ast
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -380,6 +381,54 @@ except ValueError:
     defect = False
 """,
     ),
+    (
+        "M17",
+        "两段判据：MIME 主类型是权威（第一段不许被第二段盖掉）",
+        "    if from_mime:\n        return tuple(sorted(from_mime))",
+        "    pass",
+        """
+# 删掉第一段的「早返回」后，`audio/mp4` 会走回子串匹配 → 多认 video。
+# 这正是事故的形状：纯音频文件通过「必须有画面」的闸门。
+defect = (m._declared_media(
+    m._describe_media_ref({"uri": "x", "mime": "audio/mp4"})) == ("audio",))
+defect = not defect
+""",
+    ),
+    (
+        "M18",
+        "两段判据：裸串仍走第二段（第 2 段不许被简化掉）",
+        '    bare = [v for v in values if "/" not in v]',
+        "    bare = []",
+        """
+# 删掉第二段后，裸扩展名 / 中文 kind 全部认不出 —— G4 那 9 条会静默退化。
+defect = (m._declared_media(
+    m._describe_media_ref({"uri": "x", "kind": "mp4"})) != ("video",))
+""",
+    ),
+    (
+        "M19",
+        "application/* 默认不是介质（只认显式列出的容器）",
+        '    if major == "application":\n'
+        "        medium = _APPLICATION_CONTAINERS.get(subtype)\n"
+        "        return (medium,) if medium else ()",
+        '    if major == "application":\n        return ()',
+        """
+# 删掉容器白名单后，application/mp4 不被认成视频。
+defect = (m._declared_media(
+    m._describe_media_ref({"uri": "x", "mime": "application/mp4"})) != ("video",))
+""",
+    ),
+    (
+        "M20",
+        "text/* 等非介质主类型必须返回 ()",
+        '    if major in ("image", "video", "audio"):\n        return (major,)',
+        '    if True:\n        return (major,)',
+        """
+# 改成「任何主类型都当成介质」后，text/voice-transcript 会被认成 text 介质。
+defect = bool(m._declared_media(
+    m._describe_media_ref({"uri": "x", "mime": "text/plain"})))
+""",
+    ),
 ]
 
 PROBE_TEMPLATE = '''\
@@ -409,7 +458,12 @@ def _probe(src_path: Path, body: str) -> bool:
         fh.write(code)
     try:
         proc = subprocess.run(
-            [sys.executable, "-I", str(probe_path), str(src_path)],
+            # ★ `-B` 必须加：探针会 import 变异副本，Python 默认在副本旁边写
+            #   `__pycache__/`。那是一个**目录**，而下面的清理用 unlink() 只删文件 ——
+            #   macOS 上 unlink 一个目录抛 PermissionError，整个自证从「红/绿」
+            #   变成「未测 rc=2」。这个 bug 是我把副本从 base/ 挪进 tmpdir 时引入的
+            #   （原先写在仓里，`-B` 之前没人注意）。
+            [sys.executable, "-I", "-B", str(probe_path), str(src_path)],
             capture_output=True, text=True, timeout=90,
         )
         if proc.returncode not in (0, 1):
@@ -655,6 +709,75 @@ def main() -> int:
     add("D8 ★ 报告里 manifest 与 digest 出自同一份对象（不会自相矛盾）",
         rep["digest_sha256"] == M._manifest_digest(rep["providers"]), "")
 
+
+    # ══════════════════════════════════════════════════════════════════
+    # 介质识别：两段判据 + 反向对照（2026-10-21 加）
+    #
+    # 起因是一次实测：`audio/mp4`（M4A 音频的标准 MIME）被整串子串匹配
+    # 认成「音频 + 视频」，于是纯音频文件通过了 `av_alignment`（要 video+audio）
+    # 的介质闸门，provider 被真的调用了一次 —— 不报错。
+    # ══════════════════════════════════════════════════════════════════
+    def declared(value, field="mime"):
+        return M._declared_media(M._describe_media_ref({"uri": "x", field: value}))
+
+    # ── D9：MIME 主类型是权威（第一段）──
+    # 这三条是那次事故的直接形状。修之前全部返回 ('audio','video') / ('video','audio')。
+    add("D9a ★ audio/mp4 → 只 audio（subtype 的 mp4 是容器名，不是「含视频」）",
+        declared("audio/mp4") == ("audio",), str(declared("audio/mp4")))
+    add("D9b ★ audio/webm → 只 audio",
+        declared("audio/webm") == ("audio",), str(declared("audio/webm")))
+    add("D9c ★ video/ogg → 只 video",
+        declared("video/ogg") == ("video",), str(declared("video/ogg")))
+
+    # ── D10：裸串必须仍能认出（第二段）──
+    # ★ 这一段存在的理由：以后若有人把判据「简化」成只认 MIME 主类型，
+    #   下面这些会静默退化 —— 而它们现在是全对的。所以必须有断言守着。
+    bare_cases = {
+        "mp4": ("video",), "png": ("image",), "mp3": ("audio",),
+        "mov": ("video",), "wav": ("audio",),
+        "图片": ("image",), "视频": ("video",), "音频": ("audio",),
+    }
+    bad_bare = {k: declared(k) for k, want in bare_cases.items()
+                if declared(k) != want}
+    add("D10 ★ 无斜杠的裸串仍按扩展名/中文认出（第二段不许被简化掉）",
+        not bad_bare,
+        "退化：%s" % bad_bare if bad_bare else "%d/%d" % (len(bare_cases), len(bare_cases)))
+
+    # ── D11：非介质串必须返回 ()（从「运气」变成「设计」）──
+    #   原先 application/octet-stream 返回 () 只是恰好不含任何 hint 子串。
+    #   下面这条 + M17 一起，把「恰好」变成「必然」。
+    non_media = [
+        "application/octet-stream", "application/json", "text/plain", "text/html",
+        "text/css", "text/javascript", "text/markdown", "multipart/form-data",
+        # ★ 子串污染探针：这些**含**介质 hint 子串，但主类型说它们不是介质
+        "application/x-gift",                      # 含 "gif"
+        "application/x-image",                     # 含 "image"
+        "application/x-picture",                   # 含 "picture"
+        "text/x-voice-transcript",                 # 含 "voice"
+        "application/vnd.oasis.opendocument.image",  # 含 "image"
+    ]
+    misread = {v: declared(v) for v in non_media if declared(v)}
+    add("D11 ★ 非介质 MIME 必须返回 ()，含子串污染的也不许误认",
+        not misread, "误认：%s" % misread if misread else "%d/%d 全部正确未认"
+        % (len(non_media), len(non_media)))
+
+    # ── D12：清理失败不许把结论变成「未测」──
+    #   §2.4.4 的形状：验证动作自己出问题，把「通过」改写成别的。
+    #   2026-10-21 实测过一次：变异副本旁生成 __pycache__（目录），
+    #   而清理用 unlink() 只删文件 → PermissionError → 整个自证 rc=2。
+    # ★ 这里读的必须是**本文件自己**，不是契约源码。
+    #   第一版我写成了 `in src`（`src` 是 base/multimodal_provider.py 的内容），
+    #   于是这条断言永远红 —— 判据盯错了对象，正是它本来要防的那个病。
+    # ★ 探针串必须**拼出来**，不能写字面量 —— 写了的话它自己就出现在本文件里，
+    #   `not in self_src` 恒为 False，这条断言永远红。
+    #   这是「判据自己的文本满足了自己要找的条件」，§2.4.4 那个坑的又一例。
+    self_src = Path(__file__).read_text(encoding="utf-8")
+    good_cleanup = "rmtree(" + "tmpdir, ignore_errors=True)"
+    bad_cleanup = "leftover." + "unlink(missing_ok=True)"
+    add("D12 ★ 临时目录清理用 rmtree(ignore_errors)，不许在 finally 里抛",
+        good_cleanup in self_src and bad_cleanup not in self_src,
+        "" if good_cleanup in self_src else "清理仍可能抛异常")
+
     # ══════════════════════════════════════════════════════════════════
     # E. 变异测试：把每道守卫单点删掉，缺陷必须真的出现
     # ══════════════════════════════════════════════════════════════════
@@ -701,9 +824,11 @@ def main() -> int:
             "恒真的探针：%s" % false_positives if false_positives
             else "%d/%d 干净" % (len(MUTATIONS), len(MUTATIONS)))
     finally:
-        for leftover in tmpdir.glob("*"):
-            leftover.unlink(missing_ok=True)
-        tmpdir.rmdir()
+        # ★ 清理失败不许把「验收结论」变成「未测」。
+        #   自证的价值在结论行；一个在 finally 里抛异常的实现，
+        #   会让所有断言的结果一起消失（§2.2 第 7 条那个形状：
+        #   崩了 vs 静默 —— 这里两者都不该发生）。所以 ignore_errors。
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
     # ══════════════════════════════════════════════════════════════════
     # 汇总
