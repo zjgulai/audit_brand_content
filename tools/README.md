@@ -64,6 +64,12 @@
 > 对 openai-whisper 先检查本地模型文件。工具缺失退 **2（未测）**，不是通过。
 > 样本与 gold 的交付要求见 [`PMO/implement/阶段3-gold样本需求.md`](../PMO/implement/阶段3-gold样本需求.md)。
 
+## 五之前 · 采集器（**落盘根在仓外**）
+
+| 工具 | 什么时候用它 | 产物 / 退出 |
+|---|---|---|
+| [`momcozy/README.md`](./momcozy/README.md) | Momcozy 商品图采集器。★ **产物落仓外** `~/audit-data/momcozy-catalog/`，`assert_outside_repo()` 对仓内路径**硬拒退 2** —— 本仓公开，客户素材不许写入（`AGENTS.md` §2.6） | 仓外 0700；退 2 = 落盘根在仓内或缺参 |
+
 ## 五、任务与联调入口
 
 | 工具 | 什么时候用它 | 产物 / 退出 |
