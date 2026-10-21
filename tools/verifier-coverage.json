@@ -320,7 +320,7 @@
   },
   {
    "verifier": "tools/verify_no_media_in_repo.py",
-   "asserts": "旧 DL-3（媒体入仓扫描）验收器；已被 verify_download_governance 取代，保留作历史对照",
+   "asserts": "deprecated 兼容入口：仓内内容直接委托现行 DG-3；AUDIT_MEDIA_ROOT 缺失/不存在落未测；未登记 PNG 红、正确 sha256 基线绿；三态退出码 0/1/2",
    "subjects": [
     "tools/verify_download_governance.py",
     "AGENTS.md"
