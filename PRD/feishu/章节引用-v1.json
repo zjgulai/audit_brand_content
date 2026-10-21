@@ -341,6 +341,108 @@
       "section": "7.3",
       "kind": "current",
       "heading": "一票否决项（P0 级，命中即 BLOCK）"
+    },
+    {
+      "file": "PMO/audit/内容审查Agent-决策总账-v2-20261018.md",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "PRD/内容审查Agent-PRD-优化版-v2.0.md",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "Playbook/内容审查Agent-产品Playbook-v0.md",
+      "section": "9",
+      "kind": "current",
+      "heading": "人工复核与 sign-off"
+    },
+    {
+      "file": "skill/kb-content-review/references/categories.md",
+      "section": "7.2",
+      "kind": "current",
+      "heading": "母婴品类场景域规则覆盖"
+    },
+    {
+      "file": "skill/kb-content-review/references/categories.md",
+      "section": "7.3",
+      "kind": "current",
+      "heading": "一票否决项（P0 级，命中即 BLOCK）"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "12",
+      "kind": "current",
+      "heading": "非功能需求"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "5.4",
+      "kind": "current",
+      "heading": "结构化 JSON 规范"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "6.2",
+      "kind": "current",
+      "heading": "规则优先级分层设计"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "6.3",
+      "kind": "current",
+      "heading": "分层执行流程"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "6.6",
+      "kind": "current",
+      "heading": "置信度与分流策略"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "7.2",
+      "kind": "current",
+      "heading": "母婴品类场景域规则覆盖"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/review.py",
+      "section": "8.3",
+      "kind": "current",
+      "heading": "报告链接"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/risk_category.py",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/risk_category.py",
+      "section": "5.4",
+      "kind": "current",
+      "heading": "结构化 JSON 规范"
+    },
+    {
+      "file": "skill/kb-content-review/scripts/risk_category.py",
+      "section": "8.3",
+      "kind": "current",
+      "heading": "报告链接"
+    },
+    {
+      "file": "skill/内容审查总控/references/会话蒸馏回灌.md",
+      "section": "5.3",
+      "kind": "current",
+      "heading": "三态结论输出规范"
     }
   ]
 }
