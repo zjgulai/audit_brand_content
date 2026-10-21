@@ -2,7 +2,7 @@
   "_meta": {
     "name": "品牌用词规则-候选-v1",
     "generated_at": "2026-10-21",
-    "status": "candidate_not_in_rules_v1",
+    "status": "imported_in_rules_v1_164768a",
     "not_for_production": true,
     "rule_family": "T10",
     "batch": 1,
@@ -11,7 +11,7 @@
     "why_batch_1_first": "2026-10-21 实测的 5.6%–9.9% 误报，来源是生成期词表混进发布期。把这 10 条发布期用词规则单独拉出来跑，如果误报率显著低于 9.9%，证明分层判断对；如果不低，说明我们对『发布期』的理解也错了。两种结果都有信息。",
     "schema_note": "字段沿用 research/governance/skeleton/rules-v1.json 的形状；match.exclude_patterns 与 examples 是候选扩展，导入前需规范 owner 复核。",
     "common_context_rule": "引用竞品原话、法规/研究原文、用户原话时，一律降级为 manual_review，不 auto_reject；引用段落不当作品牌自己的话。",
-    "blocking_issue": "10 条规则的 parent_rule 是哨兵 __PENDING_CONTROL_POINT__，不是真实控制点。现状：没有任何断言会因此变红 —— verify_engine_contract.py:184 的 V1c 只查键在不在（k not in hit），哨兵能过；verify_control_points.py:508 的 C74-1 查的是反方向（新控制点必须有规则指向），导入而不建新控制点时它也看不见。风险恰恰在此：它会安静地通过，而 hit 里带的是 __PENDING_CONTROL_POINT__ 这种不是控制点的字符串。所以这条哨兵需要一个执行点，否则它只是一句自白 —— 见 _meta.required_assertions。",
+    "blocking_issue": "resolved (2026-10-21, commit 164768a): 10 条 parent_rule 已映射为 B01–B04；断言 A（verify_control_points.py C71-RP1/RP2）与断言 B（verify_brand_rules.py）已落地。当前读数：verify_control_points.py 48/48 绿；verify_brand_rules.py 35/35 绿；剩余 8 条规则只有文本排除说明、无 exclude_patterns 执行点。",
     "blocking_issue_type": "import_blocker",
     "exclusion_source_of_truth": "match.exclude_patterns",
     "exclusion_note": "match.exclude_patterns 是执行点；context_exclusion 只是给人看的注释；导入前必须有一条断言让两者对齐，否则会漂。",
@@ -20,15 +20,15 @@
         "id": "A",
         "file": "tools/verify_control_points.py",
         "assert": "rules-v1.json 里任何规则的 parent_rule 必须属于控制点主表 control_code 全集 ∪ {安全词}；出现 __PENDING_CONTROL_POINT__ 或任何未知字符串 → 红",
-        "now": "绿（候选规则尚未进 rules-v1.json；现有 26 条都合法）",
-        "on_import": "红，直到 10 条 parent_rule 被映射为真实控制点"
+        "now": "已实现并通过：verify_control_points.py C71-RP1/RP2；48 项全过；T10 已导入，parent_rule=B01–B04",
+        "on_import": "已导入；当前绿"
       },
       {
         "id": "B",
         "file": "tools/verify_brand_rules.py",
         "assert": "context_exclusion 改为结构化 [{id, pattern, note}]，match.exclude_patterns 与它的 pattern 集合恒等；每个 pattern 必须编译通过；有 exclude_patterns 就必须有对应 note",
-        "now": "已实现：tools/verify_brand_rules.py（读数以该脚本运行输出为准）",
-        "on_import": "先改候选格式，再落断言；否则两处会漂"
+        "now": "已实现：verify_brand_rules.py 35/35；2 条有排除项集合恒等；8 条无排除项（有文本说明、无执行点，脚本已标 warning）",
+        "on_import": "已导入；8 条待 owner 决定是否补 pattern"
       }
     ],
     "known_gaps": [
@@ -53,7 +53,13 @@
         "difference": "正则多覆盖 machine washing（旧文本未列）；machine washing 是技术固定搭配，属于补全/放宽，不是漏；旧文本未写，需 owner 确认。",
         "classification": "故意放宽/补全（旧文本漏写，待 owner 确认）"
       }
-    ]
+    ],
+    "blocking_issue_status": "resolved",
+    "blocking_issue_history": "10 条规则的 parent_rule 是哨兵 __PENDING_CONTROL_POINT__，不是真实控制点。现状：没有任何断言会因此变红 —— verify_engine_contract.py:184 的 V1c 只查键在不在（k not in hit），哨兵能过；verify_control_points.py:508 的 C74-1 查的是反方向（新控制点必须有规则指向），导入而不建新控制点时它也看不见。风险恰恰在此：它会安静地通过，而 hit 里带的是 __PENDING_CONTROL_POINT__ 这种不是控制点的字符串。所以这条哨兵需要一个执行点，否则它只是一句自白 —— 见 _meta.required_assertions。",
+    "blocking_issue_resolution": "164768a: B01–B04；verify_control_points.py C71-RP1/RP2 48/48；verify_brand_rules.py 35/35",
+    "imported_at": "2026-10-21",
+    "imported_by": "1d",
+    "import_commit": "164768a"
   },
   "rules": [
     {
@@ -138,8 +144,8 @@
           "note": "同上，中文：临床(试验|研究|证据)。"
         }
       ],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B01；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -230,8 +236,8 @@
           "note": "同上，中文：机器学习/可读/状态机。"
         }
       ],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B01；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -314,8 +320,8 @@
       },
       "false_positive_risk": "高：weight loss 在法规、儿科、泛健康内容里很常见；没有产品上下文就降级。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B01；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -382,8 +388,8 @@
       },
       "false_positive_risk": "低：精确短语；近义词不会命中，需靠同义词表另行召回。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B02；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -450,8 +456,8 @@
       },
       "false_positive_risk": "低到中：近义词『一切都很值得』不会命中；需要同义词表或人工兜底。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B02；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -518,8 +524,8 @@
       },
       "false_positive_risk": "中：『你应该』在用户问答/引用里常见；精确串降低误报，但引用上下文必须降级。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B03；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -586,8 +592,8 @@
       },
       "false_positive_risk": "低：精确短语；近义句不会命中。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B03；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -654,8 +660,8 @@
       },
       "false_positive_risk": "低：精确短语；近义句不会命中。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B02；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -734,8 +740,8 @@
       },
       "false_positive_risk": "中：user group 是泛称；没有官方社群上下文时不能判。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B04；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     },
     {
@@ -815,8 +821,8 @@
       },
       "false_positive_risk": "中高：suction cup 是通用部件词；没有 DoubleFit/法兰上下文时不能判。",
       "context_exclusion": [],
-      "parent_rule_unassigned": true,
-      "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
+      "parent_rule_unassigned": false,
+      "parent_rule_reason": "已映射为 B04；见 control-points-v1.json 与 164768a",
       "exclusion_source_of_truth": "match.exclude_patterns"
     }
   ]
