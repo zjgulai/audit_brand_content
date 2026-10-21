@@ -1,38 +1,38 @@
 {
-  "$note": "附件下载调用点登记表。改线后（2026-10-17）下载允许，但每个调用点必须在 entries 里结构化登记：谁消费、落在哪个根、保留多久、数据分级。未登记即红（verify_feishu_index.py M1）。",
-  "$schema": {
-    "path": "相对仓库根的源文件路径（.py / .mjs）",
-    "symbol": "发起下载的函数名（AST 级定位到调用所在函数）",
-    "api": "实际调用的飞书接口（drive/v1/files/{t}/download、medias/batch_get_tmp_download_url，或 im/v1/messages/{id}/resources/{key}）",
-    "consumer": "谁消费这份字节 —— 必须是具体模块名，不许写「系统」",
-    "landing_root": "落盘根（环境变量名或绝对路径）；必须是仓外目录",
-    "retention": "保留期，如 24h / 7d / run-scoped",
-    "data_class": "数据分级：public / internal / confidential / pii"
+ "$note": "附件下载调用点登记表。改线后（2026-10-17）下载允许，但每个调用点必须在 entries 里结构化登记：谁消费、落在哪个根、保留多久、数据分级。未登记即红（verify_feishu_index.py M1）。",
+ "$schema": {
+  "path": "相对仓库根的源文件路径（.py / .mjs）",
+  "symbol": "发起下载的函数名（AST 级定位到调用所在函数）",
+  "api": "实际调用的飞书接口（drive/v1/files/{t}/download、medias/batch_get_tmp_download_url，或 im/v1/messages/{id}/resources/{key}）",
+  "consumer": "谁消费这份字节 —— 必须是具体模块名，不许写「系统」",
+  "landing_root": "落盘根（环境变量名或绝对路径）；必须是仓外目录",
+  "retention": "保留期，如 24h / 7d / run-scoped",
+  "data_class": "数据分级：public / internal / confidential / pii"
+ },
+ "entries": [
+  {
+   "path": "tools/gold_pilot_fetch.py",
+   "symbol": "fetch_tmp_urls",
+   "api": "medias/batch_get_tmp_download_url",
+   "api_kind": "media_tmp_url",
+   "ordinal": 1,
+   "consumer": "gold_pilot_fetch（审查结论 gold 试点）",
+   "landing_root": "/Users/lute/audit-data/gold/pilot",
+   "retention": "run-scoped",
+   "data_class": "confidential",
+   "never_tracked": true
   },
-  "entries": [
-    {
-      "path": "tools/gold_pilot_fetch.py",
-      "symbol": "fetch_tmp_urls",
-      "api": "medias/batch_get_tmp_download_url",
-      "api_kind": "media_tmp_url",
-      "ordinal": 1,
-      "consumer": "gold_pilot_fetch（审查结论 gold 试点）",
-      "landing_root": "/Users/lute/audit-data/gold/pilot",
-      "retention": "run-scoped",
-      "data_class": "confidential",
-      "never_tracked": true
-    },
-    {
-      "path": "tools/agent/feishu.mjs",
-      "symbol": "downloadMessageResource",
-      "api": "im/v1/messages/{message_id}/resources/{file_key}",
-      "api_kind": "im_message_resource",
-      "ordinal": 1,
-      "consumer": "agent.mjs（守衡群附件入站：文本类附件抽取后交给模型）",
-      "landing_root": "/Users/lute/.shouheng/attachments",
-      "retention": "run-scoped",
-      "data_class": "confidential",
-      "never_tracked": true
-    }
-  ]
+  {
+   "path": "tools/agent/feishu.mjs",
+   "symbol": "downloadMessageResource",
+   "api": "im/v1/messages/{message_id}/resources/{file_key}",
+   "api_kind": "im_message_resource",
+   "ordinal": 1,
+   "consumer": "agent.mjs（守衡群附件入站：文本类附件抽取后交给模型）",
+   "landing_root": "/Users/lute/.shouheng/attachments",
+   "retention": "run-scoped",
+   "data_class": "confidential",
+   "never_tracked": true
+  }
+ ]
 }
