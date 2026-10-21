@@ -194,7 +194,9 @@ class P:
         return {"tasks": {"scene_semantics": {"status": "ok"}}}   # 没有任何观察
 registry = m.ProviderRegistry()
 registry.register(reg, P())
-r = registry.analyze(m.MediaRef(uri="x://a"), ["scene_semantics"])
+# ★ 必须带 kind：不带的话会先被介质闸门挡成 untested，
+#   探针就永远走不到 observations 那条路径（假红）。
+r = registry.analyze(m.MediaRef(uri="x://a", kind="image/png"), ["scene_semantics"])
 defect = (r["results"]["scene_semantics"]["status"] == "ok")
 """,
     ),
@@ -277,10 +279,105 @@ class P:
 registry = m.ProviderRegistry()
 registry.register(reg, P())
 try:
-    registry.analyze(m.MediaRef(uri="x://a"), ["scene_semantics"])
+    # ★ 带 kind，理由同 M8：介质闸门在授权闸门**之后**，
+    #   但不带 kind 会让「删掉授权闸门」之后仍被介质挡住，探针假红。
+    registry.analyze(m.MediaRef(uri="x://a", kind="image/png"), ["scene_semantics"])
 except m.NotAuthorized:
     pass
 defect = (called["n"] > 0)      # 未授权却先出境了
+""",
+    ),
+    (
+        "M13",
+        "出境清单按任务收窄",
+        "        if task is None:\n"
+        "            return self.egress_items\n"
+        "        return tuple(item for item in self.egress_items if item.applies_to(task))",
+        "        return self.egress_items",
+        """
+# 删掉收窄后，只跑静图的部署也会在清单里看到音轨。
+reg = m.ProviderRegistration(
+    provider_id="p",
+    egress_items=(
+        m.EgressItem(item_id="frames", description="帧", data_class="internal"),
+        m.EgressItem(item_id="audio_track", description="音轨", data_class="pii",
+                     tasks=("av_alignment",)),
+    ),
+    recipient="r",
+    required_authorizations={"scene_semantics": ("s",), "av_alignment": ("s",)},
+    authorized={"scene_semantics": True, "av_alignment": True},
+    granted_authorizations=("s",),
+)
+registry = m.ProviderRegistry()
+class P:
+    provider_id = "p"
+    def analyze(self, media, tasks): return {"tasks": {}}
+registry.register(reg, P())
+entry = registry.egress_manifest("scene_semantics")[0]
+defect = any(i["item_id"] == "audio_track" for i in entry["egress_items"])
+""",
+    ),
+    (
+        "M14",
+        "介质闸门在调用前拦截",
+        "        lacking = {\n"
+        "            task: _missing_media(task, media)\n"
+        "            for task in executed\n"
+        "            if _missing_media(task, media)\n"
+        "        }\n"
+        "        if lacking:",
+        "        lacking = {}\n"
+        "        if False:",
+        """
+# 删掉介质闸门后，缺音轨的请求会被放行给 provider。
+called = {"n": 0}
+reg = m.ProviderRegistration(
+    provider_id="p",
+    egress_items=(m.EgressItem(item_id="f", description="d"),),
+    recipient="r", required_authorizations={"av_alignment": ("s",)},
+    authorized={"av_alignment": True}, granted_authorizations=("s",),
+)
+class P:
+    provider_id = "p"
+    def analyze(self, media, tasks):
+        called["n"] += 1
+        return {"tasks": {t.value: {"status": "ok", "observations": []} for t in tasks}}
+registry = m.ProviderRegistry()
+registry.register(reg, P())
+r = registry.analyze(m.MediaRef(uri="x://a", kind="video/mp4"), ["av_alignment"])
+defect = (called["n"] > 0 and r.get("status") != m.STATUS_UNTESTED)
+""",
+    ),
+    (
+        "M15",
+        "kind/mime 都空时按「缺」处理",
+        "    required = task.required_media\n"
+        "    if not required:\n"
+        "        return ()\n"
+        "    declared = set(_declared_media(media))\n"
+        "    return tuple(medium for medium in required if medium not in declared)",
+        "    return ()",
+        """
+# 删掉判据后，「什么都没声明」会被当成「什么都不缺」——
+# 正是「没测被读成通过」的那一步。
+media = m._describe_media_ref(m.MediaRef(uri="x://a"))     # kind/mime 全空
+defect = (m._missing_media(m.MultimodalTask.AV_ALIGNMENT, media) == ())
+""",
+    ),
+    (
+        "M16",
+        "data_class 只接受四个分级",
+        "        if data_class not in DATA_CLASSES:",
+        "        if False:",
+        """
+# 删掉这道守卫后，任意字符串都能当分级收下 ——
+# 审计读到的「这一项是 internal 还是 pii」就变成调用方随手写的字。
+defect = False
+try:
+    m.EgressItem(item_id="x", description="d", data_class="weird")
+    defect = True
+except ValueError:
+    defect = False
 """,
     ),
 ]
@@ -498,9 +595,29 @@ def main() -> int:
 
     man = gm.egress_manifest()
     add("D1 清单能列出 provider", len(man) == 1, "%d 条" % len(man))
-    add("D2 ★ 每项出境数据都必须带合法 data_class",
-        all(it.get("data_class") in M.DATA_CLASSES
-            for p in man for it in p.get("egress_items", [])), "")
+    # ★ 2026-10-21 改：这条原先断言「清单里每项的 data_class 都合法」——
+    #   而 `EgressItem.__post_init__` 在**构造期**就拒掉了非法值，
+    #   所以清单里永远不可能出现非法 data_class。**它是一条恒真的断言**，
+    #   从来没拦住过任何东西（§2.4「名字出现过 ≠ 拦得住」的又一例）。
+    #
+    #   现在改成断言「清单**忠实传递**每项的分级」：造两项分属不同分级的数据，
+    #   看清单是不是原样带出去、有没有被默认值抹平。
+    #   这条能红 —— 把 `to_dict()` 里的 data_class 换成常量就会红。
+    graded = M.ProviderRegistration(
+        provider_id="p-graded",
+        egress_items=(
+            M.EgressItem(item_id="frames", description="帧", data_class="internal"),
+            M.EgressItem(item_id="audio", description="音轨", data_class="pii"),
+        ),
+        recipient="graded-vendor.example",
+        required_authorizations={"av_alignment": ("s",)},
+        authorized={"av_alignment": True}, granted_authorizations=("s",),
+    )
+    graded_entry = graded.to_manifest_entry()
+    add("D2 ★ 清单忠实传递每项 data_class（不被默认值抹平）",
+        {i["item_id"]: i["data_class"] for i in graded_entry["egress_items"]}
+        == {"frames": "internal", "audio": "pii"}
+        and graded_entry["data_classes"] == ["internal", "pii"], "")
     add("D3 ★ 接收方可指认（不是「云端」这类空话）",
         all(p.get("recipient") and p["recipient"].strip()
             and p["recipient"].strip().lower() not in M._PLACEHOLDERS for p in man), "")
@@ -576,9 +693,13 @@ def main() -> int:
                     false_positives.append(mid)
             except Exception:  # noqa: BLE001
                 false_positives.append(mid)
-        add("E0 ★ 反向对照：未改动的源码里 12 个缺陷都不许出现",
+        # ★ 条数**算出来**，不写死。写死的数字一定过期 ——
+        #   §2.2 第 1 条：文档里的数字要算出来。这里是同一个规矩，只是对象是断言而不是文档。
+        #   本行原先写死「12 个」，加 M13–M15 之后它就成了假的。
+        add("E0 ★ 反向对照：未改动的源码里 %d 个缺陷都不许出现" % len(MUTATIONS),
             not false_positives,
-            "恒真的探针：%s" % false_positives if false_positives else "12/12 干净")
+            "恒真的探针：%s" % false_positives if false_positives
+            else "%d/%d 干净" % (len(MUTATIONS), len(MUTATIONS)))
     finally:
         for leftover in tmpdir.glob("*"):
             leftover.unlink(missing_ok=True)

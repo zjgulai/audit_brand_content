@@ -92,7 +92,10 @@ from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 
-SCHEMA_VERSION = "multimodal-provider-v1"
+# ★ 2026-10-21 从 v1 升到 v2：`EgressItem` 加了 `tasks`、出境清单改成按任务展开、
+#   并新增 `required_media` 闸门 —— **digest 的输入集合变了**。
+#   版本号是让「旧 receipt 不被静默当成有效」的那把锁：见 `manifest_report_is_current()`。
+SCHEMA_VERSION = "multimodal-provider-v2"
 
 # 结果状态。`invalid_response` 是本层对「provider 返回结构坏了」的定性，
 # 它既不是 provider 可以主动申报的状态，也不能被降级成 untested 之外的任何东西。
@@ -158,6 +161,31 @@ class MultimodalTask(str, Enum):
     MARK_SYMBOL = "mark_symbol"
     # 音视频对齐：音调/节奏/字幕/画面是否对不上（例如字幕说 A、画面演示 B）。
     AV_ALIGNMENT = "av_alignment"
+
+    @property
+    def required_media(self) -> Tuple[str, ...]:
+        """这条任务**必须**拿到哪些介质才谈得上分析。
+
+        ★ 这是 2026-10-21 补的闸门，起因是一个具体的读数：
+          `glm-5.3-flash` 在 27 家 provider 上 `audio` 是 **0 家**
+          （`image+pdf+text+video` 14 / `image+text` 6 / `image+text+video` 4 / `text` 3）。
+          拿它做 `av_alignment` 做视频时，**不会报错**，只会返回一个
+          「看起来分析过了」的结果 —— 音轨那一路它根本没看。
+
+        所以「模态够不够」必须在**调用之前**判，且判据落在契约里而不是实现方脑子里。
+        判不够就落 `untested` 并说清缺哪种介质；**不许**静默放行、**不许**抛异常。
+        """
+        return _REQUIRED_MEDIA[self]
+
+
+# 任务 → 必需介质。空元组表示「不依赖具体介质」（当前没有这样的任务）。
+_REQUIRED_MEDIA: Dict["MultimodalTask", Tuple[str, ...]] = {
+    MultimodalTask.SCENE_SEMANTICS: ("image",),
+    MultimodalTask.MARK_SYMBOL: ("image",),
+    # 音画对齐要**同时**有画面与音轨：只有画面时它只能看字幕与画面的关系，
+    # 而需求原话要的是「音调/节奏」——那在音轨里。缺音轨就必须说缺，不许降级成静图分析。
+    MultimodalTask.AV_ALIGNMENT: ("video", "audio"),
+}
 
 
 TASK_DESCRIPTIONS = {
@@ -395,6 +423,58 @@ def _describe_media_ref(media_ref: Any) -> Dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# ②b 介质充分性：任务要的介质，这个 media_ref 有没有
+# ══════════════════════════════════════════════════════════════════════════
+
+# kind / mime 里的介质线索。**刻意用「包含」而不是精确匹配**：
+# `kind` 是调用方自由填的字符串（本层不做枚举改造 —— 那会把「未来新增媒体类型」
+# 变成一次契约修订），所以这里只认得出常见的写法，认不出就落 untested。
+#
+# ★ 为什么同时读 kind **和** mime：实测这两个是独立字段，
+#   `MediaRef(uri=..., mime="audio/mpeg")` 的 kind 是 None，
+#   `MediaRef(uri=..., kind="video/mp4")` 的 mime 是 None。
+#   只读 kind 会把「只填了 mime」的调用方误判成「什么都没给」。
+_MEDIA_HINTS: Dict[str, Tuple[str, ...]] = {
+    "image": ("image", "img", "picture", "photo", "jpg", "jpeg", "png",
+              "webp", "gif", "bmp", "heic", "静图", "图片", "画面"),
+    "video": ("video", "movie", "mp4", "mov", "mkv", "webm", "avi",
+              "视频", "影片"),
+    "audio": ("audio", "sound", "voice", "mp3", "wav", "aac", "m4a",
+              "flac", "ogg", "音轨", "音频", "语音"),
+}
+
+
+def _declared_media(media: Mapping[str, Any]) -> Tuple[str, ...]:
+    """从已归一化的 media 描述里读出「调用方声明了哪些介质」。"""
+    blob = " ".join(
+        str(media.get(field) or "") for field in ("kind", "mime")
+    ).lower()
+    if not blob.strip():
+        return ()
+    found = []
+    for medium, hints in _MEDIA_HINTS.items():
+        if any(hint in blob for hint in hints):
+            found.append(medium)
+    return tuple(sorted(found))
+
+
+def _missing_media(
+    task: MultimodalTask, media: Mapping[str, Any]
+) -> Tuple[str, ...]:
+    """该任务缺哪些介质；空的元组表示「要的都有」。
+
+    ★ 语义上最要紧的一条：`required_media` 非空而**调用方什么都没声明**时，
+      结果是「全都缺」，不是「不缺」。因为「没说是图片」不等于「是图片」，
+      而这正是本项目反复纠正过的形状（没测被读成通过）。
+    """
+    required = task.required_media
+    if not required:
+        return ()
+    declared = set(_declared_media(media))
+    return tuple(medium for medium in required if medium not in declared)
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # ③ provider 协议
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -567,6 +647,32 @@ def _normalize_scopes(value: Any, field: str) -> Tuple[str, ...]:
     return tuple(sorted(out))
 
 
+def _normalize_task_names(value: Any, field: str) -> Tuple[str, ...]:
+    """把「任务名序列」归一成去重、按枚举序排列的字符串元组。
+
+    与 `_normalize_scopes` 同一条纪律：**单个字符串必须拒绝**，
+    否则 `"scene_semantics"` 会被逐字符拆成 15 个任务名，
+    而拼错的项又会在过滤时静默地什么都不命中 —— 清单于是变成空，看起来像「不出境」。
+    """
+    if isinstance(value, str):
+        raise ValueError(
+            "%s 必须是字符串序列，不能是单个字符串（否则每个字符都会被当成一个任务）"
+            % field
+        )
+    try:
+        raw = tuple(value)
+    except TypeError:
+        raise ValueError("%s 必须是字符串序列，收到 %r" % (field, type(value).__name__))
+    seen = set()
+    for item in raw:
+        task = _coerce_task(item)      # 未知任务名在这里就炸，不许静默忽略
+        if task.value in seen:
+            raise ValueError("%s 有重复任务 %r" % (field, task.value))
+        seen.add(task.value)
+    # 按枚举序归一：同一套任务换个书写顺序必须得到同一份清单指纹。
+    return tuple(name for name in _TASK_ORDER if name in seen)
+
+
 def _normalize_required_map(value: Any) -> Dict[str, Tuple[str, ...]]:
     if not isinstance(value, Mapping):
         raise ValueError("required_authorizations 必须是 Mapping")
@@ -630,11 +736,24 @@ class EgressItem:
 
     `data_class` 不是装饰：审计最先问的是「有没有 PII 出境」。
     把音频轨标成 `internal` 而它含人声，就是登记表在说谎。
+
+    ★ `tasks`（2026-10-21 加）：这一项**对哪些任务**会出境。
+      空元组 = 适用于全部任务（默认，等于旧行为）。
+
+    **为什么必须加这个字段**：原先 `egress_items` 只挂在 provider 上，
+    而任务挂在 `required_authorizations` 上 —— 于是「音轨只对 av_alignment 有意义」
+    这件事在清单里表达不出来。后果有两个方向，都不响：
+
+      * 一个只跑静图的部署，清单里也挂着 `audio_track` —— **审计读到的出境面比实际大**；
+      * 实现方偷懒不登记音轨 —— **也没有东西会红**。
+
+    这就是 `AGENTS.md` §2.4 那个病（写进文档的约束必须有执行点）长在审计件上。
     """
 
     item_id: str
     description: str
     data_class: str = "internal"
+    tasks: Tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -653,12 +772,26 @@ class EgressItem:
                 % (", ".join(sorted(DATA_CLASSES)), data_class)
             )
         object.__setattr__(self, "data_class", data_class)
+        object.__setattr__(
+            self, "tasks", _normalize_task_names(self.tasks, "egress_items[].tasks")
+        )
+
+    def applies_to(self, task: Union["MultimodalTask", str]) -> bool:
+        """这一项对某个任务是否出境。空 `tasks` = 全部任务。"""
+        if not self.tasks:
+            return True
+        value = task.value if isinstance(task, MultimodalTask) else str(task)
+        return value in self.tasks
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "item_id": self.item_id,
             "description": self.description,
             "data_class": self.data_class,
+            # ★ 显式写出来，不省略。省略会让读者分不清
+            #   「适用于全部任务」与「这个字段还没人填」——两者长得一样。
+            "tasks": list(self.tasks),
+            "applies_to_all_tasks": not self.tasks,
         }
 
 
@@ -782,24 +915,48 @@ class ProviderRegistration:
             if self.authorized.get(task) is not True
         )
 
-    def to_manifest_entry(self) -> Dict[str, Any]:
-        """一条「若启用，会送出什么」的机器可读记录。"""
+    def egress_items_for(
+        self, task: Union[MultimodalTask, str, None]
+    ) -> Tuple[EgressItem, ...]:
+        """某个任务会出境的项；`task=None` 返回全部。
+
+        ★ 「按任务收窄」是这个方法的全部意义：只跑静图的部署，
+          `av_alignment` 专用的 `audio_track` **不该出现在它的清单里**。
+          否则审计读到的出境面比实际大（§2.4：不该报的报了）。
+        """
+        if task is None:
+            return self.egress_items
+        return tuple(item for item in self.egress_items if item.applies_to(task))
+
+    def to_manifest_entry(
+        self, task: Union[MultimodalTask, str, None] = None
+    ) -> Dict[str, Any]:
+        """一条「若启用，会送出什么」的机器可读记录。
+
+        传 `task` 时，`egress_items` / `data_classes` 只算与**那个任务**相关的项；
+        不传时返回全貌（旧行为）。两种口径并存是刻意的：
+        审计要全貌，单次调用要「这一次到底会送什么」。
+        """
+        items = tuple(sorted(self.egress_items_for(task), key=lambda i: i.item_id))
         return {
             "provider_id": self.provider_id,
             # 按 item_id 排序，让同一套出境项换个书写顺序也得到同一份清单指纹。
-            "egress_items": [
-                item.to_dict()
-                for item in sorted(self.egress_items, key=lambda item: item.item_id)
-            ],
-            "data_classes": sorted({item.data_class for item in self.egress_items}),
+            "egress_items": [item.to_dict() for item in items],
+            "data_classes": sorted({item.data_class for item in items}),
+            # ★ 这个字段回答「这条清单是按任务收窄过的吗」。
+            #   省略它的话，一份全貌清单和一份收窄后恰好只剩一项的清单长得一样。
+            "scoped_to_task": (
+                None if task is None
+                else (task.value if isinstance(task, MultimodalTask) else str(task))
+            ),
             "recipient": self.recipient,
             "required_authorizations": {
-                task: list(scopes)
-                for task, scopes in self.required_authorizations.items()
+                task_name: list(scopes)
+                for task_name, scopes in self.required_authorizations.items()
             },
             "authorized": dict(self.authorized),
-            "authorized_tasks": [task.value for task in self.authorized_tasks],
-            "unauthorized_tasks": [task.value for task in self.unauthorized_tasks],
+            "authorized_tasks": [t.value for t in self.authorized_tasks],
+            "unauthorized_tasks": [t.value for t in self.unauthorized_tasks],
             "would_egress": bool(self.authorized_tasks),
             "granted_authorizations": list(self.granted_authorizations),
             "note": self.note,
@@ -1233,6 +1390,45 @@ def _manifest_digest(manifest: Sequence[Mapping[str, Any]]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def manifest_report_is_current(report: Any) -> bool:
+    """一份**已落盘的**出境清单报告，还能不能和本层当前的算法比。
+
+    存在的理由（`AGENTS.md` §2.4.1 第 5 行）：**一个会过期的读数，
+    如果没有东西在它过期时变红，它就会一直被当成有效。**
+
+    v1 → v2 时 `EgressItem` 加了 `tasks`、清单改成按任务展开 —— **digest 的输入集合变了**。
+    于是同一个出境面在 v1 和 v2 下会算出**两个不同的值**。这不是 bug，
+    但如果一份 v1 的报告被拿来和 v2 的当前值比，会得出「出境面变了」这个**假结论**；
+    反过来，如果只比 digest 而不看版本，一份**早已过期**的报告也可能碰巧相等。
+
+    所以判据是**两条一起**：
+
+      1. `schema_version` 必须**等于**当前 `SCHEMA_VERSION`；
+      2. 报告里必须同时有 `providers` 与 `digest_sha256`，且两者**自洽**
+         （digest 必须能从它自己那份 providers 算出来）。
+
+    第 2 条防的是「版本号对了，但内容是半截的」—— 那种报告比过期更危险，
+    因为它通过了第一道门。
+
+    ★ 任何一条不满足都返回 `False`（不可比），**不返回 None、不抛异常**：
+      调用方需要的是一个能直接进 if 的判据，而不是三种情况的组合。
+    """
+    if not isinstance(report, Mapping):
+        return False
+    if report.get("schema_version") != SCHEMA_VERSION:
+        return False
+    providers = report.get("providers")
+    digest = report.get("digest_sha256")
+    if not isinstance(providers, list) or not isinstance(digest, str):
+        return False
+    # 自洽：digest 必须能由这份 providers 重算出来。
+    # 只比 digest 不看内容，等于信任一份没人复核过的读数。
+    try:
+        return _manifest_digest(providers) == digest
+    except (TypeError, ValueError):
+        return False
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # ⑧ 注册表
 # ══════════════════════════════════════════════════════════════════════════
@@ -1320,13 +1516,24 @@ class ProviderRegistry:
     # 出境清单
     # ------------------------------------------------------------------
 
-    def egress_manifest(self) -> List[Dict[str, Any]]:
-        """返回「若启用，会送出什么」的机器可读清单（按 provider_id 排序）。"""
-        return [registration.to_manifest_entry() for registration in self.registrations()]
+    def egress_manifest(
+        self, task: Union[MultimodalTask, str, None] = None
+    ) -> List[Dict[str, Any]]:
+        """返回「若启用，会送出什么」的机器可读清单（按 provider_id 排序）。
 
-    def egress_manifest_digest(self) -> str:
+        `task` 为 None 时是全貌（旧行为）；传了就按任务收窄 —— 每一项只算
+        `applies_to(task)` 的出境项。**只跑静图的部署因此不会在清单里看到音轨。**
+        """
+        return [
+            registration.to_manifest_entry(task)
+            for registration in self.registrations()
+        ]
+
+    def egress_manifest_digest(
+        self, task: Union[MultimodalTask, str, None] = None
+    ) -> str:
         """清单的稳定指纹；用于发现「出境面悄悄变了」。"""
-        return _manifest_digest(self.egress_manifest())
+        return _manifest_digest(self.egress_manifest(task))
 
     def egress_manifest_report(self) -> Dict[str, Any]:
         """清单 + 本层边界 + 指纹。审计落地时建议整份存档。"""
@@ -1500,6 +1707,37 @@ class ProviderRegistry:
         # 不做「先跑已授权的部分」—— 部分执行会让调用方误以为全部任务都看过了。
         for task in executed:
             self.require_authorization(provider_id, task)
+
+        # ★ 调用前的介质闸门：任务要的介质，这个引用有没有。
+        # ★ 顺序是刻意的：**授权在前、介质在后**。两者都不满足时先报授权 ——
+        #   因为「缺介质」会让调用方以为补上 kind 就能跑，而真正的墙是没授权。
+        #   报一个更靠外的阻塞，比报一个更靠内的更接近真相。
+        # ★ 缺音轨时**一次都不发**，不做「先用画面凑合分析一下」：
+        #   降级分析正是要消灭的失败模式 —— 它不报错，只是安静地少看一路。
+        lacking = {
+            task: _missing_media(task, media)
+            for task in executed
+            if _missing_media(task, media)
+        }
+        if lacking:
+            return _untested_result(
+                reason=(
+                    "未测：本次请求的任务缺少必需介质，本层没有调用 provider。缺什么：%s。"
+                    "`kind`/`mime` 都没声明时按「全都缺」处理 —— "
+                    "没说是图片不等于它是图片。"
+                    % ("；".join(
+                        "任务 %s 缺 %s" % (task.value, "、".join(missing))
+                        for task, missing in lacking.items()
+                    ))
+                ),
+                reason_code="media_insufficient",
+                provider_id=provider_id,
+                requested=requested,
+                media=media,
+                registration=registration,
+                unsupported=unsupported,
+            )
+
 
         try:
             raw_report = provider.analyze(media_ref, executed)
@@ -1716,7 +1954,22 @@ def _selftest() -> None:
     )
     authorized_registry = ProviderRegistry()
     authorized_registry.register(authorized_registration, provider)
-    result = authorized_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+
+    # ★ 介质夹具（2026-10-21 加 `required_media` 之后引入）。
+    #
+    # 下面 #3–#8 这几个用例原本验的是**授权 / 归一化 / 警告**，与介质无关。
+    # 加了介质闸门后，它们若仍传裸字符串，就会在闸门处提前变成 `untested`，
+    # 于是「原本该 ok 的仍然 ok」这条不再成立 —— 而那是它们各自的前提。
+    # 所以这些点补上 `kind="image/png"`，让它们**仍然走到原来那条路径**。
+    #
+    # ★ 反过来，**有 6 处刻意不补**，因为它们本来就在介质闸门之前返回：
+    #   #1 空注册表 / #2 未授权 / #9 任务全不支持 / #10 多 provider 未指定
+    #   / #11 未知 provider / #15 空任务。
+    #   它们保持原样，等于顺带断言了「闸门顺序：这些前置判断优先于介质」。
+    #   给它们补介质反而会让这条顺序断言消失。
+    frame_ref = MediaRef(uri="demo-frame-001.png", kind="image/png")
+
+    result = authorized_registry.analyze(frame_ref, ["scene_semantics"])
     check(result["status"] == STATUS_OK, "已授权时返回 ok")
     check(provider.calls == 1, "已授权时 provider 被调用一次")
     check(
@@ -1737,7 +1990,7 @@ def _selftest() -> None:
         },
     }
     result = authorized_registry.analyze(
-        "demo-frame-001.png", ["scene_semantics", "mark_symbol"]
+        frame_ref, ["scene_semantics", "mark_symbol"]
     )
     check(result["status"] == STATUS_UNTESTED, "漏任务时整体 untested")
     check(result["results"]["mark_symbol"]["status"] == STATUS_UNTESTED,
@@ -1750,7 +2003,7 @@ def _selftest() -> None:
         "status": STATUS_OK,
         "tasks": {"scene_semantics": {"status": STATUS_OK}},
     }
-    result = authorized_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+    result = authorized_registry.analyze(frame_ref, ["scene_semantics"])
     check(result["status"] == STATUS_UNTESTED, "ok 但无 observations 时整体 untested")
     check(result["results"]["scene_semantics"]["status"] == STATUS_UNTESTED,
           "ok 但无 observations 的逐任务状态是 untested")
@@ -1769,7 +2022,7 @@ def _selftest() -> None:
             },
         },
     }
-    result = authorized_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+    result = authorized_registry.analyze(frame_ref, ["scene_semantics"])
     check(result["status"] == STATUS_OK, "未请求任务不改变请求任务的结论")
     check("av_alignment" not in result["results"], "未请求任务不进入 results")
     check(any("未请求" in warning for warning in result["warnings"]),
@@ -1785,7 +2038,7 @@ def _selftest() -> None:
             }
         },
     }
-    result = authorized_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+    result = authorized_registry.analyze(frame_ref, ["scene_semantics"])
     check(result["status"] == STATUS_UNTESTED,
           "不可序列化的 observations 让整体 untested")
     check(result["results"]["scene_semantics"]["observations"] == [],
@@ -1802,7 +2055,7 @@ def _selftest() -> None:
             }
         },
     }
-    result = authorized_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+    result = authorized_registry.analyze(frame_ref, ["scene_semantics"])
     check(result["status"] == STATUS_OK, "枚举键也能被正确识别")
     check(not any("未请求" in warning for warning in result["warnings"]),
           "枚举键不会被误报为未请求任务")
@@ -1819,7 +2072,7 @@ def _selftest() -> None:
             }
         },
     }
-    result = authorized_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+    result = authorized_registry.analyze(frame_ref, ["scene_semantics"])
     check(any("自报字段" in warning for warning in result["warnings"]),
           "provider 自报授权/出境字段被忽略并留痕")
 
@@ -1832,7 +2085,7 @@ def _selftest() -> None:
 
     broken_registry = ProviderRegistry()
     broken_registry.register(authorized_registration, BrokenProvider())
-    result = broken_registry.analyze("demo-frame-001.png", ["scene_semantics"])
+    result = broken_registry.analyze(frame_ref, ["scene_semantics"])
     check(result["status"] == STATUS_ERROR, "provider 异常落成 error")
     check("model endpoint unavailable" in result["reason"], "error 保留原因")
     check(result["results"]["scene_semantics"]["status"] == STATUS_UNTESTED,
@@ -1976,6 +2229,177 @@ def _selftest() -> None:
     result = authorized_registry.analyze("demo-frame-001.png", [])
     check(result["status"] == STATUS_UNTESTED, "空任务返回 untested")
     check("空任务不等于通过" in result["reason"], "空任务 reason 明说")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 16) 介质闸门（required_media）：模态不够时不许降级分析
+    #
+    # 起因是一个具体读数：`glm-5.3-flash` 27 家里 `audio` 是 0 家。
+    # 拿它做 av_alignment 不会报错，只会安静地少看一路。
+    # ══════════════════════════════════════════════════════════════════
+    video_only = MediaRef(uri="demo-video-001.mp4", kind="video/mp4")
+    before_calls = provider.calls
+    provider.report = None
+    result = authorized_registry.analyze(video_only, ["av_alignment"])
+    check(result["status"] == STATUS_UNTESTED, "缺音轨时 av_alignment 是 untested")
+    check(result["reason_code"] == "media_insufficient", "缺介质有专门的 reason_code")
+    check("audio" in result["reason"], "reason 点名缺的是 audio")
+    check(provider.calls == before_calls, "缺介质时一次都不调用 provider")
+
+    # 反过来：kind 与 mime 各自单独提供，也必须能被认出来。
+    # 这两个字段是独立的（实测 kind=None 而 mime='audio/mpeg' 是合法输入），
+    # 只读一个会把「只填了另一个」的调用方误判成「什么都没给」。
+    both = MediaRef(uri="demo-video-002.mp4", kind="video/mp4", mime="audio/mpeg")
+    result = authorized_registry.analyze(both, ["av_alignment"])
+    check(result["status"] == STATUS_OK, "kind+mime 齐全时 av_alignment 能执行")
+
+    mime_only = MediaRef(uri="demo-video-003.mp4", mime="video/mp4")
+    check(
+        _missing_media(MultimodalTask.AV_ALIGNMENT, _describe_media_ref(mime_only))
+        == ("audio",),
+        "只填 mime 也能识别出 video，仍缺 audio",
+    )
+
+    # ★ 最要紧的一条：什么都没声明 → 缺全部，不是「不缺」。
+    #   「没说是图片」不等于「它是图片」。
+    bare = MediaRef(uri="demo-frame-002.png")
+    check(
+        _missing_media(MultimodalTask.SCENE_SEMANTICS, _describe_media_ref(bare))
+        == ("image",),
+        "kind/mime 都空时按「缺」处理，不是按「不缺」",
+    )
+    # ★ 基准必须在这一行之前取。上面那条 `both` 用例是**成功**调用，
+    #   它已经把 calls 加过一次了；拿更早的基准比会得到一个假红。
+    calls_before_bare = provider.calls
+    result = authorized_registry.analyze(bare, ["scene_semantics"])
+    check(result["status"] == STATUS_UNTESTED,
+          "什么都没声明时不许静默当成满足")
+    check(provider.calls == calls_before_bare,
+          "没声明介质时也不调用 provider")
+
+    # 闸门顺序：授权优先于介质。两者都不满足时报授权 —— 那是更靠外的阻塞。
+    # 报「缺介质」会让调用方以为补上 kind 就能跑，而真正的墙是没授权。
+    order_registry = ProviderRegistry()
+    order_registry.register(registration, provider)      # 这个登记项三个任务全未授权
+    exc = expect_raises(
+        NotAuthorized,
+        lambda: order_registry.analyze(video_only, ["av_alignment"]),
+        "未授权且缺介质时，报的是授权而不是介质",
+    )
+    check(exc.missing, "顺序断言：异常里点名了缺的授权项")
+
+    # ══════════════════════════════════════════════════════════════════
+    # 17) 出境清单按任务收窄：只跑静图的部署不该在清单里看到音轨
+    # ══════════════════════════════════════════════════════════════════
+    scoped_registration = ProviderRegistration(
+        provider_id="fake.scoped",
+        egress_items=(
+            EgressItem("frames", "抽帧画面", "internal"),
+            EgressItem("audio_track", "视频音轨（可能含人声）", "pii",
+                       tasks=("av_alignment",)),
+        ),
+        recipient="scoped-vendor.example",
+        required_authorizations={
+            "scene_semantics": ("vendor.scene.read",),
+            "av_alignment": ("vendor.av.read",),
+        },
+        authorized={"scene_semantics": True, "av_alignment": True},
+        granted_authorizations=("vendor.scene.read", "vendor.av.read"),
+    )
+    # ★ provider_id 必须与登记表一致 —— 注册表会拒掉不一致的（这本身是道闸门）。
+    #   所以这里给收窄用例单独造一个同名 provider，而不是复用 fake.local。
+    class ScopedProvider(MultimodalProvider):
+        provider_id = "fake.scoped"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def analyze(self, media_ref, tasks):
+            self.calls += 1
+            return {
+                "tasks": {
+                    task.value: {"status": STATUS_OK, "observations": [{"note": "scoped"}]}
+                    for task in tasks
+                }
+            }
+
+    scoped_provider = ScopedProvider()
+    scoped_registry = ProviderRegistry()
+    scoped_registry.register(scoped_registration, scoped_provider)
+
+    scene_entry = scoped_registry.egress_manifest("scene_semantics")[0]
+    ids = [item["item_id"] for item in scene_entry["egress_items"]]
+    check(ids == ["frames"], "scene_semantics 的清单里没有 audio_track")
+    check(not any(item["data_class"] == "pii" for item in scene_entry["egress_items"]),
+          "按任务收窄后没有 pii 项")
+
+    av_entry = scoped_registry.egress_manifest("av_alignment")[0]
+    ids = [item["item_id"] for item in av_entry["egress_items"]]
+    check(ids == ["audio_track", "frames"], "av_alignment 的清单里两项都在")
+
+    full_entry = scoped_registry.egress_manifest()[0]
+    check(len(full_entry["egress_items"]) == 2, "不传任务时返回全貌")
+    check(full_entry["scoped_to_task"] is None, "全貌清单标明未按任务收窄")
+    check(scene_entry["scoped_to_task"] == "scene_semantics",
+          "收窄清单标明收窄到哪个任务")
+
+    # 空 tasks = 适用全部任务：frames 在两边都应出现。
+    frames_item = scoped_registration.egress_items[0]
+    check(frames_item.applies_to("scene_semantics")
+          and frames_item.applies_to("av_alignment"),
+          "空 tasks 表示适用于全部任务")
+
+    # 同一套出境项换个书写顺序，收窄后的指纹也必须相同。
+    check(
+        scoped_registry.egress_manifest_digest("scene_semantics")
+        == scoped_registry.egress_manifest_digest("scene_semantics"),
+        "按任务收窄后指纹仍然稳定",
+    )
+
+    # 18) EgressItem.tasks 的输入校验：单个字符串必须拒（会被逐字符拆开）
+    expect_raises(
+        ValueError,
+        lambda: EgressItem("x", "d", "internal", tasks="av_alignment"),
+        "tasks 传单个字符串必须拒",
+    )
+    expect_raises(
+        ValueError,
+        lambda: EgressItem("x", "d", "internal", tasks=("no_such_task",)),
+        "tasks 里有未知任务必须拒",
+    )
+    expect_raises(
+        ValueError,
+        lambda: EgressItem("x", "d", "internal",
+                           tasks=("scene_semantics", "scene_semantics")),
+        "tasks 重复任务必须拒",
+    )
+
+    # ══════════════════════════════════════════════════════════════════
+    # 19) 版本与新鲜度：旧 digest 不许被静默当成有效
+    #
+    # v1→v2 改了 digest 的输入集合。旧报告若被拿来比，会得出「出境面变了」
+    # 这个假结论；只比 digest 不看版本，又可能碰巧相等。
+    # ══════════════════════════════════════════════════════════════════
+    report = scoped_registry.egress_manifest_report()
+    check(report["schema_version"] == SCHEMA_VERSION, "报告带当前版本号")
+    check(manifest_report_is_current(report), "当前形状的报告被判为可比")
+
+    stale = dict(report)
+    stale["schema_version"] = "multimodal-provider-v1"
+    check(not manifest_report_is_current(stale),
+          "v1 旧报告必须判成不可比，不许当成同一份")
+
+    half = dict(report)
+    half.pop("providers")
+    check(not manifest_report_is_current(half),
+          "缺 providers 的报告判成不可比（版本对也不行）")
+
+    tampered = dict(report)
+    tampered["digest_sha256"] = "0" * 64
+    check(not manifest_report_is_current(tampered),
+          "digest 与 providers 不自洽时判成不可比")
+
+    check(not manifest_report_is_current({}), "空报告判成不可比")
+    check(not manifest_report_is_current(None), "None 判成不可比，不抛异常")
 
     print(
         "✓ multimodal_provider selftest: %d checks passed（含 %d 条必红反向对照）"
