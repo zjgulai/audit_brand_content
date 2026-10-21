@@ -343,7 +343,7 @@ def validate_item(it: dict, ptr_check=check_pointer) -> list[str]:
     #   C3 只管「不许把我方的问题写成对方的承诺」，**没有人管「到底问了没有」**：
     #   一条 `性质: 我方待问` 的条目，出处全是 kind:file（或只有一份本地旧件），
     #   照样能永远 open 而全绿 —— 而我方的提问**不会自己飞到群里去**。
-    #   实测（加这条之前）：P-02 出处两条全是 kind:file、零 outbound，verify_pending.py 退 0。
+    #   实测（加这条之前）：RC-02 出处两条全是 kind:file、零 outbound，verify_pending.py 退 0。
     #   所以判据是硬的：它必须在外发台账里指得出一条 message_id。
     if it.get("性质") == "我方待问" and it.get("状态") in {"open", "partial"}:
         if not any(isinstance(p, dict) and p.get("kind") == "outbound" for p in ptrs):
@@ -413,9 +413,10 @@ def overdue_items(items: list[dict], today: date) -> list[dict]:
 
 # ───────────────────── E 段：被引用的条目存不存在 ─────────────────────
 
-# 只匹配 `P-` + 两位数字。刻意**不会**命中 `PB-001`（P 与 - 之间隔着 B）与
-# `..._PDP-06.jpg`（`P-06` 前面是 `D`，不是词边界）—— 这两条都真的在盘上。
-REF_RE = re.compile(r"\bP-\d{2}\b")
+# 待收清单改用 `RC-` 前缀：与 UIUX 的页面编号 P-01…P-12、
+# 以及「内容推送与被at登记」的 P-10…P-34 彻底分开。
+# 只匹配 `RC-` + 两位数字；`PB-007` / `PDP-06` 不受影响。
+REF_RE = re.compile(r"\bRC-\d{2}\b")
 
 # ★★ 命名空间边界：**这个仓库里 `P-` 前缀被两套台账同时占用了。**
 #
@@ -425,25 +426,18 @@ REF_RE = re.compile(r"\bP-\d{2}\b")
 # （P-10…P-34「被引用但清单里没有」）—— 而那 22 条一条错都没有，错的是判据。
 # `AGENTS.md` §2.1.1 那句话在这里第二次应验：**一个会误报的检查器比没有检查器更糟。**
 #
-# 实测两套的实际占位：本清单这一段（`REF_MIN`…`REF_MAX`，即 01–09）在整个仓库里
-# **只**出现在真正引用待收清单的地方（8 个文件，逐个看过），另一个台账从第 10 号起。
-# 所以边界就画在这儿 ——
-# **画在证据说的地方，不猜。**
-#
-# 代价是清单最多 9 条。这不是限制，是一个**必须显式做的决定**：
-# 要超过 9 条，先给待收清单换一套不撞车的命名空间（例如 `RC-01`），再把引用一起改；
-# 那时把这段注释与 `REF_MIN/REF_MAX` 一起删掉。`judge()` 的 E2 会在这件事发生时变红，
-# 而不是让你悄悄踩进撞车区间。
-REF_MIN, REF_MAX = 1, 9
+# `RC-` 前缀不再与任何页面编号/推送台账共用，因此不再需要 `P-01…P-09`
+# 那种窄区间；只保留两位数字的形状检查（01–99），E2 盯的是「前缀必须对」。
+REF_MIN, REF_MAX = 1, 99
 
 
 def in_ns(i) -> bool:
-    """这个 id 是否落在**本检查器敢判**的区间内。落在撞车区间的一律不判（不猜）。"""
-    m = re.fullmatch(r"P-(\d{2})", str(i or ""))
+    """这个 id 是否是待收清单自己的命名空间（RC-两位数字）。"""
+    m = re.fullmatch(r"RC-(\d{2})", str(i or ""))
     return bool(m) and REF_MIN <= int(m.group(1)) <= REF_MAX
 
 
-# 扫描范围：**只扫会把 P-xx 当条目编号用的那些文本**。
+# 扫描范围：**只扫会把 RC-xx 当条目编号用的那些文本**。
 # 为什么不扫 .json / .txt / 数据目录：research/ 下有商品 JSON（`..._PDP-06.jpg` 那种），
 # 把整棵数据树拉进来只会更慢、更容易误报，而它要防的错误不在那里。
 SCAN_EXTS = (".md", ".py", ".mjs", ".sh")
@@ -453,9 +447,9 @@ SCAN_MAX_BYTES = 512 * 1024
 
 
 def scan_referenced_ids(root: Path = REPO) -> dict:
-    """全仓找出所有被引用的 `P-xx`，回 `{id: [相对路径, ...]}`（只收 `in_ns` 认的）。
+    """全仓找出所有被引用的 `RC-xx`，回 `{id: [相对路径, ...]}`（只收 `in_ns` 认的）。
 
-    ★ 治的是 2026-09-22 实测到的一个真事故：**P-06 被四份文档指着，而清单里从来没有这一条。**
+    ★ 治的是 2026-09-22 实测到的一个真事故：**RC-06 被四份文档指着，而清单里从来没有这一条。**
       `verify_pending.py` 一直退 0 —— 它只验「已有的条目」，从不验「被引用的条目存不存在」。
       同一个病（§2.4：写下的东西必须有执行点），这次长在**索引**上。
     """
@@ -503,7 +497,7 @@ def judge(items: list[dict], today: date, ptr_check=check_pointer, refs=None, at
         struct.extend(validate_item(it, ptr_check))
 
     # ★ E —— 被引用的条目**必须在清单里**（2026-09-22 加）。
-    #   实测事故：P-06 被四份文档指着（AGENTS.md 一处、verify_lark_share.py 两处、
+    #   实测事故：RC-06 被四份文档指着（AGENTS.md 一处、verify_lark_share.py 两处、
     #   验收文档五处），而清单里从来没有这一条，全绿。**「指着一个不存在的落点」
     #   和不指是同一种病，只是一个更安静。** 折进 struct_errors 是有意的：
     #   daemon 那条链路只读 overdue 与 struct_errors 两个键（见 prd_baseline.mjs），
@@ -518,21 +512,18 @@ def judge(items: list[dict], today: date, ptr_check=check_pointer, refs=None, at
             dangling.append(f"{rid} 被 {len(files)} 个文件引用，清单里没有这一条：{where}")
             struct.append(dangling[-1])
 
-    # ★ E2 —— 清单**自己**不许长进撞车区间（2026-09-22 加）。
-    #   与 E1 是一对：E1 管「被引用的条目要在」，E2 管「在的那一条不许是无法判定的 id」。
-    #   没有 E2，清单加到第 10 条时会**安静地**进入 `P-10`+，而扫描器恰好不判那一段 ——
-    #   于是 E1 会从「护着」变成「对新增条目完全不设防」，且没有任何东西会红。
+    # ★ E2 —— 清单**自己**必须使用自己的命名空间（2026-09-22 加，2026-10-21 改前缀）。
+    #   与 E1 是一对：E1 管「被引用的条目要在」，E2 管「在的那一条必须是 RC-xx」。
+    #   P-01…P-12 是 UIUX 页面编号，P-10…P-34 是推送台账行号；待收清单不再共用。
     for it in items:
         if not isinstance(it, dict):
             continue
         i = it.get("id")
         if i and not in_ns(i):
             struct.append(
-                f"{i}: id 不在本检查器敢判的区间内（P-{REF_MIN:02d}–P-{REF_MAX:02d}）"
-                f" —— 这一段是**另一套台账**"
-                f"（PMO/守衡-内容推送与被at登记-*.md）的编号区间，引用检查在这里不敢判（会误报）。"
-                f"要加第 10 条：先给待收清单换命名空间（如 RC-01）并把引用一起改，"
-                f"再放宽 verify_pending.py 的 REF_MIN/REF_MAX。**别把 id 写成 P-10 就往下走。**")
+                f"{i}: id 不是待收清单的命名空间（必须 RC-两位数字，01–99）"
+                f" —— P-01…P-12 是 UIUX 页面编号、P-10…P-34 是推送台账行号，"
+                f"两套都不是待收承诺。**别把页面编号写成待收 id。**")
 
     od = overdue_items(items, today)
     # ★ F 段：**不进 `code`** —— 「问了还没回」不是清单的毛病，也不是违约，只是该再问一句。
@@ -615,7 +606,7 @@ def controls() -> int:
     p02 = base["items"][1]          # 真实的「我方待问」样本
     p03 = base["items"][2]          # 真实的「承诺 + 有我方推算到期日」样本
     p05 = base["items"][4]          # 真实的 kind:outbound 指针样本（我方 15:42 问的那句）
-    p06 = base["items"][5]          # 真实的「我方待问 + 恰好一条 outbound」样本（P-06）
+    p06 = base["items"][5]          # 真实的「我方待问 + 恰好一条 outbound」样本（RC-06）
 
     def cp(o, **kw):
         d = json.loads(json.dumps(o))
@@ -634,6 +625,9 @@ def controls() -> int:
         return any(needle in e for e in validate_item(o))
 
     fake = lambda p: None  # 不读盘的指针检查器（反向对照只在内存里做）
+    # 动态拼出不存在 id：本文件也在 E 段扫描范围内，写死一个 RC-两位数字
+    # 会让扫描器把检查器自己报成「引用了不存在的条目」。
+    missing_ref = "RC-" + "99"
 
     def scan_tmp(text: str) -> set:
         """把一段文本写进临时目录、跑一遍 E 段扫描器，回它命中的 id 集合。
@@ -647,9 +641,9 @@ def controls() -> int:
             shutil.rmtree(d, ignore_errors=True)
 
     cases = [
-        ("真实样本 P-01（条件承诺）→ 必须过", lambda: no_err(p01)),
-        ("真实样本 P-02（我方待问）→ 必须过", lambda: no_err(p02)),
-        ("真实样本 P-03（承诺 + 推算到期日）→ 必须过", lambda: no_err(p03)),
+        ("真实样本 RC-01（条件承诺）→ 必须过", lambda: no_err(p01)),
+        ("真实样本 RC-02（我方待问）→ 必须过", lambda: no_err(p02)),
+        ("真实样本 RC-03（承诺 + 推算到期日）→ 必须过", lambda: no_err(p03)),
 
         ("★ 性质=承诺 却只有 none 指针 → 必须红",
          lambda: has_err(cp(p03, 出处=[{"kind": "none", "角色": "无", "why": "我觉得她说过"}]),
@@ -695,7 +689,7 @@ def controls() -> int:
         # ★ kind:outbound（2026-09-22 加）—— 「我方发出去的话」的指针。
         #   这四条是它的正反两侧：真实那条必须过；quote 改一个字、id 不存在、缺 id 都必须红。
         #   没有这一组，「我方外发有落点了」就只是一句声明（§2.4.2：承诺要有执行点）。
-        ("★ outbound 指针：P-05 的真指针（15:42:25 那条）→ 必须过",
+        ("★ outbound 指针：RC-05 的真指针（15:42:25 那条）→ 必须过",
          lambda: check_pointer(p05["出处"][0]) is None),
         ("★ outbound 指针：quote 改一个字 → 必须红",
          lambda: check_pointer({**p05["出处"][0],
@@ -721,9 +715,9 @@ def controls() -> int:
                                 "why": "x"}) is not None),
 
         ("到期判据：open + 到期日=昨天 → 必须进到期表",
-         lambda: [o["id"] for o in overdue_items([cp(p03, 到期日="2026-09-20")], T)] == ["P-03"]),
+         lambda: [o["id"] for o in overdue_items([cp(p03, 到期日="2026-09-20")], T)] == ["RC-03"]),
         ("到期判据：**今天**到期 → 必须进（当天就算到期）",
-         lambda: [o["id"] for o in overdue_items([cp(p03, 到期日="2026-09-21")], T)] == ["P-03"]),
+         lambda: [o["id"] for o in overdue_items([cp(p03, 到期日="2026-09-21")], T)] == ["RC-03"]),
         ("反向对照：open + 到期日=明天 → 必须不进（上面两条不是恒红）",
          lambda: overdue_items([cp(p03, 到期日="2026-09-22")], T) == []),
         ("反向对照：done + 到期日=昨天 → 必须不进（关掉的条不再提醒）",
@@ -731,16 +725,16 @@ def controls() -> int:
                                    完成依据=p03["出处"])], T) == []),
         ("partial + 到期日=昨天 → 必须进（部分收到仍算没齐）",
          lambda: [o["id"] for o in overdue_items([cp(p03, 到期日="2026-09-20", 状态="partial")], T)]
-                 == ["P-03"]),
-        ("无到期日的条目永远不进到期表（P-01 的现状）",
+                 == ["RC-03"]),
+        ("无到期日的条目永远不进到期表（RC-01 的现状）",
          lambda: overdue_items([p01], date(2030, 1, 1)) == []),
 
         ("id 重复 → 必须红",
          lambda: "id 重复" in " ".join(judge([p01, cp(p01)], T, fake)["struct_errors"])),
         ("整份清单干净 + 今天 09-21（未到期）→ 退 0",
          lambda: judge([p01, p02, p03], T, fake)["code"] == 0),
-        ("同一份清单 + 今天 10-03（已过期）→ 退 1，且只有 P-03",
-         lambda: (lambda r: r["code"] == 1 and [o["id"] for o in r["overdue"]] == ["P-03"])(
+        ("同一份清单 + 今天 10-03（已过期）→ 退 1，且只有 RC-03",
+         lambda: (lambda r: r["code"] == 1 and [o["id"] for o in r["overdue"]] == ["RC-03"])(
              judge([p01, p02, p03], date(2026, 10, 3), fake))),
         ("★ 只要结构违规就退 1（哪怕没有到期未收）",
          lambda: judge([cp(p03, 状态="大概吧")], T, fake)["code"] == 1),
@@ -750,7 +744,7 @@ def controls() -> int:
         # ★ D 段（2026-09-22 加）—— 「我方待问」必须真的问出去过。
         #   正反两侧都要有：改红容易，难的是**不许把已经问过的那条也判红**。
         ("★ D：「我方待问 + open」而出处全是 kind:file → 必须红"
-         "（这就是 P-02 在 17:34 之前的真实形状）",
+         "（这就是 RC-02 在 17:34 之前的真实形状）",
          lambda: (lambda o: has_err(o, "没有任何 outbound 指针"))(
              cp(p02, 出处=[p for p in p02["出处"] if p.get("kind") != "outbound"]))),
         ("★ D 反向对照：同一条把 outbound 指针加回来 → 必须绿（上面那条不是恒红）",
@@ -764,24 +758,24 @@ def controls() -> int:
          lambda: any("出处必须是非空数组" in x for x in validate_item(cp(p02, 出处=[])))),
 
         # ★ E 段（2026-09-22 加）—— 被引用的条目必须在清单里。
-        #   来历：P-06 被四份文档指着，清单里从来没有这一条，而 verify_pending 一直退 0。
-        ("★ E：文档引用了 P-99 而清单里没有该条 → 必须红，且报错点得出是哪个文件",
+        #   来历：RC-06 被四份文档指着，清单里从来没有这一条，而 verify_pending 一直退 0。
+        ("★ E：文档引用了不存在的 RC-两位数 id 而清单里没有该条 → 必须红，且报错点得出是哪个文件",
          lambda: (lambda r: r["code"] == 1
-                  and any("P-99" in e and "fake.md" in e for e in r["dangling"]))(
-             judge([p01, p03], T, fake, refs={"P-99": ["fake.md"]}))),
-        ("★ E 反向对照：引用的 P-03 就在清单里 → 必须绿（上面那条不是恒红）",
-         lambda: judge([p01, p03], T, fake, refs={"P-03": ["fake.md"]})["code"] == 0),
+                  and any(missing_ref in e and "fake.md" in e for e in r["dangling"]))(
+             judge([p01, p03], T, fake, refs={missing_ref: ["fake.md"]}))),
+        ("★ E 反向对照：引用的 RC-03 就在清单里 → 必须绿（上面那条不是恒红）",
+         lambda: judge([p01, p03], T, fake, refs={"RC-03": ["fake.md"]})["code"] == 0),
         ("E：不传 refs 时**不查**引用（judge 对 controls 仍是纯的）",
          lambda: judge([p01, p03], T, fake)["dangling"] == []),
-        ("★ E：扫描器从**真盘**上读得到 P-06 —— 它确实被四份文档引用着",
-         lambda: "P-06" in scan_referenced_ids()),
+        ("★ E：扫描器从**真盘**上读得到 RC-06 —— 它确实被四份文档引用着",
+         lambda: "RC-06" in scan_referenced_ids()),
         ("E：扫描器抓得住正常引用",
-         lambda: scan_tmp("见 PMO/待收清单-v1.json 的 P-06。\n") == {"P-06"}),
+         lambda: scan_tmp("见 PMO/待收清单-v1.json 的 RC-06。\n") == {"RC-06"}),
         ("★ E 反向对照：扫描器**不许**把 `PDP-06` / `PB-007` 当成条目编号"
          "（两者都真的在盘上；一个会误报的检查器比没有检查器更糟）",
          lambda: scan_tmp("US_Aug2026_PDP-06.jpg\nPB-007 手册原文\n") == set()),
         ("E 反向对照：清单文件自己不算「引用」（它是**定义**这些 id 的地方）",
-         lambda: scan_referenced_ids(LIST_PATH.parent.parent).get("P-06") is not None),
+         lambda: scan_referenced_ids(LIST_PATH.parent.parent).get("RC-06") is not None),
 
         # ★★ E 段的**假红**这一侧（2026-09-22 当天就踩到，必须留成断言）。
         #   第一版扫描器没有命名空间边界，当场把 PMO/守衡-内容推送与被at登记-*.md 里
@@ -792,8 +786,8 @@ def controls() -> int:
         ("★★ 反向对照：真盘上那份『内容推送与被at登记』的 25 个行号，扫描器一个都不许收",
          lambda: not any(n in scan_referenced_ids()
                          for n in ["P-10", "P-16", "P-24", "P-29", "P-34"])),
-        ("★ E2：清单里出现 P-10 → **必须红**（命名空间撞车；改红是为了逼一次显式决定）",
-         lambda: any("不在本检查器敢判的区间内" in e
+        ("★ E2：清单里出现旧前缀 P-10 → **必须红**（不是待收命名空间）",
+         lambda: any("不是待收清单的命名空间" in e
                      for e in judge([cp(p01, id="P-10")], T, fake)["struct_errors"])),
         #   ★ 这里刻意**不写字面量**（区间最后一个 id）：本文件自己也在扫描范围内
         #     —— 它确实会引用条目 —— 写一个不在清单里的字面量，E1 就会把这个检查器
@@ -803,11 +797,11 @@ def controls() -> int:
         #     （判据被它自己的解释文字绊倒）。**注释不算代码，但扫描器不认这句话。**
         ("★ E2 反向对照：id 取区间内**最后一个**（REF_MAX）→ 不许被 E2 判红"
          "（上面那条不是恒红）",
-         lambda: not any("不在本检查器敢判的区间内" in e
-                         for e in judge([cp(p01, id=f"P-{REF_MAX:02d}")], T, fake)["struct_errors"])),
-        ("★ E2：清单长过 9 条时必须**自己说出来**，而不是安静地不判",
+         lambda: not any("不是待收清单的命名空间" in e
+                         for e in judge([cp(p01, id=f"RC-{REF_MAX:02d}")], T, fake)["struct_errors"])),
+        ("★ E2：清单出现旧前缀时必须**自己说出来**，而不是安静地不判",
          lambda: (lambda r: r["code"] == 1 and len(r["dangling"]) == 0
-                  and any("不在本检查器敢判的区间内" in e for e in r["struct_errors"]))(
+                  and any("不是待收清单的命名空间" in e for e in r["struct_errors"]))(
              judge([cp(p01, id="P-10")], T, fake, refs={}))),
 
         # ★ F 段（2026-09-22 加）—— 「问出去两个工作日了还没回」该补问一次。
@@ -825,7 +819,7 @@ def controls() -> int:
          lambda: working_days_between(date(2026, 9, 22), date(2026, 9, 21)) == 0),
         ("★ F：四条都成立（还开着 / 恰好一条 outbound / 已过 2 个工作日）→ 必须进补问表",
          lambda: [n["id"] for n in ask_nags([p06], T, lambda _m: "2026-09-17T09:00:00.000Z")]
-                 == ["P-06"]),
+                 == ["RC-06"]),
         ("★ F 反向对照：**今天刚问的** → 不许进（上面那条不是恒进）",
          lambda: ask_nags([p06], T, lambda _m: "2026-09-21T01:00:00.000Z") == []),
         ("★ F 反向对照：**指针有两条**（已经问过不止一次）→ 不许再自动补"
@@ -847,7 +841,7 @@ def controls() -> int:
         ("★ F 拿真盘做正向：把这批「问于 09-17」→ 三条并进补问表（它确实会响，不是恒空）",
          lambda: sorted(n["id"] for n in ask_nags(base["items"], T,
                                                   lambda _m: "2026-09-17T09:00:00.000Z"))
-                 == ["P-01", "P-02", "P-06"]),
+                 == ["RC-01", "RC-02", "RC-06"]),
         ("★ F：`nag` **不许**折进 `code` —— 「问了还没回」不是清单坏了，"
          "否则 daemon 会拿「清单坏了」的话术去冒充一句催问",
          lambda: judge([p06], T, fake, refs={}, at_of=lambda _m: "2026-09-17T09:00:00.000Z")
