@@ -41,6 +41,15 @@ import evidence_origin as EO  # noqa: E402
 import matcher as _mm  # noqa: E402
 
 RESULTS: list[tuple[str, bool, str]] = []
+#: 未测（退出码 2）：判据存在、但这次**数不出来 / 读不到**。
+#   与红分开：红是「断言不成立」，未测是「我没测到」。二者下一步动作不同。
+UNTESTED: list[str] = []
+
+
+def untested(vid: str, title: str, detail: str = ""):
+    """落「未测」：不计入 RESULTS（分母），退出码由 main 统一处理。"""
+    UNTESTED.append(f"{vid} {title} — {detail}")
+    print(f"  ⚠ {vid}  {title}" + (f"\n        {detail}" if detail else ""))
 
 
 def check(vid: str, title: str, ok: bool, detail: str = ""):
@@ -73,6 +82,15 @@ REQUIRED_LAYER = ["id", "name", "who", "final_action", "machine_may_finalize"]
 #   这是**如实**，而不是把未覆盖读成已检查（§catch_all 的注释）。recall 未动说明没漏放。
 BASELINE = {"precision": 0.983, "recall": 0.962, "f1": 0.972,
             "catch_all": 162, "records": 291}
+
+
+#: 草案里每条候选的形状：`| \`CLAIM-01\` | … |`（首列是唯一的 subclass_code）。
+DRAFT_CODE_RE = re.compile(r"^\|\s*`([A-Z]+-\d{2})`\s*\|", re.M)
+
+
+def draft_candidate_count(text: str) -> int:
+    """数草案里的候选条数（按唯一 code 去重）。数不出返回 0 —— 调用方据此落未测。"""
+    return len({m.group(1) for m in DRAFT_CODE_RE.finditer(text or "")})
 
 
 def rule_key_problems(rules):
@@ -505,7 +523,7 @@ def main() -> int:
         F1 = 2 * P * Rc / (P + Rc) if P + Rc else 0
         got = {"precision": round(P, 3), "recall": round(Rc, 3), "f1": round(F1, 3),
                "catch_all": ca, "records": len(recs)}
-        check("V13", "291 条存量语料的混淆矩阵与基线逐项一致",
+        check("V13", f"{len(recs)} 条存量语料的混淆矩阵与基线逐项一致",
               got == BASELINE, f"{got} vs 基线 {BASELINE}")
 
     # ── V14 匹配原语只有一份实现 ────────────────────────────────────
@@ -938,7 +956,7 @@ def main() -> int:
               _eL["machine_may_finalize"] is False and _eL["can_finalize"] is False,
               f"machine_may_finalize={_eL['machine_may_finalize']}")
         _ob0 = _eL.get("outbound") or {}
-        check("V26c", "DP0 的出口禁止说「合规」（今天这 59 条写的正是 合规·绿/无需处理）",
+        check("V26c", "DP0 的出口禁止说「合规」",
               "合规" in (_ob0.get("must_not_say") or [])
               and _e["suggestion"] == "转人工",
               f"must_not_say={_ob0.get('must_not_say')} · suggestion={_e['suggestion']}")
@@ -1870,7 +1888,7 @@ def main() -> int:
             return bad
 
         _rp = _route_problems(_rt, _src, _owner_addr)
-        check("V41a", "D20 落地：两路合起来覆盖来源里的全部发现（页面侧 4 个产品 / 法务侧 33 条），"
+        check("V41a", f"D20 落地：两路合起来覆盖来源里的全部发现（页面侧 {(_rt.get('页面侧') or {}).get('条数')} 个产品 / 法务侧 {(_rt.get('法务侧') or {}).get('条数')} 条），"
                       "且没有一条被两路同时接走",
               bool(_rt) and not _rp,
               f"页面侧 {(_rt.get('页面侧') or {}).get('条数')} 条 · "
@@ -3242,16 +3260,27 @@ def main() -> int:
 
         _readme = (SKEL.parent / "README.md").read_text(encoding="utf-8")
         _draft58 = ROOT / "PMO" / "implement" / "58子类-候选映射草案-20261019.md"
-        _v61d_ok = ("58 子类" in _readme
-                    and "规则清单-P0-P3" in _readme
-                    and "58子类-候选映射草案" in _readme
-                    and _draft58.exists()
-                    and "58" in _draft58.read_text(encoding="utf-8"))
-        check("V61d", "58 子类权威清单已落盘：README 必须指出来源 xlsx 与草案；"
-                      "草案必须真实存在且含 58 条候选，不得只写一句「已找到」",
-              _v61d_ok,
-              f"README 指来源={'规则清单-P0-P3' in _readme} / 指草案={'58子类-候选映射草案' in _readme}"
-              f" · 草案存在={_draft58.exists()}")
+        _draft_txt = _draft58.read_text(encoding="utf-8") if _draft58.exists() else ""
+        _n_cand = draft_candidate_count(_draft_txt)
+        # 反向对照：造一份只有 50 条的样本 —— 计数器必须得到 50（不是恒 58）
+        _ctl_txt = "\n".join("| `X-%02d` | n | c | 1 | — |" % i for i in range(1, 51))
+        _ctl_ok = draft_candidate_count(_ctl_txt) == 50
+        _v61d_base = ("58 子类" in _readme
+                      and "规则清单-P0-P3" in _readme
+                      and "58子类-候选映射草案" in _readme
+                      and _draft58.exists())
+        _v61d_title = ("58 子类权威清单已落盘：README 必须指出来源 xlsx 与草案；"
+                       "草案必须真实存在且含 58 条候选，不得只写一句「已找到」")
+        if _draft58.exists() and _n_cand == 0:
+            # ★ 文件在、但一条候选都数不出 → 未测（格式可能变了）。
+            #   「我数不出」与「正好 58」必须长得不一样。
+            untested("V61d", _v61d_title, "草案存在但数不出候选（格式可能变了）")
+        else:
+            check("V61d", _v61d_title,
+                  _v61d_base and _n_cand == 58 and _ctl_ok,
+                  f"README 指来源={'规则清单-P0-P3' in _readme} / "
+                  f"指草案={'58子类-候选映射草案' in _readme} · 草案存在={_draft58.exists()}"
+                  f" · 草案候选 {_n_cand} 条（合同目标 58） · 计数对照={_ctl_ok}")
 
         _hit_keys = [h.get("rule_key") for h in R["reject"]["hits"]]
         check("V61e", "判定输出以 rule_key 为键（没有第二个机器键）；冲突时 rule_key 为准",
@@ -3363,13 +3392,18 @@ def main() -> int:
     else:
         print()
         print("=" * 74)
-        print(f"验收 {ok}/{n}  {'全绿' if ok == n else '★ 有红项'}")
+        print(f"验收 {ok}/{n}  {'全绿' if ok == n else '★ 有红项'}"
+              + (f" · ⚠ 另有 {len(UNTESTED)} 项未测（未测 ≠ 通过 ≠ 红）" if UNTESTED else ""))
         print("=" * 74)
+        for u in UNTESTED:
+            print(f"  ⚠ 未测：{u}")
     if a.json:
-        print(json.dumps({"passed": ok, "total": n,
+        print(json.dumps({"passed": ok, "total": n, "untested": UNTESTED,
                           "items": [{"id": i, "ok": o, "title": t} for i, o, t in RESULTS]},
                          ensure_ascii=False, indent=2))
-    return 0 if ok == n else 1
+    if ok != n:
+        return 1
+    return 2 if UNTESTED else 0
 
 
 if __name__ == "__main__":

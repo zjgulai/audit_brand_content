@@ -65,6 +65,8 @@ DOC_TOKENHUB_COUNT = 116
 # S6：文档写 27；低于 20 说明 failover 论据不成立
 GLM_MIN_PROVIDERS = 20
 GLM_DOC_PROVIDERS = 27
+#: 与文档声明值的允许差（provider 上下架的正常抖动）；超过即视为清单坏了。
+GLM_DELTA_TOL = 3
 
 # S8：文档 §五 的规模读数。容差是「同一数量级」，不是相等 —— 语料会增长。
 DOC_INDEXABLE_MB = 8.9
@@ -246,10 +248,13 @@ def check(manifest_root: Path, repo_root: Path) -> dict:
 
     # S6：glm-5.3-flash provider 覆盖数 ≥ 20（文档写 27）
     providers = sorted({p for p, _ in glm})
-    add("S6", len(providers) >= GLM_MIN_PROVIDERS,
-        "glm-5.3-flash provider 覆盖=%d（文档写 %d，阈值 %d）%s"
-        % (len(providers), GLM_DOC_PROVIDERS, GLM_MIN_PROVIDERS, providers[:8]),
-        "§二：27 个 provider 覆盖，是 failover 论据")
+    _delta = len(providers) - GLM_DOC_PROVIDERS
+    add("S6", len(providers) >= GLM_MIN_PROVIDERS
+              and abs(_delta) <= GLM_DELTA_TOL,
+        "glm-5.3-flash provider 覆盖=%d（文档写 %d，差值 %+d，抖动容差 ±%d，可用下限 %d）%s"
+        % (len(providers), GLM_DOC_PROVIDERS, _delta, GLM_DELTA_TOL,
+           GLM_MIN_PROVIDERS, providers[:8]),
+        f"§二：{GLM_DOC_PROVIDERS} 个 provider 覆盖，是 failover 论据")
 
     # S7：vod/tokenhub 的 Price/Provider/Released 全空
     for label, models in (("vod", vod_models), ("tokenhub", th_models)):
@@ -403,7 +408,7 @@ def run_controls() -> int:
     try:
         good = tmp / "good"
         repo_good = tmp / "repo-good"
-        _write_manifest(good, _fixture_global(), _fixture_vod(), _fixture_tokenhub())
+        _write_manifest(good, _fixture_global(glm_providers=GLM_DOC_PROVIDERS), _fixture_vod(), _fixture_tokenhub())
         _fixture_repo(repo_good, int(DOC_INDEXABLE_MB * 1024 * 1024))
         ok_all &= _run_case("好样本", good, repo_good, "pass")
 
@@ -429,6 +434,14 @@ def run_controls() -> int:
         bad = tmp / "bad-providers"
         _write_manifest(bad, _fixture_global(glm_providers=19), _fixture_vod(), _fixture_tokenhub())
         ok_all &= _run_case("坏样本：glm provider 降到 19", bad, repo_good, "red", "S6")
+
+        bad5 = tmp / "bad-providers-5"
+        _write_manifest(bad5, _fixture_global(glm_providers=5), _fixture_vod(), _fixture_tokenhub())
+        ok_all &= _run_case("坏样本：glm provider 降到 5（差值超出 ±3）", bad5, repo_good, "red", "S6")
+
+        ok26 = tmp / "ok-providers-26"
+        _write_manifest(ok26, _fixture_global(glm_providers=26), _fixture_vod(), _fixture_tokenhub())
+        ok_all &= _run_case("边界样本：glm provider 26（抖动 ±1，必须绿）", ok26, repo_good, "pass")
 
         bad = tmp / "bad-vod"
         _write_manifest(bad, _fixture_global(), _fixture_vod(include_both=False), _fixture_tokenhub())

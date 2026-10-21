@@ -814,7 +814,7 @@ def main():
         _b_ctl_ok = ({"凭空一行", "删一行"} <= set(_ctl_cov)
                      and len(_ctl_cov) >= 3
                      and all("覆盖" in v for v in _ctl_cov.values()))
-        c.add("T17b", "逐条缺口账：62 条逐条有落点，正反两面一致",
+        c.add("T17b", f"逐条缺口账：{len(_ext_entries)} 条逐条有落点，正反两面一致",
               not _bad_of("覆盖") and _b_ctl_ok and not _pos_bad,
               (f"{len(_ext_entries)} 条外部标准逐条恰一行（库=外部标准库·通道=rules）；"
                f"cited_by ⇔ 反向指针（{_cite_note}）；"

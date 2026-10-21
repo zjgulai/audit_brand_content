@@ -386,6 +386,7 @@ head('J 信封 · 解析、上限执行、以及「标记不许漏进群」');
     }
 
     // J1c：现有模版必须都不超限 —— 否则是上限与模版不相容（MAX_SECTIONS=3 就是这么废的）
+    const nSamples = Object.keys(samples).length;
     let worst = 0, worstKind = '';
     for (const r of REGISTRY) {
       const c = samples[r.kind];
@@ -398,7 +399,7 @@ head('J 信封 · 解析、上限执行、以及「标记不许漏进群」');
         `「${worstKind}」顶层有 ${worst} 段，超过 MAX_SECTIONS=${MS} —— ` +
         `上限比模版还小，等于每次都要搬，和当初 MAX_SECTIONS=3 是同一个病`);
     } else {
-      ok(`J1c 上限与模版相容：11 张样例卡最紧的一张是「${worstKind}」${worst} 段 ≤ ${MS}`);
+      ok(`J1c 上限与模版相容：${nSamples} 张样例卡最紧的一张是「${worstKind}」${worst} 段 ≤ ${MS}`);
     }
   }
 
