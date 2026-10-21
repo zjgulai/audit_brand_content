@@ -324,6 +324,20 @@ if [ -z "${PID:-}" ]; then
   echo "  失联每多一秒都是净损失，所以救活不必等人同意；但要留痕。"
   if [ "$CHECK" = "1" ] && [ "$YES" = "0" ]; then echo "  （--check：以上为查看，未做任何动作）"; exit 0; fi
   if [ "$YES" = "0" ]; then echo "  确认救活：加 --yes"; exit "$EXIT_REFUSED"; fi
+  # ★ 2026-10-21 补：留痕这一半原先**没有执行点** —— rescue 分支直接
+  #   MODE=rescue 落到下面的 kickstart，`--yes` 不带理由也能救活。
+  #   §2.7 的例外条款写的是「救活不必等人同意；但要留痕」，所以这里与
+  #   重启分支同一口径：缺 --why 就拒（退 3）。检查必须在 kickstart 之前。
+  if [ -z "$WHY" ]; then
+    echo "  ✗ 拒绝救活：--yes 必须配 --why=\"<理由>\" —— 救活也要留痕，理由就是痕迹。"
+    exit "$EXIT_REFUSED"
+  fi
+  # --no-kick 在 rescue 分支也必须生效：它承诺「全部校验跑完但不真重启」，
+  # 否则自证在「守衡没在跑」时没法安全地测 A6（实测过：它会真的 kickstart）。
+  if [ "$NO_KICK" = "1" ]; then
+    echo "  （--no-kick：--why 校验已过，但**没有执行 kickstart** —— 进程一个字节没动）"
+    exit 0
+  fi
   MODE="rescue"
 else
   # ── 在跑：这是重启，默认拒绝 ──────────────────────────────

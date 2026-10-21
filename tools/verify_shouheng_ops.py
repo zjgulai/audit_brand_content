@@ -100,6 +100,55 @@ def run_gate(*args, consent=None):
     return p.returncode, p.stdout + p.stderr
 
 
+def run_sandbox_gate(gate, env, *args):
+    p = subprocess.run(["bash", str(gate), *args], capture_output=True, text=True,
+                       timeout=120, env=env)
+    return p.returncode, p.stdout + p.stderr
+
+
+def make_sandbox_gate(*, remove_rescue_why=False):
+    """把闸门复制到临时目录，用假的 launchctl/pgrep **强制 rescue 分支**。
+
+    为什么 A6 不直接跑真闸门：2026-10-21 修前实测过，守衡没在跑时
+    `--yes` 会真的 kickstart（rescue 分支漏了 --why 与 --no-kick）。
+    自证不能因为闸门回归而重启生产进程（§2.4.4）。副本与源文件逐字节相同，
+    只是 PATH 里换了 launchctl/pgrep；它测的是同一段代码。
+    """
+    src = GATE.read_text(encoding="utf-8")
+    if remove_rescue_why:
+        block = '''  if [ -z "$WHY" ]; then
+    echo "  ✗ 拒绝救活：--yes 必须配 --why=\\"<理由>\\" —— 救活也要留痕，理由就是痕迹。"
+    exit "$EXIT_REFUSED"
+  fi
+'''
+        if block not in src:
+            return None
+        src = src.replace(block, "", 1)
+    d = Path(tempfile.mkdtemp(prefix="shouheng-gate-"))
+    (d / "tools").mkdir()
+    (d / "PMO" / "logs").mkdir(parents=True)
+    (d / "PMO" / "shouheng-state").mkdir(parents=True)
+    gate = d / "tools" / "restart_shouheng.sh"
+    gate.write_text(src, encoding="utf-8")
+    bin_dir = d / "bin"
+    bin_dir.mkdir()
+    marker = d / "kick"
+    launch = ('#!/bin/bash\n'
+              'if [ "$1" = "print" ]; then exit 1; fi\n'
+              'if [ "$1" = "kickstart" ]; then echo x >> "$MARKER"; exit 0; fi\n'
+              'exit 1\n')
+    pgrep = '#!/bin/bash\nexit 1\n'
+    (bin_dir / "launchctl").write_text(launch, encoding="utf-8")
+    (bin_dir / "pgrep").write_text(pgrep, encoding="utf-8")
+    for f in (bin_dir / "launchctl", bin_dir / "pgrep"):
+        f.chmod(0o755)
+    env = dict(os.environ)
+    env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
+    env["MARKER"] = str(marker)
+    env["SHOUHENG_RESTART_CONSENT"] = str(CONSENT_TMP)
+    return gate, env, marker
+
+
 def daemon_pid():
     p = subprocess.run(["pgrep", "-f", r"ws_daemon\.mjs"], capture_output=True, text=True)
     return p.stdout.split()[0] if p.stdout.strip() else ""
@@ -318,8 +367,31 @@ ledger_after = LEDGER.read_text(encoding="utf-8").count("\n") if LEDGER.exists()
 check("A4", ledger_after == ledger_before, f"拒绝时没记账（{ledger_before} → {ledger_after} 行）")
 rc, _ = run_gate("--check")
 check("A5", rc == 0, f"--check → 退出码 {rc}（应 0，纯查看）")
-rc, out = run_gate("--yes")
-check("A6", rc == 3 and "why" in out, f"--yes 不给理由 → 退出码 {rc}（应 3，重启必须留痕）")
+# A6：救活分支也必须要求 --why。**不跑真闸门** —— 修前它会在 rescue 分支
+# 直接 kickstart；自证不能重启生产进程（§2.4.4）。副本与源文件逐字节相同。
+sb = make_sandbox_gate()
+if sb is None:
+    check("A6", False, "沙箱副本建不出来")
+else:
+    gate_s, env_s, marker_s = sb
+    rc, out = run_sandbox_gate(gate_s, env_s, "--yes", "--no-kick")
+    check("A6", rc == 3 and "why" in out and not marker_s.exists(),
+          f"--yes 不给理由 → 退出码 {rc}（应 3，救活/重启都必须留痕）")
+
+    # A6b：反向对照 —— 带 --why + --no-kick 必须放行且**不 kickstart**
+    rc, out = run_sandbox_gate(gate_s, env_s, "--yes", "--why=selftest", "--no-kick")
+    check("A6b", rc == 0 and "--no-kick" in out and not marker_s.exists(),
+          f"救活分支 --no-kick → 退出码 {rc}（应 0，进程未动）")
+
+    # A6r：反向对照 —— 删掉 rescue 的 --why 检查，A6 必须红（不是空转）
+    sb_r = make_sandbox_gate(remove_rescue_why=True)
+    if sb_r is None:
+        check("A6r", False, "反向对照的副本建不出来（源码里找不到 rescue 的 --why 块）")
+    else:
+        gate_r, env_r, marker_r = sb_r
+        rc, out = run_sandbox_gate(gate_r, env_r, "--yes", "--no-kick")
+        check("A6r", not (rc == 3 and "why" in out) and not marker_r.exists(),
+              f"删掉 rescue 的 --why 检查 → A6 条件不再成立（rc={rc}，未 kickstart）")
 
 # ── A7–A14 「同意」有保质期：读数与执行必须落在同一次对话里 ──────────────
 #    ★ 2026-09-22 真事故：17:54 读的读数，17:55 **别人**重启了一次，18:03 我拿旧读数
@@ -335,35 +407,43 @@ def write_consent(path, at=None, pid=None, digest=None):
                     f"digest={digest if digest is not None else 'x'}\n", encoding="utf-8")
 
 
-# A7：**没有凭证** → 拒（这是「没先读就执行」）
-CONSENT_TMP.unlink(missing_ok=True)
-rc, out = run_gate("--yes", "--why=selftest")
-check("A7", rc == 3 and "没有凭证" in out, f"没先读就执行 → 退出码 {rc}（应 3）")
+# A7 / A8–A11 只在**重启分支**可测。守衡没在跑时它们会落到 rescue 分支，
+# 而 §2.7 的例外条款明确「救活不必等人同意」—— 此时它们不是红，是**不适用**。
+# 未测必须与红、通过都长得不一样（cannot_test）。
+if UP:
+    # A7：**没有凭证** → 拒（这是「没先读就执行」）
+    CONSENT_TMP.unlink(missing_ok=True)
+    rc, out = run_gate("--yes", "--why=selftest", "--no-kick")
+    check("A7", rc == 3 and "没有凭证" in out, f"没先读就执行 → 退出码 {rc}（应 3）")
 
 # A13：**反向对照** —— A7 不是恒真：先跑一次报告，凭证必须真的被写下
+# （rescue 分支也会写；它测的是「凭证块在分支之前」，不依赖重启分支）
 rc, out = run_gate()
 check("A13", CONSENT_TMP.exists(), "不带 --yes 那一次**应当**写下凭证（否则 A7 恒真）")
 
-# A8：★ **反向对照** —— 新鲜且对得上的凭证**不许**被拒（否则闸门成了砖头，§2.1.1）
-pid_before = daemon_pid()
-rc, out = run_gate("--yes", "--why=selftest", "--no-kick")
-check("A8", rc == 0 and "凭证有效" in out, f"新鲜且匹配的凭证 → 退出码 {rc}（应 0，不许误报）")
-check("A14", daemon_pid() == pid_before, f"--no-kick 一个进程都不许动（{pid_before} → {daemon_pid()}）")
+if UP:
+    # A8：★ **反向对照** —— 新鲜且对得上的凭证**不许**被拒（否则闸门成了砖头，§2.1.1）
+    pid_before = daemon_pid()
+    rc, out = run_gate("--yes", "--why=selftest", "--no-kick")
+    check("A8", rc == 0 and "凭证有效" in out, f"新鲜且匹配的凭证 → 退出码 {rc}（应 0，不许误报）")
+    check("A14", daemon_pid() == pid_before, f"--no-kick 一个进程都不许动（{pid_before} → {daemon_pid()}）")
 
-# A9：凭证**过期** → 拒
-write_consent(CONSENT_TMP, at=int(time.time()) - 600)
-rc, out = run_gate("--yes", "--why=selftest")
-check("A9", rc == 3 and "过期" in out, f"凭证过期 → 退出码 {rc}（应 3）")
+    # A9：凭证**过期** → 拒
+    write_consent(CONSENT_TMP, at=int(time.time()) - 600)
+    rc, out = run_gate("--yes", "--why=selftest", "--no-kick")
+    check("A9", rc == 3 and "过期" in out, f"凭证过期 → 退出码 {rc}（应 3）")
 
-# A10：**PID 对不上** → 拒（= 那次事故的直接判据：这中间有一次别人的重启）
-write_consent(CONSENT_TMP, pid="99999")
-rc, out = run_gate("--yes", "--why=selftest")
-check("A10", rc == 3 and "PID 对不上" in out, f"PID 变了 → 退出码 {rc}（应 3）")
+    # A10：**PID 对不上** → 拒（= 那次事故的直接判据：这中间有一次别人的重启）
+    write_consent(CONSENT_TMP, pid="99999")
+    rc, out = run_gate("--yes", "--why=selftest", "--no-kick")
+    check("A10", rc == 3 and "PID 对不上" in out, f"PID 变了 → 退出码 {rc}（应 3）")
 
-# A11：同一 PID、但**读数摘要变了** → 拒
-write_consent(CONSENT_TMP, digest="0" * 64)
-rc, out = run_gate("--yes", "--why=selftest")
-check("A11", rc == 3 and "读数对不上" in out, f"摘要变了 → 退出码 {rc}（应 3）")
+    # A11：同一 PID、但**读数摘要变了** → 拒
+    write_consent(CONSENT_TMP, digest="0" * 64)
+    rc, out = run_gate("--yes", "--why=selftest", "--no-kick")
+    check("A11", rc == 3 and "读数对不上" in out, f"摘要变了 → 退出码 {rc}（应 3）")
+else:
+    cannot_test("A7–A11", "守衡没在跑 → 重启分支的凭证校验无法实测（不是红）")
 
 # A12：**`--check` 是纯查看，一个字节都不许落**
 CONSENT_TMP.unlink(missing_ok=True)
