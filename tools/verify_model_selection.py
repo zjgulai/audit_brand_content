@@ -358,17 +358,19 @@ def _fixture_tokenhub(asr_count: int = 8) -> list:
     return models
 
 
-def _fixture_repo(root: Path, total_bytes: int):
+def _fixture_repo(root: Path, total_bytes: int, n_files: int | None = None):
     """构造「好样本」语料：**文件数要与文档同量级**，不能只堆一个大文件。
 
     ★ 2026-10-21 更正：首版只写 1 个 `corpus.md`，靠总字节数落在 0.5–2× 带里过关。
       加了文件数断言之后它立刻变红 —— 这是**对照样本本身过期了**，不是断言写错。
       一个只有 1 个文件的「好样本」，恰好就是 S8 要防的那种范围缩水。
       所以这里按 DOC_INDEXABLE_FILES 切分，字节均摊。
+
+    `n_files` 可覆盖，专门用于「字节不变、文件数缩水」的反向对照。
     """
     target_dir = root / "PMO" / "implement"
     target_dir.mkdir(parents=True, exist_ok=True)
-    n = max(1, DOC_INDEXABLE_FILES)
+    n = max(1, n_files or DOC_INDEXABLE_FILES)
     each = max(1, total_bytes // n)
     for i in range(n):
         with (target_dir / ("corpus-%03d.md" % i)).open("wb") as f:
@@ -441,6 +443,21 @@ def run_controls() -> int:
         _fixture_repo(repo_bad, int(DOC_INDEXABLE_MB * 0.1 * 1024 * 1024))
         _write_manifest(bad, _fixture_global(), _fixture_vod(), _fixture_tokenhub())
         ok_all &= _run_case("坏样本：可索引字节只有 0.1×", bad, repo_bad, "red", "S8")
+
+        # ★ 文件数单独一条反向对照：字节仍是 8.9 MB，但文件数缩到 80。
+        #   0.1× 那条只撞字节（149 文件仍在 100–400 内），**不能**证明文件数断言活着。
+        bad = tmp / "bad-files"
+        repo_bad_files = tmp / "repo-bad-files"
+        _fixture_repo(repo_bad_files, int(DOC_INDEXABLE_MB * 1024 * 1024), n_files=80)
+        _write_manifest(bad, _fixture_global(), _fixture_vod(), _fixture_tokenhub())
+        ok_all &= _run_case("坏样本：字节 8.9MB 但文件数缩到 80", bad, repo_bad_files, "red", "S8")
+
+        # 上限对照：原首版 484 文件的口径就落在这边；字节相同也必须红。
+        bad = tmp / "bad-files-hi"
+        repo_bad_files_hi = tmp / "repo-bad-files-hi"
+        _fixture_repo(repo_bad_files_hi, int(DOC_INDEXABLE_MB * 1024 * 1024), n_files=420)
+        _write_manifest(bad, _fixture_global(), _fixture_vod(), _fixture_tokenhub())
+        ok_all &= _run_case("坏样本：字节 8.9MB 但文件数涨到 420", bad, repo_bad_files_hi, "red", "S8")
 
         missing = tmp / "missing"
         missing.mkdir()
