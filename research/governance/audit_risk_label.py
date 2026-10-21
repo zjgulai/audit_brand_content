@@ -73,6 +73,41 @@ sys.path.insert(0, str(SKEL))
 import judge as J  # noqa: E402
 import score as S  # noqa: E402
 
+# ── 输入指纹：**这份账的结论不止由 records.json 决定** ──────────────────────
+#
+# ★ 2026-10-21：原实现只记 `source_sha256`（records.json）一个指纹。
+#   而 `覆盖状态` / `盲区率` / `绿标_规则未覆盖` 全部由**规则库 + 语境守卫 + 白名单**
+#   算出来 —— 于是「改一条规则，覆盖状态会变，而制品指纹照样对得上」，
+#   V44b 一直绿着。这正是 `AGENTS.md` §2.4.1 的病：**判据盯错了对象**。
+#
+# 这一组不是照抄任务书的四份，是**在内存里逐份扰动、比对产物**实测出来的：
+#   清空 rules / whitelist / guards / topic-tree / 外部标准库，或改 disposition-layers
+#   的 mapping，`build()` 的 totals+rows 都会变 → 它们都是输入。
+#   · `product-lines-v1.json` 今天**不影响**产物（26 条规则没有一条声明 product_lines），
+#     但仍然记 —— 它是规则过滤的输入，明天规则一填它就立刻生效；代价只是它改动时重跑一次。
+#   · `engine-manifest.json` **刻意不记**：它只有 generated_at / code_version 这类元信息，
+#     判定结论不读它；记进来会让每次 manifest 重建都误报过期 —— 误报比漏报更糟（§2.1.1）。
+#
+# ★ 键名与 `audit_migration_fidelity.py` 的 `source_sha256` 字典**同一形状**（本仓先例），
+#   而 `source_sha256` 这个**字符串**字段保留不动 —— `tools/kb_facts.py` 仍在读它，
+#   改形状会跨范围破坏一个不在本次改动里的消费者。
+INPUTS = {
+    "records.json": RECORDS,
+    "rules-v1.json": SKEL / "rules-v1.json",
+    "whitelist-v1.json": SKEL / "whitelist-v1.json",
+    "context-guards-v1.json": SKEL / "context-guards-v1.json",
+    "disposition-layers-v1.json": SKEL / "disposition-layers-v1.json",
+    "product-lines-v1.json": SKEL / "product-lines-v1.json",
+    "topic-tree-v1.md": SKEL / "topic-tree-v1.md",
+    "外部标准库-v1.json": ROOT / "research" / "kb" / "外部标准库-v1.json",
+}
+
+
+def input_sha256() -> dict:
+    """{输入名: sha256}。逐份算，**少读一份就少一个键** —— 判据会因此变红。"""
+    return {name: hashlib.sha256(p.read_bytes()).hexdigest()
+            for name, p in INPUTS.items()}
+
 # ── 轴 1：可审内容 ──────────────────────────────────────────────────────────
 # ★ 「整行没读到」必须与「无文案」分开。这两者在源表里长得一样（都是空），
 #   但一个是**载体结构上不含文案**（Google PLA 商品 Feed 广告，永远不会长出
@@ -210,6 +245,9 @@ def build() -> dict:
         #   所以它必须能判断这份账**是不是对着当前语料算的** —— 否则源表一改，
         #   下游读到的就是一串没人知道过期了的数字，且没有任何东西会红。
         "source_sha256": hashlib.sha256(RECORDS.read_bytes()).hexdigest(),
+        # ★ 2026-10-21：上面那一个是**旧形状**（只记 records），保留给现有消费者；
+        #   真正决定结论的输入有 8 份，逐个记在这里。V44b 逐条比对，缺一个键也红。
+        "input_sha256": input_sha256(),
         "totals": totals(rows),
         "rows": rows,
     }
@@ -305,6 +343,17 @@ def main() -> int:
                 for k in sorted(set(t) | set(old.get("totals", {}))):
                     if t.get(k) != old.get("totals", {}).get(k):
                         print(f"     {k}: 盘上 {old.get('totals', {}).get(k)} → 现在 {t.get(k)}")
+            # ★ 输入指纹也要比：产物可能在**数字没变**的情况下过期（例如改了一条
+            #   当前语料用不到的规则），而结论所依据的输入已经换了。`--check` 与
+            #   V44b 必须用同一套判据，否则一个说绿、一个说红，读的人不知道该信谁。
+            _old_fp = old.get("input_sha256") or {}
+            _new_fp = doc["input_sha256"]
+            _miss = sorted(set(_new_fp) - set(_old_fp))
+            _diff = sorted(k for k in _new_fp if k in _old_fp and _old_fp[k] != _new_fp[k])
+            if _miss or _diff:
+                bad.append("输入指纹对不上"
+                           + (f"（缺 {_miss}）" if _miss else "")
+                           + (f"（变了 {_diff}）" if _diff else ""))
         have = current_block(DOC.read_text(encoding="utf-8")) if DOC.exists() else None
         if have != render(doc).strip():
             bad.append(f"{DOC.name} 的生成块已过期")

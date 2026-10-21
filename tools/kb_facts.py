@@ -374,6 +374,46 @@ def compute(snap=None):
             if os.path.exists(rec_p) else None
         if rl.get("source_sha256") != want:
             raise SystemExit("❌ 风险等级-还原.json 已过期（源表指纹对不上）。" + _FIX)
+        # ★★ 2026-10-21：上面那条**只盯 records.json**，而覆盖状态/盲区率/绿标未覆盖
+        #   全部由 rules / whitelist / context-guards 等另外七份算出来 ——
+        #   改一条规则，账会变，而这条指纹照样对得上。
+        #   这正是 `AGENTS.md` §2.4.1 那个病（判据盯错了对象），
+        #   同一个病在 `verify_engine_contract.py` 的 V44b 已经修过一轮
+        #   （由 1d 改成逐份比 8 个输入），这里是**它下面的一层**，还没修。
+        #
+        #   判据直接取生成器自己的 `INPUTS`，不在这里抄第二份清单 ——
+        #   抄一份就会漂（本文件同一条纪律，见上面迁移保真度那段）。
+        _inputs_rec = rl.get("input_sha256")
+        if isinstance(_inputs_rec, dict) and _inputs_rec:
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location(
+                "_rl_inputs", os.path.join(load.REPO, "research", "governance",
+                                           "audit_risk_label.py"))
+            _mod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)
+            _now = {}
+            _unread = []
+            for _name, _p in _mod.INPUTS.items():
+                if os.path.exists(_p):
+                    _now[_name] = hashlib.sha256(open(_p, "rb").read()).hexdigest()
+                else:
+                    _unread.append(_name)
+            if _unread:
+                raise SystemExit(
+                    "⚠ 风险等级-还原.json 的输入 " + str(_unread[:3])
+                    + " 读不到 —— 未测，不是通过。" + _FIX)
+            _missing = sorted(set(_now) - set(_inputs_rec))
+            _diff = sorted(k for k in _now if _inputs_rec.get(k) != _now[k])
+            if _missing or _diff:
+                raise SystemExit(
+                    "❌ 风险等级-还原.json 已过期（输入指纹对不上：缺 "
+                    + str(_missing[:3]) + " · 变了 " + str(_diff[:3]) + "）。" + _FIX)
+        else:
+            # 旧账没有 `input_sha256` → 它是在「只盯 records」那版跑出来的，
+            # **无法判断另外七份有没有变**。这是未测，不许当成通过。
+            raise SystemExit(
+                "⚠ 风险等级-还原.json 没有 `input_sha256` 字段 —— 无法判断"
+                "规则/词表有没有变（未测，不是通过）。" + _FIX)
     rl_t = (rl or {}).get("totals", {})
 
     # ★ 迁移保真度对账账本（KB-GAP-15/KB-GAP-16）。与上面同一条纪律：不在这里手算，

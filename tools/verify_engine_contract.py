@@ -2058,8 +2058,45 @@ def main() -> int:
 
     # V44b：还原账必须新鲜，且两个守恒等式必须闭合
     _rl = json.loads(_rl_path.read_text(encoding="utf-8")) if _rl_path.exists() else None
-    _fp_now = hashlib.sha256(_rec_path.read_bytes()).hexdigest()
-    _fp_ok = bool(_rl) and _rl.get("source_sha256") == _fp_now
+    # ★★ 2026-10-21 修：原来这里只比 records.json 一个指纹。
+    #   而这份账的 `覆盖状态` / `盲区率` / `绿标_规则未覆盖` 全部由规则库、语境守卫、
+    #   白名单算出来 —— 改一条规则，覆盖状态会变，**指纹照样对得上，本门一直绿着**。
+    #   这就是 §2.4.1「判据盯错了对象」。现在逐个比：输入清单只有一份（生成器里的
+    #   `INPUTS`），本门直接读它，不在这里抄第二份（抄一份就会漂）。
+    import importlib.util as _ilu_rl
+    _rl_spec = _ilu_rl.spec_from_file_location(
+        "_risk_label_mod", str(ROOT / "research" / "governance" / "audit_risk_label.py"))
+    _rl_mod = _ilu_rl.module_from_spec(_rl_spec)
+    _rl_spec.loader.exec_module(_rl_mod)
+    _fp_now = {n: hashlib.sha256(p.read_bytes()).hexdigest()
+               for n, p in _rl_mod.INPUTS.items()}
+
+    def _inputs_ok(recorded, current):
+        """纯函数：记录的指纹集与现算的**键集合相等、值全等**。
+
+        抽成纯函数是为了让反向对照能直接断言它本身（§2.4.1）：
+        缺键 / 多键 / 值差一个字节，都必须判为「不新鲜」。
+        """
+        if not isinstance(recorded, dict) or not recorded:
+            return False
+        if set(recorded) != set(current):
+            return False
+        return all(recorded[k] == current[k] for k in current)
+
+    _fp_rec = (_rl or {}).get("input_sha256")
+    _fp_missing = sorted(set(_fp_now) - set(_fp_rec or {}))
+    _fp_diff = sorted(k for k in _fp_now
+                      if (_fp_rec or {}).get(k) not in (None, _fp_now[k]))
+    _fp_ok = (bool(_rl)
+              and _rl.get("source_sha256") == _fp_now["records.json"]
+              and _inputs_ok(_fp_rec, _fp_now))
+    # 反向对照：三件事必须同时成立 —— 全等→True（不是恒红）；改一份→False；缺一个键→False
+    _fp_mut = dict(_fp_now)
+    _fp_mut["rules-v1.json"] = "0" * 64
+    _fp_part = {k: v for k, v in _fp_now.items() if k != "rules-v1.json"}
+    _fp_ctl = (_inputs_ok(_fp_now, _fp_now)
+               and not _inputs_ok(_fp_mut, _fp_now)
+               and not _inputs_ok(_fp_part, _fp_now))
     _t = (_rl or {}).get("totals", {})
     _rows = (_rl or {}).get("rows", [])
     #   ① 可审内容三值必须恰好铺满语料（少一条 = 有记录没被归类，没人会看见）
@@ -2086,18 +2123,43 @@ def main() -> int:
         _m2_rows[0]["可审内容"] = "待定"          # 造一个第五种取值
     _ctrl = (bool(_rows) and _partition_ok(_rows)
              and not _partition_ok(_m_rows) and not _partition_ok(_m2_rows))
-    check("V44b", "源表绿标的逐行还原账新鲜，且两个守恒等式闭合"
+    check("V44b", "源表绿标的逐行还原账**对全部输入**新鲜，且两个守恒等式闭合"
                   "（可审内容铺满语料 · 绿标三桶等于绿标总数）",
-          _fp_ok and _cons and bool(_rows) and _ctrl,
-          f"指纹{'一致' if _fp_ok else '❌对不上'}；"
-          f"可审内容 {_t.get('可审_有文案')}+{_t.get('可审_无文案')}"
-          f"+{_t.get('可审_未读到')}={_part} vs {len(_recs_raw)}；"
-          f"绿标三桶={_buckets} vs {_t.get('绿标_条数')}；"
-          f"反向对照：抹掉一条→守恒断 · 造第五种取值→守恒断 → {'成立' if _ctrl else '❌判据恒真'}",
+          _fp_ok and _cons and bool(_rows) and _ctrl and _fp_ctl,
+          (f"输入指纹 {len(_fp_now)} 份"
+           + ("全部一致" if _fp_ok else
+              f"❌对不上（缺 {_fp_missing or '无'} · 变了 {_fp_diff or '无'}）")
+           + f"；可审内容 {_t.get('可审_有文案')}+{_t.get('可审_无文案')}"
+             f"+{_t.get('可审_未读到')}={_part} vs {len(_recs_raw)}；"
+             f"绿标三桶={_buckets} vs {_t.get('绿标_条数')}；"
+             f"反向对照：改 rules 一个字符→指纹判据必红 · 缺一个输入键→必红 · "
+             f"抹掉一条→守恒断 · 造第五种取值→守恒断 → "
+             f"{'成立' if (_ctrl and _fp_ctl) else '❌判据恒真'}"),
           )
 
     # V44c：棘轮 —— 不许更坏；变好时提示收紧
-    _RATCHET_HIT, _RATCHET_BLIND = 3, 0.431
+    #
+    # ★★ 2026-10-21 收紧到实测值，并把「为什么变坏」写成已登记事实（不是放宽阈值）：
+    #
+    #   改前（2026-09-17 钉）：hit ≤ 3 · blind ≤ 43.1%
+    #   改后（本日实测）：      hit ≤ 0 · blind ≤ 44.4%
+    #
+    #   两个数不是两次独立变化，是**同一批 3 条记录的两个面**：
+    #   records.json 索引 265 / 274 / 280（三条 `合规·绿`），正文是同一段吸奶器文案，
+    #   唯一的 `treat` 出现在 **“Treat yourself to total comfort!”** —— 营销习语，
+    #   不是医疗宣称（全段没有 cure / disease / therapy / medical）。
+    #
+    #   改前：T1.1 medical-cure 把 `treat` 误当成医疗宣称 → 引擎命中（hit=3），
+    #         这 3 条因此被算成「覆盖」，盲区率 100/232 = 43.1%。
+    #   改后：Q25（提交 8e84c26，2026-09-23）把 `treat yourself` 从守卫改成**准入过滤**
+    #         → 规则不再命中 → hit 归 0（**这是修好了误报**），
+    #         代价是这 3 条诚实地落进「没有规则覆盖」→ 盲区率 103/232 = 44.4%。
+    #
+    #   所以 44.4% 是**更真的读数**，不是引擎退化：它们本来就没有被任何规则覆盖，
+    #   只是过去被一句习语造成的假命中遮住了。已查过：现有 26 条规则没有一条
+    #   该覆盖「产品舒适度宣称」这类文案；要不要扩规则是规则侧的决定，不是本门的。
+    #   钉在 44.4% 的意思是：**再涨一条就红**；要降就得真去扩覆盖，不能改这里。
+    _RATCHET_HIT, _RATCHET_BLIND = 0, 0.444
     _hit, _blind = _t.get("绿标_规则命中了"), _t.get("盲区率")
     # 反向对照：把两个坏值各推高一格，本门**必须**红 —— 否则棘轮是摆设
     _ratchet_red = ((_hit is None or _hit + 1 > _RATCHET_HIT)
@@ -2107,16 +2169,34 @@ def main() -> int:
         _relax.append(f"引擎命中·源表未命中 {_hit} < {_RATCHET_HIT}")
     if _blind is not None and _blind < _RATCHET_BLIND:
         _relax.append(f"盲区率 {_blind:.1%} < {_RATCHET_BLIND:.1%}")
+    # ★★ 2026-10-21 修：结论行原本**只报变好的那个轴**。
+    #   实测：hit 3→0（变好）、blind 43.1%→44.4%（**变坏**），本门因 blind 而红，
+    #   而消息写的是「★ 已改善：引擎命中·源表未命中 0 < 3 —— 转红是故意的，
+    #   请把阈值收紧」。**读的人会以为只要收紧阈值就能绿，而真相是盲区率退化了。**
+    #   这正是 `verify_shouheng_ops.py` H1–H7 治的那个病：**结论行自己不许撒谎**。
+    #   修法：把**让它红的那个轴**显式点名，且排在「已改善」之前。
+    _worse = []
+    if _hit is not None and _hit > _RATCHET_HIT:
+        _worse.append(f"引擎命中·源表未命中 {_hit} > {_RATCHET_HIT}（变坏）")
+    if _blind is not None and _blind > _RATCHET_BLIND:
+        _worse.append(f"盲区率 {_blind:.1%} > {_RATCHET_BLIND:.1%}（**变坏**）")
+    _detail = (f"引擎命中·源表未命中 {_hit}/{_RATCHET_HIT} · "
+               f"盲区率 {_blind:.1%}/{_RATCHET_BLIND:.1%}")
+    if _worse:
+        _detail += (f" · ❌ **{'；'.join(_worse)}** —— 这一条才是本门红的真因，"
+                    f"与「阈值过期」无关；先查是什么让覆盖变少了"
+                    f"（规则/守卫/白名单任一改动都会影响）")
+    elif _relax:
+        _detail += (f" · ★ 已改善：{'；'.join(_relax)} —— 另一轴没有变坏，"
+                    f"请把该轴阈值收紧到当前值再提交")
+    else:
+        _detail += f" · 反向对照：各推高一格 → {'必红' if _ratchet_red else '❌棘轮不咬'}"
     check("V44c", f"棘轮：绿标「引擎命中·源表未命中」≤ {_RATCHET_HIT} 且盲区率 ≤ {_RATCHET_BLIND:.1%}"
                   f"（只许变好；变好时必须收紧本门的阈值）",
           (_hit is not None and _hit <= _RATCHET_HIT
            and _blind is not None and _blind <= _RATCHET_BLIND)
           and _ratchet_red,
-          f"引擎命中·源表未命中 {_hit}/{_RATCHET_HIT} · 盲区率 {_blind:.1%}/{_RATCHET_BLIND:.1%}"
-          + (" · " + (f"★ 已改善：{('；'.join(_relax))} —— 本门转红是**故意的**："
-                       f"请把阈值收紧到当前值再提交，否则这条门守的是一个过期的现状"
-                       if _relax else
-                       f"反向对照：各推高一格 → {'必红' if _ratchet_red else '❌棘轮不咬'}")))
+          _detail)
 
 
     # ── V45（D15/D16 执行 · 2026-09-17）规则迁移的保真度 ──────────────────
