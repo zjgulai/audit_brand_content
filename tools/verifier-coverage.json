@@ -628,6 +628,13 @@
     "PMO/implement/多模态与向量模型-选型-20261021.md"
    ],
    "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
+  },
+  {
+   "verifier": "tools/verify_multimodal_provider.py",
+   "asserts": "多模态契约：空注册表/空任务落 untested 而非通过 · 先授权后出境 · 出境清单可指认 · 12 条变异对照删守卫必红",
+   "subjects": [
+    "base/multimodal_provider.py"
+   ]
   }
  ]
 }
