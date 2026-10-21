@@ -443,6 +443,12 @@
       "section": "5.3",
       "kind": "current",
       "heading": "三态结论输出规范"
+    },
+    {
+      "file": "base/taxonomy.py",
+      "section": "7.3",
+      "kind": "current",
+      "heading": "一票否决项（P0 级，命中即 BLOCK）"
     }
   ]
 }

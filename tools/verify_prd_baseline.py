@@ -72,6 +72,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -242,6 +243,25 @@ def prd_headings(text):
     return out
 
 
+def _ref_sections(ln):
+    """一行里所有 `PRD §N` 节号，**把正则转义的点还原成节号分隔符**。
+
+    `base/taxonomy.py` 里写的是正则字面量（`PRD` 后接 `§7\\.3`），`REF_RE` 先匹配到 `7`，
+    后面的 `\\.3` 不属于 `\\d+`，于是被记成 `§7` —— 这是把**代码里的正则**当成
+    散文引用（§2.4.1 的「口径读错」）。这里顺手吃掉紧跟的 `\\.数字` 段。
+    """
+    for m in REF_RE.finditer(ln):
+        sec = m.group(1)
+        tail = ln[m.end():]
+        while tail.startswith("\\."):
+            mm = re.match(r"\\\.(\d+)", tail)
+            if not mm:
+                break
+            sec += "." + mm.group(1)
+            tail = tail[mm.end():]
+        yield sec
+
+
 def scan_refs(root):
     """扫全仓每一处 `PRD §N`，返回 `{(相对路径, 节号): {"marker": 该行有没有版本标记}}`。"""
     found = {}
@@ -256,8 +276,8 @@ def scan_refs(root):
         except (OSError, UnicodeDecodeError):
             continue
         for ln in lines:
-            for m in REF_RE.finditer(ln):
-                e = found.setdefault((s, m.group(1)), {"marker": False})
+            for sec in _ref_sections(ln):
+                e = found.setdefault((s, sec), {"marker": False})
                 e["marker"] = e["marker"] or bool(HIST_MARKER.search(ln))
     return found
 
@@ -319,6 +339,12 @@ def controls():
         """名字里含 name 的断言是否**存在且为假**。"""
         hits = [t for t in res if name in t[1]]
         return bool(hits) and not any(t[2] for t in hits)
+
+    def _scan_escaped_sample():
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "sample.md").write_text(
+                "散文 PRD " + "§7.3\n正则 PRD " + "§7\\.3\n", encoding="utf-8")
+            return {sec for (_, sec) in scan_refs(Path(td))}
 
     cases = [
         ("基线原样 → 必须全绿（证明判据不是恒红的）",
@@ -395,6 +421,8 @@ def controls():
         ("★ 版本标记不许被**文件名**触发：`…PRD-v1.0.md` 里装的是 v1.2 正文（实测误报过一次）",
          lambda: not HIST_MARKER.search("见 `PRD/feishu/内容审查Agent-PRD-v1.0.md`")
          and bool(HIST_MARKER.search("旧版 `PRD §5.8 四类`"))),
+        ("★ 正则转义点与散文点必须都读成 7.3（样本含两种写法）",
+         lambda: _scan_escaped_sample() == {"7.3"}),
     ]
 
     print("=" * 72)
