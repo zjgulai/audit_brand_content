@@ -73,6 +73,14 @@ const CRED_PATH = process.env.SHOUHENG_KB_CRED_PATH
 /** topK 实测上限：50。60 会返回 TOPK_TOO_LARGE。 */
 export const TOPK_MAX = 50;
 export const TOPK_DEFAULT = 10;
+/**
+ * trigram 分词器的硬门槛：查询词按**码点**少于 3 个字符，服务端会回退 like/positional。
+ * 这是**事实**，不是策略；两个调用方的策略不同：
+ *   · kb_client（通用检索）—— 照查，并声明 positional 的 caveat；
+ *   · judge_evidence（判定证据）—— 丢弃短词，不拿词频序当依据。
+ * 阈值收在这一处，避免两个模块各写一个 3 然后漂移。
+ */
+export const MIN_TRIGRAM_CHARS = 3;
 
 /** 三个子库的 id（URL 编码后才是合法的路径段） */
 export const COLLECTIONS = {
@@ -517,10 +525,35 @@ export function rankingCaveat(scoreKind) {
 export function queryLengthHint(query) {
   const q = String(query ?? '').trim();
   const n = [...q].length;
-  if (n >= 3) return null;
-  return `查询词「${q}」只有 ${n} 个字符，不足 3 个 —— 索引是 trigram 分词器，`
+  if (n >= MIN_TRIGRAM_CHARS) return null;
+  return `查询词「${q}」只有 ${n} 个字符，不足 ${MIN_TRIGRAM_CHARS} 个 —— 索引是 trigram 分词器，`
        + '本次会回退成词频序（scoreKind=positional），拿不到 BM25 相关性排序。'
        + '建议改写成 ≥3 个字的更具体表达再查一次（例：「无痛」→「无痛分娩」）。';
+}
+
+/**
+ * 短查询的**策略声明**。纯函数，离线可证。
+ *
+ * ★ 与 `judge_evidence.pickKeyPhrases()` 的策略**故意不同**：
+ *   本模块是通用检索客户端，**照查**短词并声明 positional 回退；
+ *   判定证据模块**丢弃**短词（`query_policy='drop_short_for_evidence'`）。
+ *   两个模块的契约不同，不是同一个问题的两个答案 —— 但下游必须能看出走的是哪条。
+ *
+ * @returns {{policy:'queried'|'queried_short', chars:number, reason:string|null}}
+ */
+export function queryPolicy(query) {
+  const q = String(query ?? '').trim();
+  const n = [...q].length;
+  if (n >= MIN_TRIGRAM_CHARS) {
+    return { policy: 'queried', chars: n, reason: null };
+  }
+  return {
+    policy: 'queried_short', chars: n,
+    reason: `查询词只有 ${n} 个字符（<${MIN_TRIGRAM_CHARS}），服务端会回退 positional。`
+          + '本次**照查**（通用检索的选择），但 score 是词频不是相关性；'
+          + 'order_is_meaningful 为 false 时，顺序不能当相关性用。'
+          + '判定证据不走这条策略 —— judge_evidence 会丢弃短词。',
+  };
 }
 
 /**
@@ -554,6 +587,7 @@ export async function retrieve(collection, query, opts = {}) {
   //   查询词不足 3 个字符时服务端回退成词频序；把它当相关性用会直接判错。
   const orderIsOk = orderIsMeaningful(scoreKind);
   const qHint = queryLengthHint(q);
+  const qPolicy = queryPolicy(q);
 
   const out = {
     ok: true,
@@ -575,6 +609,11 @@ export async function retrieve(collection, query, opts = {}) {
     ranking_caveat: rankingCaveat(scoreKind),
     // 查询词 <3 个字时的改写建议（null = 够长）。给模型看的，别丢。
     query_hint: qHint,
+    // ★ 本次走的是哪条短查询策略（2026-10-21）。同一句文案在 kb_client 与
+    //   judge_evidence 上会走不同策略，下游必须能看出是哪条，不必猜。
+    query_chars: qPolicy.chars,
+    query_policy: qPolicy.policy,
+    query_policy_note: qPolicy.reason,
 
     // ★ 配额真值 —— 直接来自本次响应（request() 已 absorbQuota）。
     //   放在检索结果里，是为了让「还剩多少」有真值可引用，

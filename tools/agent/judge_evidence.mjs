@@ -60,8 +60,23 @@ export const MAX_EVIDENCE_ITEMS = 10;
 /** 单条证据正文截断长度。截断了必须说出来（见 text_truncated）。 */
 export const EVIDENCE_TEXT_LIMIT = 400;
 
-/** trigram 分词器要求：查询词 ≥3 个字符才有真 BM25 */
-const MIN_QUERY_CHARS = 3;
+/** trigram 分词器要求：查询词 ≥3 个字符才有真 BM25。阈值与 kb_client 同源，避免两处漂移 */
+const MIN_QUERY_CHARS = kb.MIN_TRIGRAM_CHARS;
+
+/**
+ * 判定证据的短查询策略：**丢弃**，不拿词频序当依据。
+ *
+ * ★ 与 `kb_client.queryPolicy()` 的 `queried_short` **故意不同**：
+ *   · 通用检索：短词照查，把 positional caveat 说清楚，有比没有好；
+ *   · 判定证据：短词丢弃，记进 `dropped_short_queries`，改用 ≥3 字的试探词，
+ *     并把 `basis` 降为 `probe`。拿词频序当「依据」= 拿错尺子。
+ *   两条策略都写进各自的返回，下游能看出走的是哪条。
+ */
+export const QUERY_POLICY = 'drop_short_for_evidence';
+export const QUERY_POLICY_NOTE =
+  '判定证据只使用引擎命中且 ≥3 字的表述；2 字词丢弃并记入 dropped_short_queries。'
+  + '这是与通用检索（kb_client 照查短词并声明 positional caveat）**故意不同**的策略：'
+  + '证据不接受词频序。';
 
 /** 试探词里要跳掉的英文虚词（它们出现在几乎每条文案里，查了只会浪费配额） */
 const STOPWORDS = new Set([
@@ -180,7 +195,11 @@ export function pickKeyPhrases(text, judgeResult, { max = MAX_WORDING_QUERIES } 
     if (queries.some((q) => q.source === 'probe') && usable.length) basis = 'mixed';
   }
 
-  return { queries, dropped_short: dropped, basis };
+  return {
+    queries, dropped_short: dropped, basis,
+    query_policy: QUERY_POLICY,
+    query_policy_note: QUERY_POLICY_NOTE,
+  };
 }
 
 /** judge.py 说「这条规则需要证据」时，命中的是哪种证据（不是 none 就算需要） */
@@ -276,6 +295,8 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
 
   const base = {
     basis: picked.basis,
+    query_policy: picked.query_policy,
+    query_policy_note: picked.query_policy_note,
     query_basis_note: {
       engine_matched: '查询词全部来自判定引擎实际命中的表述。',
       mixed: '查询词里有一部分来自引擎命中，另一部分是从文案里试出来的。',
