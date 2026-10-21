@@ -1,105 +1,552 @@
 {
   "_meta": {
-    "name": "同义词表-候选-v1",
+    "name": "同义词表-候选",
+    "version": "v2",
     "generated_at": "2026-10-21",
     "purpose": "query_expansion_for_retrieval_only",
     "not_for_rule_judgment": true,
-    "why": "这些是检索扩展用的同义词，不是判定等价。尤其『无痛』与『疼痛缓解』：前者可能是绝对化宣称，后者是功效表述；不能因为同表就判成同一件事。",
-    "evidence_rule": "每条必须有 file:line + excerpt；没有证据指针的不进表。",
-    "source_probe": "PMO/implement/本地向量化探针-20261021.md",
-    "count": 7
+    "why": "这些是检索扩展用的同义词/近义词，不是判定等价。尤其无痛/疼痛缓解：前者可能是绝对化宣称，后者是功效表述；不能因为同表就判成同一件事。",
+    "method": "反向抽取：扫 research/kb/台账-v1.json + research/governance/rules-mece-migration-v1.json；每个说法都要有 file:line + excerpt；bge-m3 余弦只作辅助，不作判据。三分归因：语义等价→table；语义邻近非等价→vector_only；表面词近概念不同→not_synonym。",
+    "evidence_rule": "每条必须有 file:line + excerpt；没有证据指针的不进表。existing_partial_evidence 的 query 侧在本次 1,799 语料里 0 次，已显式标出。",
+    "source_probe": "PMO/implement/本地向量实测-20261021.md",
+    "cosine_model": "bge-m3 (ollama, localhost:11434)",
+    "cosine_note": "余弦是辅助读数；高余弦不等于可当同义。",
+    "counts": {
+      "table": 9,
+      "existing_partial_evidence": 2,
+      "vector_only": 3,
+      "not_synonym": 9
+    },
+    "count": 23,
+    "known_limitations": [
+      "existing_partial_evidence 的 query 侧（胀奶、温奶器）在本次 1,799 语料里 0 次；条目保留，但严格证据不完整。",
+      "not_synonym 的疼痛缓解不在 1,799 语料里；证据取自 skeleton/rules-v1.json:342，已注明在语料外。",
+      "vector_only 的条目只用于检索，不得用于 rule_judge。",
+      "本表只覆盖本次两个语料文件；未覆盖 Brand_agent 文档、外部标准库、错题本等。"
+    ],
+    "expansion_metric": {
+      "six_pairs": {
+        "note": "6 个可测对；无痛/疼痛缓解已剔除。table + existing_partial_evidence 参与扩展。",
+        "rows": [
+          {
+            "pair": "胀奶→乳房胀痛",
+            "target_docs": 2,
+            "before": 0,
+            "after": 2
+          },
+          {
+            "pair": "防溢→溢乳",
+            "target_docs": 3,
+            "before": 1,
+            "after": 3
+          },
+          {
+            "pair": "漏奶→溢乳",
+            "target_docs": 3,
+            "before": 0,
+            "after": 3
+          },
+          {
+            "pair": "母乳→哺乳",
+            "target_docs": 159,
+            "before": 0,
+            "after": 2,
+            "note": "表只用母乳→奶水；2 条奶水文档同时含哺乳；母乳→哺乳在 vector_only，3/10"
+          },
+          {
+            "pair": "收腹带→产后束腹",
+            "target_docs": 1,
+            "before": 0,
+            "after": 1
+          },
+          {
+            "pair": "温奶器→暖奶器",
+            "target_docs": 20,
+            "before": 0,
+            "after": 10
+          }
+        ]
+      },
+      "twenty_queries": {
+        "metric": "original-term coverage@10（原查询词在 top10 文档中的覆盖率）",
+        "before_avg": 0.804,
+        "after_avg": 0.787,
+        "changed_queries": 3,
+        "changed": [
+          "温奶器 消毒器 夜间（0.67→0.33）",
+          "收腹带 产后 修复（1.00→1.00，top10 变）",
+          "漏奶 DoubleFit 密封（1.00→1.00，top10 变）"
+        ],
+        "conclusion": "没有提升，反而略降。20 条宽查询大多已经含语料词；扩表拉进同义词文档，稀释了原词覆盖率。温奶器那条下降最明显，说明这批查询不适合当扩表效果的验收集。"
+      },
+      "ceiling": "表只能修「两种说法都在语料里、且语义等价」的对：6 个可测对里 5 个能修（母乳→哺乳需 vector_only）；20 条宽查询里 15 条无变化、3 条 top10 变了但原词覆盖率没升、1 条下降。表外词（低噪音/轻便/免提等）在语料里没有证据，不能靠扩表；概念不同的对（无痛/疼痛缓解、审核/复核等）进黑名单。"
+    }
   },
   "entries": [
     {
       "id": "SYN-001",
-      "query_term": "胀奶",
-      "corpus_term": "乳房胀痛",
-      "symmetric": true,
-      "confidence": "high",
-      "evidence": {
-        "file": "research/governance/rules-mece-migration-v1.json",
-        "line": 6425,
-        "excerpt": "乳房明显胀痛或疑似乳腺炎时不要自行热敷"
-      },
-      "note": "同一症状的两种说法；语料里用『乳房胀痛』。"
-    },
-    {
-      "id": "SYN-002",
       "query_term": "防溢",
       "corpus_term": "溢乳",
       "symmetric": true,
       "confidence": "high",
-      "evidence": {
+      "evidence_query": {
         "file": "research/governance/rules-mece-migration-v1.json",
         "line": 3517,
         "excerpt": "\"topic\": \"防溢乳垫与初乳渗漏\""
       },
-      "note": "『防溢』是动作/场景，『溢乳』是现象；语料里以『溢乳』成词。"
-    },
-    {
-      "id": "SYN-003",
-      "query_term": "漏奶",
-      "corpus_term": "溢乳",
-      "symmetric": true,
-      "confidence": "high",
-      "evidence": {
+      "evidence_corpus": {
         "file": "research/governance/rules-mece-migration-v1.json",
         "line": 4768,
         "excerpt": "\"topic\": \"溢乳与就医\""
       },
-      "note": "『漏奶』是口语，『溢乳』是语料/医学用词。"
+      "note": "防溢是动作/场景，溢乳是现象；语料里以溢乳成词。",
+      "category": "table",
+      "cosine": 0.6919,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
     },
     {
-      "id": "SYN-004",
-      "query_term": "无痛",
-      "corpus_term": "疼痛缓解",
-      "symmetric": false,
-      "confidence": "medium",
-      "evidence": {
-        "file": "research/governance/skeleton/rules-v1.json",
-        "line": 342,
-        "excerpt": "\"topic_label\": \"疼痛缓解（人体结果）\""
-      },
-      "note": "仅用于检索扩展，不用于判定等价：『无痛』往往是绝对化/零风险承诺，『疼痛缓解』是人体结果宣称；两者在合规上不是一件事（见 H07/T2.1.2）。"
-    },
-    {
-      "id": "SYN-005",
-      "query_term": "母乳",
-      "corpus_term": "哺乳",
+      "id": "SYN-002",
+      "query_term": "漏奶",
+      "corpus_term": "溢乳",
       "symmetric": true,
-      "confidence": "medium",
-      "evidence": {
+      "confidence": "high",
+      "evidence_query": {
         "file": "research/governance/rules-mece-migration-v1.json",
-        "line": 817,
-        "excerpt": "\"topic\": \"哺乳/安全感与亲密连接\""
+        "line": 2217,
+        "excerpt": "\"topic\": \"奶流/排空/漏奶\""
       },
-      "note": "『母乳』是名词/喂养物，『哺乳』是行为；语料里大量以『哺乳』成词。扩展会带来更宽的候选池，不等于同义判定。"
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 4768,
+        "excerpt": "\"topic\": \"溢乳与就医\""
+      },
+      "note": "漏奶是口语，溢乳是医学/语料用词。",
+      "category": "table",
+      "cosine": 0.7262,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
     },
     {
-      "id": "SYN-006",
+      "id": "SYN-003",
       "query_term": "收腹带",
       "corpus_term": "产后束腹",
       "symmetric": true,
-      "confidence": "medium",
-      "evidence": {
+      "confidence": "high",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 1305,
+        "excerpt": "\"title\": \"品牌日二创：收腹带RB001\""
+      },
+      "evidence_corpus": {
         "file": "research/governance/rules-mece-migration-v1.json",
         "line": 6293,
         "excerpt": "\"topic\": \"产后束腹带\""
       },
-      "note": "语料写作『产后束腹带』；『收腹带』是常见商品名。扩展时按子串匹配，注意不要把它当成『束腹=收腹』的合规等价。"
+      "note": "语料写作产后束腹带；收腹带是常见商品名。",
+      "category": "table",
+      "cosine": 0.7073,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-004",
+      "query_term": "收腹带",
+      "corpus_term": "束腹带",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 1305,
+        "excerpt": "\"title\": \"品牌日二创：收腹带RB001\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 6293,
+        "excerpt": "\"topic\": \"产后束腹带\""
+      },
+      "note": "收腹/束腹是同一类产品的两种写法；语料以束腹带成词。",
+      "category": "table",
+      "cosine": 0.8491,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-005",
+      "query_term": "背带",
+      "corpus_term": "婴儿背带",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 338,
+        "excerpt": "\"产品\": \"背带\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 33735,
+        "excerpt": "\"product_line\": \"婴儿背带\""
+      },
+      "note": "短名 vs 全名；同一品类。",
+      "category": "table",
+      "cosine": 0.8669,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-006",
+      "query_term": "消毒器",
+      "corpus_term": "奶瓶消毒器",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 26561,
+        "excerpt": "\"product_line\": \"奶瓶消毒器/烘干\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 27173,
+        "excerpt": "\"product_line\": \"奶瓶消毒器/烘干\""
+      },
+      "note": "短名 vs 全名；语料 product_line 同时含两词。",
+      "category": "table",
+      "cosine": 0.8194,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
     },
     {
       "id": "SYN-007",
+      "query_term": "防溢乳垫",
+      "corpus_term": "溢乳垫",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 3524,
+        "excerpt": "\"rule_text\": \"原表述：这时可以借助防溢乳垫来保持乳房干爽…\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 3517,
+        "excerpt": "\"topic\": \"防溢乳垫与初乳渗漏\""
+      },
+      "note": "溢乳垫是防溢乳垫的短写/子串；同一产品。",
+      "category": "table",
+      "cosine": 0.9278,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-008",
+      "query_term": "母乳",
+      "corpus_term": "奶水",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 267,
+        "excerpt": "\"topic\": \"母乳喂养与配方奶\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 3349,
+        "excerpt": "\"rule_text\": \"…大多是长期奶水摄入不足引发的情绪反应…\""
+      },
+      "note": "母乳是书面/营养说法，奶水是口语；仅用于检索。",
+      "category": "table",
+      "cosine": 0.6701,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-009",
+      "query_term": "涨奶",
+      "corpus_term": "乳房胀痛",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 2849,
+        "excerpt": "\"rule_text\": \"…缓解涨奶 ease/relieve engorgement…\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 6425,
+        "excerpt": "\"rule_text\": \"…乳房明显胀痛或疑似乳腺炎时不要自行热敷…\""
+      },
+      "note": "涨奶是症状口语，乳房胀痛是书面描述；仅用于检索。",
+      "category": "table",
+      "cosine": 0.5717,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    }
+  ],
+  "existing_partial_evidence": [
+    {
+      "id": "SYN-010",
+      "query_term": "胀奶",
+      "corpus_term": "乳房胀痛",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence_query": null,
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 6425,
+        "excerpt": "\"rule_text\": \"…乳房明显胀痛或疑似乳腺炎时不要自行热敷…\""
+      },
+      "evidence_status": "query_term_absent_from_corpus",
+      "note": "v1 遗留：胀奶在本次 1,799 语料里 0 次；保留条目，但严格证据不完整。",
+      "category": "existing_partial_evidence",
+      "cosine": 0.6887,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-011",
       "query_term": "温奶器",
       "corpus_term": "暖奶器",
       "symmetric": true,
       "confidence": "high",
-      "evidence": {
+      "evidence_query": null,
+      "evidence_corpus": {
         "file": "research/kb/台账-v1.json",
         "line": 1219,
         "excerpt": "\"title\": \"品牌日二创：暖奶器MW05\""
       },
-      "note": "同一品类在两个写法之间切换；台账用『暖奶器』。"
+      "evidence_status": "query_term_absent_from_corpus",
+      "note": "v1 遗留：温奶器在本次 1,799 语料里 0 次；暖奶器是语料写法。向量 9/10 是干净增量。",
+      "category": "existing_partial_evidence",
+      "cosine": 0.9161,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    }
+  ],
+  "vector_only": [
+    {
+      "id": "SYN-012",
+      "query_term": "母乳",
+      "corpus_term": "哺乳",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 267,
+        "excerpt": "\"topic\": \"母乳喂养与配方奶\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 817,
+        "excerpt": "\"topic\": \"哺乳/安全感与亲密连接\""
+      },
+      "note": "语义邻近但不是精确等价：母乳是名词/喂养物，哺乳是行为；不进表，交给向量检索，不用于判定。",
+      "category": "vector_only",
+      "cosine": 0.7502,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-013",
+      "query_term": "吸奶器",
+      "corpus_term": "可穿戴吸奶器",
+      "symmetric": false,
+      "confidence": "high",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 148,
+        "excerpt": "\"product_line\": \"吸奶器\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 28601,
+        "excerpt": "\"product_line\": \"可穿戴吸奶器\""
+      },
+      "note": "子类关系，不是等价：可穿戴吸奶器 ⊂ 吸奶器；只可做召回扩展。",
+      "category": "vector_only",
+      "cosine": 0.8721,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "SYN-014",
+      "query_term": "UGC",
+      "corpus_term": "UGC视频",
+      "symmetric": false,
+      "confidence": "medium",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 2499,
+        "excerpt": "\"notes\": \"…（ugc混剪）\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 2524,
+        "excerpt": "\"title\": \"【法语】BM04 UGC视频改语言\""
+      },
+      "note": "UGC 是内容形态，UGC视频是载体；相关但不等价；交给向量。",
+      "category": "vector_only",
+      "cosine": 0.8707,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    }
+  ],
+  "not_synonyms": [
+    {
+      "id": "BLK-001",
+      "query_term": "无痛",
+      "corpus_term": "疼痛缓解",
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 2537,
+        "excerpt": "\"subcategory_original\": \"无痛、安全与零风险承诺\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/skeleton/rules-v1.json",
+        "line": 342,
+        "excerpt": "\"topic_label\": \"疼痛缓解（人体结果）\""
+      },
+      "reason": "无痛是绝对化/零风险承诺（H07 方向）；疼痛缓解是人体结果宣称（T2.1.2 方向）。同义桥会让只写「缓解疼痛」的正常文案被当成「无痛」命中。",
+      "category": "not_synonym",
+      "cosine": 0.7426
+    },
+    {
+      "id": "BLK-002",
+      "query_term": "漏奶",
+      "corpus_term": "溢奶",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 2217,
+        "excerpt": "\"topic\": \"奶流/排空/漏奶\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 1524,
+        "excerpt": "\"rule_text\": \"…an overflow alert…溢奶提醒…\""
+      },
+      "reason": "语料里的溢奶是设备「overflow alert / 溢奶提醒」，不是妈妈漏奶；表面词近，概念不同。",
+      "category": "not_synonym",
+      "cosine": 0.7937,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-003",
+      "query_term": "PSEO",
+      "corpus_term": "品线SEO",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 16895,
+        "excerpt": "\"source_table\": \"PSEO专家审核总表\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 12029,
+        "excerpt": "\"source_table\": \"品线SEO任务管理系统\""
+      },
+      "reason": "两个不同的源系统/表；缩写相近，不是同一概念。",
+      "category": "not_synonym",
+      "cosine": 0.5207,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-004",
+      "query_term": "审核",
+      "corpus_term": "复核",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 12562,
+        "excerpt": "\"title\": \"英文 baby name文章试稿审核\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 5,
+        "excerpt": "\"note\": \"…合并 31 条对抗复核后的判定…\""
+      },
+      "reason": "本项目里审核与复核是不同工作阶段/角色；不能互换。",
+      "category": "not_synonym",
+      "cosine": 0.7399,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-005",
+      "query_term": "需求",
+      "corpus_term": "任务",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 55,
+        "excerpt": "\"source_table\": \"【视频】日常需求看板\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 12029,
+        "excerpt": "\"source_table\": \"品线SEO任务管理系统\""
+      },
+      "reason": "需求（demand）与任务（task/system）是不同对象；同义桥会把需求记录和任务系统混在一起。",
+      "category": "not_synonym",
+      "cosine": 0.5522,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-006",
+      "query_term": "样本",
+      "corpus_term": "案例",
+      "evidence_query": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 2174,
+        "excerpt": "\"rule_text\": \"…（样本、对照、统计口径齐全）…\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 749,
+        "excerpt": "\"rule_text\": \"…也有部分案例…\""
+      },
+      "reason": "样本是研究/统计样本，案例是临床案例；概念不同。",
+      "category": "not_synonym",
+      "cosine": 0.6751,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-007",
+      "query_term": "品牌日二创",
+      "corpus_term": "二创视频",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 62,
+        "excerpt": "\"title\": \"品牌日二创：全品线合集\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 64,
+        "excerpt": "\"category\": \"二创视频\""
+      },
+      "reason": "品牌日二创是活动批次，二创视频是内容格式；不是同义。",
+      "category": "not_synonym",
+      "cosine": 0.6857,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-008",
+      "query_term": "外链发布",
+      "corpus_term": "外链文章",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 14178,
+        "excerpt": "\"title\": \"外链发布- 链接为外链文章&集合页\""
+      },
+      "evidence_corpus": {
+        "file": "research/kb/台账-v1.json",
+        "line": 13620,
+        "excerpt": "\"title\": \"geo guest post外链文章发布\""
+      },
+      "reason": "发布是动作，文章是对象；同义桥会把动作记录和内容对象混在一起。",
+      "category": "not_synonym",
+      "cosine": 0.8321,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
+    },
+    {
+      "id": "BLK-009",
+      "query_term": "可穿戴",
+      "corpus_term": "穿戴",
+      "evidence_query": {
+        "file": "research/kb/台账-v1.json",
+        "line": 28601,
+        "excerpt": "\"product_line\": \"可穿戴吸奶器\""
+      },
+      "evidence_corpus": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 6300,
+        "excerpt": "\"rule_text\": \"…具体穿戴时长…\""
+      },
+      "reason": "可穿戴是产品形容词，穿戴是佩戴动作；子串相近但概念不同。",
+      "category": "not_synonym",
+      "cosine": 0.8272,
+      "cosine_note": "辅助读数，不是判据；语义近但向量召不回，正是进表的理由。"
     }
   ]
 }
