@@ -384,6 +384,66 @@ def _version_num(v):
     return int(m.group(1)) if m else None
 
 
+# ───────── draft 控制点的激活一致性（B-8 / B-9，2026-10-21）─────────
+#
+# ★ 为什么放在这里：B-4 管的是「active 控制点必须有 enabled 规则」；
+#   这条是它的**反向**——「draft 控制点不许有 enabled 规则」。
+#   两条边放在同一个文件里，口径才不会一边严一边松。
+#   放在 verify_engine_contract 会把同一份控制点策略拆到两处，改一处忘一处。
+
+def draft_activation_summary(cp, rules):
+    """纯函数：draft 控制点的阻塞摘要（不联网、不落状态、不判断「够不够好」）。"""
+    rows = [r for r in (cp.get("control_points") or [])
+            if isinstance(r, dict) and r.get("status") == "draft"]
+    blocked = [r for r in rows if not _blank(r.get("activation_blocked_by"))]
+    codes = {r.get("control_code") for r in rows}
+    rules_list = (rules or {}).get("rules") if isinstance(rules, dict) else []
+    measured = [r for r in (rules_list or [])
+                if isinstance(r, dict) and r.get("parent_rule") in codes
+                and r.get("false_positive_measured") is True]
+    reasons = ["%s：%s" % (r.get("control_code"), r.get("activation_blocked_by"))
+               for r in blocked]
+    text = ("%d 个控制点处于 draft，阻塞原因：%s；其中 %d 条规则的误报率已实测"
+            % (len(rows), "；".join(reasons) if reasons else "（无）", len(measured)))
+    return {"text": text, "draft": len(rows), "blocked": len(blocked),
+            "measured": len(measured), "codes": sorted(c for c in codes if c)}
+
+
+def summary_matches(text, n_draft, n_measured):
+    """摘要的计数必须与数据一致。计数写错 → 这条为 False → B-9 红。"""
+    return (("%d 个控制点处于 draft" % n_draft) in text
+            and ("%d 条规则的误报率已实测" % n_measured) in text)
+
+
+def check_draft_activation(cp, rules):
+    """B-8：draft 控制点下不许有 enabled 规则（真空的方向）。
+    B-9：draft 摘要必须出现且计数正确。"""
+    out = []
+    rows = [r for r in (cp.get("control_points") or [])
+            if isinstance(r, dict) and r.get("status") == "draft"]
+    rules_list = (rules or {}).get("rules") if isinstance(rules, dict) else []
+    offenders = []
+    for r in rows:
+        code = r.get("control_code")
+        enabled = [x.get("rule_key") for x in (rules_list or [])
+                   if isinstance(x, dict) and x.get("parent_rule") == code
+                   and _rule_enabled(x)]
+        if enabled:
+            offenders.append("%s:%s" % (code, enabled))
+    out.append(_check(
+        "B-8", not offenders,
+        "draft 控制点下不许有 enabled 规则；违规 %d：%r" % (len(offenders), offenders)))
+
+    s = draft_activation_summary(cp, rules)
+    if s["draft"] == 0:
+        out.append(_check("B-9", True, "无 draft 控制点 —— 摘要不适用"))
+    else:
+        ok = (summary_matches(s["text"], s["draft"], s["measured"])
+              and all(c in s["text"] for c in s["codes"]))
+        out.append(_check("B-9", ok, s["text"]))
+    return out
+
+
 def check_registry(cp):
     """C-76：主表即码分配登记表；一个码只能属于一个族；跨族拆分必须显式批准。"""
     out = []
@@ -872,6 +932,7 @@ def evaluate(cp, rt, history=None, rules=None, require_history=False,
                 "同一映射表连跑两次结果必须一致"))
     if 71 in rows:
         checks += check_first_batch(cp, rules, history, whitelist)
+        checks += check_draft_activation(cp, rules)
     # ★ 不受 --row 限制：悬空 parent_rule 是**任何**行都该看见的问题。
     #   放进 `if 71 in rows` 里，会让 `--row 69` 那份读数对它默默无闻。
     checks += check_rule_parents(cp, rules)
@@ -1279,6 +1340,27 @@ def selftest(verbose: bool = False) -> int:
                                               tracked_hist, batch_wl)) == set(),
                     str(red_ids(check_first_batch(tracked_new, batch_rules,
                                                   tracked_hist, batch_wl)))))
+    # B-8/B-9 · draft 激活一致性（2026-10-21）
+    draft_cp = _deep(batch_cp)
+    draft_cp["control_points"].append(
+        {"control_code": "B01", "control_name": "draft", "family": "F1",
+         "status": "draft", "activation_blocked_by": "误报率未实测"})
+    draft_rules = _deep(batch_rules)
+    draft_rules["rules"].append(
+        {"rule_key": "T10.1.x", "parent_rule": "B01", "enabled": False})
+    results.append(("draft + 规则 disabled → B-8/B-9 绿",
+                    red_ids(check_draft_activation(draft_cp, draft_rules)) == set(),
+                    str(red_ids(check_draft_activation(draft_cp, draft_rules)))))
+    hot = _deep(draft_rules)
+    hot["rules"][-1]["enabled"] = True
+    results.append(("draft + 规则 enabled → B-8 红",
+                    "B-8" in red_ids(check_draft_activation(draft_cp, hot)), ""))
+    good_text = draft_activation_summary(draft_cp, draft_rules)["text"]
+    results.append(("draft 摘要计数正确 → 绿；写错 → 红",
+                    summary_matches(good_text, 1, 0)
+                    and not summary_matches(good_text.replace("1 个控制点", "2 个控制点"), 1, 0),
+                    good_text))
+
     safe_row = _deep(batch_cp)
     safe_row["control_points"].append(
         {"control_code": "安全词", "control_name": "safe", "family": "F1",
