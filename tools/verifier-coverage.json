@@ -88,6 +88,13 @@
    ]
   },
   {
+   "verifier": "tools/verify_authority_change.py",
+   "asserts": "权威源变更 → 重审入队（行 103 / RL-15）：AUTHORITY_KINDS 与 on_authority_changed",
+   "subjects": [
+    "base/authority_change.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_backend_recovery.py",
    "asserts": "权威备份/恢复：只收已提交 manifest+事件与长期审计，排除 session/projection/generation，坏 hash/夹带/半行拒绝，空目录恢复后重建 fresh 投影，失败不留半恢复",
    "subjects": [
@@ -249,10 +256,30 @@
    ]
   },
   {
+   "verifier": "tools/verify_image_judgment.py",
+   "asserts": "Q4-② 图片接线：盘上图片 row→ContentUnit→RuleJudge/Orchestrator；成功/失败 parse_status、五标签、OCR文字边界与源码变异断线必红",
+   "subjects": [
+    "base/media.py",
+    "base/normalizer.py",
+    "base/judge_entry.py",
+    "base/orchestrator.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_job_dispatcher.py",
    "asserts": "job_dispatcher：run_record 14 字段 / 恰好一个合法 ReviewOutput + run_id / 同 case 串行 / 超时 SIGKILL / 坏输出不 commit",
    "subjects": [
     "base/job_dispatcher.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_judge_entry.py",
+   "asserts": "ADR-0016 生产判定入口：RuleJudge 唯一引擎、Orchestrator 五步、确定 finding_id、恒待放行、partial 空命中不 PASS、failed 不调用判定",
+   "subjects": [
+    "base/judge_entry.py",
+    "base/rule_judge.py",
+    "base/orchestrator.py",
+    "base/decision_table.py"
    ]
   },
   {
@@ -481,6 +508,13 @@
    ]
   },
   {
+   "verifier": "tools/verify_secret_patterns.py",
+   "asserts": "仓内文本凭据形态扫描（私钥块 / 云密钥 / Bearer / 读凭据路径），按形态不按名字",
+   "subjects": [
+    "tools/verify_secret_patterns.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_semantic_judge.py",
    "asserts": "semantic_judge：默认 candidate / C1–C4 与开关 / 5 类变异必须红（适配 449 行 semantic_settle）",
    "subjects": [
@@ -511,6 +545,15 @@
    ]
   },
   {
+   "verifier": "tools/verify_skill_inventory.py",
+   "asserts": "skill/ 清单治理：跟踪集恰等于放行清单 · 整体被忽略且无单点放行 · 放行文档在盘且无真凭据形态 · 成员目录数不低于下界",
+   "subjects": [
+    "skill/README.md",
+    "skill/标准化台账-20261017.md",
+    ".gitignore"
+   ]
+  },
+  {
    "verifier": "tools/verify_solution_meta.py",
    "asserts": "技术方案头部数字与文档实况：模块数 / 判据归属 / critical·high / 三方 hash 绑定 / 门状态 / owner 无重复",
    "subjects": [
@@ -533,6 +576,13 @@
    "asserts": "RL-7/RL-8/RL-9/RL-13 下线任务：状态机与失败三处置；已发布才建/未发布 not_applicable；回填三必填+三选一+截图三项；waive 双人·scope·不自批·原签发人；每日键与事件键不许混；结构无 deadline 且指标无正常/未超时",
    "subjects": [
     "base/takedown.py"
+   ]
+  },
+  {
+   "verifier": "tools/verify_taxonomy.py",
+   "asserts": "`base/taxonomy.py` 的回归与门槛",
+   "subjects": [
+    "base/taxonomy.py"
    ]
   },
   {
@@ -564,42 +614,12 @@
    ]
   },
   {
-   "verifier": "tools/verify_authority_change.py",
-   "asserts": "权威源变更 → 重审入队（行 103 / RL-15）：AUTHORITY_KINDS 与 on_authority_changed",
-   "subjects": [
-    "base/authority_change.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_taxonomy.py",
-   "asserts": "`base/taxonomy.py` 的回归与门槛",
-   "subjects": [
-    "base/taxonomy.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_secret_patterns.py",
-   "asserts": "仓内文本凭据形态扫描（私钥块 / 云密钥 / Bearer / 读凭据路径），按形态不按名字",
-   "subjects": [
-    "tools/verify_secret_patterns.py"
-   ]
-  },
-  {
    "verifier": "web/scripts/verify_manual_a11y.mjs",
    "asserts": "人工无障碍证据门（TS-9 的另一半）：未签收项退 2（未测），不是绿也不是红",
    "subjects": [
     "web/a11y-manual-v1.json"
    ],
    "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
-  },
-  {
-   "verifier": "tools/verify_skill_inventory.py",
-   "asserts": "skill/ 清单治理：跟踪集恰等于放行清单 · 整体被忽略且无单点放行 · 放行文档在盘且无真凭据形态 · 成员目录数不低于下界",
-   "subjects": [
-    "skill/README.md",
-    "skill/标准化台账-20261017.md",
-    ".gitignore"
-   ]
   }
  ]
 }

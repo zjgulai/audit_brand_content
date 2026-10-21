@@ -91,6 +91,8 @@ def main():
         from base.rule_judge import RuleJudge
         from base.disposition_router import DispositionRouter
         from base.report_store import ReportStore
+        from base import media as M
+        from base.judge_entry import judge_unit as production_judge_unit
     except Exception as e:  # noqa: BLE001
         print("❌ 导入链路模块失败：%s" % e)
         return 1
@@ -251,6 +253,36 @@ def main():
           "parse_status": "ok", "failure_kind": None,
           "coverage_state": "partial", "findings": ir["findings"],
       }).get("state") == ir["decision"]["state"], "")
+
+    # ── 图片真实接线：row → ContentUnit → RuleJudge/Orchestrator ─────
+    image_row = {
+        "status": "ok", "page_key": "smoke-image", "url": "inline:smoke-image",
+        "alt": "", "w": 640, "h": 480,
+        "fetch": {"status": "ok", "path": os.path.join(TMP, "image.bin"),
+                  "fetch_ms": 1},
+        "ocr": {"chars": 23, "n": 1, "ms": 1},
+        "ocr_text": "hospital grade breast pump",
+    }
+    with open(image_row["fetch"]["path"], "wb") as f:
+        f.write(b"smoke-image-bytes")
+    image_result = M.judge_row(image_row, "inline:smoke-page")
+    image_ir = image_result["judgment"]["ir"]
+    T("S13b 图片 row_to_unit → RuleJudge/Orchestrator 真走通",
+      image_result["unit"]["source"]["kind"] == "image"
+      and image_result["unit"]["parse_status"] == "ok"
+      and image_result["judgment"]["steps"] == list(O.STEP_ORDER), "")
+    T("S13c 图片 ReviewIR 保留 image/ok 且只落五标签",
+      image_ir["content_unit_ref"]["kind"] == "image"
+      and image_ir["content_unit_ref"]["parse_status"] == "ok"
+      and image_ir["decision"]["state"] in {"BLOCK", "REVIEW", "未审查", "待自决", "PASS"}, "")
+    failed_image = dict(image_row, status="ocr_failed:perform_failed", ocr_text="")
+    failed_result = M.judge_row(failed_image, "inline:smoke-page")
+    T("S13d OCR 失败仍产 ReviewIR → 未审查/DP0",
+      failed_result["unit"]["parse_status"] == "failed"
+      and failed_result["judgment"]["label"] == "未审查"
+      and failed_result["judgment"]["layer"] == "DP0"
+      and failed_result["judgment"]["ir"]["content_unit_ref"]["failure_kind"]
+      == "parse_error", "")
 
     # ── report_render（Node） ──────────────────────────────────────
     runner = os.path.join(TMP, "render_runner.mjs")

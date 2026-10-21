@@ -41,7 +41,8 @@ def release_case():
         "ir": {
             "ir_id": "ir-rel", "ir_version": "review-ir-v1",
             "source_ir_version": "cu-rel",
-            "content_unit_ref": {"unit_id": "cu-rel", "kind": "text"},
+            "content_unit_ref": {"unit_id": "cu-rel", "kind": "free_text",
+                                 "parse_status": "ok"},
             "findings": [],
             "decision": {"state": "REVIEW", "layer": "DP3",
                          "release_status": "待放行", "obligations": []},

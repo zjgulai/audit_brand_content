@@ -68,6 +68,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -77,6 +78,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
 import contract as C                                    # noqa: E402
@@ -364,34 +366,159 @@ def image_row(page_key: str, page_url: str, img: dict, out_dir: Path,
     return row
 
 
-def row_to_unit(row: dict, page_uri: str) -> dict | None:
-    """一个已处理的图片样本 → `ContentUnit`（走 `contract.from_media`）。"""
-    if row.get("status") != "ok":
-        return None
-    p = Path(row["fetch"]["path"])
-    raw = p.read_bytes()
-    return C.from_media(
-        "image", raw, row["ocr_text"],
-        uri=row["url"],
-        extractor="ocr_vision/VNRecognizeText.accurate",
-        covers=["**图内文字**（OCR，准确档，" + "+".join(OCR_LANGS) + "）"],
-        does_not_cover=[
-            "**画面语义**：构图、画面暗示功效、品牌调性、模特状态",
-            "图内文字之外的视觉符号（图标、认证标志的图形部分）",
-            "视频的音调、节奏、字幕与画面对不上",
-        ],
-        # ★ 下面这几项由 from_media 强制要求，缺一即报错 —— 见 ADR-0013 异议二
-    ) | {
-        "routing": {},
-        "context": {"page_key": row["page_key"], "page_uri": page_uri,
-                    "alt": row["alt"][:200], "img_w": row.get("w"), "img_h": row.get("h"),
-                    "ocr_chars": row["ocr"]["chars"], "ocr_lines": row["ocr"]["n"],
-                    "ocr_ms": row["ocr"]["ms"], "fetch_ms": row["fetch"].get("fetch_ms")},
-        "$boundary_note": (
-            "★★ ADR-0013 异议二：**本 unit 的正文只覆盖图内文字，不含画面语义。**"
-            "只报「识别完整度 X%」而不写这一条，等于把「画面暗示功效」这类"
-            "真实风险记成已覆盖 —— 而会议明确要求打样覆盖文字、图片、视频三类，"
-            "画面暗示恰恰是图片这一类最真实的风险。"),
+def row_to_unit(row: dict, page_uri: str) -> dict:
+    """已处理图片观测 → ContentUnit；失败也显式产 unit，不再返回 None。"""
+    if not isinstance(row, dict):
+        raise ValueError("image row 必须是 dict")
+    from base import normalizer as N
+
+    covers = ["**图内文字**（OCR，准确档，" + "+".join(OCR_LANGS) + "）"]
+    does_not_cover = [
+        "**画面语义**：构图、画面暗示功效、品牌调性、模特状态",
+        "图内文字之外的视觉符号（图标、认证标志的图形部分）",
+        "区域级画面审计与视觉候选 finding",
+    ]
+    raw_path = (row.get("fetch") or {}).get("path")
+    verified = False
+    raw = b""
+    if isinstance(raw_path, str) and raw_path:
+        try:
+            raw = Path(raw_path).read_bytes()
+            verified = True
+        except OSError:
+            pass
+    source_uri = str(row.get("url") or page_uri or "inline:image")
+    if not raw:
+        raw = ("unavailable-image:" + source_uri).encode("utf-8")
+    status = str(row.get("status") or "unknown")
+    raw_input = {
+        "kind": "image", "raw": raw,
+        "text_from_media": str(row.get("ocr_text") or ""),
+        "uri": source_uri,
+        "extractor": "ocr_vision/VNRecognizeText.accurate",
+    }
+    if status == "ok" and raw_input["text_from_media"].strip():
+        unit = N.normalize(
+            raw_input, covers=covers, does_not_cover=does_not_cover,
+            parse_status="ok")
+    else:
+        if status == "ok":
+            failure_kind, reason = "empty", "OCR 成功完成，但没有识别出可读正文"
+        elif status == "degenerate":
+            failure_kind, reason = "empty", "OCR 解码到退化占位图，没有可读正文"
+        elif status == "skipped":
+            failure_kind, reason = "unsupported", "该图片形态不走 OCR 通道"
+        elif status.startswith("ocr_failed"):
+            failure_kind, reason = "parse_error", "OCR 失败：%s" % status
+        elif status in ("blocked", "http_error", "error", "too_large"):
+            failure_kind, reason = "fetch_error", "图片获取失败：%s" % status
+        else:
+            failure_kind, reason = "parse_error", "图片处理未成功：%s" % status
+        unit = N.normalize(
+            raw_input, covers=["图片原件与 OCR 失败观测"],
+            does_not_cover=does_not_cover,
+            parse_status="failed", failure_kind=failure_kind, reason=reason)
+    if not verified:
+        unit["source"]["raw_verified"] = False
+        unit["source"]["raw_pointer"] = None
+    ocr = row.get("ocr") or {}
+    unit["context"].update({
+        "page_key": row.get("page_key"), "page_uri": page_uri,
+        "alt": str(row.get("alt") or "")[:200],
+        "img_w": row.get("w"), "img_h": row.get("h"),
+        "ocr_chars": ocr.get("chars"), "ocr_lines": ocr.get("n"),
+        "ocr_ms": ocr.get("ms"),
+        "fetch_ms": (row.get("fetch") or {}).get("fetch_ms"),
+        "media_status": status,
+    })
+    unit["context"] = {k: v for k, v in unit["context"].items()
+                       if v not in (None, "")}
+    unit["$boundary_note"] = (
+        "★★ 本 unit 只覆盖图内文字，不含画面语义、视觉符号或区域级画面审计。")
+    return unit
+
+
+def judge_row(row: dict, page_uri: str, *, judge_fn=None) -> dict:
+    """唯一图片接线：row_to_unit → normalizer/from_media → production judge entry。"""
+    unit = row_to_unit(row, page_uri)
+    if not isinstance(unit, dict):
+        raise ValueError("row_to_unit 必须返回 ContentUnit dict")
+    if judge_fn is None:
+        from base.judge_entry import judge_unit as judge_fn
+    return {"unit": unit, "judgment": judge_fn(unit)}
+
+
+def image_file_row(path: str | Path, *, uri: str | None = None,
+                   server: "OcrServer | None" = None) -> dict:
+    """已落盘位图 → image row；给实时附件链复用，不下载、不删除调用方文件。"""
+    p = Path(path).expanduser().resolve()
+    if not p.is_file():
+        raise ValueError("图片文件不存在：%s" % p)
+    size = p.stat().st_size
+    if size <= 0:
+        status = "empty"
+        ocr = {"ok": False, "error": "empty", "chars": 0, "n": 0}
+    elif size > MAX_IMAGE_BYTES:
+        status = "too_large"
+        ocr = {"ok": False, "error": "too_large", "chars": 0, "n": 0}
+    elif p.suffix.lower() not in RASTER_EXT:
+        status = "skipped"
+        ocr = {"ok": False, "error": "unsupported_extension", "chars": 0, "n": 0}
+    else:
+        ocr = ocr_file(p, server=server)
+        if ocr.get("ok") and str(ocr.get("text") or "").strip():
+            status = "ok"
+        elif ocr.get("ok"):
+            status = "empty"
+        elif (ocr.get("error") == "perform_failed" and ocr.get("w") and ocr.get("h")
+              and ocr["w"] * ocr["h"] <= DEGENERATE_PIXELS):
+            status = "degenerate"
+        else:
+            status = "ocr_failed:" + str(ocr.get("error") or "unknown")
+    return {
+        "status": status,
+        "page_key": "attachment",
+        "page_url": uri or p.as_uri(),
+        "url": uri or p.as_uri(),
+        "alt": "", "w": ocr.get("w"), "h": ocr.get("h"),
+        "fetch": {"status": "ok", "path": str(p), "bytes": size,
+                  "fetch_ms": 0},
+        "ocr": {key: ocr.get(key) for key in (
+            "ok", "n", "chars", "ms", "wall_ms", "mean_conf", "error", "w", "h")},
+        "ocr_text": str(ocr.get("text") or ""),
+    }
+
+
+def judge_image_file(path: str | Path, *, uri: str | None = None,
+                     server: "OcrServer | None" = None, judge_fn=None) -> dict:
+    """实时图片文件稳定入口；文件生命周期仍由调用方负责。"""
+    row = image_file_row(path, uri=uri, server=server)
+    return judge_row(row, row["page_url"], judge_fn=judge_fn)
+
+
+def judge_rows(rows: list[dict], *, limit: int | None = None,
+               judge_fn=None) -> dict:
+    selected = list(rows[:limit] if limit is not None else rows)
+    parse, labels = Counter(), Counter()
+    entered, failures = 0, []
+    for index, row in enumerate(selected):
+        try:
+            result = judge_row(
+                row, str(row.get("page_url") or row.get("url") or "inline:image"),
+                judge_fn=judge_fn)
+            status = result["unit"].get("parse_status", "ok")
+            parse[status] += 1
+            labels[result["judgment"].get("label") or "unknown"] += 1
+            if status != "failed":
+                entered += 1
+        except Exception as exc:  # noqa: BLE001
+            failures.append({"index": index, "error": type(exc).__name__})
+    return {
+        "rows": len(selected), "image_units": sum(parse.values()),
+        "parse_status": dict(sorted(parse.items())),
+        "entered_judgment": entered,
+        "labels": dict(sorted(labels.items())),
+        "failures": failures,
     }
 
 
@@ -978,11 +1105,35 @@ def selftest(verbose: bool = True) -> list[str]:
     except ValueError:
         check("必红：covers 为空被拒（不给默认值）",
               True, "★ 一个默认的 covers 会让「只做了 OCR」看起来像「图片已审」")
-    try:
-        C.from_media("image", b"x", "t", uri="u", extractor="e", covers=["a"], does_not_cover=[])
-        check("必红：does_not_cover 为空被拒", False, "它被放行了")
-    except ValueError:
-        check("必红：does_not_cover 为空被拒", True)
+    empty_dnc = C.from_media(
+        "image", b"x", "", uri="u", extractor="e",
+        covers=["OCR 失败观测"], does_not_cover=[])
+    check("does_not_cover 显式空 list 可表达 failed 空正文（省略仍会 TypeError）",
+          empty_dnc["textification"]["does_not_cover"] == [])
+
+    print("\n[3b] 接线：图片 row 必须真进 ContentUnit→RuleJudge/Orchestrator")
+    with tempfile.TemporaryDirectory(prefix="media-wiring-") as td:
+        raw_path = Path(td) / "image.bin"
+        raw_path.write_bytes(b"selftest-image")
+        ok_row = {
+            "status": "ok", "page_key": "selftest", "url": "inline:selftest",
+            "alt": "", "w": 10, "h": 10,
+            "fetch": {"status": "ok", "path": str(raw_path), "fetch_ms": 1},
+            "ocr": {"chars": 14, "n": 1, "ms": 1},
+            "ocr_text": "hospital grade",
+        }
+        ok_result = judge_row(ok_row, "inline:selftest")
+        check("成功图片走 row_to_unit→from_media→生产判定",
+              ok_result["unit"]["source"]["kind"] == "image"
+              and ok_result["unit"]["parse_status"] == "ok"
+              and ok_result["judgment"]["steps"] ==
+              ["normalize", "judge", "dispose", "output", "evaluate"])
+        bad_row = dict(ok_row, status="ocr_failed:perform_failed", ocr_text="")
+        bad_result = judge_row(bad_row, "inline:selftest")
+        check("OCR 失败不吞：failed unit→未审查/DP0",
+              bad_result["unit"]["parse_status"] == "failed"
+              and bad_result["judgment"]["label"] == "未审查"
+              and bad_result["judgment"]["layer"] == "DP0")
 
     print("\n[4] 声明性表述的识别：复用 lp_extract 的唯一词形定义，不重复维护")
     check("CLAIM_RE 来自 lp_extract，不另写一份", len(CLAIM_PATTERNS) == 6,
@@ -1017,7 +1168,7 @@ def selftest(verbose: bool = True) -> list[str]:
           "★ 这条检查的缺席，曾让 `100%` / `#1` 静默失效")
     check("不误命中词内片段（`abc100%` 不该算）",
           not CLAIM_RE["absolute"].search("abc100%"),
-          "用 (?<![\w%]) 而不是裸匹配")
+          "用 (?<![\\w%]) 而不是裸匹配")
 
     print("\n[5] 增量口径：alt 与 OCR 的差集要算得对")
     row = {"alt": "Maternity Belly Band", "ocr_text": "Hospital Grade Breast Pump",
@@ -1387,12 +1538,57 @@ def cmd_report(design: str = "uniform") -> int:
     print("=" * 78)
     return 0
 
+def cmd_judge_image(path: str, as_json: bool = False) -> int:
+    result = judge_image_file(path)
+    summary = {
+        "unit_id": result["unit"]["unit_id"],
+        "parse_status": result["unit"].get("parse_status", "ok"),
+        "failure_kind": result["unit"].get("failure_kind"),
+        "label": result["judgment"]["label"],
+        "layer": result["judgment"]["layer"],
+        "release_status": result["judgment"]["release_status"],
+        "findings": len(result["judgment"]["findings"]),
+        "ir": result["judgment"]["ir"],
+        "receipt": result["judgment"]["receipt"],
+    }
+    if as_json:
+        print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
+    else:
+        print("%s / %s · parse=%s findings=%d" % (
+            summary["label"], summary["layer"], summary["parse_status"],
+            summary["findings"]))
+    return 0
+
+
+def cmd_judge_samples(design: str = "uniform", limit: int = 0,
+                      as_json: bool = False) -> int:
+    """盘上图片样本逐条走生产判定入口；只打印聚合读数，不输出正文/URL。"""
+    rows = load_rows(design)
+    if not rows:
+        print("盘上还没有 %s 图片样本" % design)
+        return 2
+    result = judge_rows(rows, limit=(limit or None))
+    if as_json:
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    else:
+        print("图片判定：rows=%d units=%d entered=%d failures=%d" % (
+            result["rows"], result["image_units"],
+            result["entered_judgment"], len(result["failures"])))
+        print("parse_status=" + json.dumps(
+            result["parse_status"], ensure_ascii=False, sort_keys=True))
+        print("labels=" + json.dumps(
+            result["labels"], ensure_ascii=False, sort_keys=True))
+    return 1 if result["failures"] or result["image_units"] != result["rows"] else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="图片/视频进管道（B1）")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--selftest", action="store_true")
     g.add_argument("--collect", type=int, metavar="N", help="抽样 N 个页面（联网）")
     g.add_argument("--report", action="store_true")
+    g.add_argument("--judge-samples", nargs="?", type=int, const=0, metavar="N",
+                   help="盘上图片样本走 ContentUnit→RuleJudge/Orchestrator；N=0 表示全量")
     g.add_argument("--reattach-weights", action="store_true",
                    help="把入样权重补回盘上样本（重算 + 逐行断言后才写）")
     g.add_argument("--reclassify", action="store_true",
@@ -1404,6 +1600,8 @@ def main() -> int:
                     help="抽样设计。uniform=两阶段等概率（默认）；"
                          "alt-biased=B1 的病例对照设计，只用于量偏差")
     ap.add_argument("--seed", type=int, default=0, help="uniform 设计的随机种子（可复现）")
+    ap.add_argument("--json", action="store_true",
+                    help="配合 --judge-samples：只输出机器可读聚合 JSON")
     ap.add_argument("--pages", type=int, default=0, help="配合 --reattach-weights：当初抽了几个页面")
     ap.add_argument("--per-page-n", type=int, default=0, dest="per_page_n",
                     help="配合 --reattach-weights：当初每页抽几张")
@@ -1412,6 +1610,8 @@ def main() -> int:
         return 1 if selftest() else 0
     if a.report:
         return cmd_report(a.design)
+    if a.judge_samples is not None:
+        return cmd_judge_samples(a.design, a.judge_samples, a.json)
     if a.reattach_weights:
         return cmd_reattach_weights(a.design, a.pages, a.per_page_n, a.seed, a.dry)
     if a.reclassify:

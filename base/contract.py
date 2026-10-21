@@ -558,8 +558,12 @@ def from_media(kind: str, raw: bytes, text_from_media: str, *, uri: str,
     """
     if kind not in ("image", "video"):
         raise ValueError(f"from_media 只收 image/video，收到 {kind}")
-    if not covers or not does_not_cover:
-        raise ValueError("必须显式给出 covers 与 does_not_cover —— 默认值会让覆盖范围看起来比实际大")
+    if not isinstance(covers, list) or not covers:
+        raise ValueError("必须显式给出非空 covers —— 默认值会让覆盖范围看起来比实际大")
+    if not isinstance(does_not_cover, list):
+        raise ValueError("必须显式给出 does_not_cover list；可以是空 list，但不许省略")
+    if not all(isinstance(x, str) and x.strip() for x in covers + does_not_cover):
+        raise ValueError("covers / does_not_cover 的每一项都必须是非空字符串")
     text, parts = _compose([("text_from_media", text_from_media)], "passthrough-v1")
     return _unit(kind, uri, sha256_bytes(raw), text, parts, "passthrough-v1", {}, {},
                  {"raw_bytes": len(raw), "raw_pointer": None, "raw_verified": True},

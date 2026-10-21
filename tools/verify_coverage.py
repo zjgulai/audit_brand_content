@@ -232,7 +232,8 @@ def run_controls(reg, tracked):
         ("C3 主体在盘上不存在",
          lambda r: r["verifiers"][0]["subjects"].append("tools/这个文件不存在.py")),
         ("C4 主体未在该 verifier 源码里出现",
-         lambda r: r["verifiers"][0]["subjects"].append("ADR/README.md")),
+         lambda r: r["verifiers"][0]["subjects"].append(
+             "contracts/review-ir-v1.schema.json")),
         ("C5 空 subjects 且没有 dynamic 原因",
          lambda r: r["verifiers"].append({"verifier": "tools/verify_depad.py",
                                           "asserts": "x", "subjects": []})),

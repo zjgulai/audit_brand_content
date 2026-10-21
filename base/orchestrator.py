@@ -177,8 +177,10 @@ def validate_ir(ir):
     if missing:
         p.append("缺少字段 %r" % (missing,))
     ref = ir.get("content_unit_ref")
-    if not isinstance(ref, dict) or not {"unit_id", "kind"} <= set(ref):
-        p.append("content_unit_ref 必须含 unit_id/kind")
+    if not isinstance(ref, dict) or not {"unit_id", "kind", "parse_status"} <= set(ref):
+        p.append("content_unit_ref 必须含 unit_id/kind/parse_status")
+    elif ref.get("parse_status") == "failed" and not ref.get("failure_kind"):
+        p.append("content_unit_ref failed 必须含 failure_kind")
     dec = ir.get("decision")
     if not isinstance(dec, dict) or not {"state", "layer", "release_status"} <= set(dec):
         p.append("decision 必须含 state/layer/release_status")
@@ -456,6 +458,9 @@ class Orchestrator(object):
             "content_unit_ref": {
                 "unit_id": u.get("unit_id") or "unknown",
                 "kind": (u.get("source") or {}).get("kind") or "unknown",
+                "parse_status": u.get("parse_status", "ok"),
+                **({"failure_kind": u.get("failure_kind")}
+                   if u.get("parse_status") == "failed" else {}),
             },
             "findings": findings,
             "decision": {

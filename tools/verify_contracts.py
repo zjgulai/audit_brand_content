@@ -39,6 +39,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 CONTRACTS = ROOT / "contracts"
 
 SCHEMAS = (
@@ -364,6 +366,12 @@ def samples() -> dict:
                 **good_ir["coverage"], "coverage_state": "mostly"}}, False),
             ("release_status 不是待放行", {**good_ir, "decision": {
                 **good_ir["decision"], "release_status": "已放行"}}, False),
+            ("content_unit_ref.kind=ad_text", {**good_ir, "content_unit_ref": {
+                "unit_id": "u-ad", "kind": "ad_text", "parse_status": "ok"}}, True),
+            ("content_unit_ref.kind=structured_json", {**good_ir, "content_unit_ref": {
+                "unit_id": "u-json", "kind": "structured_json", "parse_status": "ok"}}, True),
+            ("content_unit_ref.kind 未知", {**good_ir, "content_unit_ref": {
+                "unit_id": "u-bad", "kind": "hologram", "parse_status": "ok"}}, False),
             ("content_unit_ref 缺 unit_id", {**good_ir, "content_unit_ref": {
                 "kind": "free_text", "parse_status": "ok"}}, False),
             ("parse_status=failed 却无 failure_kind", {**good_ir, "decision": {
@@ -585,10 +593,38 @@ def check_behavior(schemas: dict) -> list:
        and not projection_consistent(bad_ps),
        "fresh 必须 authority.seq/hash == projection.applied_seq/hash 且 lag=0；坏样本须 False")
 
+    # ── B-7 ReviewIR 的 ContentUnit kind 与 ContentUnit schema 同域（另含 unsupported 文档） ──
+    ir_kinds = set(dig(schemas.get("review-ir-v1"), "properties", "content_unit_ref",
+                       "properties", "kind", "enum") or [])
+    content_schema_path = CONTRACTS.parent / "base" / "content-unit-v1.schema.json"
+    try:
+        content_schema = json.loads(content_schema_path.read_text(encoding="utf-8"))
+        content_kinds = set(dig(content_schema, "properties", "source", "properties",
+                                "kind", "enum") or [])
+    except (OSError, ValueError):
+        content_kinds = set()
+    ok("B-7", bool(content_kinds) and content_kinds <= ir_kinds
+       and {"ad_text", "structured_json"} <= ir_kinds,
+       "ReviewIR content_unit_ref.kind 覆盖 ContentUnit 全部 kind；ad_text/structured_json 不漏")
+
+    # ── B-8 真实 judge_entry 产出的图片 ReviewIR 必须过 schema ──
+    try:
+        from base import contract as content_contract
+        from base.judge_entry import judge_unit as production_judge
+        image_unit = content_contract.from_media(
+            "image", b"contract-image", "hospital grade breast pump",
+            uri="inline:contract-image", extractor="contract-test",
+            covers=["图内文字"], does_not_cover=["画面语义"])
+        image_unit["parse_status"] = "ok"
+        real_ir = production_judge(image_unit, clock=lambda: 1000)["ir"]
+        real_errors = validate(real_ir, schemas["review-ir-v1"])
+    except Exception as exc:  # noqa: BLE001
+        real_errors = ["%s: %s" % (type(exc).__name__, exc)]
+    ok("B-8", not real_errors,
+       "真实 judge_entry 图片 ReviewIR 喂 schema：%s" %
+       ("通过" if not real_errors else real_errors[:3]))
+
     return out
-
-
-# ═══════════════════════════ 主流程 ═══════════════════════════
 
 def main() -> int:
     ap = argparse.ArgumentParser()

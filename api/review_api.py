@@ -42,11 +42,11 @@ import datetime
 import json
 import os
 import threading
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from base.auth_session import SessionStore
 from base.rbac import can_read_content
@@ -88,7 +88,19 @@ class Coverage(BaseModel):
 
 class ContentUnitRef(BaseModel):
     unit_id: str
-    kind: str
+    kind: Literal["ad_text", "free_text", "landing_page", "structured_json",
+                  "image", "video", "文档"]
+    parse_status: Literal["ok", "partial", "failed"] = "ok"
+    failure_kind: Optional[Literal["fetch_error", "parse_error", "empty",
+                                   "unsupported"]] = None
+
+    @model_validator(mode="after")
+    def failed_has_kind(self):
+        if self.parse_status == "failed" and not self.failure_kind:
+            raise ValueError("parse_status=failed 必须带 failure_kind")
+        if self.parse_status != "failed" and self.failure_kind is not None:
+            raise ValueError("非 failed 不许带 failure_kind")
+        return self
 
 
 class ReviewIR(BaseModel):

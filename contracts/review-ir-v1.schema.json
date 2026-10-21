@@ -40,7 +40,7 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["free_text", "landing_page", "image", "video", "文档"],
+          "enum": ["ad_text", "free_text", "landing_page", "structured_json", "image", "video", "文档"],
           "description": "source.kind"
         },
         "parse_status": {
@@ -94,7 +94,14 @@
             "type": "string",
             "enum": ["P0", "P1", "P2", "P3"],
             "description": "检测层。MC-1 要求提前停的命中必须是 P0（字面类）—— 但第一阶段不启用提前停"
-          }
+          },
+          "quote": { "type": "string", "minLength": 1 },
+          "location": { "type": "object" },
+          "authority_ref": { "type": "array", "items": { "type": "object" } },
+          "rule_snapshot": { "type": "string", "minLength": 1 },
+          "kb_snapshot": { "type": "string", "minLength": 1 },
+          "rule_conflict": { "type": "boolean" },
+          "resolution_detail": { "type": ["object", "null"] }
         }
       }
     },

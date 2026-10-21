@@ -430,6 +430,7 @@ def face_A(run: bool) -> list[str]:
     """
     mods = [("contract.py", "ContentUnit 契约（B0.2）"),
             ("judge_adapter.py", "judge(unit) 适配层（B0.3）"),
+            ("judge_entry.py", "生产 RuleJudge/Orchestrator 入口"),
             ("sync_rules.py", "权威源单向同步（B0.4）"),
             ("media.py", "图片/视频进管道（B1）"),
             ("text_stage.py", "文本两组三指标（B2）"),
