@@ -1,0 +1,105 @@
+{
+  "_meta": {
+    "name": "同义词表-候选-v1",
+    "generated_at": "2026-10-21",
+    "purpose": "query_expansion_for_retrieval_only",
+    "not_for_rule_judgment": true,
+    "why": "这些是检索扩展用的同义词，不是判定等价。尤其『无痛』与『疼痛缓解』：前者可能是绝对化宣称，后者是功效表述；不能因为同表就判成同一件事。",
+    "evidence_rule": "每条必须有 file:line + excerpt；没有证据指针的不进表。",
+    "source_probe": "PMO/implement/本地向量化探针-20261021.md",
+    "count": 7
+  },
+  "entries": [
+    {
+      "id": "SYN-001",
+      "query_term": "胀奶",
+      "corpus_term": "乳房胀痛",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 6425,
+        "excerpt": "乳房明显胀痛或疑似乳腺炎时不要自行热敷"
+      },
+      "note": "同一症状的两种说法；语料里用『乳房胀痛』。"
+    },
+    {
+      "id": "SYN-002",
+      "query_term": "防溢",
+      "corpus_term": "溢乳",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 3517,
+        "excerpt": "\"topic\": \"防溢乳垫与初乳渗漏\""
+      },
+      "note": "『防溢』是动作/场景，『溢乳』是现象；语料里以『溢乳』成词。"
+    },
+    {
+      "id": "SYN-003",
+      "query_term": "漏奶",
+      "corpus_term": "溢乳",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 4768,
+        "excerpt": "\"topic\": \"溢乳与就医\""
+      },
+      "note": "『漏奶』是口语，『溢乳』是语料/医学用词。"
+    },
+    {
+      "id": "SYN-004",
+      "query_term": "无痛",
+      "corpus_term": "疼痛缓解",
+      "symmetric": false,
+      "confidence": "medium",
+      "evidence": {
+        "file": "research/governance/skeleton/rules-v1.json",
+        "line": 342,
+        "excerpt": "\"topic_label\": \"疼痛缓解（人体结果）\""
+      },
+      "note": "仅用于检索扩展，不用于判定等价：『无痛』往往是绝对化/零风险承诺，『疼痛缓解』是人体结果宣称；两者在合规上不是一件事（见 H07/T2.1.2）。"
+    },
+    {
+      "id": "SYN-005",
+      "query_term": "母乳",
+      "corpus_term": "哺乳",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 817,
+        "excerpt": "\"topic\": \"哺乳/安全感与亲密连接\""
+      },
+      "note": "『母乳』是名词/喂养物，『哺乳』是行为；语料里大量以『哺乳』成词。扩展会带来更宽的候选池，不等于同义判定。"
+    },
+    {
+      "id": "SYN-006",
+      "query_term": "收腹带",
+      "corpus_term": "产后束腹",
+      "symmetric": true,
+      "confidence": "medium",
+      "evidence": {
+        "file": "research/governance/rules-mece-migration-v1.json",
+        "line": 6293,
+        "excerpt": "\"topic\": \"产后束腹带\""
+      },
+      "note": "语料写作『产后束腹带』；『收腹带』是常见商品名。扩展时按子串匹配，注意不要把它当成『束腹=收腹』的合规等价。"
+    },
+    {
+      "id": "SYN-007",
+      "query_term": "温奶器",
+      "corpus_term": "暖奶器",
+      "symmetric": true,
+      "confidence": "high",
+      "evidence": {
+        "file": "research/kb/台账-v1.json",
+        "line": 1219,
+        "excerpt": "\"title\": \"品牌日二创：暖奶器MW05\""
+      },
+      "note": "同一品类在两个写法之间切换；台账用『暖奶器』。"
+    }
+  ]
+}

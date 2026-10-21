@@ -72,7 +72,7 @@ DOC_INDEXABLE_FILES = 149
 INDEXABLE_MIN_RATIO = 0.85
 INDEXABLE_MAX_RATIO = 1.5
 INDEXABLE_MIN_FILES = 100       # 文件数下界：防「范围被悄悄改小」后仍落在字节带里
-INDEXABLE_MAX_FILES = 400
+INDEXABLE_MAX_FILES = 300       # 上界压到 300（2.0× 文档值）：首版 484 那种 3.2× 漂移必须红
 
 # S8 的扫描范围 —— ★ **必须与文档 §五 里那段复现命令逐项相同**。
 #
