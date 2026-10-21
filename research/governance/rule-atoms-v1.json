@@ -1,0 +1,437 @@
+{
+ "schema": "rule-atoms-v1",
+ "date": "2026-10-19",
+ "field_cap": 50,
+ "note": "聚合规则拆分。★ 只拆**拿得到原文**的部分，不编造。实测：源 xlsx 的 before/after 字段各被截到 50 字（28 个 after 里 18 个恰好 50 字、0 个超过），因此 `text_complete=false` 的 atom **结构可辨认、文本不可直接使用**。",
+ "source_note": "来源：规则清单-P0-P3-按等级-20261016.xlsx / sheet1。未用 rules-mece-migration-v1.json 的 rule_text —— 那份更短（≤600 字截断）。",
+ "totals": {
+  "parent_rules": 5,
+  "declared_groups": 372,
+  "extracted_atoms": 28,
+  "atoms_text_complete": 10,
+  "coverage": 0.0753,
+  "text_complete_coverage": 0.0269
+ },
+ "rules": [
+  {
+   "parent_rule_id": "r-30c3d9dbd0f5f2a0",
+   "declared_groups": 18,
+   "actual_atoms": 6,
+   "atoms_text_complete": 0,
+   "completeness": "truncated",
+   "shortfall": 12,
+   "shortfall_reason": "源导出已截断：每列约 500 字上限，且每个 before/after 字段再被截到 50 字",
+   "source": {
+    "xlsx_row": 252,
+    "quote_column": "Q",
+    "revision_column": "U",
+    "reason_column": "T",
+    "declared_column": "AM",
+    "actual_column": "AN"
+   },
+   "reason_text": "文章整体基调过于宽松，与权威机构立场不一致：法国权威指南明确指出围产期人群应减少化妆品使用频次和数量，哺乳期女性应避免使用指甲油和染发剂（expert consensus）；文章定性为'通常不需要禁止'与此存在明显偏差，整篇文章可能需要重新措辞",
+   "review_pattern": "口径/标准不一致",
+   "topic": "标准口径",
+   "subcategory_original": "孕期与产检",
+   "atoms": [
+    {
+     "atom_index": 1,
+     "before": "染发和烫发：经皮肤吸收的量很低（整体论述基调）",
+     "before_truncated": false,
+     "after": "参照法国权威指南及预防原则，修订文章整体基调：虽目前没有直接证据表明哺乳期偶尔染发/烫发会对婴儿造成",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "标准口径",
+     "subcategory_original": "孕期与产检"
+    },
+    {
+     "atom_index": 2,
+     "before": "孕37周虽已算作足月，但按照ACOG标准，39～40周才是完全足月",
+     "before_truncated": false,
+     "after": "优化措辞：37周属于ACOG定义的早期足月，39-40周为完全足月，两者均为ACOG标准，叫法不同而",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "标准口径",
+     "subcategory_original": "孕期与产检"
+    },
+    {
+     "atom_index": 3,
+     "before": "按 ACOG 标准正式迈入足月起点（孕39周）",
+     "before_truncated": false,
+     "after": "修订为：ACOG将37周定义为早期足月（early term），39-40周为完全足月（full t",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "标准口径",
+     "subcategory_original": "孕期与产检"
+    },
+    {
+     "atom_index": 4,
+     "before": "条件一：完全母乳喂养（LAM定义描述）",
+     "before_truncated": false,
+     "after": "将LAM条件一中'完全母乳喂养'的定义修订为WHO标准定义：婴儿仅摄入母乳，不添加任何其他液体或固体",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "标准口径",
+     "subcategory_original": "孕期与产检"
+    },
+    {
+     "atom_index": 5,
+     "before": "生完孩子后，很多妈妈都在默默忍受各种疼痛：腰酸得起不来床，手腕疼得抱不住宝宝……（文章开头）",
+     "before_truncated": false,
+     "after": "建议在开头补充：产后短时间的酸痛、牵拉痛、伤口痛比较常见，通常会随组织修复逐渐减轻。但如果疼痛持续超",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "标准口径",
+     "subcategory_original": "孕期与产检"
+    },
+    {
+     "atom_index": 6,
+     "before": "顺产妈妈：通常不推荐常规使用",
+     "before_truncated": false,
+     "after": "已在正文标注建议修改，修订为：对于顺产且恢复平稳的妈妈，目前并无强证据支持常规使用束腹带。若存在明显",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "标准口径",
+     "subcategory_original": "孕期与产检"
+    }
+   ],
+   "orphan_positions": [
+    "建议优先考虑汞含量较低的品种",
+    "红色警报：体温超过38°C / 100.4°F",
+    "邓斯坦婴语适用于0-3个月的宝宝，3个月后随着婴儿表达个性化，辨识度会明显下降",
+    "胎动自我监测描述（28周起）"
+   ]
+  },
+  {
+   "parent_rule_id": "r-49a58aca87e2b71d",
+   "declared_groups": 47,
+   "actual_atoms": 6,
+   "atoms_text_complete": 4,
+   "completeness": "truncated",
+   "shortfall": 41,
+   "shortfall_reason": "源导出已截断：每列约 500 字上限，且每个 before/after 字段再被截到 50 字",
+   "source": {
+    "xlsx_row": 295,
+    "quote_column": "Q",
+    "revision_column": "U",
+    "reason_column": "T",
+    "declared_column": "AM",
+    "actual_column": "AN"
+   },
+   "reason_text": "原表述警告力度不足，未说明错误练习的具体危害",
+   "review_pattern": "笼统/不够具体",
+   "topic": "产后知识表述精确性（聚合47条）",
+   "subcategory_original": "产后恢复",
+   "atoms": [
+    {
+     "atom_index": 1,
+     "before": "不要在日常排尿中反复练习",
+     "before_truncated": false,
+     "after": "改为：此方法最多仅可尝试1到2次用于初期定位，绝对不能作为日常锻炼动作，否则可能导致排尿功能障碍或增",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "产后知识表述精确性（聚合47条）",
+     "subcategory_original": "产后恢复"
+    },
+    {
+     "atom_index": 2,
+     "before": "漏尿+排尿疼痛、尿频或发热",
+     "before_truncated": false,
+     "after": "增加：血尿（尿液发红或呈茶色）和发热（体温≥38.0℃/100.4°F），并注明需排查急性问题",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "产后知识表述精确性（聚合47条）",
+     "subcategory_original": "产后恢复"
+    },
+    {
+     "atom_index": 3,
+     "before": "产后伤口未愈合",
+     "before_truncated": false,
+     "after": "改为：会阴撕裂或侧切伤口尚未愈合",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "产后知识表述精确性（聚合47条）",
+     "subcategory_original": "产后恢复"
+    },
+    {
+     "atom_index": 4,
+     "before": "多项营养建议中（胆碱/碘等营养素参考量来源）",
+     "before_truncated": false,
+     "after": "在引用具体营养素推荐量时，明确标注数据来源机构（如IOM/NAM或WHO），不使用'多项营养建议中'",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "产后知识表述精确性（聚合47条）",
+     "subcategory_original": "产后恢复"
+    },
+    {
+     "atom_index": 5,
+     "before": "渐进式减少夜奶的方法",
+     "before_truncated": false,
+     "after": "补充说明：若妈妈需要减少夜奶，应同时考虑在白天增加喂奶量，以补足宝宝所缺的摄入量",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "产后知识表述精确性（聚合47条）",
+     "subcategory_original": "产后恢复"
+    },
+    {
+     "atom_index": 6,
+     "before": "每天吸奶 8～10 次",
+     "before_truncated": false,
+     "after": "改为：24小时内不少于8次",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "产后知识表述精确性（聚合47条）",
+     "subcategory_original": "产后恢复"
+    }
+   ],
+   "orphan_positions": [
+    "关键方法：边吸边按摩（Hands-on Pumping）斯坦福大学相关研究表明，单纯依靠吸奶器……",
+    "无法安抚的哭闹：宝宝剧烈哭闹持续2小时以上，无论你用什么方法安抚都无济于事",
+    "身体不适：顺时针揉揉肚子，会让他舒服很多",
+    "甲状腺功能异常"
+   ]
+  },
+  {
+   "parent_rule_id": "r-a1a9c278662bcad2",
+   "declared_groups": 4,
+   "actual_atoms": 4,
+   "atoms_text_complete": 0,
+   "completeness": "complete",
+   "shortfall": 0,
+   "shortfall_reason": "组数完整，但字段文本可能仍被截到 50 字",
+   "source": {
+    "xlsx_row": 456,
+    "quote_column": "Q",
+    "revision_column": "U",
+    "reason_column": "T",
+    "declared_column": "AM",
+    "actual_column": "AN"
+   },
+   "reason_text": "未能找到ACOG的对应建议出处；WHO推荐生育间隔至少24个月，间隔小于6个月或大于60个月均存在不利影响，来源应修正",
+   "review_pattern": "来源/依据缺失",
+   "topic": "来源/依据缺失（聚合4条）",
+   "subcategory_original": "内容形式与表达规范",
+   "atoms": [
+    {
+     "atom_index": 1,
+     "before": "ACOG建议，尽量避免两次妊娠间隔短于6个月（生育间隔建议来源）",
+     "before_truncated": false,
+     "after": "删除ACOG的生育间隔建议引用，改引WHO建议：推荐两次妊娠间隔至少24个月，间隔小于6个月或大于6",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "来源/依据缺失（聚合4条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 2,
+     "before": "文章整体（缺少适用人群说明）",
+     "before_truncated": false,
+     "after": "在文章开头或结尾新增适用范围说明：本指南适用于健康足月婴儿。如果宝宝是早产儿，或有先天性疾病，请在专",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "来源/依据缺失（聚合4条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 3,
+     "before": "乳房局部硬块或结节：……质地偏硬、无痛感，这类情况多为增生的腺体组织，一般无需特殊处理",
+     "before_truncated": false,
+     "after": "删除将质地偏硬、无痛感结节定性为正常增生的表述；修订为：孕晚期若发现乳房有硬块或结节，建议及时就医排",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "来源/依据缺失（聚合4条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 4,
+     "before": "28% faster pumping / Trusted by 6 million+ moms /",
+     "before_truncated": false,
+     "after": "Data claims need source, sample size and method; e",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "来源/依据缺失（聚合4条）",
+     "subcategory_original": "内容形式与表达规范"
+    }
+   ],
+   "orphan_positions": []
+  },
+  {
+   "parent_rule_id": "r-14056187c2923e38",
+   "declared_groups": 57,
+   "actual_atoms": 6,
+   "atoms_text_complete": 1,
+   "completeness": "truncated",
+   "shortfall": 51,
+   "shortfall_reason": "源导出已截断：每列约 500 字上限，且每个 before/after 字段再被截到 50 字",
+   "source": {
+    "xlsx_row": 215,
+    "quote_column": "Q",
+    "revision_column": "U",
+    "reason_column": "T",
+    "declared_column": "AM",
+    "actual_column": "AN"
+   },
+   "reason_text": "该表述与ABM指南（Physiological Infant Care—Managing Nighttime Breastfeeding in Young Infants；ABM Protocol #6 Revision 2019）存在矛盾，需根据实际情况取舍，不应单一引用AAP立场而忽略ABM的不同建议",
+   "review_pattern": "表述/措辞问题",
+   "topic": "表述/措辞问题改写（跨主题聚合）",
+   "subcategory_original": "婴幼儿睡眠",
+   "atoms": [
+    {
+     "atom_index": 1,
+     "before": "AAP的安全睡眠建议明确：侧躺可以作为哺乳姿势，但不应让宝宝在成人床上睡整觉。喂完后，应将宝宝放回独",
+     "before_truncated": true,
+     "after": "在安全睡眠建议处补充说明：AAP建议喂完后将宝宝放回独立睡眠空间；ABM Protocol #6（2",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "表述/措辞问题改写（跨主题聚合）",
+     "subcategory_original": "婴幼儿睡眠"
+    },
+    {
+     "atom_index": 2,
+     "before": "需要警惕的异常嗜睡（高发人群列举）",
+     "before_truncated": false,
+     "after": "在异常嗜睡高发人群部分，明确将'早期足月儿（37-38周）'和'晚期早产儿（34-36周）'并列强调",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "表述/措辞问题改写（跨主题聚合）",
+     "subcategory_original": "婴幼儿睡眠"
+    },
+    {
+     "atom_index": 3,
+     "before": "条件二：月经尚未恢复。产后早期恶露不算月经，但如果恶露结束后又出现类似月经的出血……",
+     "before_truncated": false,
+     "after": "将条件二修订为：产后56天后没有明显的阴道出血，并说明一旦出现月经样出血即应认为月经已恢复，LAM不",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "表述/措辞问题改写（跨主题聚合）",
+     "subcategory_original": "婴幼儿睡眠"
+    },
+    {
+     "atom_index": 4,
+     "before": "即使供需逐渐平衡，奶量也不是固定不变的。日常喂养节奏、妈妈的情绪状态和身体变化……",
+     "before_truncated": false,
+     "after": "补充说明：婴儿的摄入量本身也不是固定数值，奶量主要应与婴儿的实际需求相匹配",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "表述/措辞问题改写（跨主题聚合）",
+     "subcategory_original": "婴幼儿睡眠"
+    },
+    {
+     "atom_index": 5,
+     "before": "通常每日约补充500-600毫克钙（钙剂补充量）",
+     "before_truncated": false,
+     "after": "修订钙剂补充量描述：明确区分总摄入目标（IOM推荐1000mg/天）与在饮食不足情况下的补充剂用量，",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "表述/措辞问题改写（跨主题聚合）",
+     "subcategory_original": "婴幼儿睡眠"
+    },
+    {
+     "atom_index": 6,
+     "before": "催乳食物和饮品（galactagogues）……目前缺乏高质量证据证明它们能独立提升泌乳量",
+     "before_truncated": false,
+     "after": "补充：若某种食物能让妈妈心情愉悦或增强泌乳信心，也可能间接有所帮助，但应按需食用，不宜作为必须完成的",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "表述/措辞问题改写（跨主题聚合）",
+     "subcategory_original": "婴幼儿睡眠"
+    }
+   ],
+   "orphan_positions": [
+    "频繁吸吮通常在3-5天内逐渐缓解",
+    "长期带娃劳累与持续焦虑",
+    "保持每2～3小时一次的喂养频率",
+    "体重呈规律稳步增长"
+   ]
+  },
+  {
+   "parent_rule_id": "r-8380b74f7d98d063",
+   "declared_groups": 246,
+   "actual_atoms": 6,
+   "atoms_text_complete": 5,
+   "completeness": "truncated",
+   "shortfall": 240,
+   "shortfall_reason": "源导出已截断：每列约 500 字上限，且每个 before/after 字段再被截到 50 字",
+   "source": {
+    "xlsx_row": 407,
+    "quote_column": "Q",
+    "revision_column": "U",
+    "reason_column": "T",
+    "declared_column": "AM",
+    "actual_column": "AN"
+   },
+   "reason_text": "盆底肌并非只有松弛一种问题，高张型（痉挛/过度紧张）进行凯格尔训练会适得其反，甚至引发严重疼痛和排尿困难",
+   "review_pattern": "(未归类原因)",
+   "topic": "未归类修订聚合（246条）",
+   "subcategory_original": "内容形式与表达规范",
+   "atoms": [
+    {
+     "atom_index": 1,
+     "before": "特别提醒（盆底肌高张说明）",
+     "before_truncated": false,
+     "after": "补充盆底肌高张型禁忌说明，提示此类情况必须由专业医生或物理治疗师指导，不可自行训练",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "未归类修订聚合（246条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 2,
+     "before": "孕35～39周大脑重量约增加三分之一",
+     "before_truncated": false,
+     "after": "删除或替换该数据，改为有据可查的表述，如：孕晚期大脑持续完善皮层结构和神经连接",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "未归类修订聚合（246条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 3,
+     "before": "如果目前每天喂8次，可以尝试增加到10次，通常有机会在3～7天内看到奶量变化",
+     "before_truncated": false,
+     "after": "补充说明：若奶量相对之前有所下降，增加频率可能有效；若奶量一直偏低，则需先排查其他原因",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "未归类修订聚合（246条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 4,
+     "before": "超过 75%（的孕妈都会经历孕晚期失眠）",
+     "before_truncated": false,
+     "after": "将'超过75%'改为'大多数'或'相当一大部分'，或注明数据来源及适用范围",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "未归类修订聚合（246条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 5,
+     "before": "产后2-3个月：减少吸奶次数要慢慢来",
+     "before_truncated": false,
+     "after": "需结合宝宝摄入量判断。若本身已供需平衡再减少次数，实质是在推进离乳，应说明边界条件",
+     "after_truncated": false,
+     "text_complete": true,
+     "topic": "未归类修订聚合（246条）",
+     "subcategory_original": "内容形式与表达规范"
+    },
+    {
+     "atom_index": 6,
+     "before": "维生素D几乎无法通过母乳充分传递给宝宝。即便妈妈自身维生素D水平正常，母乳中…（补充维生素D的建议）",
+     "before_truncated": true,
+     "after": "明确区分：妈妈的维生素D补充（按需评估）与宝宝的维生素D补充（AAP建议纯母乳或混合喂养宝宝从出生后",
+     "after_truncated": true,
+     "text_complete": false,
+     "topic": "未归类修订聚合（246条）",
+     "subcategory_original": "内容形式与表达规范"
+    }
+   ],
+   "orphan_positions": [
+    "整篇文章出现多处具体数字（如起夜3-5次、间隔2-3小时、垫高15-20度等）",
+    "这类宝宝一般在新生儿科专业监护下喂养（早产儿部分）",
+    "美国儿科学会（AAP）：母乳喂养应至少持续 12 个月",
+    "宝宝两餐之间仍有相对平静、满足的时段（猛长期典型特征之一）"
+   ]
+  }
+ ]
+}
