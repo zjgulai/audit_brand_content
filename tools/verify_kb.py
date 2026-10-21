@@ -906,9 +906,15 @@ def main():
             _rd["rules"][0].pop("no_external_basis", None)
             _c18b["凭空多一条边"] = CL.rules_ref_problems(_rd, _cidx)
         _a18b = {k: len(v) > 0 for k, v in _c18b.items()}
+        # ★ 2026-10-21：这两个数原来是手写的「24 / 2」，导入 T10 后过期成 24/12。
+        #   结论行里的数字必须现算（AGENTS.md §2.2 第 1 条）—— 只改字符串构造，不改判据。
+        _n_ext = sum(1 for r in (_rules_doc.get("rules") or [])
+                     if r.get("external_ref"))
+        _n_neb = sum(1 for r in (_rules_doc.get("rules") or [])
+                     if str(r.get("no_external_basis") or "").strip())
         c.add("T18b", "条款层↔规则层：每条引用指得到，且两边互为反面（单边声明即红）",
               (not _rrp) and all(_a18b.values()) and len(_a18b) == 3,
-              (f"24 条规则带 external_ref、2 条声明 no_external_basis；"
+              (f"{_n_ext} 条规则带 external_ref、{_n_neb} 条声明 no_external_basis；"
                f"62 条条目的「我关联到谁」与规则侧「谁认账」逐条相等"
                f"；反向对照：" + "、".join(f"{k}{'✅' if v else '❌'}" for k, v in _a18b.items())
                if not _rrp else f"❌ {_rrp[:3]}"))

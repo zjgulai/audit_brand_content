@@ -288,7 +288,7 @@
    ],
    "量": {
     "rules_only_general": 3,
-    "rules_total": 26
+    "rules_total": 36
    },
    "量说明": "只能引通则的规则数 / 真规则总数（真规则 = 规则键 - catch_all）",
    "owner": "法务 Sharon",
@@ -430,8 +430,8 @@
     "KB-Q-10"
    ],
    "量": {
-    "brand_control_points": 0,
-    "brand_control_empty_families": 4,
+    "brand_control_points": 1,
+    "brand_control_empty_families": 3,
     "brand_axis_rules": 10,
     "brand_engine_rules": 0
    },
@@ -467,8 +467,8 @@
     "KB-Q-10"
    ],
    "量": {
-    "brand_asset_files": 155,
-    "brand_asset_files_missing": 58
+    "brand_asset_files": 97,
+    "brand_asset_files_missing": 0
    },
    "量说明": "manifest 声明的资产数 / 盘上实际缺的文件数（当前 155 / 58，缺的全是 `sref-candidates/`）。★ 这个数原本只活在 `verify_assets_baseline.py` 的退出码里，而该 verifier 没被登记进 AGENTS.md §2.1 的自证表 —— 红了也没人看。放进 kb_facts 后，E2 会顺带守住它。",
    "owner": "品牌侧（视觉 rubric 与色彩权威）+ 资产采集侧（sref 图补回或降级 manifest）",

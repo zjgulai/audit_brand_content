@@ -1997,14 +1997,7 @@
         "note": "命中后人工确认是不是在说 Momcozy 自己；引用段落降级。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:45",
-          "条文号": "L8",
-          "原文": "严禁使用 Clinical (临床感) 或 Machine (机器)，应改为 Personal Care (个人护理) 或 Companion (陪伴者)。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
       "detection_layer": "native",
       "examples": {
@@ -2050,7 +2043,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:45（L8），见控制点 B01 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.machine",
@@ -2086,14 +2080,7 @@
         "note": "命中后人工确认是不是在形容产品/体验；技术固定搭配降级。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:45",
-          "条文号": "L8",
-          "原文": "严禁使用 Clinical (临床感) 或 Machine (机器)。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
       "detection_layer": "native",
       "examples": {
@@ -2144,7 +2131,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:45（L8），见控制点 B01 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.weight-loss",
@@ -2188,14 +2176,7 @@
         "note": "没有产品上下文时降级；不能把泛健康内容判成品宣。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:46",
-          "条文号": "L8",
-          "原文": "严禁使用 Weight Loss (减肥/瘦身) 来描述收腹带，应改为 Core Support (核心支撑) 或 Healing (愈合)。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
       "detection_layer": "native",
       "examples": {
@@ -2230,7 +2211,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:46（L8），见控制点 B01 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.enjoy-every-moment",
@@ -2258,14 +2240,7 @@
         "note": "引用用户原话/评论区摘录时人工确认。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:22",
-          "条文号": "L2",
-          "原文": "拒绝毒鸡汤 (No Toxic Positivity): 绝不说 \"享受每一刻\" 或 \"一切都值得\"。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2 / momcozy_quick_reference.md",
       "detection_layer": "native",
       "examples": {
@@ -2300,7 +2275,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:22（L2），见控制点 B02 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.all-worth-it",
@@ -2328,14 +2304,7 @@
         "note": "引用用户原话时人工确认。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:22",
-          "条文号": "L2",
-          "原文": "绝不说 \"享受每一刻\" 或 \"一切都值得\"。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2",
       "detection_layer": "native",
       "examples": {
@@ -2370,7 +2339,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:22（L2），见控制点 B02 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.you-should",
@@ -2398,14 +2368,7 @@
         "note": "引用用户原话时人工确认；『你应当』是近义但不是本条精确串。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:23",
-          "条文号": "L2",
-          "原文": "拒绝爹味说教 (No Preaching): 绝不用 \"你应该\" 或 \"好妈妈都会...\"。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2 / momcozy_quick_reference.md",
       "detection_layer": "native",
       "examples": {
@@ -2440,7 +2403,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:23（L2），见控制点 B03 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.good-mother",
@@ -2468,14 +2432,7 @@
         "note": "引用用户原话时人工确认。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:23",
-          "条文号": "L2",
-          "原文": "绝不用 \"你应该\" 或 \"好妈妈都会...\"。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L2 / momcozy_quick_reference.md",
       "detection_layer": "native",
       "examples": {
@@ -2510,7 +2467,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:23（L2），见控制点 B03 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.1.sacred-motherhood",
@@ -2538,14 +2496,7 @@
         "note": "引用用户原话时人工确认。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 快速参考",
-          "条目ID": "quick_reference.md:10",
-          "条文号": "文案三要三不要",
-          "原文": "不要：毒鸡汤（“当妈很神圣”、“享受每一刻”）。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_quick_reference.md",
       "detection_layer": "native",
       "examples": {
@@ -2580,7 +2531,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌快速参考 quick_reference.md:10（文案三要三不要），见控制点 B02 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.2.village-naming",
@@ -2620,14 +2572,7 @@
         "note": "竞品/泛称上下文降级；官方社群才升为命中。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:42",
-          "条文号": "L8",
-          "原文": "Momcozy Village: 官方社群的名称，严禁说成“user group”。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
       "detection_layer": "native",
       "examples": {
@@ -2662,7 +2607,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:42（L8），见控制点 B04 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     },
     {
       "rule_key": "T10.2.doublefit-naming",
@@ -2703,14 +2649,7 @@
         "note": "技术定义/竞品上下文降级；品牌自己的部件描述才命中。"
       },
       "evidence_required": "brand_style_guide",
-      "external_ref": [
-        {
-          "库名": "Momcozy 品牌知识库",
-          "条目ID": "knowledge_base.md:39",
-          "条文号": "L8",
-          "原文": "DoubleFit™ Flange: 严禁说“suction cup”或“plastic part”，必须强调“双层密封法兰”。"
-        }
-      ],
+      "external_ref": [],
       "source_legacy": "momcozy_ai_brand_knowledge_base.md §L8",
       "detection_layer": "native",
       "examples": {
@@ -2745,7 +2684,8 @@
       "parent_rule_reason": "控制点主表 owner 尚未给出映射；导入前必须替换为 H01…U04/安全词之一；当前哨兵没有断言拦截（见 _meta.required_assertions.A）。",
       "exclusion_source_of_truth": "match.exclude_patterns",
       "enabled": false,
-      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。"
+      "disabled_reason": "发布期用词规则，误报率尚未实测。fa 2026-10-21 实测的 5.6%–9.9% 误报来自**生成期**词表（semantic 29 / BRAND_CONFIG 12）混进发布期；本批 10 条**没有单独跑过**。开启前须先量这 10 条各自的误报率。",
+      "no_external_basis": "本规则不引外部条款：依据是内部品牌知识库 knowledge_base.md:39（L8），见控制点 B04 的 authority_ref（authority_kind=internal）。品牌用词约束的权威在内部品牌文档，不在外部广告标准库。"
     }
   ],
   "catch_all": {

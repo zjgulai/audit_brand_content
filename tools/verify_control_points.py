@@ -415,6 +415,103 @@ def summary_matches(text, n_draft, n_measured):
             and ("%d 条规则的误报率已实测" % n_measured) in text)
 
 
+# ───────── 误报率证据（B-10，2026-10-21）─────────
+#
+# `false_positive_measured: true` 原先是一句没人能验的自白：谁都能打上它，
+# B01–B04 就能翻 active，而 10 条规则随即开始产生 hit。
+# 这里只验「有证据、可复核、自洽」，**不验「够不够高」** —— 阈值是没有依据的常量。
+
+PRECISION_TOL = 0.005   # 允许 2 位小数四舍五入（2/3 → 0.67 也能过）
+
+
+def fp_evidence_problems(rule, today=None):
+    """纯函数：一条规则的误报率证据自洽性。返回问题列表（空 = 通过）。
+
+    判据（只对 `false_positive_measured is True` 的规则生效）：
+      ① 必须有 `false_positive_evidence`；
+      ② 每个 `corpora[].path` 必须在盘上；
+      ③ `precision` 必须能从 `n_hits` / `n_false_positives` 重算出来；
+      ④ `measured_at` 必须可解析且不晚于今天。
+    """
+    import datetime as _dt
+    if rule.get("false_positive_measured") is not True:
+        return []
+    rk = rule.get("rule_key", "?")
+    bad = []
+    ev = rule.get("false_positive_evidence")
+    if not isinstance(ev, dict):
+        return [f"{rk}: false_positive_measured=true 但没有 false_positive_evidence"]
+
+    for k in ("by", "method"):
+        if _blank(ev.get(k)):
+            bad.append(f"{rk}: evidence 缺 {k}")
+
+    today = today or _dt.date.today()
+    raw = str(ev.get("measured_at") or "").strip()
+    try:
+        d = _dt.date.fromisoformat(raw)
+    except ValueError:
+        bad.append(f"{rk}: measured_at={raw!r} 不是可解析的日期（YYYY-MM-DD）")
+        d = None
+    if d is not None and d > today:
+        bad.append(f"{rk}: measured_at={d} 晚于今天 {today}")
+
+    corpora = ev.get("corpora")
+    if not isinstance(corpora, list) or not corpora:
+        bad.append(f"{rk}: evidence.corpora 必须是非空数组")
+        corpora = []
+    total_hits = total_fp = 0
+    for i, c in enumerate(corpora):
+        if not isinstance(c, dict):
+            bad.append(f"{rk}: corpora[{i}] 不是对象")
+            continue
+        path = str(c.get("path") or "").strip()
+        if not path:
+            bad.append(f"{rk}: corpora[{i}] 缺 path")
+        else:
+            pth = Path(path).expanduser()
+            if not pth.exists():
+                bad.append(f"{rk}: corpora[{i}].path 不在盘上：{path}")
+        vals = {}
+        for k in ("n_records", "n_hits", "n_false_positives"):
+            v = c.get(k)
+            if not isinstance(v, int) or v < 0:
+                bad.append(f"{rk}: corpora[{i}].{k}={v!r} 必须是非负整数")
+                vals[k] = 0
+            else:
+                vals[k] = v
+        if vals["n_false_positives"] > vals["n_hits"]:
+            bad.append(f"{rk}: corpora[{i}] 假阳性数 > 命中数")
+        if vals["n_hits"] > vals["n_records"]:
+            bad.append(f"{rk}: corpora[{i}] 命中数 > 记录数")
+        total_hits += vals["n_hits"]
+        total_fp += vals["n_false_positives"]
+
+    prec = ev.get("precision")
+    if total_hits == 0:
+        if prec is not None:
+            bad.append(f"{rk}: 零命中时 precision 必须为 null（无可算的分母）")
+    else:
+        want = (total_hits - total_fp) / total_hits
+        if not isinstance(prec, (int, float)):
+            bad.append(f"{rk}: precision={prec!r} 不是数字")
+        elif abs(float(prec) - want) > PRECISION_TOL:
+            bad.append(f"{rk}: precision={prec} 与重算值 {want:.6f} 不自洽"
+                       f"（容差 {PRECISION_TOL}）")
+    return bad
+
+
+def check_fp_evidence(rules):
+    """B-10：所有声明已测的规则，其证据必须自洽。"""
+    rs = (rules or {}).get("rules") if isinstance(rules, dict) else []
+    bad = []
+    for r in (rs or []):
+        if isinstance(r, dict):
+            bad += fp_evidence_problems(r)
+    return [_check("B-10", not bad,
+                   "误报率证据自洽；问题 %d：%r" % (len(bad), bad[:5]))]
+
+
 def check_draft_activation(cp, rules):
     """B-8：draft 控制点下不许有 enabled 规则（真空的方向）。
     B-9：draft 摘要必须出现且计数正确。"""
@@ -933,6 +1030,7 @@ def evaluate(cp, rt, history=None, rules=None, require_history=False,
     if 71 in rows:
         checks += check_first_batch(cp, rules, history, whitelist)
         checks += check_draft_activation(cp, rules)
+        checks += check_fp_evidence(rules)
     # ★ 不受 --row 限制：悬空 parent_rule 是**任何**行都该看见的问题。
     #   放进 `if 71 in rows` 里，会让 `--row 69` 那份读数对它默默无闻。
     checks += check_rule_parents(cp, rules)
@@ -1340,6 +1438,39 @@ def selftest(verbose: bool = False) -> int:
                                               tracked_hist, batch_wl)) == set(),
                     str(red_ids(check_first_batch(tracked_new, batch_rules,
                                                   tracked_hist, batch_wl)))))
+    # B-10 · 误报率证据（2026-10-21）
+    import datetime as _dt
+    _today = _dt.date(2026, 10, 21)
+    def _fp_rule(**over):
+        ev = {
+            "measured_at": "2026-10-21", "by": "selftest",
+            "corpora": [{"path": "research/governance/control-points-v1.json",
+                         "n_records": 100, "n_hits": 4, "n_false_positives": 1}],
+            "precision": 0.75, "method": "selftest",
+            "sample_file": "无（零命中）",
+        }
+        ev.update(over)
+        return {"rule_key": "T10.selftest", "false_positive_measured": True,
+                "false_positive_evidence": ev}
+    results.append(("B-10 好样本（证据自洽）→ 绿",
+                    fp_evidence_problems(_fp_rule(), today=_today) == [], ""))
+    no_ev = _fp_rule(); no_ev.pop("false_positive_evidence")
+    results.append(("B-10 缺 evidence → 红",
+                    bool(fp_evidence_problems(no_ev, today=_today)), ""))
+    bad_path = _fp_rule(corpora=[{"path": "tests/__no_such_corpus__.json",
+                                  "n_records": 10, "n_hits": 1,
+                                  "n_false_positives": 0}], precision=1.0)
+    results.append(("B-10 语料路径不存在 → 红",
+                    bool(fp_evidence_problems(bad_path, today=_today)), ""))
+    bad_prec = _fp_rule(precision=0.95)
+    results.append(("B-10 precision 不自洽 → 红",
+                    bool(fp_evidence_problems(bad_prec, today=_today)), ""))
+    future = _fp_rule(measured_at="2999-01-01")
+    results.append(("B-10 measured_at 在未来 → 红",
+                    bool(fp_evidence_problems(future, today=_today)), ""))
+    results.append(("B-10 未声明已测 → 绿（不误报）",
+                    fp_evidence_problems({"rule_key": "x"}, today=_today) == [], ""))
+
     # B-8/B-9 · draft 激活一致性（2026-10-21）
     draft_cp = _deep(batch_cp)
     draft_cp["control_points"].append(

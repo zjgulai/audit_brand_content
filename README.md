@@ -185,6 +185,10 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 **PMO / audit / implement**
 
 - `PMO/Momcozy-品牌资产落盘方案-20261017-v1.md`
+- `PMO/Momcozy-采集方案-20261017.md`（v1 现场留痕：HTML 翻页路线）
+- `PMO/Momcozy-采集方案-20261017-v1.1.md`（主站改走 UCP/MCP；`tools/momcozy/README.md` 指向这份）
+- `PMO/audit/内容审核Agent-输入类型与工作流剖析-20261020.html`（单文件 HTML，零外链）
+- `PMO/audit/前端设计系统与依赖治理-优化方案-v1.1-20261021.md`
 - `PMO/audit/Playbook-v1.1-专项核验-20261017.md`
 - `PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md`
 - `PMO/audit/内容审查Agent-决策总账-v2-20261018.md`
