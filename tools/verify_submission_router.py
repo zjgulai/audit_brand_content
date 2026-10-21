@@ -37,6 +37,79 @@ except Exception as exc:  # noqa: BLE001
     sys.exit(2)
 
 
+def adv1_holds(verdict, attempt):
+    """SR-ADV1：文档 + 非飞书链接必须显式 rejected_unsupported。"""
+    return (verdict.get("outcome") == "rejected_unsupported"
+            and verdict.get("failure_kind") == "unsupported"
+            and attempt is not None
+            and attempt.get("outcome") == "rejected_unsupported")
+
+
+def adv2_holds(a1, a2, entry_count):
+    """SR-ADV2：同 submission_id 连续两次 submit，attempt_id 必须不同。"""
+    return (a1.get("attempt_id") != a2.get("attempt_id")
+            and entry_count == 2)
+
+
+def controls():
+    """反向对照：断言对象必须真的能区分「修好」与「断开」。"""
+    checks = []
+
+    def ok(name, cond, detail=""):
+        checks.append((name, bool(cond), detail))
+
+    # SR-ADV1：把坏样本伪装成 accepted，adv1_holds 必须判假。
+    bad_verdict = {"outcome": "accepted", "reason": "domain check passed"}
+    bad_attempt = {"outcome": "accepted", "ir_id": "ir-bad"}
+    ok("SR-ADV1 断开文档/渠道守卫 → 断言判红",
+       adv1_holds(bad_verdict, bad_attempt) is False,
+       "accepted 仍被判为通过")
+
+    # SR-ADV2：两条 attempt_id 相同，adv2_holds 必须判假。
+    same1 = {"attempt_id": "at-same"}
+    same2 = {"attempt_id": "at-same"}
+    ok("SR-ADV2 去掉序号 → 同 id 两次 → 断言判红",
+       adv2_holds(same1, same2, 2) is False,
+       "相同 attempt_id 仍被判为通过")
+
+    # 正样本：真实实现必须能过（不是恒红）。
+    r = SR.SubmissionRouter()
+    sub = {
+        "submission_id": "control-doc",
+        "content_type": "文档",
+        "content_stage": "brief",
+        "entry_channel": "群消息",
+        "source": {"kind": "free_text"},
+    }
+    v = SR.classify_submission(sub)
+    try:
+        a = r.submit(sub)
+    except Exception as exc:  # noqa: BLE001
+        a = {"outcome": "exception:%s" % type(exc).__name__}
+    ok("SR-ADV1 真实实现 → 断言判绿", adv1_holds(v, a), "verdict=%r attempt=%r" % (v, a))
+
+    r2 = SR.SubmissionRouter()
+    base = {
+        "submission_id": "control-retry",
+        "content_type": "文本",
+        "content_stage": "brief",
+        "entry_channel": "群消息",
+        "source": {"kind": "free_text"},
+    }
+    x1 = r2.submit(base, ir_id="ir-1", now=1000)
+    x2 = r2.submit(base, ir_id="ir-2", now=1000)
+    ok("SR-ADV2 真实实现 → 断言判绿", adv2_holds(x1, x2, r2.entry_count),
+       "%s vs %s entry=%d" % (x1["attempt_id"], x2["attempt_id"], r2.entry_count))
+
+    failed = [c for c in checks if not c[1]]
+    for name, good, detail in checks:
+        print("%s %s%s" % ("✓" if good else "✗", name,
+                           "" if good else " —— " + detail))
+    print("\n%s %d/%d 项通过"
+          % ("✅" if not failed else "❌", len(checks) - len(failed), len(checks)))
+    return 0 if not failed else 1
+
+
 def main():
     passed = 0
     failed = 0
@@ -147,14 +220,13 @@ def main():
                        source={"kind": "free_text"})
     verdict_doc = SR.classify_submission(sub_doc)
     try:
+        # 不传 ir_id：正常路径必须落 rejected_unsupported；若守卫被删，
+        # classify_submission 会先返回 accepted，下面的 verdict 断言就会红。
         a_doc = r.submit(sub_doc)
         err_doc = None
     except Exception as exc:  # noqa: BLE001
         a_doc, err_doc = None, exc
-    report(verdict_doc.get("outcome") == "rejected_unsupported"
-           and verdict_doc.get("failure_kind") == "unsupported"
-           and a_doc is not None
-           and a_doc.get("outcome") == "rejected_unsupported",
+    report(adv1_holds(verdict_doc, a_doc),
            "SR-ADV1 content_type=文档 + 群消息 → rejected_unsupported",
            "verdict=%r attempt=%r err=%r" % (verdict_doc, a_doc, err_doc))
 
@@ -280,7 +352,7 @@ def main():
     r = new_router()
     a1 = r.submit(base_sub(submission_id="retry-same"), ir_id="ir-r1", now=1000)
     a2 = r.submit(base_sub(submission_id="retry-same"), ir_id="ir-r2", now=1000)
-    report(a1["attempt_id"] != a2["attempt_id"] and r.entry_count == 2,
+    report(adv2_holds(a1, a2, r.entry_count),
            "SR-ADV2 同 submission_id/同 now 重试 → attempt_id 不同",
            "%s vs %s entry=%d"
            % (a1["attempt_id"], a2["attempt_id"], r.entry_count))
@@ -337,6 +409,8 @@ def main():
 
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv:
+            sys.exit(controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         print("UNTESTED: 验收器自身异常: %s" % exc)
