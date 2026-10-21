@@ -635,6 +635,13 @@
    "subjects": [
     "base/multimodal_provider.py"
    ]
+  },
+  {
+   "verifier": "tools/verify_brand_rules.py",
+   "asserts": "品牌用词候选规则的 context_exclusion 与 match.exclude_patterns 集合恒等；每个 pattern 可编译；note/id 非空；两侧有/无一致",
+   "subjects": [
+    "PMO/implement/品牌用词规则-候选-v1.json"
+   ]
   }
  ]
 }

@@ -1,6 +1,6 @@
 {
  "schema_version": "control-points-v1",
- "table_version": "cp-2026-10-18-v2",
+ "table_version": "cp-2026-10-21-v3",
  "generated_from": [
   {
    "file": "research/governance/skeleton/rules-v1.json",
@@ -32,11 +32,6 @@
   },
   {
    "family": "渠道控制",
-   "state": "无控制点",
-   "reason": "U2 点位内容未定，待产品+法务签署"
-  },
-  {
-   "family": "品牌控制",
    "state": "无控制点",
    "reason": "U2 点位内容未定，待产品+法务签署"
   }
@@ -814,35 +809,130 @@
    "parent": null,
    "version": "v1",
    "status": "active"
+  },
+  {
+   "control_code": "B01",
+   "control_name": "医疗化 / 功效化用词",
+   "family": "品牌控制",
+   "judge_type": "literal",
+   "authority_kind": "internal",
+   "authority_ref": [
+    {
+     "source": "Momcozy 品牌知识库",
+     "path": "PMO/audit/momcozy-assets/rules/knowledge_base.md",
+     "entry_id": "knowledge_base.md:45",
+     "article": "L8",
+     "quote": "严禁使用 **\"Clinical\" (临床感)** 或 **\"Machine\" (机器)**，应改为 **\"Personal Care\" (个人护理)** 或 **\"Companion\" (陪伴者)**。"
+    },
+    {
+     "source": "Momcozy 品牌知识库",
+     "path": "PMO/audit/momcozy-assets/rules/knowledge_base.md",
+     "entry_id": "knowledge_base.md:46",
+     "article": "L8",
+     "quote": "严禁使用 **\"Weight Loss\" (减肥/瘦身)** 来描述收腹带，应改为 **\"Core Support\" (核心支撑)** 或 **\"Healing\" (愈合)**。"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "draft",
+   "activation_blocked_by": "T10 用词规则误报率未实测（fa 2026-10-21 实测的 5.6%–9.9% 来自生成期词表，本批未单独跑）"
+  },
+  {
+   "control_code": "B02",
+   "control_name": "毒鸡汤 / 情感绑架",
+   "family": "品牌控制",
+   "judge_type": "literal",
+   "authority_kind": "internal",
+   "authority_ref": [
+    {
+     "source": "Momcozy 品牌知识库",
+     "path": "PMO/audit/momcozy-assets/rules/knowledge_base.md",
+     "entry_id": "knowledge_base.md:22",
+     "article": "L2",
+     "quote": "🚫 拒绝毒鸡汤 (No Toxic Positivity): 绝不说 \"享受每一刻\" 或 \"一切都值得\"。"
+    },
+    {
+     "source": "Momcozy 快速参考",
+     "path": "PMO/audit/momcozy-assets/reference/quick_reference.md",
+     "entry_id": "quick_reference.md:10",
+     "article": "文案三要三不要",
+     "quote": "- **不要**：毒鸡汤（“当妈很神圣”、“享受每一刻”）。"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "draft",
+   "activation_blocked_by": "T10 用词规则误报率未实测（fa 2026-10-21 实测的 5.6%–9.9% 来自生成期词表，本批未单独跑）"
+  },
+  {
+   "control_code": "B03",
+   "control_name": "说教 / 母职规训",
+   "family": "品牌控制",
+   "judge_type": "literal",
+   "authority_kind": "internal",
+   "authority_ref": [
+    {
+     "source": "Momcozy 品牌知识库",
+     "path": "PMO/audit/momcozy-assets/rules/knowledge_base.md",
+     "entry_id": "knowledge_base.md:23",
+     "article": "L2",
+     "quote": "🚫 拒绝爹味说教 (No Preaching): 绝不用 \"你应该\" 或 \"好妈妈都会...\"。"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "draft",
+   "activation_blocked_by": "T10 用词规则误报率未实测（fa 2026-10-21 实测的 5.6%–9.9% 来自生成期词表，本批未单独跑）"
+  },
+  {
+   "control_code": "B04",
+   "control_name": "品牌专名误称",
+   "family": "品牌控制",
+   "judge_type": "literal",
+   "authority_kind": "internal",
+   "authority_ref": [
+    {
+     "source": "Momcozy 品牌知识库",
+     "path": "PMO/audit/momcozy-assets/rules/knowledge_base.md",
+     "entry_id": "knowledge_base.md:39",
+     "article": "L8",
+     "quote": "- **DoubleFit™ Flange**: 严禁说“suction cup”或“plastic part”，必须强调“双层密封法兰”。"
+    },
+    {
+     "source": "Momcozy 品牌知识库",
+     "path": "PMO/audit/momcozy-assets/rules/knowledge_base.md",
+     "entry_id": "knowledge_base.md:42",
+     "article": "L8",
+     "quote": "- **Momcozy Village**: 官方社群的名称，严禁说成“user group”。"
+    }
+   ],
+   "parent": null,
+   "version": "v1",
+   "status": "draft",
+   "activation_blocked_by": "T10 用词规则误报率未实测（fa 2026-10-21 实测的 5.6%–9.9% 来自生成期词表，本批未单独跑）"
   }
  ],
  "contract_impact": {
-  "why": "空族从 3 变 4（新增品牌控制）。以下位置写着「空三族」，下一次同步批必须改；本文件只登记，不改它们。",
+  "why": "品牌控制点 B01–B04 落地后，空族是 3（场景/权利/渠道）。本字段原列的 items 1–4 写于品牌控制点落地前，要求把文档改成「四族」—— 那是错的，按它们执行会把文档改写错。已清掉，只保留仍有效的一条。",
+  "dropped": [
+   {
+    "was": "Playbook §5.3 / §7 U2：三族 → 四族",
+    "why_dropped": "落地后空族回到 3，原文的「三族」反而又对了；且 Playbook:1429 明写「不要写死，读 empty_families」"
+   },
+   {
+    "was": "PRD v2.0 GAP-1：三族未定 → 四族未定",
+    "why_dropped": "同上"
+   },
+   {
+    "was": "端到端工作流规格 §0.3：三族 → 四族",
+    "why_dropped": "同上"
+   },
+   {
+    "was": "UIUX 前后端规格：三族 → 四族",
+    "why_dropped": "同上"
+   }
+  ],
   "items": [
-   {
-    "file": "Playbook/内容审查Agent-产品Playbook-v1.1.md",
-    "where": "§5.3 / §7 U2",
-    "current": "剩余三族（场景/权利/渠道）",
-    "must_become": "剩余四族（场景/权利/渠道/品牌）"
-   },
-   {
-    "file": "PRD/内容审查Agent-PRD-优化版-v2.0.md",
-    "where": "GAP-1",
-    "current": "三族未定",
-    "must_become": "四族未定"
-   },
-   {
-    "file": "PMO/audit/内容审查Agent-端到端工作流规格草案-v1.md",
-    "where": "§0.3",
-    "current": "三族",
-    "must_become": "四族"
-   },
-   {
-    "file": "PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md",
-    "where": "覆盖说明/文案",
-    "current": "三族",
-    "must_become": "四族"
-   },
    {
     "file": "PMO/audit/验收表-v3-覆盖全部判据-20261017.md",
     "where": "#79（L6-1…L6-6）",
@@ -850,7 +940,7 @@
     "must_become": "补一条断言：空族数与主表 empty_families 恒等"
    }
   ],
-  "execution_note": "同步批改完上述五处后，本节的对应条目改为 done；在此之前**任何文档不得声称空三族**。"
+  "execution_note": "items 只剩这一条，因为它是原五条里唯一能防这类漂移的：前三类「让人去改数字」，这一条把「空族数」从散文变成断言 —— 前者治症状，后者治因。改完这条后本节可整段删除。"
  },
  "field_set": {
   "fields": [

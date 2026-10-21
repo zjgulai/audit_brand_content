@@ -1,16 +1,16 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-09-24T12:10:07+00:00",
-  "engine_version": "be85eeb07df56369",
+  "generated_at": "2026-10-21T11:00:58+00:00",
+  "engine_version": "7169834ac97fc730",
   "code_version": "d811f61fa4e1f79e",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
-      "bytes": 72087,
-      "sha256": "43e531bd184fa74d84c8433b37fdbd94d55470ed5fa53b4ba7795fb7a42a0796",
+      "bytes": 103434,
+      "sha256": "bbb181af23df8ffd15c17b48fd557c5dde40135777cd682ee002161c6fc5a375",
       "why": "判险词 + 规则 + 兜底通道（唯一产生命中的来源）",
       "counts": {
-        "rules": 26,
+        "rules": 36,
         "enabled": 25,
         "is_modifier": 1,
         "with_escalation": 1,
@@ -112,15 +112,15 @@
   "upstream": {
     "integrity": "declared",
     "note": "以下上游引用**未经校验**：whitelist/context-guards 里有 source.snapshot 文件名，rules-v1.json 连文件名都没有。把它们当证明用等于把声明洗成证明。升级为证明需要可复算的构建链（ADR-0012 后续项）。",
-    "snapshot": "snapshot-20260916T050845Z.json",
-    "captured_at_utc": "2026-09-16T05:08:45.473112+00:00",
+    "snapshot": "snapshot-20261020T162244Z.json",
+    "captured_at_utc": "2026-10-20T16:22:44.083486+00:00",
     "feishu_content_sha256": {
-      "ad_copy": "0927fd58b0f8bf104b5e8f9a1c4dd356ea4f509b45fba38db4207c2efd6c31f6",
-      "boundary_rules": "2a1a219a7e76b459e6a7c846559fedd9023f8b6e08f146feadda85ad312c34bb",
+      "ad_copy": "232c8963887246f4993484e22f1593a189e526209820405f505cd7a821f4e59a",
+      "boundary_rules": "fc35fe32ec98df94f31e96066516e7e8e5ccf3c9ce58aaa32e8af6e967de3223",
       "w1_claims": "494caaf569a781620e7c1c917959f090d1e8329ca6770f6c7c32d14de34829fc",
-      "rewrite_lib": "bc1aa46519a860836265188020c74b0257c04d8351327d2171b0e5fbe4eddf1f",
-      "kb_materials": "6460ec5b5fb0f8821237a22a74a8137f358ebf9edecab436e34f505e24728336",
-      "kb_samples": "edc06d151b034228aa6a14cbbab217eaac357529ec32e0e3ef6ba64e88939ea1"
+      "rewrite_lib": "4ff654139772ff1226e369a428307679084ff1ed7ddbbbcf2dec69a3c82e80c6",
+      "kb_materials": "e1c188b9011e0c42787d7304a122424df998dc08adc55ca53a592c15ebe08c16",
+      "kb_samples": "5711b123511a890eed2bf84705173bfd2adde9424ca1c7a882900015c808b388"
     },
     "_found": true
   }

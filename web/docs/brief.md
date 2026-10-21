@@ -80,7 +80,7 @@ S0 受理 → S1 分派 → S2 归一 → S3 判定 → S4 落盘 → S5 覆盖 
 
 ## Representative runs
 
-`case-smoke`（`tools/smoke_end_to_end.py` 产出）：`state=BLOCK`、`layer=DP2`、`release_status=待放行`、`obligations=["partial_coverage"]`；1 条 finding（`H01` / `L4` / `quote="治疗"` / `location{6,8}` / `authority_ref=EXT-021` / `authority_state=ok`）；coverage `partial`，四族 `not_wired`。**这是唯一一条真实案件。**
+`case-smoke`（`tools/smoke_end_to_end.py` 产出）：`state=BLOCK`、`layer=DP2`、`release_status=待放行`、`obligations=["partial_coverage"]`；1 条 finding（`H01` / `L4` / `quote="治疗"` / `location{6,8}` / `authority_ref=EXT-021` / `authority_state=ok`）；coverage `partial`，空族 `not_wired`（以 `empty_families` 为准，2026-10-21 是 3 族：场景/权利/渠道）。**这是唯一一条真实案件。**
 
 ## Integrations and permissions
 

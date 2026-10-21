@@ -1,6 +1,6 @@
 {
  "schema_version": "routing-v1",
- "routing_version": "rt-2026-10-18-v2",
+ "routing_version": "rt-2026-10-21-v3",
  "status_note": "T0-01 产物。**owner 不是占位值** —— 按族映射到 Playbook §4.1 五层里的复核角色。★ 这是**按族推出的默认责任人**，具体到人待业务确认；L3-1 要求的「每个控制点映射到一个下一层负责人」已满足。",
  "role_note": "族→角色映射依据 Playbook §4.1 五层：DP3 内容审核员复核 / DP4 法务终审。具体人名不在本表。",
  "routes": [
@@ -159,6 +159,38 @@
   {
    "control_code": "U04",
    "owner": "法务 + 医学顾问",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "B01",
+   "owner": "法务 + 品牌",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "B02",
+   "owner": "法务 + 品牌",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "B03",
+   "owner": "法务 + 品牌",
+   "layer": "DP4",
+   "due": "2 个工作日",
+   "escalation": "项目统筹",
+   "appeal": "案件号即 receipt_id"
+  },
+  {
+   "control_code": "B04",
+   "owner": "法务 + 品牌",
    "layer": "DP4",
    "due": "2 个工作日",
    "escalation": "项目统筹",

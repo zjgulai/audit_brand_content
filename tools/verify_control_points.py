@@ -651,10 +651,40 @@ def check_first_batch(cp, rules, history, whitelist):
 
     extra = sorted(set(codes) - expected)
     missing = sorted(expected - set(codes))
+
+    # ★ 2026-10-21 按验收表行 71 的两条子句拆开（05 裁定）：
+    #   第一条「恰好等于」写的是**当时的表状态**；第二条「始终存在且从未被重新分配」
+    #   才是长期不变量。品牌控制点 B01–B04 落地后第一条自动作废、第二条仍成立。
+    #   B-1a：首批码必须全部仍在，且族归属与**历史基线**一致（防改号/改族）。
+    entries = ((history or {}).get("entries")
+               if isinstance(history, dict) else None) or []
+    base_family = {}
+    for e in entries:
+        fb = e.get("family_by_code") if isinstance(e, dict) else None
+        if isinstance(fb, dict):
+            base_family = {k: v for k, v in fb.items() if k in expected}
+            break
+    fam_now = _family_map(cp)
+    changed_family = sorted(
+        c for c in expected
+        if c in set(codes) and base_family.get(c) is not None
+        and fam_now.get(c) != base_family.get(c))
     out.append(_check(
-        "B-1", not extra and not missing,
-        "首批码必须恰好是 H01–H09 / M01–M07 / U01–U04；"
-        "实际 %d 个；多 %r；少 %r" % (len(codes), extra, missing)))
+        "B-1a", not missing and not changed_family,
+        "首批 20 码必须全部仍在且未改族；实际 %d 个；少 %r；改族 %r"
+        % (len(codes), missing, changed_family)))
+
+    # B-1b：首批之外的新增码必须能在**某条历史 entry 的 codes 快照**里找到。
+    #   这把「可增长」与「可追溯」绑在一起 —— 没有它，任何人往主表塞码都不会红。
+    hist_codes = set()
+    for e in entries:
+        if isinstance(e, dict):
+            hist_codes |= set(e.get("codes") or [])
+    untracked = sorted(c for c in extra if c not in hist_codes)
+    out.append(_check(
+        "B-1b", not untracked,
+        "新增码必须在 history 里有 entry（可追溯来源）；未登记 %r；新增 %r"
+        % (untracked, extra)))
 
     safe_rows = [r for r in rows if r.get("control_code") == "安全词"]
     out.append(_check(
@@ -757,6 +787,68 @@ def check_first_batch(cp, rules, history, whitelist):
     return out
 
 
+# ───────── 行 71b：规则指向的控制点必须真实存在 ─────────
+
+# 规则里允许指向「不是控制点码」的父级，只有这一种。
+# 安全词是白名单侧的处置对象，不是主表里的 control_code（B-2 明确禁止它入表）。
+RULE_PARENT_NON_CODES = ("安全词",)
+
+
+def check_rule_parents(cp, rules):
+    """**每条规则的 `parent_rule` 必须指向一个真实存在的控制点。**
+
+    这是 C74-1 的**反面**，而那个反面此前完全没有判据：
+
+      * `C74-1`  问「主表新增了一个控制点，有没有规则引用它」—— 防的是**孤儿控制点**；
+      * `C71-RP` 问「规则指向的那个东西，主表里存不存在」—— 防的是**悬空指针**。
+
+    只查前一个方向时，一条规则的 `parent_rule` 写成 `__PENDING_CONTROL_POINT__`
+    这类哨兵值，引擎 hit 会带出一个不属于任何控制点的字符串，而**全仓没有一个检查器会说话**
+    （`verify_engine_contract.py:184` 的 V1c 判的是键在不在，哨兵能过）。
+
+    ★ 为什么这条不能省：「规则还没想好归到哪个控制点」是**正常中间状态**，
+      但如果它没有执行点，那个中间状态就会一路带进生产 hit 里 ——
+      而它的表现不是报错，是「每条内容都命中一个不存在的控制点」。
+    """
+    if rules is None:
+        # ★ 「没提供」与「提供了但不合法」必须分开：
+        #   前者是调用方的事（main() 已在缺文件时落 **未测** 退 2），
+        #   后者才是红。混在一起会让自测夹具全部假红 ——
+        #   而一个会误报的检查器比没有检查器更糟（§2.1.1）。
+        return []
+    if not isinstance(rules, dict):
+        return [_check("C71-RP", False,
+                       "E_RULES_UNREADABLE：rules-v1.json 不是对象，无法核对规则指向")]
+    rules_list = rules.get("rules")
+    if not isinstance(rules_list, list):
+        return [_check("C71-RP", False, "rules-v1.json 的 rules 不是数组")]
+
+    known = set(_codes(cp)) | set(RULE_PARENT_NON_CODES)
+    dangling = []
+    blank = []
+    for rule in rules_list:
+        if not isinstance(rule, dict):
+            continue
+        parent = rule.get("parent_rule")
+        ident = rule.get("rule_key") or rule.get("rule_id") or rule.get("id") or "?"
+        if _blank(parent):
+            blank.append(str(ident))
+        elif parent not in known:
+            dangling.append("%s→%r" % (ident, parent))
+
+    out = []
+    out.append(_check(
+        "C71-RP1", not blank,
+        "每条规则都必须有 parent_rule；缺 %d 条：%r" % (len(blank), blank[:10])))
+    out.append(_check(
+        "C71-RP2", not dangling,
+        "规则的 parent_rule 必须属于「主表 control_code 全集 ∪ %r」；"
+        "悬空 %d 条：%r（示例：%r）"
+        % (list(RULE_PARENT_NON_CODES), len(dangling), dangling[:10],
+           sorted(known)[:4])))
+    return out
+
+
 # ─────────────────────────── 汇总 ───────────────────────────
 
 def evaluate(cp, rt, history=None, rules=None, require_history=False,
@@ -780,6 +872,9 @@ def evaluate(cp, rt, history=None, rules=None, require_history=False,
                 "同一映射表连跑两次结果必须一致"))
     if 71 in rows:
         checks += check_first_batch(cp, rules, history, whitelist)
+    # ★ 不受 --row 限制：悬空 parent_rule 是**任何**行都该看见的问题。
+    #   放进 `if 71 in rows` 里，会让 `--row 69` 那份读数对它默默无闻。
+    checks += check_rule_parents(cp, rules)
     reds = [c for c in checks if not c["ok"]]
     return {"checks": checks, "reds": reds,
             "verdict": "red" if reds else "ok",
@@ -1156,9 +1251,34 @@ def selftest(verbose: bool = False) -> int:
                                                   batch_hist, batch_wl)))))
     wrong_codes = _deep(batch_cp)
     wrong_codes["control_points"] = wrong_codes["control_points"][:-1]
-    results.append(("行71 码集少一个 → B-1 红",
-                    "B-1" in red_ids(check_first_batch(wrong_codes, batch_rules,
-                                                       batch_hist, batch_wl)), ""))
+    results.append(("行71 码集少一个 → B-1a 红",
+                    "B-1a" in red_ids(check_first_batch(wrong_codes, batch_rules,
+                                                        batch_hist, batch_wl)), ""))
+    changed_fam = _deep(batch_cp)
+    changed_fam["control_points"][0]["family"] = "F2"
+    results.append(("行71 首批码改族 → B-1a 红",
+                    "B-1a" in red_ids(check_first_batch(changed_fam, batch_rules,
+                                                        batch_hist, batch_wl)), ""))
+    naked_new = _deep(batch_cp)
+    naked_new["control_points"].append(
+        {"control_code": "B99", "control_name": "naked", "family": "F1",
+         "status": "draft"})
+    results.append(("行71 塞 history 里没有的新码 → B-1b 红",
+                    "B-1b" in red_ids(check_first_batch(naked_new, batch_rules,
+                                                        batch_hist, batch_wl)), ""))
+    tracked_new = _deep(batch_cp)
+    tracked_new["control_points"].append(
+        {"control_code": "B98", "control_name": "tracked", "family": "F1",
+         "status": "draft"})
+    tracked_hist = _deep(batch_hist)
+    tracked_hist["entries"].append({"codes": list(FIRST_BATCH_CODES) + ["B98"],
+                                    "family_by_code": dict(
+                                        {c: "F1" for c in FIRST_BATCH_CODES}, B98="F1")})
+    results.append(("行71 塞 history 里有的新码 → 必须绿",
+                    red_ids(check_first_batch(tracked_new, batch_rules,
+                                              tracked_hist, batch_wl)) == set(),
+                    str(red_ids(check_first_batch(tracked_new, batch_rules,
+                                                  tracked_hist, batch_wl)))))
     safe_row = _deep(batch_cp)
     safe_row["control_points"].append(
         {"control_code": "安全词", "control_name": "safe", "family": "F1",
@@ -1197,6 +1317,51 @@ def selftest(verbose: bool = False) -> int:
                     "B-7" in red_ids(check_first_batch(batch_cp, batch_rules,
                                                        bad_name, batch_wl)), ""))
 
+    # ══════════════════ C71-RP：规则指向的控制点必须存在 ══════════════════
+    #
+    # 这一组存在的理由：这条断言在写下来的当天，用的是**真实仓里的规则**跑的，
+    # 而真实仓现在全是绿的。一条从没红过的断言不算验证过它（§2.4.1 末段）。
+    # 所以下面四条既是自测，也是这条断言自己的执行点。
+    rp_cp = {"control_points": [
+        {"control_code": "X01"}, {"control_code": "X02"},
+    ]}
+
+    # ① 好样本：26 条真实规则那种形状 → 绿
+    rp_good = {"rules": [
+        {"rule_key": "r1", "parent_rule": "X01"},
+        {"rule_key": "r2", "parent_rule": "X02"},
+        {"rule_key": "r3", "parent_rule": "安全词"},   # 白名单侧处置对象，不是控制点码
+    ]}
+    results.append(("C71-RP 好样本",
+                    not red_ids(check_rule_parents(rp_cp, rp_good)), ""))
+
+    # ② ★ 核心：哨兵值 → C71-RP2 红
+    #    这正是本次派单的起因。候选规则 JSON 的 10 条 parent_rule 全是这个哨兵。
+    rp_sentinel = {"rules": [
+        {"rule_key": "r1", "parent_rule": "X01"},
+        {"rule_key": "r2", "parent_rule": "__PENDING_CONTROL_POINT__"},
+    ]}
+    results.append(("C71-RP 哨兵值 → 红",
+                    "C71-RP2" in red_ids(check_rule_parents(rp_cp, rp_sentinel)), ""))
+
+    # ③ 拼错/已删除的控制点 → 红（不只是哨兵那一种写法）
+    rp_typo = {"rules": [{"rule_key": "r1", "parent_rule": "X99"}]}
+    results.append(("C71-RP 悬空码 → 红",
+                    "C71-RP2" in red_ids(check_rule_parents(rp_cp, rp_typo)), ""))
+
+    # ④ parent_rule 缺失 → C71-RP1 红（与「写错」分开报）
+    rp_blank = {"rules": [{"rule_key": "r1"}]}
+    results.append(("C71-RP 缺 parent_rule → 红",
+                    "C71-RP1" in red_ids(check_rule_parents(rp_cp, rp_blank)), ""))
+
+    # ⑤ 反向对照：rules 未提供时**不许误红**（自测夹具大多不传 rules）
+    results.append(("C71-RP 未提供 rules → 不误报",
+                    not check_rule_parents(rp_cp, None), ""))
+
+    # ⑥ 反向对照：rules 提供了但不是对象 → 必须红，不许静默放过
+    results.append(("C71-RP rules 非对象 → 红",
+                    bool(red_ids(check_rule_parents(rp_cp, []))), ""))
+
     ok = sum(1 for _, p, _ in results if p)
     total = len(results)
     print("=" * 62)
@@ -1206,7 +1371,7 @@ def selftest(verbose: bool = False) -> int:
         print(f"  {'✓' if passed else '✗'} {name:<16} {detail}")
     print()
     if ok == total:
-        print(f"✅ {ok}/{total} 项全过（4 类坏样本均会红，好样本会绿）")
+        print(f"✅ {ok}/{total} 项全过（反向对照全过：坏样本会红，好样本会绿）")
         return 0
     print(f"✗ {ok}/{total} 项通过，{total - ok} 项失败")
     return 1
@@ -1264,12 +1429,22 @@ def main() -> int:
         if Path(args.category_map).exists():
             category_map, _err6 = load(Path(args.category_map))
             category_map2, _err6b = load(Path(args.category_map))
-    if args.row == 71:
+    # ★ 2026-10-21 改：原先是 `args.row == 71`，于是**默认路径**（row=None，
+    #   实际 rows=(69,71)）反而绕过了这道闸 —— 规则读不出时不会落未测，
+    #   而是带着 rules=None 往下跑。加 C71-RP 之后这必须堵上：
+    #   「没测到规则指向」不许和「规则指向都正确」长得一样。
+    #
+    # ★ 两段分开判，因为覆盖面不同：
+    #   * `rules` —— C71-RP **在每一行**都跑，所以每一行都需要它；
+    #   * `hist` / `whitelist` —— 只有行 71（check_first_batch）用得到。
+    #   合成一段会有一个方向错：`--row 69` 缺 rules 时，C71-RP 返回 [] 静默通过，
+    #   而那正是「未测被读成通过」—— 本项目已经栽过好几次的那个形状。
+    if rules is None:
+        return untested(err4)
+    if args.row in (None, 71):
         missing = []
         if hist is None:
             missing.append(err3)
-        if rules is None:
-            missing.append(err4)
         if whitelist is None:
             missing.append(err5)
         if missing:
