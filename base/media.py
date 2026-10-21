@@ -461,10 +461,9 @@ def image_file_row(path: str | Path, *, uri: str | None = None,
     elif size > MAX_IMAGE_BYTES:
         status = "too_large"
         ocr = {"ok": False, "error": "too_large", "chars": 0, "n": 0}
-    elif p.suffix.lower() not in RASTER_EXT:
-        status = "skipped"
-        ocr = {"ok": False, "error": "unsupported_extension", "chars": 0, "n": 0}
     else:
+        # 实时附件的临时文件名不等于真实媒体格式；Vision 按内容解码。
+        # 不用后缀或第二份魔数表决定能力，解码失败会显式落 parse_error/未审查。
         ocr = ocr_file(p, server=server)
         if ocr.get("ok") and str(ocr.get("text") or "").strip():
             status = "ok"

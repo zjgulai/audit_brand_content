@@ -42,6 +42,13 @@ const feishu = await import('./feishu.mjs');
 const agent = await import('./agent.mjs');
 const lifecycle = await import('./attachment_lifecycle.mjs');
 
+// ★ 与 base ContentUnit/ReviewIR 的合法域同步：图片侧**合成**的 failure_kind
+//   只允许这四个值。自由值（too_large / empty_file / runner_error / download_failed）
+//   会让下游契约校验直接拒绝。这个集合只用于测试，防止未来再写自由值。
+const LEGAL_FAILURE_KINDS = new Set(['fetch_error', 'parse_error', 'empty', 'unsupported']);
+const imageFailureResults = [];
+const legalKind = (r) => LEGAL_FAILURE_KINDS.has(r.failure_kind);
+
 const origGet = feishu.client.im.v1.messageResource.get;
 const setGet = (impl) => { feishu.client.im.v1.messageResource.get = impl; };
 const restoreGet = () => { feishu.client.im.v1.messageResource.get = origGet; };
@@ -130,11 +137,36 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
 }
 
 {
+  let destroyed = false;
+  setGet(async () => ({
+    headers: { 'content-length': String(999 * 1024 * 1024) },
+    writeFile: async () => { throw new Error('不该落盘'); },
+    getReadableStream: () => ({ destroy() { destroyed = true; } }),
+  }));
+  const r = await feishu.ingestAttachment(imageMsg());
+  imageFailureResults.push(r);
+  T('B6b ★ 图片超限：failure_kind=fetch_error（合法域），reason=image_too_large',
+    r.status === 'image_judge_failed' && r.failure_kind === 'fetch_error'
+      && r.reason === 'image_too_large' && destroyed === true && legalKind(r),
+    JSON.stringify({ status: r.status, kind: r.failure_kind, reason: r.reason, destroyed }));
+}
+
+{
   setGet(async () => { throw new Error('模拟隧道断开'); });
   const r = await feishu.ingestAttachment(fileMsg());
   T('B7 download_failed：说「没取到」，不是「文件没内容」',
     r.status === 'download_failed' && /没取到/.test(r.reply) && /不是.*没有内容/.test(r.reply),
     r.status);
+}
+
+{
+  setGet(async () => { throw new Error('模拟隧道断开'); });
+  const r = await feishu.ingestAttachment(imageMsg());
+  imageFailureResults.push(r);
+  T('B7b ★ 图片下载失败：failure_kind=fetch_error，reason=image_download_failed',
+    r.status === 'image_judge_failed' && r.failure_kind === 'fetch_error'
+      && r.reason === 'image_download_failed' && legalKind(r),
+    `${r.status}/${r.failure_kind}/${r.reason}`);
 }
 
 {
@@ -175,31 +207,30 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
       judgment: { label: '未审查', layer: 'L0', release_status: '待放行', run_state: 'OK', findings: [] },
     }),
   });
+  imageFailureResults.push(r);
   T('B10 ★ 图片 OCR 失败 → image_judge_failed + 未审查/DP0，不是「附件不支持」',
-    r.status === 'image_judge_failed'
+    r.status === 'image_judge_failed' && r.failure_kind === 'empty' && legalKind(r)
       && /未审查（DP0）/.test(r.summary) && /failure_kind=empty/.test(r.summary)
       && /不是「附件不支持」/.test(r.summary),
-    `${r.status}/${r.summary}`.slice(0, 200));
+    `${r.status}/${r.failure_kind}/${r.summary}`.slice(0, 200));
 }
 {
   setGet(writeStub(Buffer.from([0x89, 0x50, 0x4e, 0x47])));
   const r = await feishu.ingestAttachment(imageMsg(), {
     judgeImage: async () => ({ ok: false, error: '模拟入口坏了' }),
   });
-  T('B11 ★ 图片判定入口坏了 → 仍返回未审查/DP0，不是附件不支持',
-    r.status === 'image_judge_failed'
+  imageFailureResults.push(r);
+  T('B11 ★ 图片判定入口坏了 → 未审查/DP0，failure_kind=parse_error（合法域）',
+    r.status === 'image_judge_failed' && r.failure_kind === 'parse_error' && legalKind(r)
       && /未审查（DP0）/.test(r.summary) && /不是「附件不支持」/.test(r.summary),
-    `${r.status}/${r.summary}`.slice(0, 200));
+    `${r.status}/${r.failure_kind}/${r.summary}`.slice(0, 200));
 }
 
 /* ── B12 反向对照：断开 judgeImage 调用，B8 的断言必须红 ─────────────── */
 {
   const srcPath = path.join(HERE, 'feishu.mjs');
   const src = fs.readFileSync(srcPath, 'utf8');
-  const needle = '        judged = await judgeImage({\n'
-    + '          filePath: dest, messageId: msg.message_id,\n'
-    + '          pageUri: `feishu:message:${msg.message_id}`,\n'
-    + '        });';
+  const needle = '        judged = await judgeImage({ filePath: dest, messageId: msg.message_id });';
   const mutantPath = path.join(HERE, `.mutant-image-${process.pid}.mjs`);
   if (!src.includes(needle)) {
     T('B12a ★ 反向对照自身有效：找得到 judgeImage 调用', false,
@@ -218,8 +249,9 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
         judgeImage: async () => { mCalled = true; return { ok: true }; },
       });
       T('B12 ★ 断开调用后 base 入口不再被调用（B8 会红，证明它拦得住）',
-        mCalled === false && mr.status === 'image_judge_failed',
-        `${mr.status}/called=${mCalled}`);
+        mCalled === false && mr.status === 'image_judge_failed' && legalKind(mr),
+        `${mr.status}/${mr.failure_kind}/called=${mCalled}`);
+      imageFailureResults.push(mr);
     } finally {
       try { fs.unlinkSync(mutantPath); } catch { /* 清理失败不影响断言 */ }
     }
@@ -234,6 +266,11 @@ const writeStub = (content, headers = { 'content-length': String(Buffer.byteLeng
   T('B13 bad_content：有 file_name 没 file_key → 说拿不到下载地址，不瞎猜',
     r.status === 'bad_content' && /file_key/.test(r.reply), r.status);
 }
+
+/* ── B13b. 图片 failure_kind 枚举：不许再出现自由值 ─────────────────── */
+T('B13b ★ 图片失败 failure_kind 全部落在合法枚举（fetch_error/parse_error/empty/unsupported）',
+  imageFailureResults.length >= 5 && imageFailureResults.every(legalKind),
+  imageFailureResults.map((r) => r.failure_kind).join(','));
 
 /* ── B14–B19. 残留读数与生命周期台账（只数不删）─────────────────────── */
 {

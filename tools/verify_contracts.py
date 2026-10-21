@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-verify_contracts.py —— 三份契约 schema 的正/负样本校验（T1-C1）
+verify_contracts.py —— 五份契约 schema 的正/负样本校验（T1-C1）
 
 **它修的是什么**：技术方案里到处引用 `contracts/*.schema.json`，而 `contracts/` 目录
 此前根本不存在。这个脚本做两件事：
-  ① 校验**三份 schema 文件本身**结构合法（不是空壳、required 非空、enum 非空）；
+  ① 校验**五份 schema 文件本身**结构合法（不是空壳、required 非空、enum 非空）；
   ② 喂**正/负样本**给每份 schema，断言好样本过、坏样本必须被拒。
 
 ──────────────────────────────────────────────────────────────
@@ -249,11 +249,11 @@ def samples() -> dict:
         "skill_hash": "abc", "started_at": "2026-10-18T10:00:00Z",
         "ended_at": "2026-10-18T10:00:03Z",
         "steps": [
-            {"name": "normalize", "input_digest": "d1", "output_digest": "d2", "elapsed_ms": 10},
-            {"name": "judge", "input_digest": "d3", "output_digest": "d4", "elapsed_ms": 20},
-            {"name": "dispose", "input_digest": "d5", "output_digest": "d6", "elapsed_ms": 5},
-            {"name": "output", "input_digest": "d7", "output_digest": "d8", "elapsed_ms": 5},
-            {"name": "evaluate", "input_digest": "d9", "output_digest": "d10", "elapsed_ms": 3},
+            {"name": "normalize", "input_summary": "d1", "output_summary": "d2", "duration_ms": 10},
+            {"name": "judge", "input_summary": "d3", "output_summary": "d4", "duration_ms": 20},
+            {"name": "dispose", "input_summary": "d5", "output_summary": "d6", "duration_ms": 5},
+            {"name": "output", "input_summary": "d7", "output_summary": "d8", "duration_ms": 5},
+            {"name": "evaluate", "input_summary": "d9", "output_summary": "d10", "duration_ms": 3},
         ],
         "skipped": [],
         "rule_snapshot": "r1", "kb_snapshot": "k1",
@@ -351,8 +351,13 @@ def samples() -> dict:
                 "state": "PASS", "layer": "DP1", "release_status": "已放行"}}, False),
             ("state 枚举外", {**good_receipt, "disposition": {
                 "state": "OK", "layer": "DP1", "release_status": "待放行"}}, False),
+            ("step 旧字段名 input_digest/elapsed_ms 必须拒绝", {
+                **good_receipt,
+                "steps": [{"name": "normalize", "input_digest": "d1",
+                           "output_digest": "d2", "elapsed_ms": 1}]}, False),
             ("step 名枚举外", {**good_receipt, "steps": [
-                {"name": "loop", "input_digest": "d", "output_digest": "d", "elapsed_ms": 1}]}, False),
+                {"name": "loop", "input_summary": "d",
+                 "output_summary": "d", "duration_ms": 1}]}, False),
             ("skipped.reason 用了「提前停」（第一阶段不存在）", {**good_receipt, "skipped": [
                 {"step": "judge", "reason": "early_stop"}]}, False),
             ("缺必填 skill_hash", {k: v for k, v in good_receipt.items() if k != "skill_hash"}, False),
@@ -616,13 +621,20 @@ def check_behavior(schemas: dict) -> list:
             uri="inline:contract-image", extractor="contract-test",
             covers=["图内文字"], does_not_cover=["画面语义"])
         image_unit["parse_status"] = "ok"
-        real_ir = production_judge(image_unit, clock=lambda: 1000)["ir"]
+        judged = production_judge(image_unit, clock=lambda: 1000)
+        real_ir = judged["ir"]
+        real_receipt = judged["receipt"]
         real_errors = validate(real_ir, schemas["review-ir-v1"])
+        receipt_errors = validate(real_receipt, schemas["receipt-v1"])
     except Exception as exc:  # noqa: BLE001
         real_errors = ["%s: %s" % (type(exc).__name__, exc)]
+        receipt_errors = list(real_errors)
     ok("B-8", not real_errors,
        "真实 judge_entry 图片 ReviewIR 喂 schema：%s" %
        ("通过" if not real_errors else real_errors[:3]))
+    ok("B-9", not receipt_errors,
+       "真实 judge_entry 图片 receipt 喂 schema：%s" %
+       ("通过" if not receipt_errors else receipt_errors[:3]))
 
     return out
 

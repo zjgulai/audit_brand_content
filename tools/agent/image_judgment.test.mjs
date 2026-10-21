@@ -56,7 +56,7 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'image-judgment-test-'));
 }
 fs.writeFileSync(path.join(tmp, 'not-an-image.img'), '这不是图片，只有文本字节。');
 
-const { runImageJudgment, summarizeImageJudgment, compactJudgment } =
+const { runImageJudgment, summarizeImageJudgment, compactJudgment, buildImageJudgeArgs } =
   await import('./image_judgment.mjs');
 
 /* ── D. 真实链路：image message → 下载 → **默认** judgeImage → base 入口 ──
@@ -84,8 +84,7 @@ const pngBytes = fs.readFileSync(path.join(tmp, 'white.png'));
   });
   T('D1 真实链路：image message → 下载 → 默认 judgeImage 真跑到 base 入口',
     downloaded === true && r.status === 'image_judge_failed'
-      && r.parse_status === 'failed'
-      && typeof r.failure_kind === 'string' && r.failure_kind.length > 0,
+      && r.parse_status === 'failed' && r.failure_kind === 'empty',
     JSON.stringify({ downloaded, status: r.status, parse: r.parse_status,
                      failure: r.failure_kind }));
   T('D2 真实链路失败仍返回未审查/DP0（不是「附件不支持」）',
@@ -103,8 +102,8 @@ const pngBytes = fs.readFileSync(path.join(tmp, 'white.png'));
   });
   T('A1 真跑 base 入口 → ok=true，返回 judgment（不是 None）',
     r.ok === true && !!r.judgment && !!r.unit, JSON.stringify({ ok: r.ok, error: r.error }));
-  T('A2 白图无可读文字 → parse_status=failed + failure_kind',
-    r.unit?.parse_status === 'failed' && typeof r.unit?.failure_kind === 'string',
+  T('A2 白图无可读文字 → parse_status=failed + failure_kind=empty',
+    r.unit?.parse_status === 'failed' && r.unit?.failure_kind === 'empty',
     `${r.unit?.parse_status}/${r.unit?.failure_kind}`);
   T('A3 失败图片的 label 是「未审查」',
     r.judgment?.label === '未审查', String(r.judgment?.label));
@@ -122,8 +121,7 @@ const pngBytes = fs.readFileSync(path.join(tmp, 'white.png'));
 {
   const r = await runImageJudgment({
     filePath: path.join(tmp, 'not-an-image.img'), messageId: 'om_test_bad',
-  });
-  T('B1 坏图也返回 judgment（parse_status=failed），不是 None',
+  });  T('B1 坏图也返回 judgment（parse_status=failed），不是 None',
     r.ok === true && !!r.judgment && r.unit?.parse_status === 'failed',
     JSON.stringify({ ok: r.ok, parse: r.unit?.parse_status, error: r.error }));
   T('B2 坏图的 label 仍是「未审查」',
@@ -139,6 +137,37 @@ const pngBytes = fs.readFileSync(path.join(tmp, 'white.png'));
   const sum = summarizeImageJudgment({ ok: false, error: '模拟入口坏了' });
   T('C1 入口异常 → 摘要说未审查/DP0，不是附件不支持',
     /未审查（DP0）/.test(sum) && /不是「附件不支持」/.test(sum), sum);
+}
+
+/* ── E. 实际 argv 回读：必须带 --uri feishu-message:<id> ─────────────── */
+{
+  const built = buildImageJudgeArgs({ filePath: '/tmp/x.png', messageId: 'om_argv' });
+  T('E1 纯函数构造的 argv 含 --uri feishu-message:om_argv',
+    built.ok && built.args.includes('--uri')
+      && built.args[built.args.indexOf('--uri') + 1] === 'feishu-message:om_argv',
+    built.args.join(' '));
+
+  let seen = null;
+  const fakeExec = async (cmd, args) => {
+    seen = { cmd, args };
+    return { stdout: JSON.stringify({
+      unit_id: 'u-test', parse_status: 'ok', failure_kind: null,
+      label: 'REVIEW', layer: 'L1', release_status: '待放行',
+      findings: 0, ir: {}, receipt: {},
+    }) };
+  };
+  const rr = await runImageJudgment({
+    filePath: '/tmp/x.png', messageId: 'om_argv2', exec: fakeExec,
+  });
+  T('E2 runImageJudgment 实际传给子进程的 argv 含 --uri feishu-message:om_argv2',
+    rr.ok && !!seen && seen.args.includes('--uri')
+      && seen.args[seen.args.indexOf('--uri') + 1] === 'feishu-message:om_argv2',
+    seen ? seen.args.join(' ') : 'exec 未被调用');
+
+  const noUri = await runImageJudgment({ filePath: '/tmp/x.png', exec: fakeExec });
+  T('E3 没有稳定 URI → 拒绝调用，不回落到 file://',
+    noUri.ok === false && /稳定 URI/.test(String(noUri.error)),
+    String(noUri.error));
 }
 
 try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* 清理失败不影响断言 */ }

@@ -444,6 +444,10 @@ export async function ingestAttachment(msg, {
                   + '这是这条事件的内容问题，不是权限问题。' });
   }
   const isImage = a.type === 'image';
+  // ★ 图片侧**合成**的 failure_kind 只能落在 ContentUnit/ReviewIR 的合法域：
+  //   fetch_error / parse_error / empty / unsupported。
+  //   下载失败/超限 → fetch_error；空文件 → empty；入口/解析失败 → parse_error。
+  //   自由值会让下游契约校验直接拒绝，且不会有人读得懂它属于哪一档。
   if (!isImage && !isTextAttachment(a.fileName)) {
     return finish('unsupported_type', { reason: 'attachment_type_unparsed', ...baseMeta,
              reply: `附件「${name}」我收到了，但这类文件的内容解析**这条链路还没接上**。`
@@ -465,6 +469,9 @@ export async function ingestAttachment(msg, {
     // mkdtemp 默认 0700；文件名不用用户给的名字（避免路径穿越），只保留扩展名。
     dir = fs.mkdtempSync(path.join(root, 'msg-'));
     const effectiveMax = isImage ? MAX_IMAGE_BYTES : maxBytes;
+    // ★ 图片用中性后缀 `.img`：飞书附件没有可靠文件名/后缀，临时文件也不该
+    //   冒充某个具体格式。base 的 image_file_row 已不按 suffix 拒绝，
+    //   Vision 按**内容**解码；未知/坏字节会显式落 parse_error/未审查。
     const ext = isImage ? '.img' : path.extname(a.fileName).toLowerCase();
     const dest = path.join(dir, `attachment${ext}`);
     const got = await downloadMessageResource({
@@ -476,7 +483,7 @@ export async function ingestAttachment(msg, {
         const summary = `图片未审查（DP0）：文件超过读取上限（${got.size ?? '大小未知'} 字节），`
           + '没有下载/判定。这是未审查，不是「附件不支持」。';
         return finish('image_judge_failed', { reason: 'image_too_large', ...baseMeta,
-          size: got.size ?? null, parse_status: 'failed', failure_kind: 'too_large',
+          size: got.size ?? null, parse_status: 'failed', failure_kind: 'fetch_error',
           summary, reply: summary });
       }
       return finish('too_large', { reason: 'attachment_too_large', ...baseMeta, size: got.size ?? null,
@@ -489,7 +496,7 @@ export async function ingestAttachment(msg, {
         const summary = '图片未审查（DP0）：文件是空的（0 字节），没有进入判定。'
           + '这是未审查，不是「附件不支持」。';
         return finish('image_judge_failed', { reason: 'image_empty', ...baseMeta,
-          parse_status: 'failed', failure_kind: 'empty_file', summary, reply: summary });
+          parse_status: 'failed', failure_kind: 'empty', summary, reply: summary });
       }
       return finish('empty', { reason: 'attachment_empty', ...baseMeta,
                reply: `附件「${name}」取到了，但文件是空的（0 字节）。` });
@@ -500,10 +507,7 @@ export async function ingestAttachment(msg, {
       //   finish() 在判定完成后删除本次临时目录，台账记 deleted 的实际结果。
       let judged;
       try {
-        judged = await judgeImage({
-          filePath: dest, messageId: msg.message_id,
-          pageUri: `feishu:message:${msg.message_id}`,
-        });
+        judged = await judgeImage({ filePath: dest, messageId: msg.message_id });
       } catch (e) {
         judged = { ok: false, error: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
       }
@@ -515,7 +519,7 @@ export async function ingestAttachment(msg, {
         reason: status, ...baseMeta, size: got.size,
         image_status: judged.row_status ?? null,
         parse_status: parseStatus,
-        failure_kind: judged.unit?.failure_kind ?? (judged.ok ? null : 'runner_error'),
+        failure_kind: judged.unit?.failure_kind ?? 'parse_error',
         judgment: compactJudgment(judged.judgment),
         summary, reply: summary,
         ...(judged.ok ? {} : { error: judged.error ?? 'unknown' }),
@@ -541,7 +545,7 @@ export async function ingestAttachment(msg, {
         + '这是未审查，不是「附件不支持」，也不是「图片里没有内容」。';
       return finish('image_judge_failed', { reason: 'image_download_failed', ...baseMeta,
         error: e?.message ?? String(e), parse_status: 'failed',
-        failure_kind: 'download_failed', summary, reply: summary });
+        failure_kind: 'fetch_error', summary, reply: summary });
     }
     return finish('download_failed', { reason: 'attachment_download_failed', ...baseMeta,
              error: e?.message ?? String(e),

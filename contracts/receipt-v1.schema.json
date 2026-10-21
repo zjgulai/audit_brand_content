@@ -26,16 +26,16 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "input_digest", "output_digest", "elapsed_ms"],
+        "required": ["name", "input_summary", "output_summary", "duration_ms"],
         "properties": {
           "name": {
             "type": "string",
             "enum": ["normalize", "judge", "dispose", "output", "evaluate"],
             "description": "五步封闭集合。★ 第一阶段五步各执行一次、无回边、无轮次（委托方 2026-10-18 定）"
           },
-          "input_digest": { "type": "string", "minLength": 1 },
-          "output_digest": { "type": "string", "minLength": 1 },
-          "elapsed_ms": { "type": "integer", "minimum": 0 }
+          "input_summary": { "type": "string", "minLength": 1 },
+          "output_summary": { "type": "string", "minLength": 1 },
+          "duration_ms": { "type": "number", "minimum": 0 }
         }
       }
     },
@@ -63,15 +63,7 @@
     "obligations": {
       "type": "array",
       "description": "并行义务（§3.3.8.1b）。必须同时出现在报告与回执里 —— 没有字段那句话就没有落点",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["kind", "finding_id"],
-        "properties": {
-          "kind": { "type": "string", "minLength": 1 },
-          "finding_id": { "type": "string", "minLength": 1 }
-        }
-      }
+      "items": { "type": "string", "minLength": 1 }
     },
     "invariant_violation": {
       "type": ["object", "null"],
@@ -121,7 +113,21 @@
           "description": "★ 只有这一个值。放行状态由 release_gate 改，**不在回执里改**（L3-5：不存在标签到发布状态的直连路径）"
         }
       }
-    }
+    },
+    "unknown_buckets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "scene_domain", "authority_source", "consequence"],
+      "properties": {
+        "family": { "type": "integer", "minimum": 0 },
+        "scene_domain": { "type": "integer", "minimum": 0 },
+        "authority_source": { "type": "integer", "minimum": 0 },
+        "consequence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "unknown_bucket_total": { "type": "integer", "minimum": 0 },
+    "handoff_reason": { "type": ["string", "null"] },
+    "target_layer": { "type": ["string", "null"] }
   },
   "x-notes": [
     "★ 五步齐全（normalize/judge/dispose/output/evaluate 各一次）**不是**靠 schema 的 allOf 表达的。",

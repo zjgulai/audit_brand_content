@@ -154,8 +154,10 @@ def main():
         report(bool(ok_result) and path.is_file() and not C.validate(ok_unit),
                "C9 单图 unit 可序列化且契约合法")
         image_path = Path((ok_row.get("fetch") or {})["path"])
+        neutral_path = Path(td) / "attachment.img"
+        neutral_path.write_bytes(image_path.read_bytes())
         try:
-            file_result = media.judge_image_file(image_path, uri="inline:file-test")
+            file_result = media.judge_image_file(neutral_path, uri="inline:file-test")
         except Exception as exc:  # noqa: BLE001
             report(False, "C9b 实时图片文件路径可直接 OCR→判定",
                    "%s: %s" % (type(exc).__name__, exc))
@@ -165,7 +167,22 @@ def main():
                and file_result["unit"]["source"]["uri"] == "inline:file-test"
                and file_result["judgment"]["label"] in
                {"BLOCK", "REVIEW", "未审查", "待自决", "PASS"},
-               "C9b 实时图片文件路径可直接 OCR→判定")
+               "C9b 中性后缀实时图片可按内容 OCR→判定且保留稳定 URI")
+        empty_row = {
+            "status": "empty", "page_key": "empty", "url": "inline:empty",
+            "alt": "", "fetch": {"status": "ok", "path": str(image_path)},
+            "ocr": {"ok": True, "chars": 0, "n": 0}, "ocr_text": "",
+        }
+        try:
+            empty_result = media.judge_row(empty_row, "inline:empty")
+        except Exception as exc:  # noqa: BLE001
+            report(False, "C9c OCR 成功但无文字 → failure_kind=empty",
+                   "%s: %s" % (type(exc).__name__, exc))
+            empty_result = None
+        report(empty_result is not None
+               and empty_result["unit"]["failure_kind"] == "empty"
+               and empty_result["judgment"]["label"] == "未审查",
+               "C9c OCR 成功但无文字 → failure_kind=empty")
 
     # M1 源码变异：临时副本断开 judge_row→row_to_unit，整份 verifier 必须 rc=1。
     if os.environ.get("IMAGE_MUTANT_CHILD") != "1":

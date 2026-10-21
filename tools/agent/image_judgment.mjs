@@ -33,18 +33,48 @@ export const IMAGE_JUDGE_TIMEOUT_MS = 180_000;
  * @returns {Promise<{ok:boolean, judgment?:object, unit?:object, row_status?:string,
  *                    elapsed_ms?:number, error?:string, code?:string|null}>}
  */
+/**
+ * 构造调用 base CLI 的**实际 argv**。纯函数，离线可证。
+ *
+ * ★ 必须带稳定 URI：`feishu-message:<message_id>`。
+ *   不传的话 base 会落本地临时 file://，而临时目录在判定后被删除 —— 审计来源失真。
+ *   没有 messageId 时只接受调用方显式给的 pageUri；两个都没有就**拒绝调用**，
+ *   不允许回落到 file://。
+ */
+export function buildImageJudgeArgs({ filePath, messageId = '', pageUri = null } = {}) {
+  if (!filePath) return { ok: false, error: '缺少图片路径' };
+  const uri = messageId ? `feishu-message:${messageId}` : pageUri;
+  if (!uri) {
+    return {
+      ok: false,
+      error: '缺少稳定 URI（messageId / pageUri）—— 不允许回落到本地 file://',
+    };
+  }
+  return {
+    ok: true,
+    uri: String(uri),
+    args: [MEDIA_PY, '--judge-image', String(filePath), '--uri', String(uri), '--json'],
+  };
+}
+
+/**
+ * 调稳定入口：`.venv/bin/python base/media.py --judge-image <PATH> --uri <URI> --json`。
+ *
+ * @returns {Promise<{ok:boolean, judgment?:object, unit?:object, unit_id?:string,
+ *                    uri?:string, elapsed_ms?:number, error?:string, code?:string|null}>}
+ */
 export async function runImageJudgment({
   filePath, messageId = '', pageUri = null, timeoutMs = IMAGE_JUDGE_TIMEOUT_MS,
+  // 测试注入点：用于回读**实际传给子进程的 argv**，默认是 promisify(execFile)。
+  exec = execFileP,
 } = {}) {
-  if (!filePath) return { ok: false, error: '缺少图片路径' };
+  const built = buildImageJudgeArgs({ filePath, messageId, pageUri });
+  if (!built.ok) return built;
   if (!fs.existsSync(PYTHON) || !fs.existsSync(MEDIA_PY)) {
     return { ok: false, error: `未找到 ${PYTHON} 或 ${MEDIA_PY}（base 图片判定需要仓库 venv）` };
   }
-  // CLI 目前不接受 uri/message-id；保留参数只为调用方接口稳定。
-  void messageId; void pageUri;
   try {
-    const args = [MEDIA_PY, '--judge-image', String(filePath), '--json'];
-    const { stdout } = await execFileP(PYTHON, args, {
+    const { stdout } = await exec(PYTHON, built.args, {
       cwd: REPO_ROOT, timeout: timeoutMs, maxBuffer: 1 << 25,
     });
     const r = JSON.parse(stdout);
@@ -70,6 +100,7 @@ export async function runImageJudgment({
     };
     return {
       ok: true, judgment, unit, unit_id: r.unit_id ?? null,
+      uri: built.uri,
       // CLI 不返回 row_status；不要编一个。image_status 在 meta 里会是 null。
       row_status: null, elapsed_ms: r.elapsed_ms ?? null,
     };

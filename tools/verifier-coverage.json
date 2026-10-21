@@ -141,7 +141,7 @@
   },
   {
    "verifier": "tools/verify_contracts.py",
-   "asserts": "五份 contracts/*.schema.json 的结构与正负样本校验（attempt / receipt / review-ir / business-command-batch / projection-status）+ fresh seq/hash 恒等式",
+   "asserts": "五份 contracts/*.schema.json 的结构与正负样本；fresh seq/hash 恒等式；真实 judge_entry 图片 ReviewIR/receipt 分别经 B-8/B-9 喂 schema，旧 receipt step 字段名必须拒绝",
    "subjects": [],
    "dynamic": "五份 schema 名在源码 SCHEMAS 元组里列举、文件名运行时拼出（f\"{name}.schema.json\"），静态 subjects 无法逐字命中；运行期按该元组逐份加载并做正负样本"
   },
@@ -257,7 +257,7 @@
   },
   {
    "verifier": "tools/verify_image_judgment.py",
-   "asserts": "Q4-② 图片接线：盘上图片 row→ContentUnit→RuleJudge/Orchestrator；成功/失败 parse_status、五标签、OCR文字边界与源码变异断线必红",
+   "asserts": "Q4-② 图片接线：盘上120图 row→ContentUnit→RuleJudge/Orchestrator；实时中性后缀 file path + stable URI；成功/失败 parse_status、empty 四值、五标签、OCR文字边界与源码变异断线必红",
    "subjects": [
     "base/media.py",
     "base/normalizer.py",
