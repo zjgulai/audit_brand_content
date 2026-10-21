@@ -449,6 +449,12 @@
       "section": "7.3",
       "kind": "current",
       "heading": "一票否决项（P0 级，命中即 BLOCK）"
+    },
+    {
+      "file": "Playbook/内容审查Agent-产品Playbook-v0.md",
+      "section": "5.3.2",
+      "kind": "current",
+      "heading": "REVIEW"
     }
   ]
 }
