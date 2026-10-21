@@ -80,8 +80,18 @@ _RE_MEDIA_TMP_API = re.compile(
     r"medias/batch_get_tmp_download_url(?:$|[?#\s])", re.I)
 _RE_IM_RESOURCE_API = re.compile(
     r"im/v1/messages/[^/\s]+/resources/[^/\s]+(?:$|[?#\s])", re.I)
+# ★ 2026-10-21 扩第四族 `external_http`：Momcozy 商品图采集
+#   （`tools/momcozy/lib/image.mjs` 的 `fetchOnce`）走的是**外站**普通 HTTPS，
+#   不是飞书接口。它同样「把客户素材取回本地」，所以同样必须登记、
+#   同样要过 landing_root 的仓外 + 0700 判据。
+#   ★ 不扩这一族会怎样：momcozy 一旦入库，DG-1 会报「调用点没被任何登记项覆盖」，
+#     而登记表里**无族可归** —— 那是一条无法消除的红。上一个扩族（im_message_resource）
+#     的注释已经记过这件事。
+_RE_EXTERNAL_HTTP_API = re.compile(
+    r"^(?:https?://|https?\.request\s+path=)", re.I)
 
-KNOWN_API_KINDS = ("drive_file", "media_tmp_url", "im_message_resource")
+KNOWN_API_KINDS = ("drive_file", "media_tmp_url", "im_message_resource",
+                   "external_http")
 RETENTIONS = ("run-scoped", "24h", "7d", "30d", "1y")
 DATA_CLASSES = ("public", "internal", "confidential", "pii")
 
@@ -140,6 +150,9 @@ def _api_kind_of_registry_api(api):
         return "drive_file"
     if _RE_IM_RESOURCE_API.search(s):
         return "im_message_resource"
+    # 放在最后：飞书三族都带完整 URL，若先判外站会把它们一起吞掉。
+    if _RE_EXTERNAL_HTTP_API.search(s):
+        return "external_http"
     return None
 
 
@@ -171,6 +184,13 @@ def _call_api_kind(call):
     # SDK 只给方法名、没有 URL 字面量时，download 系列按 drive_file 归族。
     if str(call.get("sink") or "") == "sdk" and "download" in low:
         return "drive_file"
+    # 外站普通 HTTP：JS 扫描器把它记成 sink=https.request、shape=request_path，
+    # `api` 形如 `https.request path=pathAndQuery`（没有域名 —— 域名是运行时才拼的）。
+    # ★ 必须放在最后：前面三族都带飞书域名/路径，先判外站会把它们吞掉。
+    # ★ 这一条**只看形状**，不猜 URL：request_path 是「用 https.request + path 键」
+    #   的确定形状，而它既不是 SDK 也不是飞书域名 —— 归 external_http 是唯一不撒谎的选择。
+    if str(call.get("shape") or "") == "request_path":
+        return "external_http"
     return None
 
 

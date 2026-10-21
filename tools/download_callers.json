@@ -33,6 +33,18 @@
    "retention": "run-scoped",
    "data_class": "confidential",
    "never_tracked": true
+  },
+  {
+   "path": "tools/momcozy/lib/image.mjs",
+   "symbol": "fetchOnce",
+   "api": "https.request path=<商品图 URL>",
+   "api_kind": "external_http",
+   "ordinal": 1,
+   "consumer": "tools/momcozy/batch_download.py（Momcozy 商品图采集）",
+   "landing_root": "/Users/lute/audit-data/momcozy-catalog",
+   "retention": "run-scoped",
+   "data_class": "confidential",
+   "never_tracked": true
   }
  ]
 }
