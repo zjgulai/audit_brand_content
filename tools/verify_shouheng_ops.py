@@ -133,9 +133,17 @@ def make_sandbox_gate(*, remove_rescue_why=False):
     bin_dir = d / "bin"
     bin_dir.mkdir()
     marker = d / "kick"
+    # ★ 2026-10-22 补：`bootout` 必须有**自己的**探针。
+    #   原先这里只有一个 `$MARKER`，而且只有 `kickstart` 写它 —— 于是
+    #   「S4 的标记没被写」对 `--stop` 那条路**恒真**：`--stop` 走的是 `bootout`，
+    #   永远不碰 `MARKER`。一个在它要测的那条路上恒真的断言，等于没测。
+    #   这与 S4 原本要防的形状（§2.4：名字出现过 ≠ 它拦得住）是同一个 ——
+    #   只不过那次长在判据里，这次长在**测试夹具**里。
+    boot_marker = d / "boot"
     launch = ('#!/bin/bash\n'
               'if [ "$1" = "print" ]; then exit 1; fi\n'
               'if [ "$1" = "kickstart" ]; then echo x >> "$MARKER"; exit 0; fi\n'
+              'if [ "$1" = "bootout" ]; then echo x >> "$BOOT_MARKER"; exit 0; fi\n'
               'exit 1\n')
     pgrep = '#!/bin/bash\nexit 1\n'
     (bin_dir / "launchctl").write_text(launch, encoding="utf-8")
@@ -145,8 +153,9 @@ def make_sandbox_gate(*, remove_rescue_why=False):
     env = dict(os.environ)
     env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
     env["MARKER"] = str(marker)
+    env["BOOT_MARKER"] = str(boot_marker)
     env["SHOUHENG_RESTART_CONSENT"] = str(CONSENT_TMP)
-    return gate, env, marker
+    return gate, env, marker, boot_marker
 
 
 def daemon_pid():
@@ -373,7 +382,7 @@ sb = make_sandbox_gate()
 if sb is None:
     check("A6", False, "沙箱副本建不出来")
 else:
-    gate_s, env_s, marker_s = sb
+    gate_s, env_s, marker_s, boot_s = sb
     rc, out = run_sandbox_gate(gate_s, env_s, "--yes", "--no-kick")
     check("A6", rc == 3 and "why" in out and not marker_s.exists(),
           f"--yes 不给理由 → 退出码 {rc}（应 3，救活/重启都必须留痕）")
@@ -401,18 +410,29 @@ else:
           f"--stop --yes 不给理由 → 退出码 {rc}（应 3，停也要留痕）")
 
     # S4：反向对照 —— 带 --why + --no-kick 必须放行且**不 bootout**。
-    # 判据不是「rc==0」，而是「rc==0 **且** 标记文件没被写」—— 只查退出码的话，
+    # 判据不是「rc==0」，而是「rc==0 **且** bootout 探针没被写」—— 只查退出码的话，
     # 一个根本没走到 bootout 的实现也会绿（§2.4：名字出现过 ≠ 它拦得住）。
+    # ★ 探针必须是 `BOOT_MARKER` 而不是 `MARKER`：`--stop` 走 bootout，
+    #   永远不碰 kickstart 的那个 MARKER，拿它当判据会恒真。
     rc, out = run_sandbox_gate(gate_s, env_s, "--stop", "--yes", "--why=selftest", "--no-kick")
-    check("S4", rc == 0 and "--no-kick" in out and not marker_s.exists(),
+    check("S4", rc == 0 and "--no-kick" in out
+          and not marker_s.exists() and not boot_s.exists(),
           f"--stop --no-kick → 退出码 {rc}（应 0，进程未动）")
+
+    # S4r：反向对照 —— 去掉 --no-kick 时必须**真的写到** BOOT_MARKER。
+    # 没有这一条，S4 的「探针没被写」就可能是**探针根本不会响**（夹具坏了），
+    # 而不是实现正确。两者在 S4 里长得一模一样 —— 这正是 §2.1.1 那个形状。
+    rc, out = run_sandbox_gate(gate_s, env_s, "--stop", "--yes", "--why=selftest")
+    check("S4r", boot_s.exists(),
+          f"不带 --no-kick → bootout 探针 {'已' if boot_s.exists() else '未'}触发"
+          f"（应已触发，否则 S4 恒真）")
 
     # A6r：反向对照 —— 删掉 rescue 的 --why 检查，A6 必须红（不是空转）
     sb_r = make_sandbox_gate(remove_rescue_why=True)
     if sb_r is None:
         check("A6r", False, "反向对照的副本建不出来（源码里找不到 rescue 的 --why 块）")
     else:
-        gate_r, env_r, marker_r = sb_r
+        gate_r, env_r, marker_r, _boot_r = sb_r
         rc, out = run_sandbox_gate(gate_r, env_r, "--yes", "--no-kick")
         check("A6r", not (rc == 3 and "why" in out) and not marker_r.exists(),
               f"删掉 rescue 的 --why 检查 → A6 条件不再成立（rc={rc}，未 kickstart）")
