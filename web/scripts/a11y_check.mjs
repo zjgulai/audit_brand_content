@@ -678,6 +678,19 @@ async function runStandaloneSuite(cdp) {
           </form>
         </section>`,
     },
+    {
+      name: "login-page",
+      title: "登录页",
+      body: `
+        <section class="case">
+          <h1>登录</h1>
+          <div class="browser-support" data-browser-support="">
+            <span class="hint">正式支持范围：仅桌面 Google Chrome 最近两个主要版本（Chrome 155 / 156，基准实测于 2026-10-23）</span>
+          </div>
+          <p>使用飞书账号登录后即可进入复核队列。</p>
+          <p><a class="btn" href="#auth-login">使用飞书登录</a></p>
+        </section>`,
+    },
   ];
 
   const buildShellHtml = (innerBody) => `<!doctype html>

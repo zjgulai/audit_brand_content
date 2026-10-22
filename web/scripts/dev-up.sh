@@ -184,11 +184,11 @@ node "${WEB}/scripts/check_review_actions.mjs" \
   > "${RUN_DIR}/actions.json" 2> "${RUN_DIR}/actions.err"
 cat "${RUN_DIR}/actions.json"
 
-echo "[9/11] 无障碍自动检查（12 页全量扫描 + 1280x720 + 320px Reflow）"
+echo "[9/11] 无障碍自动检查（全部工作台页面 15 条路由扫描 + 1280x720 + 320px Reflow）"
 node "${WEB}/scripts/a11y_check.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --enable-dev-identity 1 \
-  --pages "/submit,/inbox,/queue,/cases,/cases/${FIRST_CASE},/appeals,/release,/release/${FIRST_CASE},/takedown,/reports,/reports/report-smoke,/taxonomy,/admin/grants,/admin/sessions" \
+  --pages "/login,/submit,/inbox,/queue,/cases,/cases/${FIRST_CASE},/appeals,/release,/release/${FIRST_CASE},/takedown,/reports,/reports/report-smoke,/taxonomy,/admin/grants,/admin/sessions" \
   --out "${RUN_DIR}/a11y.json" \
   > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
 cat "${RUN_DIR}/a11y.stdout"

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "policy_id": "TS-5",
+  "$note": "前端栈兼容矩阵登记表（#108 / TS-5）。注意：verified=true 的依据仅限『本仓构建与本地联调通过』，不代表上游官方跨库兼容性声明。",
+  "combinations": [
+    {
+      "react": "19.3.1",
+      "react-dom": "19.3.1",
+      "react-router-dom": "7.18.4",
+      "typescript": "5.9.3",
+      "vite": "7.3.7",
+      "@vitejs/plugin-react": "5.2.0",
+      "@types/react": "19.3.0",
+      "@types/react-dom": "19.3.0",
+      "@types/node": "24.19.2",
+      "node_runtime": "v24.21.0",
+      "verified": true,
+      "verified_at": "2026-10-23",
+      "evidence_basis": "本仓构建与本地门禁通过（tsc -b && vite build && verify:static && verify:build rc=0），非上游兼容性声明",
+      "evidence_command": "npm --prefix web run verify:build && node web/scripts/check_frontend_gates.mjs --row 108"
+    }
+  ]
+}

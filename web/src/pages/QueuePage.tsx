@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useIdentity } from "../components/IdentitySwitcher";
+import InlineMetricSummary from "../components/InlineMetricSummary";
 import StatusBadge, { resolveDecisionBadge } from "../components/StatusBadge";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
@@ -346,6 +347,12 @@ export default function QueuePage() {
             快捷键：按 <code>J</code> / <code>K</code> 在右侧同屏切换待办案件；点击左侧案件行直接进入全宽双栏深审页。
           </span>
         </div>
+        <InlineMetricSummary
+          scope="queue"
+          countsLabel={`待办 ${queued.length} 条（REVIEW ${counts.get("REVIEW") ?? 0} / 待自决 ${counts.get("待自决") ?? 0}）`}
+          trendLabel={null}
+          untestedLabel={queued.length > 0 ? "partial" : "未测"}
+        />
         {activeCaseId ? (
           <CaseDetailPage embeddedCaseId={activeCaseId} />
         ) : (

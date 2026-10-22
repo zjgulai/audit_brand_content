@@ -7,6 +7,7 @@ import {
   type CaseDetail,
   type ReportSummary,
 } from "../api/client";
+import InlineMetricSummary from "../components/InlineMetricSummary";
 import StatusBadge, { resolveAuthorityState } from "../components/StatusBadge";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
@@ -154,6 +155,13 @@ export default function ReportPage() {
           {resignMsg.text}
         </div>
       )}
+
+      <InlineMetricSummary
+        scope="report"
+        countsLabel={`finding ${findings.length} 项 · 未评估 ${notEvaluated.length} 项`}
+        trendLabel={null}
+        untestedLabel={ir?.coverage?.coverage_state ?? "未测"}
+      />
 
       <dl className="facts">
         <dt>report_id</dt>

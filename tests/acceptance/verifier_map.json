@@ -742,6 +742,14 @@
       "command": "{venv} {root}/tools/verify_rule_change_regression.py",
       "timeout": 120,
       "cpu_seconds": 90
+    },
+    "108": {
+      "test_id": "acceptance-108",
+      "criteria": "TS-5",
+      "fixture": "{root}/web/scripts/check_frontend_gates.mjs",
+      "command": "node {root}/web/scripts/check_frontend_gates.mjs --row 108 && node {root}/web/scripts/check_frontend_gates.mjs --controls",
+      "timeout": 15,
+      "cpu_seconds": 10
     }
   }
 }

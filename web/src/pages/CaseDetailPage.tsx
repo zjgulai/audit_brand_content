@@ -10,6 +10,7 @@ import {
 } from "../api/client";
 import ContentUnitViewer from "../components/ContentUnitViewer";
 import { useIdentity } from "../components/IdentitySwitcher";
+import InlineMetricSummary from "../components/InlineMetricSummary";
 import ReviewActions from "../components/ReviewActions";
 import StatusBadge, {
   resolveAuthorityState,
@@ -478,6 +479,12 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           <span className="font-data">{ir.receipt_ref ?? "未测"}</span>
           {ir.created_at && <> · {ir.created_at}</>}
         </p>
+        <InlineMetricSummary
+          scope="case"
+          countsLabel={`finding ${(ir.findings ?? []).length} 项 · 未评估 ${notEvaluated.length} 项`}
+          trendLabel={null}
+          untestedLabel={notEvaluated.length > 0 ? "partial" : cov.coverage_state}
+        />
       </div>
 
       <div className="case__workspace">
