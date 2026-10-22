@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
+import BrowserSupportNotice from "./BrowserSupportNotice";
 import { useIdentity } from "./IdentitySwitcher";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
@@ -194,7 +195,10 @@ export default function AppShell() {
         )}
       </main>
       <footer className="shell__footer">
-        判定由后端唯一产出，本页不重算；人工动作只经写 API；五标签一律止于「待放行」。
+        <div>
+          判定由后端唯一产出，本页不重算；人工动作只经写 API；五标签一律止于「待放行」。
+        </div>
+        <BrowserSupportNotice compact />
       </footer>
     </div>
   );

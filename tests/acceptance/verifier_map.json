@@ -704,6 +704,22 @@
       "command": "{venv} {root}/tools/verify_regression_set.py",
       "timeout": 60,
       "cpu_seconds": 45
+    },
+    "116": {
+      "test_id": "acceptance-116",
+      "criteria": "TS-14",
+      "fixture": "{root}/web/scripts/a11y_check.mjs",
+      "command": "node {root}/web/scripts/a11y_check.mjs --standalone",
+      "timeout": 30,
+      "cpu_seconds": 20
+    },
+    "113": {
+      "test_id": "acceptance-113",
+      "criteria": "TS-12",
+      "fixture": "{root}/web/scripts/check_browser_scope.mjs",
+      "command": "node {root}/web/scripts/check_browser_scope.mjs --controls",
+      "timeout": 15,
+      "cpu_seconds": 10
     }
   }
 }

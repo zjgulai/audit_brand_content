@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "policy_id": "TS-12",
+  "browser_family": "Desktop Google Chrome",
+  "window_size_majors": 2,
+  "measured_chrome_version": "156.0.8078.47",
+  "measured_chrome_major": 156,
+  "min_supported_chrome_major": 155,
+  "supported_chrome_majors": [155, 156],
+  "measured_at": "2026-10-23",
+  "max_age_days": 45,
+  "measured_by": {
+    "command": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --version",
+    "stdout": "Google Chrome 156.0.8078.47",
+    "platform": "darwin-arm64 (Darwin 25.6.0)",
+    "session": "audit-multi-content-ea"
+  },
+  "enforcement_mode": "warn_banner_only_non_blocking",
+  "enforcement_honesty_note": "BrowserSupportNotice 仅渲染非支持提示横幅、不阻断路由或 API 操作，因此非支持浏览器下的『静默功能降级/出错』在运行时仍可能发生；不得将该横幅声称为功能级降级容错。"
+}

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { appOrigin, reviewApi } from "../api/client";
+import BrowserSupportNotice from "../components/BrowserSupportNotice";
 
 /**
- * 登录页（T-150）。
+ * 登录页（T-150 + #113 / TS-12 浏览器范围明示）。
  *
  * 生产：后端 `/auth/login` 发起飞书 OAuth；回调后 `csrf` 与 session cookie 由服务端下发。
  * 开发：身份来自 `/dev/session`（只在 dev wrapper 存在），本页直接回队列，
@@ -40,9 +41,10 @@ export default function LoginPage() {
   if (state === "authed") return <Navigate to="/queue" replace />;
 
   return (
-    <main id="main">
+    <main id="main" className="case">
       <section>
         <h1>登录</h1>
+        <BrowserSupportNotice />
         {state === "checking" && <p className="hint">正在检查登录状态…</p>}
         {state === "anon" && (
           <>
