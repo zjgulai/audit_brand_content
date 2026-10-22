@@ -4,6 +4,33 @@
 
 主体：api/production_app.py、api/oauth.py、api/review_api.py、api/write_api.py、
 base/auth_session.py、base/principal_directory.py、base/review_command_service.py。
+
+## 行 132 逐条对账（2026-10-23 T-132；**结论：仍有一件没有对象，故未映射**）
+
+验收表行 132 原文（`PMO/audit/验收表-v3-覆盖全部判据-20261017.md:275`）与
+`Playbook/内容审查Agent-产品Playbook-v1.1.md:1332`（TS-29）要求：
+
+| 行 132 的要求 | 本文件的执行点 | 状态 |
+|---|---|---|
+| 两库是两个独立文件、各自 WAL | **C31a-1**（读真实 `PRAGMA journal_mode`，不读建库代码）+ **R4**（判据自己的反向对照：同一路径/软链/相对路径都必须判 False） | ✅ |
+| 各自清理配置 | **C31a-2**（无策略时要求「无自动清理」被写下来） | ✅ |
+| 各自备份配置 | 不在本文件：`tools/verify_backend_recovery.py` 的 **C1/C7** 断言 session/projection/WAL 哨兵不进备份、恢复不带 session | ✅（跨 verifier） |
+| ① IR 读取仍正常 | **C31c**（读回 `ir_id=ir-prod` 且 decision/unit 对得上） | ✅ |
+| ① **manifest 读取**仍正常 | **无** —— 见下 | ❌ **缺对象** |
+| ② 业务投影查询仍正常 | **C31b**（先 claim 让投影里真有东西，再读回那一条） | ✅ |
+| ③ 系统报 session 不可用而不是整体失败 | **C31**（`/readyz` 503 且 `session_db=false`） | ✅ |
+| 反向对照：损坏业务投影库 → session 认证仍可用 | **C32a** | ✅ |
+
+**为什么 manifest 那半条不补：** 行 132 / TS-29 说的 manifest 是 `base/artifact_store.py`
+的 `manifests/<run_id>.json`（技术解决方案 §3.3 的唯一可见提交点）。而**这套生产装配里
+根本没有接线 artifact_store**：`api/` 下 grep `artifact_store` 为 0 命中，
+`api/production_app.py` 的 `repository` 是 `FileProjectionRepository`（读冻结投影目录的
+JSON 文件，目录里也没有 manifest 文件）。也就是说：不是「没写断言」，是**当前装配里
+没有这个读对象**。为了一条验收措辞去凭空造一个 manifest 读路径，就是拿实现去迎合表格。
+
+结论：**#132 不填 `verifier_map`**（填了会让 runner 报 passed，而 manifest 那半条没人验）。
+两条出路由编排/产品裁定：① 把行 132 的 manifest 半句改掉或降级（架构已变）；
+② 单开票把 artifact_store 接进生产装配，再接映射。
 """
 from __future__ import annotations
 
@@ -104,6 +131,17 @@ def headers(client, key):
     }
 
 
+def dbs_physically_distinct(session_db, projection_db) -> bool:
+    """两库是否指向**不同文件**。
+
+    用 `realpath` 比，不是字符串比：
+      * 相对路径与绝对路径写到同一个文件 → 同一个库；
+      * 软链指到同一个 inode → 同一个库。
+    字符串比会把这两种都判成「分离」，于是 C31a-1 在它们面前恒真。
+    """
+    return os.path.realpath(str(session_db)) != os.path.realpath(str(projection_db))
+
+
 def run_controls():
     """`--controls`：反向对照常驻项。
 
@@ -185,6 +223,31 @@ def run_controls():
         ok("R3 坏头部对照可执行", False, "%s: %s" % (type(exc).__name__, exc))
     finally:
         shutil.rmtree(root, ignore_errors=True)
+
+    # ── R4：C31a-1「两库是独立文件」这条判据自己会不会红 ────────────────────
+    #   ★ 2026-10-23 T-132：「物理分离」如果没有反向对照，就只是一句同义反复 ——
+    #     只要实现里永远给两个不同路径，断言永远绿，而我们不知道它拦不拦得住
+    #     「被配成同一个文件」这件事。05 要的那条正是第 2 项。
+    ok("R4 两条不同路径 → 判据为 True（正常配置）",
+       dbs_physically_distinct("/tmp/a/session.db", "/tmp/a/projection.db") is True)
+    ok("★ R4 session_db 被配成业务投影同一个文件 → 判据为 False（C31a-1 会红）",
+       dbs_physically_distinct("/tmp/a/projection.db", "/tmp/a/projection.db") is False)
+    _r4root = tempfile.mkdtemp(prefix="controls-distinct-")
+    try:
+        _real = os.path.join(_r4root, "shared.db")
+        with open(_real, "wb") as _f:
+            _f.write(b"")
+        _link = os.path.join(_r4root, "session-link.db")
+        os.symlink(_real, _link)
+        ok("R4 软链指向同一个文件 → 判据为 False（证明比的是 realpath，不是字符串）",
+           dbs_physically_distinct(_link, _real) is False)
+        ok("R4 相对路径与绝对路径指向同一个文件 → 判据为 False",
+           dbs_physically_distinct(
+               os.path.relpath(_real, os.getcwd()), _real) is False)
+    except Exception as exc:  # noqa: BLE001
+        ok("R4 软链/相对路径对照可执行", False, "%s: %s" % (type(exc).__name__, exc))
+    finally:
+        shutil.rmtree(_r4root, ignore_errors=True)
 
     print("=" * 72)
     print("verify_production_app · --controls（平台前提的反向对照）")
@@ -663,8 +726,8 @@ def main():
                         _con.close()
                     except Exception as _exc:  # noqa: BLE001
                         db_modes[_label] = "unreadable:%s" % type(_exc).__name__
-                distinct = (os.path.realpath(str(ready_cfg.session_db))
-                            != os.path.realpath(str(ready_cfg.review_projection_db)))
+                distinct = dbs_physically_distinct(
+                    ready_cfg.session_db, ready_cfg.review_projection_db)
                 report(distinct and db_modes == {"session": "wal", "projection": "wal"},
                        "C31a-1 两库是两个独立文件且各自 journal_mode=wal",
                        "distinct=%s modes=%r" % (distinct, db_modes))
