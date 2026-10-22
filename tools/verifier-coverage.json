@@ -677,6 +677,17 @@
     "PMO/audit/waiver-v1.json",
     "PMO/上线Ticket清单-20261022.md"
    ]
+  },
+  {
+   "verifier": "tools/verify_deploy.py",
+   "asserts": "部署工件静态自证：Dockerfile 多阶段 / CMD 不含 --workers（flock writer lease）/ CMD 带 --factory / compose 不绑 0.0.0.0 / 独立 project name 与独立网络 / .env.production 被忽略而 .example 不被忽略 / 12 个必填键与 ProductionSettings.from_env 逐项一致 / 本文件写死的 REQUIRED_ENV 与源码无漂移 / 模板无凭据形态值 / 六个数据路径互不重叠且不在 /app 下 / .dockerignore 排除 .git 与凭据 / healthcheck 打 /healthz 而非依赖外部存储的 /readyz。结论行明写「只证明工件写对了，不证明镜像能构建、容器能起来」",
+   "subjects": [
+    "Dockerfile",
+    "docker-compose.yml",
+    ".env.production.example",
+    ".dockerignore",
+    "api/production_app.py"
+   ]
   }
  ]
 }
