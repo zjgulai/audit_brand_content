@@ -827,6 +827,14 @@
         "research/governance/skeleton/rules-v1.json",
         "research/governance/regression-set-v1.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_pycompat.py",
+      "asserts": "行 105 Python 3.9 vs 3.12 退出码逐条相同。三个要点：① **逐条比退出码**，不是比「有没有红」—— 一条两边都红，对行 105 是合格的（它证明版本不改变结论）；② **变绿也算失败**：3.9 红、3.12 绿说明该检查器原本没在测（判据不稳，不是升级修好了）；③ 两边都红只说明这一半合格，**不说明检查器本身对不对**（后者各有自己的票）。★ 3.9 **按版本号探测不按命令名**：第一版查 `python3.9` 命令名没找到就写「本机无 3.9」，实际 `/usr/bin/python3` 就是 3.9.6 —— 命令名不是解释器本体。找不到 → 退 2。★ `verify_cards.mjs` 是 node，**不参与对比**：混进去会得到一个永远相同的假样本，分母掺水。5 项反向对照（含「3.12 专有语法两边必须不同」证明判据不是恒真）",
+      "subjects": [
+        "tools/verify_depad.py",
+        "tools/verify_kb.py"
+      ]
     }
   ]
 }

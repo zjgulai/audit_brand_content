@@ -750,6 +750,14 @@
       "command": "node {root}/web/scripts/check_frontend_gates.mjs --row 108 && node {root}/web/scripts/check_frontend_gates.mjs --controls",
       "timeout": 15,
       "cpu_seconds": 10
+    },
+    "105": {
+      "test_id": "acceptance-105",
+      "criteria": "（行 105 逐字点名 12 个检查器）",
+      "fixture": "{root}/tools/verify_pycompat.py",
+      "command": "{venv} {root}/tools/verify_pycompat.py",
+      "timeout": 900,
+      "cpu_seconds": 600
     }
   }
 }
