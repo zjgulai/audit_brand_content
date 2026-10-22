@@ -21,7 +21,33 @@ verify_control_points.py —— 控制点主表与路由表的契约验收（L6-
 用法：
   python3 tools/verify_control_points.py            # 正式表
   python3 tools/verify_control_points.py --json     # 机器可读
-  python3 tools/verify_control_points.py --selftest # 反向对照（含 4 个坏样本 + 1 个好样本）
+  python3 tools/verify_control_points.py --selftest # 反向对照（项数以运行输出为准）
+
+## 行 76 逐条对账（2026-10-23 T-76；**结论：两条在本架构里没有对象，故未映射**）
+
+验收表行 76（`PMO/audit/验收表-v3-覆盖全部判据-20261017.md:203`）要四件事：
+
+| 行 76 的要求 | 本仓的执行点 | 状态 |
+|---|---|---|
+| ① 首字母与族不一致的控制点 → 断言按 `family` 走，按首字母推断即红 | 无 | ❌ **无对象** |
+| ② 码分配登记表存在且可读 | **C76-4**（本次新增：非空 + `table_version` 可读） | ✅ |
+| ② 每个新码在登记表里唯一一条分配记录 | **CP-2**（码唯一）+ **C74-1/2/3**（新码各自有规则/依据/版本）+ H 段（历史留痕） | ✅ |
+| ② 只在规则里出现、登记表没有的码 → 红 | **C71-RP2**（悬空 `parent_rule`） | ✅ |
+| ③ schema 保证 `family` 单值 | **C76-1**（非字符串或不在 families 内即红） | ✅ |
+| ③ 同一 `control_code` 不许同时在两族 | **C76-3**（重复且 `family` 不同即红） | ✅ |
+| ③ 跨族挂载样本被拒 | **C76-2**（`families`/`family_split` 无 `family_split_approval` 即红） | ✅（表级） |
+| ④ 跨族规则样本 → 要求拆成两个控制点或拒绝单点挂载 | 无 | ❌ **无对象** |
+| ④ 拆成两个后各自独立 `control_code` / `authority_ref` / 各自挂规则 | **C74-1/2/3** 逐码断言（两个码各自有规则与依据） | ✅（结构级） |
+
+**为什么 ① 与 ④ 不补：**
+
+* ①：全仓**没有任何一行按码的首字母推断族** —— `grep -rn "startswith" base/ tools/ api/`
+  只命中 tempdir 前缀之类无关用法。也就是说「按首字母推断成别的族」这件事在本架构里
+  不存在。`--selftest` 里那条「U99 挂 F1 仍绿」**证明不了它按 family 走**：既然没有前缀
+  逻辑，U99 挂哪一族都会绿 —— 它是一条真空的绿。正确处置是**降级该条要求**，
+  而不是补一条「证明没人按前缀推族」的断言（那是拿断言去证一个否定命题）。
+* ④：本仓没有「挂载一条规则到控制点」这个动作/API；表是静态的，「跨族」只体现为
+  一行带 `families`/`family_split`，由 C76-2 管。没有可构造的「挂载样本」。
 """
 from __future__ import annotations
 
@@ -599,6 +625,16 @@ def check_registry(cp):
         seen[c] = f
     out.append(_check("C76-3", not conflict,
                       f"同一 code 跨族 {len(conflict)}" + (f"：{conflict}" if conflict else "")))
+
+    # ── C76-4：登记表本身必须**非空且带版本** ──────────────────────────
+    #   ★ 2026-10-23 行 76 对账时发现：行 76 ② 要求「码分配登记表文件存在且可读」，
+    #     而这一条此前没有任何编号执行点。更要命的是**空表会让上面三条全部真空绿**：
+    #       control_points=[] → CP-1（无行可错）、CP-2（无码可重）、C76-1/3（无行可查）
+    #       全部通过，只有 C71-RP2 会因为规则悬空而红 —— 而一个刚建的空表连规则都没有。
+    #     所以「表存在且可读」必须落成一条会红的断言，不能靠「读不到就退 2」的隐含前提。
+    empty_registry = (not rows) or _blank(cp.get("table_version"))
+    out.append(_check("C76-4", not empty_registry,
+                      "码分配登记表必须非空且带 table_version（空表会让 CP-1/CP-2/C76-1/C76-3 全部真空绿）"))
     return out
 
 
@@ -1224,6 +1260,20 @@ def selftest(verbose: bool = False) -> int:
     cp["control_points"].append(dict(cp["control_points"][0], family="F2"))
     expect("同一 code 跨族", cp, rt, False, hist, rules)
 
+    # ⑯b 空登记表 → C76-4 红（否则 CP-1/CP-2/C76-1/C76-3 全部真空绿）
+    cp, rt = _deep(cp0), _deep(rt0)
+    cp["control_points"] = []
+    rt["routes"] = []
+    r_empty = evaluate(cp, rt)
+    results.append((
+        "★ 空登记表 → C76-4 红（证明「表存在且可读」不是隐含前提）",
+        "C76-4" in {c["id"] for c in r_empty["reds"]},
+        f"红项={sorted({c['id'] for c in r_empty['reds']})}"))
+    results.append((
+        "反向对照：正常登记表 → C76-4 不红（上面那条不是恒红）",
+        "C76-4" not in {c["id"] for c in evaluate(_deep(cp0), _deep(rt0))["reds"]},
+        ""))
+
     # ⑰b C-78 数量口径（行 78 的 ②③）
     #
     # ★ 这里的样本是**构造的**，因为盘上没有真实 58 子类清单（README 明写「待补」）。
@@ -1611,6 +1661,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    # ★ 2026-10-23：AGENTS §2.1 里新加的几行都写「加 `--controls`」，而本文件的
+    #   反向对照一直叫 `--selftest`。两种叫法都接受，免得「照着文档跑」时报
+    #   usage error（rc=2 会被读成「未测」而没人发现命令根本不存在）。
+    ap.add_argument("--controls", action="store_true",
+                    help="--selftest 的别名")
     ap.add_argument("--table", default=str(TABLE))
     ap.add_argument("--routing", default=str(ROUTING))
     ap.add_argument("--history", default=str(HISTORY))
@@ -1622,7 +1677,7 @@ def main() -> int:
     ap.add_argument("--verbose", action="store_true")
     args = ap.parse_args()
 
-    if args.selftest:
+    if args.selftest or args.controls:
         return selftest(args.verbose)
 
     cp, err1 = load(Path(args.table))
