@@ -5,6 +5,9 @@ import {
   type SubmitMutation,
 } from "./client";
 
+/** confirm / reject 的响应：台账变更 + 被裁决的 finding。 */
+export type FindingMutation = LedgerMutation & { finding?: Record<string, unknown> };
+
 /**
  * 人工写动作只在开发验收包中动态导入；生产构建不引用本模块。
  *
@@ -35,6 +38,35 @@ export const reviewWriteApi = {
     request<DraftMutation>(`/cases/${encodeURIComponent(caseId)}/actions`, {
       method: "POST",
       body: { version, action: "save_draft", draft },
+      idempotencyKey,
+    }),
+
+  /** T-170：逐条确认 / 驳回。reason 可选，作为裁决理由落 authority。 */
+  confirmFinding: (
+    caseId: string,
+    version: number,
+    findingId: string,
+    reason: string,
+    idempotencyKey: string,
+  ) =>
+    request<FindingMutation>(`/cases/${encodeURIComponent(caseId)}/actions`, {
+      method: "POST",
+      body: { version, action: "confirm", finding_id: findingId,
+              ...(reason.trim() ? { reason: reason.trim() } : {}) },
+      idempotencyKey,
+    }),
+
+  rejectFinding: (
+    caseId: string,
+    version: number,
+    findingId: string,
+    reason: string,
+    idempotencyKey: string,
+  ) =>
+    request<FindingMutation>(`/cases/${encodeURIComponent(caseId)}/actions`, {
+      method: "POST",
+      body: { version, action: "reject", finding_id: findingId,
+              ...(reason.trim() ? { reason: reason.trim() } : {}) },
       idempotencyKey,
     }),
 

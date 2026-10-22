@@ -9,6 +9,7 @@ import {
 } from "../api/client";
 import { stateBadge } from "./QueuePage";
 import { useIdentity } from "../components/IdentitySwitcher";
+import ReviewActions from "../components/ReviewActions";
 import taxonomy from "../data/taxonomy.json";
 
 /**
@@ -288,7 +289,6 @@ export default function CaseDetailPage() {
   const badge = stateBadge(dec.state);
   const partial = cov.coverage_state === "partial";
   const notEvaluated = cov.not_evaluated_reason ?? [];
-  const isCandidate = (ir.findings ?? []).some((f) => f.status === "candidate");
   const review = detail.review;
   const leaseActive =
     typeof review?.lease_expires === "number" && review.lease_expires > Date.now() / 1000;
@@ -403,80 +403,31 @@ export default function CaseDetailPage() {
           <dt>正式记录</dt>
           <dd>当前 GET 不返回 formal 摘要</dd>
         </dl>
-        {__REVIEW_WRITE_ENABLED__ && DevReviewActions ? (
-          current ? (
-            <Suspense fallback={<p className="hint">加载开发写动作…</p>}>
-              <DevReviewActions
-                key={`${detail.case_id}:${current.id}`}
-                detail={detail}
-                refresh={refreshAfterWrite}
-              />
-            </Suspense>
-          ) : (
-            <div className="state state--warn" role="note">
-              只读：先显式启用本地开发身份。身份未建立前不会加载写动作。
-            </div>
-          )
+        {__REVIEW_DEV_IDENTITY__ ? (
+          __REVIEW_WRITE_ENABLED__ && DevReviewActions ? (
+            current ? (
+              <Suspense fallback={<p className="hint">加载开发写动作…</p>}>
+                <DevReviewActions
+                  key={`${detail.case_id}:${current.id}`}
+                  detail={detail}
+                  refresh={refreshAfterWrite}
+                />
+              </Suspense>
+            ) : (
+              <div className="state state--warn" role="note">
+                只读：先显式启用本地开发身份。身份未建立前不会加载写动作。
+              </div>
+            )
+          ) : null
         ) : (
-          <div className="state state--warn" role="note">
-            只读：生产认证写入口尚未接入，生产构建不包含人工写动作模块。
-          </div>
-        )}
-        <div className="actions__row" style={{ marginTop: "0.6rem" }}>
-          {isCandidate && (
-            <>
-              {/*
-                ★ 2026-10-20：这两个按钮**刻意禁用**，不是没做完。
-                实测证据（两条，缺一条都不成立）：
-                  1. api/review_api.py:377 是 `FindingStore()` —— 空仓库，
-                     从没从投影载入任何 finding。对真实案件调 confirm 返回
-                     404「finding 不存在」。
-                  2. 即使载入了，读侧也看不见：GET /cases/{id} 的 ir 直接取
-                     投影文件（`case["ir"]`），而 finding_store 在 review_api.py
-                     里一次都没被读过（grep `.active()` → 0 命中）。
-                 于是 write_api 写 finding_store、read_api 读投影文件，
-                 两条路不通。修它要决定「ir.findings 的真相源是谁」，
-                 属 ADR 级变更，不在 Web 范围内。
-                 见 web/docs/handoff-4b.md §五。
-              */}
-              <button
-                type="button"
-                className="btn"
-                disabled
-                title="后端 finding_store 未接线，确认后不会反映到 ir.findings"
-              >
-                确认 finding
-              </button>
-              <button
-                type="button"
-                className="btn"
-                disabled
-                title="后端 finding_store 未接线，驳回后不会反映到 ir.findings"
-              >
-                驳回 finding
-              </button>
-            </>
-          )}
-        </div>
-        {isCandidate && (
-          <div className="state state--warn" role="note" style={{ marginTop: "0.5rem" }}>
-            <strong>逐条确认 / 驳回暂不可用（不是没做完，是后端未接线）</strong>
-            <p style={{ margin: "0.3rem 0 0" }}>
-              写端点 <code>POST /cases/{"{id}"}/actions</code> 的 confirm / reject
-              会写进 <code>finding_store</code>，但该仓库是空的
-              （<code>api/review_api.py:377</code> 未从投影载入），
-              且读侧 <code>GET /cases/{"{id}"}</code> 的 findings 直接取自投影文件、
-              从不读 <code>finding_store</code>。两条路不通 ——
-              点了也看不到变化，所以这里禁用，而不是假装能点。
-            </p>
-          </div>
+          <ReviewActions detail={detail} refresh={refreshAfterWrite} />
         )}
         <p className="actions__note">
-          {__REVIEW_WRITE_ENABLED__ && DevReviewActions
+          {__REVIEW_DEV_IDENTITY__
             ? current
               ? `当前开发身份：${current.label}（${current.id}）。人工意见不改变机器标签或放行状态。`
               : "当前没有开发 session；页面保持只读。"
-            : "生产构建保持只读；真实认证与持久写链另行验收。"}
+            : "生产：登录后可认领、存草稿、提交与逐条裁决；人工意见不改变机器标签或放行状态。"}
         </p>
       </div>
 

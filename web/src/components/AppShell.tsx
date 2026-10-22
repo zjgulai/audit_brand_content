@@ -1,5 +1,45 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Navigate, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useIdentity } from "./IdentitySwitcher";
+import { reviewApi } from "../api/client";
+
+/**
+ * 生产身份区（T-150）：主体由 `ProductionIdentityProvider` 从 `/api/v1/me` 取。
+ * dev 构建不会渲染本组件（`__REVIEW_DEV_IDENTITY__` 分支）。
+ */
+function ProductionIdentity() {
+  const { current, error } = useIdentity();
+  const navigate = useNavigate();
+
+  if (error === "unauthorized") return <Navigate to="/login" replace />;
+  if (!current) {
+    return (
+      <span className={error ? "error" : "hint"} role={error ? "alert" : undefined}>
+        {error ? "身份读取失败" : "正在确认身份…"}
+      </span>
+    );
+  }
+  return (
+    <>
+      <span>{current.label}</span>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          void (async () => {
+            try {
+              await reviewApi.logout();
+            } catch {
+              /* 登出失败也回登录页：session 可能已经失效 */
+            }
+            navigate("/login", { replace: true });
+          })();
+        }}
+      >
+        退出登录
+      </button>
+    </>
+  );
+}
 
 export default function AppShell() {
   const {
@@ -52,7 +92,7 @@ export default function AppShell() {
               </label>
             )
           ) : (
-            <span>只读 · 生产认证写入口未接入</span>
+            <ProductionIdentity />
           )}
           {error && (
             <span className="error" role="alert">

@@ -1,4 +1,5 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
+import { reviewApi } from "../api/client";
 
 export interface Identity {
   id: string;
@@ -33,10 +34,45 @@ export const EMPTY_IDENTITY: IdentityState = {
 
 export const IdentityContext = createContext<IdentityState>(EMPTY_IDENTITY);
 
-/** 生产构建只使用这个 Provider；不会读取 localStorage 或请求 /dev。 */
+/**
+ * 生产构建只使用这个 Provider；不会读取 localStorage 或请求 /dev。
+ * T-150：登录后从 `/api/v1/me` 取当前主体；401 用 `error="unauthorized"` 标记，
+ * 由 AppShell 决定跳登录页（本 Provider 不自己导航，避免登录页也被重定向）。
+ */
 export function ProductionIdentityProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<IdentityState>(EMPTY_IDENTITY);
+  useEffect(() => {
+    let alive = true;
+    reviewApi
+      .me()
+      .then((me) => {
+        if (!alive) return;
+        const identity: Identity = {
+          id: me.principal,
+          label: `${me.principal}（${me.tenant}）`,
+          roles: me.roles,
+          product_lines: me.product_lines,
+        };
+        setState({
+          ...EMPTY_IDENTITY,
+          current: identity,
+          identities: [identity],
+        });
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        const err = e as { status?: number };
+        setState({
+          ...EMPTY_IDENTITY,
+          error: err.status === 401 ? "unauthorized" : "identity_unavailable",
+        });
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   return (
-    <IdentityContext.Provider value={EMPTY_IDENTITY}>
+    <IdentityContext.Provider value={state}>
       {children}
     </IdentityContext.Provider>
   );

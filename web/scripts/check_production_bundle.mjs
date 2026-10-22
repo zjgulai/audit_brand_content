@@ -30,18 +30,28 @@ const forbiddenChecks = [
   ["开发身份列表端点", (text) => !text.includes("/dev/identities")],
   ["替身 principal", (text) => !/u_dp3|u_dp4|u_signer/.test(text)],
   ["开发身份启用控件", (text) => !text.includes("启用本地开发身份")],
-  ["claim 请求路径", (text) => !/[`'\"]\/cases\/\$\{[^}]+\}\/claim/.test(text)],
-  ["actions 请求模板", (text) => !/[`'\"]\/cases\/\$\{[^}]+\}\/actions/.test(text)],
 ];
 const checks = forbiddenChecks.map(([label, predicate]) => [`不含${label}`, predicate(source)]);
-checks.push(["不含写客户端 chunk", files.every((name) => !name.includes("write-client"))]);
+// ★ T-170：生产写 UI 必须在包里（正向断言），且 CSRF 头存在。
+checks.push(["生产包含写入口（/claim）", source.includes("/claim")]);
+checks.push(["生产包含写入口（/actions）", source.includes("/actions")]);
+checks.push(["生产包含 CSRF 头", source.includes("x-csrf-token")]);
 // ★ T-210：内部判定数据只在**生产构建**里必须为空。
 //   dev-up 的 hostile-build 是 `--mode development` 构建，本来就允许带 dev 模块，
 //   所以那一次检查显式不带 `--production`，跳过这两条（不是放行生产）。
 const hasInternalData = (text) =>
   text.includes("rule_examples") || text.includes("boundary_disputes");
 checks.push(["不含内部判定数据（rule_examples / boundary_disputes）", !hasInternalData(source)]);
-checks.push(["生产界面明确只读", source.includes("只读 · 生产认证写入口未接入")]);
+// ★ T-150：生产界面的边界从「完全只读」变成「可登录，但没有签发/撤回控件」。
+//   登录/登出不是内容写；release-decision / release-revoke 仍然只许人经受控入口。
+checks.push(["生产界面提供登录入口（/auth/login）", source.includes("/auth/login")]);
+const hasReleasePath = (text) =>
+  text.includes("/release-decision") || text.includes("/release-revoke");
+checks.push(["不含签发/撤回请求路径（说明文字不算）", !hasReleasePath(source)]);
+checks.push([
+  "反向对照：植入 /release-decision 必须被抓到",
+  hasReleasePath(source + '\nconst __probe = "/release-decision";') === true,
+]);
 // 反向对照：已知坏样本必须让对应谓词失败，证明扫描器不是恒真。
 checks.push([
   "反向对照：植入 /dev/session 必须被抓到",

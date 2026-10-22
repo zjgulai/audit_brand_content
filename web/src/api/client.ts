@@ -1,3 +1,5 @@
+import { csrfHeaders, parseCookie } from "./auth-headers";
+
 /**
  * review-api 客户端。
  *
@@ -19,7 +21,7 @@ export const apiBase = (
 ).replace(/\/$/, "");
 
 /** 同源开发端点的根；只由开发身份模块使用。 */
-export const appOrigin = apiBase.replace(/\/review-api$/, "");
+export const appOrigin = apiBase.replace(/\/(review-api|api\/v1)$/, "");
 
 /** 五标签。闭集 —— 出现别的值是后端坏了，不是新标签。 */
 export const FIVE_LABELS = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"] as const;
@@ -27,6 +29,13 @@ export type Label = (typeof FIVE_LABELS)[number];
 
 /** 队列只允许这两个标签（A1）。 */
 export const QUEUE_LABELS: readonly string[] = ["REVIEW", "待自决"];
+
+export interface Me {
+  principal: string;
+  tenant: string;
+  roles: string[];
+  product_lines: string[];
+}
 
 export interface CaseSummary {
   case_id: string;
@@ -162,13 +171,21 @@ export class ApiError extends Error {
   }
 }
 
+/** 读 cookie。`csrf` 是后端在 `/auth/callback` 下发的（httponly=false，专供 JS 读）。 */
+export function readCookie(name: string): string | null {
+  const jar = typeof document === "undefined" ? null : document.cookie;
+  return parseCookie(jar, name);
+}
+
 export async function request<T>(
   path: string,
   init?: { method?: string; body?: unknown; idempotencyKey?: string },
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
   const headers: Record<string, string> = { Accept: "application/json" };
   if (init?.body !== undefined) headers["Content-Type"] = "application/json";
   if (init?.idempotencyKey) headers["Idempotency-Key"] = init.idempotencyKey;
+  Object.assign(headers, csrfHeaders(method, typeof document === "undefined" ? null : document.cookie));
 
   const res = await fetch(`${apiBase}${path}`, {
     method: init?.method ?? "GET",
@@ -224,4 +241,10 @@ export const reviewApi = {
 
   getReport: (reportId: string) =>
     request<ReportSummary>(`/reports/${encodeURIComponent(reportId)}`),
+
+  /** 当前登录主体（生产）。未登录 → 401。 */
+  me: () => request<Me>("/me"),
+
+  /** 登出：POST（带 CSRF），后端撤销 session 并清 cookie。 */
+  logout: () => request<{ logged_out: boolean }>("/logout", { method: "POST" }),
 };
