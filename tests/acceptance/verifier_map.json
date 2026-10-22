@@ -637,6 +637,12 @@
       "fixture": "{root}/tools/verify_control_points.py",
       "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
     },
+    "76": {
+      "test_id": "acceptance-76",
+      "criteria": "SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
+    },
     "77": {
       "test_id": "acceptance-77",
       "criteria": "SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32",

@@ -23,31 +23,38 @@ verify_control_points.py —— 控制点主表与路由表的契约验收（L6-
   python3 tools/verify_control_points.py --json     # 机器可读
   python3 tools/verify_control_points.py --selftest # 反向对照（项数以运行输出为准）
 
-## 行 76 逐条对账（2026-10-23 T-76；**结论：两条在本架构里没有对象，故未映射**）
+## 行 76 逐条对账（2026-10-23 T-76；**结论：四条全部有执行点，已映射**）
 
 验收表行 76（`PMO/audit/验收表-v3-覆盖全部判据-20261017.md:203`）要四件事：
 
 | 行 76 的要求 | 本仓的执行点 | 状态 |
 |---|---|---|
-| ① 首字母与族不一致的控制点 → 断言按 `family` 走，按首字母推断即红 | 无 | ❌ **无对象** |
+| ① 首字母与族不一致的控制点 → 断言按 `family` 走，按首字母推断即红 | **C76-5a/b/c**（5 条现成反例 + 探针接住 judge_entry 真正传给合成器的 `control_points_by_family`） | ✅ |
 | ② 码分配登记表存在且可读 | **C76-4**（本次新增：非空 + `table_version` 可读） | ✅ |
 | ② 每个新码在登记表里唯一一条分配记录 | **CP-2**（码唯一）+ **C74-1/2/3**（新码各自有规则/依据/版本）+ H 段（历史留痕） | ✅ |
 | ② 只在规则里出现、登记表没有的码 → 红 | **C71-RP2**（悬空 `parent_rule`） | ✅ |
 | ③ schema 保证 `family` 单值 | **C76-1**（非字符串或不在 families 内即红） | ✅ |
 | ③ 同一 `control_code` 不许同时在两族 | **C76-3**（重复且 `family` 不同即红） | ✅ |
 | ③ 跨族挂载样本被拒 | **C76-2**（`families`/`family_split` 无 `family_split_approval` 即红） | ✅（表级） |
-| ④ 跨族规则样本 → 要求拆成两个控制点或拒绝单点挂载 | 无 | ❌ **无对象** |
-| ④ 拆成两个后各自独立 `control_code` / `authority_ref` / 各自挂规则 | **C74-1/2/3** 逐码断言（两个码各自有规则与依据） | ✅（结构级） |
+| ④ 跨族规则样本 → 要求拆成两个控制点或拒绝单点挂载 | **C76-6a**（`parent_rule` 给数组 → 真实装载器 `RuleJudge` 必拒） | ✅ |
+| ④ 拆成两个后各自独立 `control_code` / `authority_ref` / 各自挂规则 | **C76-6b**（两条规则各自装载，码独立、依据齐备）+ C74-1/2/3 | ✅ |
 
-**为什么 ① 与 ④ 不补：**
+**一处误判的更正（2026-10-23，必须留着）**
 
-* ①：全仓**没有任何一行按码的首字母推断族** —— `grep -rn "startswith" base/ tools/ api/`
-  只命中 tempdir 前缀之类无关用法。也就是说「按首字母推断成别的族」这件事在本架构里
-  不存在。`--selftest` 里那条「U99 挂 F1 仍绿」**证明不了它按 family 走**：既然没有前缀
-  逻辑，U99 挂哪一族都会绿 —— 它是一条真空的绿。正确处置是**降级该条要求**，
-  而不是补一条「证明没人按前缀推族」的断言（那是拿断言去证一个否定命题）。
-* ④：本仓没有「挂载一条规则到控制点」这个动作/API；表是静态的，「跨族」只体现为
-  一行带 `families`/`family_split`，由 C76-2 管。没有可构造的「挂载样本」。
+我第一版写的是「① 与 ④ 在本架构里没有对象」，理由是
+`grep` 没找到「按首字母推族」的代码、也没有「挂载 API」。**两条都错了**：
+
+* ① 的对象不在代码里，在**数据**里：主表本身就有 5 条前缀≠族的反例
+  （`H06` 披露控制、`H08` 事实控制、`M03`/`M06` 事实控制、`M07` 披露控制；
+  `H`/`M`/`U` 三个前缀各自横跨 2–3 个族）。更重要的是：`judge_entry` 真正传给
+  `coverage_composer` 的 `control_points_by_family` **可以被探针接住** —— 断言就落在那上面，
+  不落在 `derive_state`（空族还在时它恒为 partial，落那里就是一条永远绿的断言）。
+* ④ 的对象也不在「API」里，在**数据关系**里：`parent_rule` 是运行时读的
+  （`base/rule_judge.py:70`），`RuleJudge` 装载时要求它是**单个字符串** ——
+  所以「单条规则同时挂两个控制点」在挂载点就会被拒，这是可以构造样本验的。
+
+共同形状：**把「grep 没命中」当成「不存在」**（§2.4.1 第 4 行）。否定结论必须写清
+「查了哪几条通道、每条怎么排除」，只写「0 命中」不接受。
 """
 from __future__ import annotations
 
@@ -1057,6 +1064,186 @@ def check_rule_parents(cp, rules):
     return out
 
 
+# ───────── 行 76 ① / ④：族归属不按首字母 · 单点挂载必须被拒 ─────────
+
+#: 主表里**前缀与族不一致**的现成反例（2026-10-23 实测，5 条）。
+#: 它们让「按首字母推族」这个假设被数据当场证伪：H / M 两个前缀各自横跨 2–3 个族。
+FAMILY_MISMATCH_EXPECT = {
+    "H06": "披露控制",
+    "H08": "事实控制",
+    "M03": "事实控制",
+    "M06": "事实控制",
+    "M07": "披露控制",
+}
+
+
+def _family_attr_problems(rows: dict) -> list[str]:
+    """5 条反例码的 family 是否与独立期望一致。纯函数，自测可直接喂样本。"""
+    bad = []
+    for code, fam in FAMILY_MISMATCH_EXPECT.items():
+        got = (rows.get(code) or {}).get("family")
+        if got != fam:
+            bad.append("%s: family=%r 期望 %r" % (code, got, fam))
+    return bad
+
+
+def _prefix_blind(rows: dict) -> list[str]:
+    """前缀多数族恰好等于该码族 → 两种假设不可分辨（断言会退化成恒真）。"""
+    by_prefix = {}
+    for r in rows.values():
+        c, f = r.get("control_code") or "", r.get("family")
+        if c and f:
+            by_prefix.setdefault(c[0], {}).setdefault(f, 0)
+            by_prefix[c[0]][f] += 1
+    majority = {p: max(v, key=v.get) for p, v in by_prefix.items()}
+    return [c for c, fam in FAMILY_MISMATCH_EXPECT.items()
+            if majority.get(c[:1]) in (None, fam)]
+
+
+def check_family_attribution(cp):
+    """C76-5（行 76 ①）：族归属必须按 `family` 字段，不按码首字母。
+
+    ## 为什么断言落在 `control_points_by_family` 而不是 `coverage_state`
+
+    2026-10-23 实测：把 judge_entry 的 by_family 从「按 family 字段」换成
+    「按首字母推」，`derive_state` 的结果**完全一样**（都是 partial）—— 因为空族还在，
+    partial 是恒定的。所以任何「按派生状态判族路由」的断言都是恒真的。
+
+    这里的做法：用**探针**接住 judge_entry 真正传给 `coverage_composer.compose_and_derive`
+    的 `control_points_by_family`，再与「按 family 字段」独立算出的集合对拍。
+    探针只记录参数、照常调用原函数 —— 不改变产品行为，也不是读我们自己复刻的算法。
+    """
+    out = []
+    rows = {r.get("control_code"): r for r in (cp.get("control_points") or [])
+            if isinstance(r, dict)}
+
+    # C76-5a：5 条反例的 family 必须与独立期望一致（前缀都不等于族）
+    wrong = _family_attr_problems(rows)
+    out.append(_check("C76-5a", not wrong,
+                      "5 条前缀≠族的反例必须与独立期望一致；不一致 %d：%s"
+                      % (len(wrong), wrong[:3])))
+
+    # C76-5b：数据必须**真能分辨**两种假设（某个前缀的多数族若恰好等于该码的族，
+    #          这条断言就分辨不出「按前缀」与「按字段」，会退化成恒真）
+    blind = _prefix_blind(rows)
+    out.append(_check("C76-5b", not blind,
+                      "前缀多数族若等于该码族，断言就分辨不出两种假设：%s" % blind))
+
+    # C76-5c：探针接住真实 by_family，与「按 family 字段」独立集合对拍
+    detail = ""
+    ok = False
+    try:
+        import base.coverage_composer as CC
+        from base import contract as C
+        from base.judge_entry import judge_unit
+
+        captured = {}
+        _orig = CC.compose_and_derive
+
+        def _spy(**kwargs):
+            captured.update(kwargs)
+            return _orig(**kwargs)
+
+        CC.compose_and_derive = _spy
+        try:
+            judge_unit(C.from_text("这款吸奶器采用食品级硅胶材质，容量 150ml。"),
+                       clock=lambda: 1000)
+        finally:
+            CC.compose_and_derive = _orig
+
+        by_family = captured.get("control_points_by_family")
+        if not isinstance(by_family, dict) or not by_family:
+            detail = "探针没接住 control_points_by_family（judge_entry 调法变了？）"
+        else:
+            ran = {f for f, v in by_family.items() if v == "ran"}
+            field_ran = {r.get("family") for r in rows.values()
+                         if r.get("status") == "active"}
+            ok = (ran == field_ran)
+            detail = "运行时 ran=%r；按 family 字段=%r" % (sorted(ran), sorted(field_ran))
+    except Exception as exc:  # noqa: BLE001
+        detail = "%s: %s" % (type(exc).__name__, exc)
+    out.append(_check("C76-5c", ok, "族归属必须按 family 字段（探针读真实 by_family）：" + detail))
+    return out
+
+
+def check_single_mounting(cp):
+    """C76-6（行 76 ④）：跨族规则必须在**挂载点**被拒，或拆成两个各自独立的控制点。
+
+    「没有挂载 API」不等于「没有对象」——挂载是**数据关系**：规则用 `parent_rule`
+    指向控制点，而 `base/rule_judge._compile_rule` 在装载时读它、并要求它是**单个字符串**。
+    所以「单点挂载到两个族」这件事在运行时会被拒，这里直接喂给真实装载器验。
+    """
+    import json as _json
+    import tempfile
+    from pathlib import Path as _Path
+
+    out = []
+    try:
+        from base.control_points import ControlPointRegistry
+        from base.rule_judge import InvalidRuleSnapshot, RuleJudge
+    except Exception as exc:  # noqa: BLE001
+        return [_check("C76-6", False, "导入 rule_judge/control_points 失败：%s" % exc)]
+
+    registry = ControlPointRegistry()
+    template = {
+        "rule_key": "verify.cross-family", "parent_rule": "H06",
+        "topic": "T-verify", "topic_label": "verify", "modality": "prohibit",
+        "severity": "L4", "disposition": "auto_reject", "evaluability": "auto",
+        "match": {"keywords": ["x"], "patterns": ["\\bx\\b"], "languages": ["en"]},
+    }
+
+    def load(rules):
+        with tempfile.TemporaryDirectory(prefix="c76-rules-") as td:
+            p = _Path(td) / "rules.json"
+            p.write_text(_json.dumps({"rules": rules}, ensure_ascii=False), encoding="utf-8")
+            return RuleJudge(registry, rules_path=str(p))
+
+    # ④a：把一条规则同时挂到两族（parent_rule 是数组）→ 必须被拒
+    cross = dict(template, parent_rule=["H06", "M03"])
+    raised = None
+    try:
+        load([cross])
+    except InvalidRuleSnapshot as exc:
+        raised = str(exc)
+    except Exception as exc:  # noqa: BLE001
+        raised = "%s: %s" % (type(exc).__name__, exc)
+    out.append(_check("C76-6a", raised is not None,
+                      "单条规则同时挂两个控制点必须被拒（实际：%r）" % (raised,)))
+
+    # ④b：拆成两条、各挂一个 → 必须能装载，且各自 control_code 独立
+    split = [dict(template, rule_key="verify.split.h06", parent_rule="H06"),
+             dict(template, rule_key="verify.split.m03", parent_rule="M03")]
+    try:
+        judge = load(split)
+        codes = {(r.get("control_code") if isinstance(r, dict)
+                  else getattr(r, "control_code", None)) for r in judge.rules}
+        rows = {r.get("control_code"): r for r in (cp.get("control_points") or [])
+                if isinstance(r, dict)}
+        auth_ok = all((rows.get(c) or {}).get("authority_ref") for c in ("H06", "M03"))
+        out.append(_check("C76-6b",
+                          codes == {"H06", "M03"} and auth_ok,
+                          "拆开后两条规则各自的 parent_rule 必须独立且各有 authority_ref；"
+                          "读到 %r，依据齐备=%s" % (codes, auth_ok)))
+    except Exception as exc:  # noqa: BLE001
+        out.append(_check("C76-6b", False, "拆开后的正样本装载失败：%s" % exc))
+
+    # ④c：正常单挂（反向对照）→ 不许被上面那条误伤
+    try:
+        judge_ok = load([dict(template, rule_key="verify.single")])
+        out.append(_check("C76-6c", len(judge_ok.rules) == 1,
+                          "单挂一条规则必须能装载（反向对照：④a 不是恒拒）"))
+    except Exception as exc:  # noqa: BLE001
+        out.append(_check("C76-6c", False, "单挂正样本装载失败：%s" % exc))
+    return out
+
+
+def _is_real_table(cp) -> bool:
+    """这 5 条反例码是否都在表里 —— 在，才说明拿到的是真实主表而不是自测夹具。"""
+    codes = {r.get("control_code") for r in (cp.get("control_points") or [])
+             if isinstance(r, dict)}
+    return set(FAMILY_MISMATCH_EXPECT) <= codes
+
+
 # ─────────────────────────── 汇总 ───────────────────────────
 
 def evaluate(cp, rt, history=None, rules=None, require_history=False,
@@ -1085,6 +1272,12 @@ def evaluate(cp, rt, history=None, rules=None, require_history=False,
     # ★ 不受 --row 限制：悬空 parent_rule 是**任何**行都该看见的问题。
     #   放进 `if 71 in rows` 里，会让 `--row 69` 那份读数对它默默无闻。
     checks += check_rule_parents(cp, rules)
+
+    # ★ 行 76 ①④：只在**真实主表**上跑 —— 这两条依赖真实码（H06/H08/M03/M06/M07）
+    #   与真实登记表；在自测夹具（F1/F2/F3）上跑会变成误报。
+    if _is_real_table(cp):
+        checks += check_family_attribution(cp)
+        checks += check_single_mounting(cp)
     reds = [c for c in checks if not c["ok"]]
     return {"checks": checks, "reds": reds,
             "verdict": "red" if reds else "ok",
@@ -1273,6 +1466,24 @@ def selftest(verbose: bool = False) -> int:
         "反向对照：正常登记表 → C76-4 不红（上面那条不是恒红）",
         "C76-4" not in {c["id"] for c in evaluate(_deep(cp0), _deep(rt0))["reds"]},
         ""))
+
+    # ⑯c 行 76 ① 的判据本身会不会红（纯函数，喂内存样本）
+    _rows_ok = {c: {"control_code": c, "family": f}
+                for c, f in FAMILY_MISMATCH_EXPECT.items()}
+    results.append((
+        "C76-5 好样本：5 条反例的 family 与独立期望一致",
+        not _family_attr_problems(_rows_ok), ""))
+    _rows_bad = {k: dict(v) for k, v in _rows_ok.items()}
+    _rows_bad["H06"]["family"] = "宣称控制"   # 按前缀 H 推出来的族
+    results.append((
+        "★ C76-5 坏样本：把 H06 改成按前缀推出来的族 → 必须红",
+        bool(_family_attr_problems(_rows_bad)), ""))
+    _rows_blind = {"H08": {"control_code": "H08", "family": "事实控制"},
+                   "H06": {"control_code": "H06", "family": "事实控制"}}
+    results.append((
+        "★ C76-5b 坏样本：前缀多数族恰好等于该码族 → 判定不可分辨，必须报出来"
+        "（M 前缀没有样本时也算不可分辨）",
+        "H08" in _prefix_blind(_rows_blind), repr(_prefix_blind(_rows_blind))))
 
     # ⑰b C-78 数量口径（行 78 的 ②③）
     #
