@@ -83,10 +83,67 @@ NOT_EVALUATED = (
 
 PRODUCT_LINES = ("pump", "wearable", "skincare", "feeding")
 TENANTS = ("t1", "t1", "t1", "t2")
+CHANNELS = ("amazon", "shopify", "tiktok", "edm")
 
 
 def _hash16(*parts: object) -> str:
     return hashlib.sha256("|".join(str(p) for p in parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _compose_unit_and_findings(idx: int, n_findings: int, rng: random.Random, state: str, kind: str) -> tuple[dict, list[dict]]:
+    """构造带真实可定位正文的 ContentUnit 与 Findings（满足 G-02 双栏原文高亮联动）。"""
+    findings = []
+    segments = [
+        "【Momcozy 北美上市送审素材 · 编号 #%02d】" % idx,
+        "适用渠道与人群：北美职场妈妈日常吸乳与母婴护理场景。",
+    ]
+    cursor = len("\n".join(segments)) + 1
+
+    for row in range(n_findings):
+        f = _finding(idx, row, rng, state)
+        q = f["quote"]
+        if isinstance(q, str) and q:
+            prefix = "条款段落 %d：本品在实际宣传中声称「" % (row + 1)
+            suffix = "」，请核对合规边界。"
+            start = cursor + len(prefix)
+            end = start + len(q)
+            f["location"] = {"type": "text", "start": start, "end": end}
+            line = prefix + q + suffix
+            segments.append(line)
+            cursor += len(line) + 1
+        findings.append(f)
+
+    segments.append("补充声明：以上文案仅供发布前合规预审，最终放行须经人工签发。")
+    full_text = "\n".join(segments)
+    text_sha = hashlib.sha256(full_text.encode("utf-8")).hexdigest()
+    raw_sha = _hash16(SEED, idx, "raw") * 4
+
+    covers = ["正文文字", "结构化字段"] if kind == "free_text" else ["图片OCR文字"]
+    does_not_cover = (
+        [] if (idx % 3 == 0 and kind == "free_text")
+        else ["画面构图与模特神态", "区域级像素篡改审计"]
+    )
+    unit = {
+        "unit_id": "cu-%s" % _hash16(SEED, idx, "cu"),
+        "kind": kind,
+        "parse_status": "ok" if state != "未审查" else "partial",
+        "text": full_text,
+        "has_text": True,
+        "fields": {
+            "product_line": PRODUCT_LINES[idx % len(PRODUCT_LINES)],
+            "channel": CHANNELS[idx % len(CHANNELS)],
+            "content_stage": "final_content",
+        },
+        "textification": {
+            "covers": covers,
+            "does_not_cover": does_not_cover,
+        },
+        "fingerprint": {
+            "raw_sha256": raw_sha,
+            "text_sha256": text_sha,
+        },
+    }
+    return unit, findings
 
 
 def _finding(idx: int, row: int, rng: random.Random, state: str) -> dict:
@@ -145,8 +202,10 @@ def build_cases() -> list[dict]:
             STATES, weights=(2, 5, 2, 2, 2))[0]
         idx = "c%02d" % i
         case_id = "case-%s" % _hash16(SEED, idx)[:8]
-        findings = [_finding(i, r, rng, state)
-                    for r in range(rng.randint(1, 3))]
+        kind = "free_text" if i % 4 else "image"
+        unit, findings = _compose_unit_and_findings(
+            i, rng.randint(1, 3), rng, state, kind
+        )
         # 每 6 条里放一条「依据过期」的 finding，已在 _finding 里轮转；这里再保证覆盖
         coverage_state = "partial" if i % 3 else "full"
         not_evaluated = ([] if coverage_state == "full"
@@ -172,6 +231,8 @@ def build_cases() -> list[dict]:
             "assignee_id": "u_dp3" if i % 2 == 0 else "u_dp4",
             "actionable": True,
             "sample": True,
+            "entry_channel": CHANNELS[i % len(CHANNELS)],
+            "content_unit": unit,
             "ir": {
                 "ir_id": "ir-%s" % _hash16(SEED, idx, "ir"),
                 "ir_version": "v1",
@@ -179,8 +240,8 @@ def build_cases() -> list[dict]:
                 # ★ 必须是对象 {unit_id, kind} —— api/review_api.py 的 ContentUnitRef
                 #   写成字符串后端会在序列化时 500（ResponseValidationError）。
                 "content_unit_ref": {
-                    "unit_id": "cu-%s" % _hash16(SEED, idx, "cu"),
-                    "kind": "free_text" if i % 4 else "image",
+                    "unit_id": unit["unit_id"],
+                    "kind": kind,
                 },
                 "findings": findings,
                 "decision": {

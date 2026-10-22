@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * 生产 bundle 边界检查。
+ * 生产 bundle 边界检查（T-150 / T-170 / T-210 / G-05 受控签发白名单）。
  *
  * 输入是 npm run build 的 dist，不启动服务器、不改代码：
- * - 开发身份模块/写客户端不能成为生产 chunk；
- * - 不得出现 dev 端点、替身 principal 或真正的写 URL 形状；
- * - 只读提示里可以提到 `/actions`，但不能出现 fetch/request + write path。
+ * - 不得出现 dev 端点、替身 principal 或内部判定数据（rule_examples / boundary_disputes）；
+ * - 生产写入口（/claim, /actions）与 CSRF 头必须存在；
+ * - 签发/撤回请求路径（/release-decision, /release-revoke）只允许出现在按需分包的
+ *   `ReleasePage-*.js` 受控 chunk 中（且必须同时包含 `step_up_token` 绑定字段），
+ *   主入口 chunk 与其他业务页面 chunk 一旦出现 `/release-decision` 立即判红！
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -24,7 +26,19 @@ if (!fs.existsSync(assets)) {
 }
 
 const files = fs.readdirSync(assets).filter((name) => name.endsWith(".js"));
-const source = files.map((name) => fs.readFileSync(path.join(assets, name), "utf8")).join("\n");
+const byFile = new Map(
+  files.map((name) => [name, fs.readFileSync(path.join(assets, name), "utf8")]),
+);
+const source = [...byFile.values()].join("\n");
+const nonReleaseSource = [...byFile.entries()]
+  .filter(([name]) => !name.startsWith("ReleasePage-"))
+  .map(([, text]) => text)
+  .join("\n");
+const releaseChunkSource = [...byFile.entries()]
+  .filter(([name]) => name.startsWith("ReleasePage-"))
+  .map(([, text]) => text)
+  .join("\n");
+
 const forbiddenChecks = [
   ["开发 session 端点", (text) => !text.includes("/dev/session")],
   ["开发身份列表端点", (text) => !text.includes("/dev/identities")],
@@ -32,27 +46,29 @@ const forbiddenChecks = [
   ["开发身份启用控件", (text) => !text.includes("启用本地开发身份")],
 ];
 const checks = forbiddenChecks.map(([label, predicate]) => [`不含${label}`, predicate(source)]);
-// ★ T-170：生产写 UI 必须在包里（正向断言），且 CSRF 头存在。
 checks.push(["生产包含写入口（/claim）", source.includes("/claim")]);
 checks.push(["生产包含写入口（/actions）", source.includes("/actions")]);
 checks.push(["生产包含 CSRF 头", source.includes("x-csrf-token")]);
-// ★ T-210：内部判定数据只在**生产构建**里必须为空。
-//   dev-up 的 hostile-build 是 `--mode development` 构建，本来就允许带 dev 模块，
-//   所以那一次检查显式不带 `--production`，跳过这两条（不是放行生产）。
+
 const hasInternalData = (text) =>
   text.includes("rule_examples") || text.includes("boundary_disputes");
 checks.push(["不含内部判定数据（rule_examples / boundary_disputes）", !hasInternalData(source)]);
-// ★ T-150：生产界面的边界从「完全只读」变成「可登录，但没有签发/撤回控件」。
-//   登录/登出不是内容写；release-decision / release-revoke 仍然只许人经受控入口。
 checks.push(["生产界面提供登录入口（/auth/login）", source.includes("/auth/login")]);
+
 const hasReleasePath = (text) =>
   text.includes("/release-decision") || text.includes("/release-revoke");
-checks.push(["不含签发/撤回请求路径（说明文字不算）", !hasReleasePath(source)]);
 checks.push([
-  "反向对照：植入 /release-decision 必须被抓到",
-  hasReleasePath(source + '\nconst __probe = "/release-decision";') === true,
+  "非签发 chunk 不含签发/撤回请求路径（受控隔离 G-05）",
+  !hasReleasePath(nonReleaseSource),
 ]);
-// 反向对照：已知坏样本必须让对应谓词失败，证明扫描器不是恒真。
+checks.push([
+  "签发受控 chunk 强制绑定 step_up_token",
+  releaseChunkSource.length > 0 && releaseChunkSource.includes("step_up_token"),
+]);
+checks.push([
+  "反向对照：在非签发 chunk 植入 /release-decision 必须被抓到",
+  hasReleasePath(nonReleaseSource + '\nconst __probe = "/release-decision";') === true,
+]);
 checks.push([
   "反向对照：植入 /dev/session 必须被抓到",
   forbiddenChecks[0][1](source + '\nfetch("/dev/session")') === false,
@@ -61,6 +77,7 @@ checks.push([
   "反向对照：植入 rule_examples 必须被抓到",
   hasInternalData(source + '\nconst __probe = "rule_examples";') === true,
 ]);
+
 let failed = 0;
 for (const [label, ok] of checks) {
   console.log(`${ok ? "✓" : "✗"} ${label}`);

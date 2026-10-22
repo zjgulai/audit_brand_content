@@ -129,12 +129,19 @@ class CaseSummary(BaseModel):
     tenant: Optional[str] = None
     product_line: Optional[str] = None
     assignee_id: Optional[str] = None
+    sample: Optional[bool] = None
+    entry_channel: Optional[str] = None
+    created_at: Optional[str] = None
+    title_or_excerpt: Optional[str] = None
+    high_severity_count: Optional[int] = None
+    coverage_state: Optional[str] = None
 
 
 class CaseDetail(BaseModel):
     case_id: str
     ir: ReviewIR
     review: Optional[Dict[str, Any]] = None
+    content_unit: Optional[Dict[str, Any]] = None
 
 
 class ReportSummary(BaseModel):
@@ -273,6 +280,7 @@ class AuthorityCaseSource:
             "assignee_id": state.get("assignee"),
             "actionable": state.get("status") in ("unassigned", "released"),
             "ir": ir,
+            "content": state.get("content"),
             "case_version": int(state.get("version") or 0),
             "ir_id": ir.get("ir_id"),
             "ir_version": ir.get("ir_version"),
@@ -337,10 +345,10 @@ def _ir_field(case, *keys):
     return value
 
 
-def _review_summary(value):
+def _review_summary(value, *, store=None, case_id=None):
     if not isinstance(value, dict):
         return value
-    return {
+    out = {
         key: value.get(key)
         for key in (
             "case_id", "status", "assignee", "version", "claimed_at",
@@ -348,11 +356,57 @@ def _review_summary(value):
             "released_draft_id", "primary_draft_id",
         )
     }
+    drafts = value.get("drafts")
+    if not isinstance(drafts, list) and store is not None and case_id:
+        list_fn = getattr(store, "list_drafts", None)
+        if callable(list_fn):
+            try:
+                drafts = list_fn(case_id)
+            except Exception:
+                drafts = None
+    if isinstance(drafts, list):
+        out["drafts"] = drafts
+        primary_id = out.get("primary_draft_id")
+        out["primary_draft"] = next(
+            (d for d in drafts if isinstance(d, dict) and d.get("draft_id") == primary_id),
+            drafts[-1] if drafts else None,
+        )
+    else:
+        out["drafts"] = []
+        out["primary_draft"] = None
+    refs = value.get("fragment_references")
+    out["fragment_references"] = refs if isinstance(refs, list) else []
+    return out
+
+
+def _extract_excerpt(case):
+    unit = case.get("content") or case.get("content_unit") or {}
+    if isinstance(unit, dict):
+        txt = unit.get("text")
+        if isinstance(txt, str) and txt.strip():
+            return txt.strip().replace("\n", " ")[:64]
+    ir = case.get("ir") or {}
+    for f in ir.get("findings") or []:
+        if isinstance(f, dict) and isinstance(f.get("quote"), str) and f["quote"].strip():
+            return f["quote"].strip().replace("\n", " ")[:64]
+    return None
 
 
 def _summary(case):
     ir = case.get("ir") or {}
     dec = ir.get("decision") or {}
+    cov = ir.get("coverage") or {}
+    findings = ir.get("findings") or []
+    high_cnt = sum(
+        1 for f in findings
+        if isinstance(f, dict) and str(f.get("severity") or "").upper() in ("L4", "L5")
+    )
+    unit = case.get("content") or case.get("content_unit") or {}
+    channel = case.get("entry_channel")
+    if not channel and isinstance(unit, dict):
+        ctx = unit.get("context") or {}
+        if isinstance(ctx, dict):
+            channel = ctx.get("entry_channel") or ctx.get("channel")
     return {
         "case_id": case.get("case_id"),
         "ir_id": ir.get("ir_id"),
@@ -362,6 +416,12 @@ def _summary(case):
         "tenant": case.get("tenant"),
         "product_line": case.get("product_line"),
         "assignee_id": case.get("assignee_id"),
+        "sample": bool(case.get("sample")) if "sample" in case else None,
+        "entry_channel": channel,
+        "created_at": ir.get("created_at"),
+        "title_or_excerpt": _extract_excerpt(case),
+        "high_severity_count": high_cnt,
+        "coverage_state": cov.get("coverage_state"),
     }
 
 
@@ -616,8 +676,13 @@ def create_app(*, session_store=None, repository=None, principals=None,
             raise HTTPException(404, "案件不存在")
         require_read(principal, case)
         require_review_fresh()
-        return {"case_id": id, "ir": case["ir"],
-                "review": _review_summary(repo_ledger.get_case(id))}
+        unit = case.get("content_unit") or case.get("content")
+        return {
+            "case_id": id,
+            "ir": case["ir"],
+            "review": _review_summary(repo_ledger.get_case(id), store=repo_ledger, case_id=id),
+            "content_unit": unit if isinstance(unit, dict) else None,
+        }
 
     @app.get("/api/v1/queue", response_model=List[CaseSummary])
     def queue(principal=Depends(principal_dep)):

@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useIdentity } from "../components/IdentitySwitcher";
+import StatusBadge, { resolveDecisionBadge } from "../components/StatusBadge";
+import Button from "../ui/Button";
+import Icon from "../ui/icon";
 import { QUEUE_LABELS, reviewApi, splitQueue, type CaseSummary } from "../api/client";
+import CaseDetailPage from "./CaseDetailPage";
 
 /**
- * 复核队列（A1 Triage queue）。
+ * 复核队列（P-05 · Wave B 同屏 Master-Detail 分诊 + 紧迫度排序 + J/K 键盘流）。
  *
- * 口径：`GET /api/v1/queue` 只返回 REVIEW 与 待自决。
- * 若后端仍返回别的标签（例如代理没关 /queue 那个联调别名），
- * `splitQueue` 会把它们挑出来，页面上**明说「口径异常」**——
- * 静默 filter 掉会让这个 bug 永远看不见（断言 A1 的反向对照要的就是「它不出现」）。
+ * 1. 口径：`GET /api/v1/queue` 只返回 REVIEW 与 待自决（A1）；
+ * 2. 左栏展示高信息密度队列行（含内容首句摘要、高危计数、品线/渠道、认领状态），
+ *    点击左栏 `<Link to="/cases/...">` 默认导航至独立详情页（保证 check_pages.mjs 契约全绿），
+ *    同时每行提供「同屏分诊」按钮（或按 J/K 键）在右侧主栏直接内嵌渲染 CaseDetailPage！
  */
 
 const FILTERS = [
@@ -18,26 +22,27 @@ const FILTERS = [
   { key: "待自决", label: "待自决" },
 ] as const;
 
+const SORTS = [
+  { key: "urgency", label: "按紧迫度" },
+  { key: "newest", label: "按最新提交" },
+] as const;
+
+const SAMPLE_HIDDEN_KEY = "review-workbench.sample-hidden";
+
 /** 五标签 → 徽标样式。语义色，**不使用品牌红**（DESIGN §7 / 断言 A6）。 */
 export function stateBadge(state: string | null | undefined): {
   cls: string;
   text: string;
 } {
-  switch (state) {
-    case "BLOCK":
-      return { cls: "badge badge--block", text: "BLOCK" };
-    case "REVIEW":
-      return { cls: "badge badge--review", text: "REVIEW" };
-    case "PASS":
-      return { cls: "badge badge--pass", text: "PASS" };
-    case "待自决":
-      return { cls: "badge badge--pending", text: "待自决" };
-    case "未审查":
-      return { cls: "badge badge--untested", text: "未审查" };
-    default:
-      // ★ 不许折叠成「—」或空：未测是独立状态，不是缺值（断言 A2）
-      return { cls: "badge badge--untested", text: "未测" };
-  }
+  const b = resolveDecisionBadge(state);
+  return { cls: b.cls, text: b.text };
+}
+
+function urgencyScore(c: CaseSummary): number {
+  let score = (c.high_severity_count ?? 0) * 100;
+  if (c.state === "REVIEW") score += 30;
+  if (!c.assignee_id) score += 15;
+  return score;
 }
 
 export default function QueuePage() {
@@ -45,7 +50,16 @@ export default function QueuePage() {
   const [rows, setRows] = useState<CaseSummary[] | null>(null);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
-  const { pathname } = useLocation();
+  const [sortBy, setSortBy] = useState<(typeof SORTS)[number]["key"]>("urgency");
+  const [sampleHidden, setSampleHidden] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(SAMPLE_HIDDEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const previewCaseId = searchParams.get("caseId");
 
   useEffect(() => {
     if (devEnabled && current === null) {
@@ -71,21 +85,80 @@ export default function QueuePage() {
     };
   }, [current, devEnabled, sessionEpoch]);
 
-  const { queued, offQueue } = useMemo(
+  const { queued: rawQueued, offQueue } = useMemo(
     () => splitQueue(rows ?? []),
     [rows],
   );
 
+  const sampleCount = useMemo(
+    () => rawQueued.filter((c) => c.sample === true).length,
+    [rawQueued],
+  );
+
+  const queued = useMemo(
+    () => (sampleHidden ? rawQueued.filter((c) => c.sample !== true) : rawQueued),
+    [rawQueued, sampleHidden],
+  );
+
   const visible = useMemo(() => {
-    if (filter === "all") return queued;
-    return queued.filter((c) => c.state === filter);
-  }, [queued, filter]);
+    const base =
+      filter === "all" ? [...queued] : queued.filter((c) => c.state === filter);
+    if (sortBy === "urgency") {
+      base.sort((a, b) => urgencyScore(b) - urgencyScore(a));
+    } else {
+      base.sort((a, b) =>
+        String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")),
+      );
+    }
+    return base;
+  }, [queued, filter, sortBy]);
 
   const counts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const c of queued) m.set(String(c.state), (m.get(String(c.state)) ?? 0) + 1);
+    for (const c of queued)
+      m.set(String(c.state), (m.get(String(c.state)) ?? 0) + 1);
     return m;
   }, [queued]);
+
+  const activeCaseId = useMemo(() => {
+    if (previewCaseId && visible.some((c) => c.case_id === previewCaseId)) {
+      return previewCaseId;
+    }
+    return null;
+  }, [previewCaseId, visible]);
+
+  // J / K 纯键盘上下切案（AX-2）
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (visible.length === 0) return;
+      if (e.key === "j" || e.key === "J") {
+        e.preventDefault();
+        const idx = visible.findIndex((c) => c.case_id === activeCaseId);
+        const next = visible[Math.min(visible.length - 1, idx + 1)] ?? visible[0];
+        if (next) setSearchParams({ caseId: next.case_id }, { replace: true });
+      } else if (e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        const idx = visible.findIndex((c) => c.case_id === activeCaseId);
+        const prev =
+          idx > 0 ? visible[idx - 1] : visible[visible.length - 1];
+        if (prev) setSearchParams({ caseId: prev.case_id }, { replace: true });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeCaseId, setSearchParams, visible]);
+
+  const toggleSampleHidden = (hide: boolean) => {
+    setSampleHidden(hide);
+    try {
+      if (hide) window.localStorage.setItem(SAMPLE_HIDDEN_KEY, "1");
+      else window.localStorage.removeItem(SAMPLE_HIDDEN_KEY);
+    } catch {
+      /* ignore storage errors */
+    }
+  };
 
   if (error) {
     if (error.status === 401) {
@@ -129,14 +202,34 @@ export default function QueuePage() {
   return (
     <div className="queue">
       <div className="queue__list">
-        <div className="queue__filters" role="group" aria-label="队列筛选">
+        {sampleCount > 0 && (
+          <div className="sample-banner" data-sample-banner="">
+            <span>
+              <StatusBadge axis="sample" value="样例数据" />{" "}
+              {sampleHidden
+                ? `已隐藏 ${sampleCount} 条夹具`
+                : `含 ${sampleCount} 条确定性测试夹具`}
+            </span>
+            <Button
+              variant="secondary"
+              data-clear-sample=""
+              onClick={() => toggleSampleHidden(!sampleHidden)}
+            >
+              {sampleHidden ? "恢复样例" : "清空样例"}
+            </Button>
+          </div>
+        )}
+
+        <div className="queue__filters" role="group" aria-label="队列筛选与排序">
           {FILTERS.map((f) => {
-            const n = f.key === "all" ? queued.length : counts.get(f.key) ?? 0;
+            const n =
+              f.key === "all" ? queued.length : counts.get(f.key) ?? 0;
             return (
               <button
                 key={f.key}
                 type="button"
                 className="queue__filter"
+                data-queue-filter={f.key}
                 aria-pressed={filter === f.key}
                 onClick={() => setFilter(f.key)}
               >
@@ -144,44 +237,99 @@ export default function QueuePage() {
               </button>
             );
           })}
+          {SORTS.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              className="queue__filter"
+              aria-pressed={sortBy === s.key}
+              onClick={() => setSortBy(s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {/* ★ 本页只有一个 h1，在右侧主栏。左栏列表不再放 h1 ——
             两个 h1 会触发 a11y 的 h1-unique 断言（计数 2）。 */}
 
-        {rows === null && <p className="hint" style={{ padding: "0.7rem" }}>加载中…</p>}
+        {rows === null && <p className="hint">加载中…</p>}
 
         {rows !== null && queued.length === 0 && (
-          <p className="hint" style={{ padding: "0.7rem" }}>
+          <p className="hint">
             队列为空 —— 没有处于 REVIEW 或 待自决 的案件。
           </p>
         )}
 
         {visible.map((c) => {
-          const b = stateBadge(c.state);
+          const isSelected = activeCaseId === c.case_id;
           return (
-            <Link
+            <div
               key={c.case_id}
-              to={`/cases/${encodeURIComponent(c.case_id)}`}
-              className="queue__row"
-              aria-current={pathname === `/cases/${c.case_id}` ? "true" : undefined}
+              className={
+                "queue__item-wrap" +
+                (isSelected ? " queue__item-wrap--selected" : "")
+              }
             >
-              <span className="queue__row-top">
-                <span className="queue__row-id font-data">{c.case_id}</span>
-                <span className={b.cls}>{b.text}</span>
-              </span>
-              <span className="queue__row-meta">
-                <span className="font-data">{c.layer ?? "未测"}</span>
-                <span>{c.product_line ?? "未测"}</span>
-                <span className="font-data">{c.assignee_id ?? "未指派"}</span>
-              </span>
-            </Link>
+              <Link
+                to={`/cases/${encodeURIComponent(c.case_id)}`}
+                className="queue__row"
+                data-sample={c.sample === true ? "true" : undefined}
+                aria-current={isSelected ? "true" : undefined}
+              >
+                <span className="queue__row-top">
+                  <span className="queue__row-id font-data">{c.case_id}</span>
+                  <StatusBadge axis="decision" value={c.state} />
+                </span>
+                {c.title_or_excerpt && (
+                  <span className="queue__row-excerpt">
+                    {c.title_or_excerpt}
+                  </span>
+                )}
+                <span className="queue__row-meta">
+                  <span className="font-data">{c.layer ?? "未测"}</span>
+                  <span>{c.product_line ?? "未测"}</span>
+                  {c.entry_channel && <span>{c.entry_channel}</span>}
+                  <span className="font-data">{c.assignee_id ?? "未指派"}</span>
+                  {(c.high_severity_count ?? 0) > 0 && (
+                    <span
+                      className="badge badge--severity-high"
+                      data-status-badge=""
+                    >
+                      高危×{c.high_severity_count}
+                    </span>
+                  )}
+                  {c.sample === true && (
+                    <span className="badge badge--sample" data-status-badge="">
+                      样例
+                    </span>
+                  )}
+                </span>
+              </Link>
+              <div className="queue__row-actions">
+                <button
+                  type="button"
+                  className="queue__preview-btn"
+                  aria-pressed={isSelected}
+                  onClick={() =>
+                    setSearchParams(
+                      isSelected ? {} : { caseId: c.case_id },
+                      { replace: true },
+                    )
+                  }
+                >
+                  {isSelected ? "收起同屏" : "同屏分诊"}
+                </button>
+              </div>
+            </div>
           );
         })}
 
         {offQueue.length > 0 && (
-          <div className="state state--warn" role="alert" style={{ margin: "0.7rem" }}>
-            <h2>⚠ 队列口径异常</h2>
+          <div className="state state--warn" role="alert">
+            <h2>
+              <Icon name="alert-triangle" size={13} /> 队列口径异常
+            </h2>
             <p>
               后端返回了 {offQueue.length} 条不属于待办队列的案件（
               {[...new Set(offQueue.map((c) => String(c.state)))].join(" / ")}）。
@@ -191,11 +339,23 @@ export default function QueuePage() {
         )}
       </div>
 
-      <div className="case">
-        <h1>复核队列</h1>
-        <p className="hint">
-          选择左侧一条案件查看判定与证据链。队列只读；复核动作在案件详情页进行。
-        </p>
+      <div className="queue__detail-pane">
+        <div className="queue__detail-header">
+          <h1>复核队列</h1>
+          <span className="hint">
+            快捷键：按 <code>J</code> / <code>K</code> 在右侧同屏切换待办案件；点击左侧案件行直接进入全宽双栏深审页。
+          </span>
+        </div>
+        {activeCaseId ? (
+          <CaseDetailPage embeddedCaseId={activeCaseId} />
+        ) : (
+          <div className="case">
+            <p className="hint">
+              点击任意案件下方的「同屏分诊」（或按键盘 <code>J</code> 键）即可在本栏直接展开待审原件、证据链与复核动作；
+              点击案件编号则进入独立双栏深审视图。
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

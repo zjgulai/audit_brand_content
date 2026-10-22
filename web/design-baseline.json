@@ -2,31 +2,19 @@
  "schema_version": 1,
  "$note": "DT-3 的裸值基线（file+selector+property+value，shrink-only）。只由 check_design_tokens.mjs --rebase-baseline 生成；手改会被下一次 --check 当成「新增裸值」。visual 段由 check_visual.mjs --update 维护。",
  "generated_by": "web/scripts/check_design_tokens.mjs --rebase-baseline",
- "generated_at": "2026-10-21",
+ "generated_at": "2026-10-22",
  "tokens": [
   {
    "file": "src/styles.css",
-   "selector": ":root",
+   "selector": "html",
    "prop": "color",
    "value": "hsl(var(--foreground))"
   },
   {
    "file": "src/styles.css",
-   "selector": ":root",
+   "selector": "html",
    "prop": "background",
    "value": "hsl(var(--background))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ":root",
-   "prop": "font-family",
-   "value": "system-ui, -apple-system, \"Segoe UI\", \"PingFang SC\",\n    \"Hiragino Sans GB\", \"Microsoft YaHei\", sans-serif"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ":root",
-   "prop": "font-size",
-   "value": "13px"
   },
   {
    "file": "src/styles.css",
@@ -42,6 +30,12 @@
   },
   {
    "file": "src/styles.css",
+   "selector": "a:focus-visible, a:focus, button:focus-visible, button:focus, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible",
+   "prop": "outline-offset",
+   "value": "2px"
+  },
+  {
+   "file": "src/styles.css",
    "selector": ".skip-link",
    "prop": "background",
    "value": "hsl(var(--card))"
@@ -61,26 +55,20 @@
   {
    "file": "src/styles.css",
    "selector": ".skip-link:focus",
+   "prop": "outline-offset",
+   "value": "2px"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".skip-link:focus",
    "prop": "box-shadow",
    "value": "0 0 0 2px hsl(var(--card))"
   },
   {
    "file": "src/styles.css",
    "selector": "code",
-   "prop": "font-family",
-   "value": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": "code",
    "prop": "background",
    "value": "hsl(var(--muted))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".font-data",
-   "prop": "font-family",
-   "value": "\"JetBrains Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
   },
   {
    "file": "src/styles.css",
@@ -93,12 +81,6 @@
    "selector": ".shell__header",
    "prop": "border-bottom",
    "value": "1px solid hsl(var(--border))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".shell__brand",
-   "prop": "font-size",
-   "value": "14px"
   },
   {
    "file": "src/styles.css",
@@ -121,20 +103,26 @@
   {
    "file": "src/styles.css",
    "selector": ".shell__right",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".shell__right",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
   },
   {
    "file": "src/styles.css",
-   "selector": ".shell__footer",
-   "prop": "font-size",
-   "value": "11px"
+   "selector": ".shell__right select",
+   "prop": "border",
+   "value": "1px solid hsl(var(--input))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".shell__right select",
+   "prop": "background",
+   "value": "hsl(var(--card))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".shell__right select",
+   "prop": "color",
+   "value": "hsl(var(--foreground))"
   },
   {
    "file": "src/styles.css",
@@ -158,7 +146,7 @@
    "file": "src/styles.css",
    "selector": ".btn",
    "prop": "border",
-   "value": "1px solid hsl(var(--border))"
+   "value": "1px solid hsl(var(--input))"
   },
   {
    "file": "src/styles.css",
@@ -210,15 +198,27 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".badge",
-   "prop": "border",
-   "value": "1px solid currentColor"
+   "selector": ".btn--danger",
+   "prop": "background",
+   "value": "hsl(var(--destructive))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".btn--danger",
+   "prop": "border-color",
+   "value": "hsl(var(--destructive))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".btn--danger",
+   "prop": "color",
+   "value": "hsl(var(--destructive-foreground))"
   },
   {
    "file": "src/styles.css",
    "selector": ".badge",
-   "prop": "font-size",
-   "value": "11px"
+   "prop": "border",
+   "value": "1px solid currentColor"
   },
   {
    "file": "src/styles.css",
@@ -242,13 +242,13 @@
    "file": "src/styles.css",
    "selector": ".badge--pending",
    "prop": "color",
-   "value": "hsl(211 60% 34%)"
+   "value": "hsl(var(--info))"
   },
   {
    "file": "src/styles.css",
    "selector": ".badge--untested",
    "prop": "color",
-   "value": "hsl(270 45% 42%)"
+   "value": "hsl(var(--violet))"
   },
   {
    "file": "src/styles.css",
@@ -258,9 +258,45 @@
   },
   {
    "file": "src/styles.css",
+   "selector": ".badge--warn",
+   "prop": "color",
+   "value": "hsl(var(--warn))"
+  },
+  {
+   "file": "src/styles.css",
    "selector": ".badge--sample",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".badge--severity-high",
+   "prop": "color",
+   "value": "hsl(var(--bad))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".badge--severity-med",
+   "prop": "color",
+   "value": "hsl(var(--warn))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".sample-banner",
+   "prop": "background",
+   "value": "hsl(var(--muted))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".sample-banner",
+   "prop": "border-bottom",
+   "value": "1px solid hsl(var(--border))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".sample-banner",
+   "prop": "color",
+   "value": "hsl(var(--foreground))"
   },
   {
    "file": "src/styles.css",
@@ -289,14 +325,8 @@
   {
    "file": "src/styles.css",
    "selector": ".queue__filter",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".queue__filter",
    "prop": "border",
-   "value": "1px solid hsl(var(--border))"
+   "value": "1px solid hsl(var(--input))"
   },
   {
    "file": "src/styles.css",
@@ -348,15 +378,9 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".queue__row-id",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".queue__row-meta",
-   "prop": "font-size",
-   "value": "11px"
+   "selector": ".queue__row[aria-current=\"true\"]",
+   "prop": "border-left-color",
+   "value": "hsl(var(--brand))"
   },
   {
    "file": "src/styles.css",
@@ -366,39 +390,15 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".case__head h1",
-   "prop": "font-size",
-   "value": "17px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".case__sub",
-   "prop": "font-size",
-   "value": "11px"
-  },
-  {
-   "file": "src/styles.css",
    "selector": ".case__sub",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".case h2",
-   "prop": "font-size",
-   "value": "13px"
   },
   {
    "file": "src/styles.css",
    "selector": ".case h2",
    "prop": "border-bottom",
    "value": "1px solid hsl(var(--border))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".facts",
-   "prop": "font-size",
-   "value": "12px"
   },
   {
    "file": "src/styles.css",
@@ -420,21 +420,9 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".evidence__head",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
    "selector": ".evidence__quote",
    "prop": "background",
    "value": "hsl(var(--muted))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".evidence__quote",
-   "prop": "font-size",
-   "value": "12px"
   },
   {
    "file": "src/styles.css",
@@ -451,20 +439,8 @@
   {
    "file": "src/styles.css",
    "selector": ".evidence__why",
-   "prop": "font-size",
-   "value": "11.5px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".evidence__why",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".evidence__loc",
-   "prop": "font-size",
-   "value": "11px"
   },
   {
    "file": "src/styles.css",
@@ -474,9 +450,15 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".notrun",
-   "prop": "font-size",
-   "value": "12px"
+   "selector": ".conflict-card",
+   "prop": "background",
+   "value": "hsl(var(--muted))"
+  },
+  {
+   "file": "src/styles.css",
+   "selector": ".conflict-card",
+   "prop": "border",
+   "value": "1px solid hsl(var(--border))"
   },
   {
    "file": "src/styles.css",
@@ -487,12 +469,6 @@
   {
    "file": "src/styles.css",
    "selector": ".notrun__why",
-   "prop": "font-size",
-   "value": "11px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".notrun__why",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
   },
@@ -511,32 +487,14 @@
   {
    "file": "src/styles.css",
    "selector": ".actions__note",
-   "prop": "font-size",
-   "value": "11px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".actions__note",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
   },
   {
    "file": "src/styles.css",
-   "selector": ".actions label",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".actions textarea",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
    "selector": ".actions textarea",
    "prop": "border",
-   "value": "1px solid hsl(var(--border))"
+   "value": "1px solid hsl(var(--input))"
   },
   {
    "file": "src/styles.css",
@@ -549,12 +507,6 @@
    "selector": ".state",
    "prop": "background",
    "value": "hsl(var(--card))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".state",
-   "prop": "font-size",
-   "value": "12px"
   },
   {
    "file": "src/styles.css",
@@ -582,21 +534,15 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".state h2",
-   "prop": "font-size",
-   "value": "13px"
+   "selector": ".state--forbidden",
+   "prop": "border-width",
+   "value": "2px"
   },
   {
    "file": "src/styles.css",
    "selector": ".hint",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".hint",
-   "prop": "font-size",
-   "value": "11.5px"
   },
   {
    "file": "src/styles.css",
@@ -615,18 +561,6 @@
    "selector": ".taxonomy-card",
    "prop": "border",
    "value": "1px solid hsl(var(--border))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".taxonomy-card h3",
-   "prop": "font-size",
-   "value": "13px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".taxonomy-fields",
-   "prop": "font-size",
-   "value": "12px"
   },
   {
    "file": "src/styles.css",
@@ -660,30 +594,6 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".taxonomy-flow__step:not(:last-child)::after",
-   "prop": "color",
-   "value": "hsl(var(--brand))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".taxonomy-flow__step h3",
-   "prop": "font-size",
-   "value": "13px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".taxonomy-flow__step p",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".taxonomy-flow__index",
-   "prop": "font-size",
-   "value": "11px"
-  },
-  {
-   "file": "src/styles.css",
    "selector": ".taxonomy-flow__index",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
@@ -692,13 +602,7 @@
    "file": "src/styles.css",
    "selector": ".taxonomy-lookup input",
    "prop": "border",
-   "value": "1px solid hsl(var(--border))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".taxonomy-lookup input",
-   "prop": "font-size",
-   "value": "12px"
+   "value": "1px solid hsl(var(--input))"
   },
   {
    "file": "src/styles.css",
@@ -714,45 +618,9 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".taxonomy-result",
-   "prop": "font-size",
-   "value": "12px"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".spec-version",
-   "prop": "font-size",
-   "value": "11px"
-  },
-  {
-   "file": "src/styles.css",
    "selector": ".spec-version",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
-  },
-  {
-   "file": "src/pages/CaseDetailPage.tsx",
-   "selector": "inline-style",
-   "prop": "color",
-   "value": "hsl(var(--muted-foreground))"
-  },
-  {
-   "file": "src/pages/CaseDetailPage.tsx",
-   "selector": "inline-style",
-   "prop": "fontSize",
-   "value": "12"
-  },
-  {
-   "file": "src/pages/CaseDetailPage.tsx",
-   "selector": "inline-style",
-   "prop": "fontSize",
-   "value": "11"
-  },
-  {
-   "file": "src/pages/TaxonomyPage.tsx",
-   "selector": "inline-style",
-   "prop": "fontSize",
-   "value": "11"
   }
  ],
  "visual": null

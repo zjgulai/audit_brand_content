@@ -49,6 +49,9 @@ export default defineConfig(({ command, mode }) => {
       __REVIEW_DEV_IDENTITY__: JSON.stringify(devIdentityEnabled),
       __REVIEW_WRITE_ENABLED__: JSON.stringify(devIdentityEnabled),
     },
+    build: {
+      manifest: true,
+    },
     server: {
       port: 5173,
       proxy: {

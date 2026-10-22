@@ -392,11 +392,12 @@ async function main() {
     untested = true;
   }
 
-  // ── A4 前端不得有 release-decision 调用 ────────────────────────────
-  // ★ 判据要区分「调用」与「提到」：第一版扫 /release-decision/ 文本，
-  //   结果被一句正确的说明文字命中（`只由人经 release-decision 变更`）。
-  //   现在只认**路径/请求形状**：`/release-decision"` `.../release-decision` 后面
-  //   跟斜杠或引号，或出现 method: "POST" 且同一行有该词。
+  // ── A4 受控签发边界：非签发专属模块不得有 release-decision / release-revoke 调用 ──
+  // ★ 落 G-05 决策：
+  //   1. 只有受控模块 `release-client.ts` 与 `ReleasePage.tsx` 允许包含签发路径，
+  //      且 `release-client.ts` 必须强制校验 `step_up_token` 与 `nonce`；
+  //   2. 任何其他前端源码文件（如 CaseDetailPage / QueuePage / ReviewActions）一旦出现
+  //      `/release-decision` 或 `/release-revoke` 调用形状，立即判红！
   const srcFiles = [];
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -406,19 +407,32 @@ async function main() {
     }
   };
   walk(path.join(repoRoot, "web/src"));
-  // 只匹配「像 URL 片段」或「像 fetch 目标」的出现
+  const ALLOWED_RELEASE_MODULES = new Set(["release-client.ts", "ReleasePage.tsx"]);
   const CALL_SHAPE = /["'`][^"'`]*\/?(release-decision|release-revoke)["'`/]/;
   const offenders = [];
   for (const f of srcFiles) {
+    const baseName = path.basename(f);
+    if (ALLOWED_RELEASE_MODULES.has(baseName)) continue;
     const src = stripComments(fs.readFileSync(f, "utf8"));
-    // 逐行判：一行同时含 release-decision 与请求形状才算调用
     const hit = src
       .split("\n")
       .some((line) => CALL_SHAPE.test(line) || /release-(decision|revoke)\s*[`'"]/.test(line));
-    if (hit) offenders.push(path.basename(f));
+    if (hit) offenders.push(baseName);
   }
-  record("A4", "前端源码不含 release-decision / release-revoke 调用",
-    offenders.length === 0, offenders.join(","));
+  const releaseClientPath = path.join(repoRoot, "web/src/api/release-client.ts");
+  const releaseClientSrc = fs.existsSync(releaseClientPath)
+    ? stripComments(fs.readFileSync(releaseClientPath, "utf8"))
+    : "";
+  const hasStepUpGuard =
+    releaseClientSrc.includes("step_up_token") &&
+    releaseClientSrc.includes("nonce") &&
+    releaseClientSrc.includes("step_up_required");
+  record(
+    "A4",
+    "非受控模块不含 release-decision / release-revoke 调用，且受控客户端强制校验 step_up_token",
+    offenders.length === 0 && hasStepUpGuard,
+    offenders.length ? offenders.join(",") : "release-client 缺少 step_up_token 守卫",
+  );
   // A4b 反向对照：喂一个真调用，必须红；喂一句说明文字，必须不红
   record("A4b", "反向对照：真调用被抓到、说明文字不误报",
     CALL_SHAPE.test('fetch(`/release-decision`)') === true &&

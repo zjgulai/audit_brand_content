@@ -1,39 +1,39 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  ApiError,
   reviewApi,
   type CaseDetail,
   type Finding,
   type NotEvaluated,
   type ReportSummary,
 } from "../api/client";
-import { stateBadge } from "./QueuePage";
+import ContentUnitViewer from "../components/ContentUnitViewer";
 import { useIdentity } from "../components/IdentitySwitcher";
 import ReviewActions from "../components/ReviewActions";
+import StatusBadge, {
+  resolveAuthorityState,
+  resolveCoverageBadge,
+} from "../components/StatusBadge";
+import Button from "../ui/Button";
+import Icon from "../ui/icon";
 import taxonomy from "../data/taxonomy.json";
 
 /**
- * 案件详情（A7 Research brief）。
+ * 案件深度审查页（P-04 · Wave B 双栏高亮联动 + 证据链就地裁决）。
  *
- * 这一屏的智能体时刻是「解释判定」——**纯本地渲染，不接模型**
- * （api/ 与 base/ 零 LLM 依赖，这是要保住的性质）。
- *
- * 它做三件事，全部可由字段核对，不编造：
- *   1. 把每条 finding 还原成「命中哪条规则 · 原文在哪 · 依据能不能核」
- *   2. 说清覆盖是 partial 还是 full，以及哪几族**根本没跑**（不是 0）
- *   3. 显示复核台账摘要；开发验收可动态加载人工写动作，生产构建保持只读
+ * 1. 左栏展示 ContentUnit 原件（归一化正文、结构化字段、覆盖边界与双指纹），
+ *    与右栏证据链双向点击定位高亮（修复 D-04「盲审」缺陷）；
+ * 2. 右栏证据链内每条 candidate finding 支持直接点击「确认 / 驳回」就地裁决（修复 D-08 空间割裂）；
+ * 3. 规则冲突（rule_conflict=true）并排展示冲突依据卡片（修复 D-09）；
+ * 4. 既可作为独立双栏页面 `/cases/:caseId` 打开，也可由 `QueuePage` 右侧内嵌调用（`embeddedCaseId`）。
  */
 
 const WHY_TEXT: Record<string, string> = {
   not_wired: "未接线（根本没跑，不是跑了没问题）",
   no_rule: "无适用规则",
   no_capability: "无该能力",
-};
-
-const AUTHORITY_TEXT: Record<string, string> = {
-  ok: "可核",
-  expired: "依据已过期",
-  missing: "依据缺失",
+  no_control_points: "未做·无控制点（这一族还没有定控制点）",
 };
 
 interface SpecMeta {
@@ -46,41 +46,18 @@ const DevReviewActions = __REVIEW_WRITE_ENABLED__
   ? lazy(() => import("../components/DevReviewActions"))
   : null;
 
-/**
- * ★ 2026-10-20 删掉了一段死代码，记在这里因为它长得太像在工作：
- *
- * 原先有 `disputeOf(ruleId)`，按 `rule_id` 精确匹配 `meta.boundary_disputes`，
- * 但调用处写的是 `disputeOf(f.control_code)` —— 实参形如 `H02`，
- * 而 disputes 的键形如 `r-724b26ecb1dee9c4`。**永远不相等**，
- * 欠定徽标一次都没渲染过，而类型检查、构建、A8 全绿。
- *
- * 更根本的是：**`Finding` 契约里没有 `rule_id`**
- * （`api/review_api.py` 的 `class Finding` 只有 finding_id / control_code /
- * status / severity / ... 见断言 A10）。所以「按 rule_id 关联 finding 与欠定条目」
- * 这件事**在当前契约下无法成立**，不是查法写错。
- *
- * 现在改成：不假装能逐条关联，在证据链旁边如实说明这条断层。
- */
-
-/**
- * 本页能诚实说的：规范登记了若干欠定条目，但 finding 侧没有能与之对上的键。
- *
- * ★ 措辞经过一次更正（4b，2026-10-20）。原先写「这不等于『没有落上』—— 是查不了」，
- *   但「查不了」和「没有落上」在界面上长得一样，都会被复核员读成「这里没问题」。
- *   最后一句必须是**否定式的那半句**：只说明关联做不到，不说明本案件不落在其中。
- */
 function SpecSeamNote({ disputeCount }: { disputeCount: number }) {
   if (disputeCount === 0) return null;
   return (
-    <div className="state state--warn" role="note" style={{ margin: "0 0 0.6rem" }}>
+    <div className="state state--warn" role="note">
       <strong>规范有 {disputeCount} 条已登记欠定边界，本页无法逐条关联</strong>
-      <p style={{ margin: "0.3rem 0 0" }}>
+      <p>
         <code>Finding.control_code</code>（形如 H02）与{" "}
         <code>欠定条目的 rule_id</code>（形如 r-724b26ec…）不是同一个键，
         而欠定条目描述里的条款号（DSC12 / FCT5 / FCT2）同样对不上，
         所以无法判断某条 finding 是否落在其中。
       </p>
-      <p style={{ margin: "0.3rem 0 0" }}>
+      <p>
         <b>这只说明关联做不到，不说明本案件不落在其中任何一条。</b>
         欠定条目本身见「分类规范」页。
       </p>
@@ -88,33 +65,120 @@ function SpecSeamNote({ disputeCount }: { disputeCount: number }) {
   );
 }
 
-function EvidenceItem({ f, index }: { f: Finding; index: number }) {
+interface EvidenceItemProps {
+  f: Finding;
+  index: number;
+  isActive: boolean;
+  canAdjudicate: boolean;
+  caseId: string;
+  version: number | null;
+  onLocate: (findingId: string) => void;
+  onAdjudicated: () => Promise<CaseDetail | null>;
+}
+
+function EvidenceItem({
+  f,
+  index,
+  isActive,
+  canAdjudicate,
+  caseId,
+  version,
+  onLocate,
+  onAdjudicated,
+}: EvidenceItemProps) {
   const quote = f.quote;
   const isLong = typeof quote === "string" && quote.length > 180;
-  const authority = String(f.authority_state ?? "ok");
-  const authText = AUTHORITY_TEXT[authority] ?? authority;
+  // ★ 修 D-01 / 断言 A2d：authority_state 缺失绝不默认 "ok"（可核），必须落「未测」
+  const authInfo = resolveAuthorityState(f.authority_state);
+  const conflictRefs = f.resolution_detail?.refs ?? [];
+  const [reason, setReason] = useState("");
+  const [showReason, setShowReason] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [itemMsg, setItemMsg] = useState<{ ok: boolean; text: string } | null>(
+    null,
+  );
+
+  const handleAdjudicate = async (decision: "confirm" | "reject") => {
+    if (version === null || busy !== null) return;
+    setBusy(decision);
+    setItemMsg(null);
+    try {
+      const { reviewWriteApi } = await import("../api/write-client");
+      const key = crypto.randomUUID();
+      if (decision === "confirm") {
+        await reviewWriteApi.confirmFinding(
+          caseId,
+          version,
+          f.finding_id,
+          reason,
+          key,
+        );
+      } else {
+        await reviewWriteApi.rejectFinding(
+          caseId,
+          version,
+          f.finding_id,
+          reason,
+          key,
+        );
+      }
+      await onAdjudicated();
+      setItemMsg({
+        ok: true,
+        text: `已${decision === "confirm" ? "确认" : "驳回"} ${f.finding_id}`,
+      });
+    } catch (e: unknown) {
+      const msg =
+        e instanceof ApiError ? `${e.status}: ${e.message}` : String(e);
+      setItemMsg({ ok: false, text: `裁决失败（${msg}）` });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
-    <li className="evidence__item">
+    <li
+      id={`evidence-item-${f.finding_id}`}
+      className={
+        "evidence__item" + (isActive ? " evidence__item--active" : "")
+      }
+    >
       <div className="evidence__head">
-        <span className="font-data" style={{ fontWeight: 600 }}>
-          {index + 1}. {f.control_code}
+        <span className="font-data">
+          <strong>
+            {index + 1}. {f.control_code}
+          </strong>
         </span>
-        <span className="font-data" style={{ color: "hsl(var(--muted-foreground))" }}>
-          {f.finding_id}
+        <span className="font-data hint">{f.finding_id}</span>
+        <StatusBadge axis="severity" value={f.severity} />
+        <span className="hint">
+          {f.status === "candidate"
+            ? "候选（待裁）"
+            : f.status === "confirmed"
+              ? "已确认"
+              : f.status === "rejected"
+                ? "已驳回"
+                : f.status}
         </span>
-        <span className="badge badge--partial">{f.severity}</span>
-        <span className="hint">{f.status === "candidate" ? "候选（待裁）" : f.status}</span>
+        {quote && (
+          <Button
+            variant="ghost"
+            className="evidence__locate-btn"
+            onClick={() => onLocate(f.finding_id)}
+          >
+            定位原文
+          </Button>
+        )}
       </div>
 
       {quote === null || quote === undefined ? (
-        // ★ 空原文是「没有」，不是「空字符串」——必须明说（断言 A2 的近亲）
         <div className="evidence__quote evidence__quote--empty">无原文引用</div>
       ) : (
         <div
           className={
             "evidence__quote" + (isLong ? " evidence__quote--long" : "")
           }
+          onClick={() => onLocate(f.finding_id)}
         >
           {quote}
         </div>
@@ -130,16 +194,8 @@ function EvidenceItem({ f, index }: { f: Finding; index: number }) {
         <span>
           依据：{(f.authority_ref ?? []).map((r) => r.ref_id).join("、") || "未登记"}
           {" · "}
-          <span
-            style={{
-              color:
-                authority === "ok"
-                  ? "hsl(var(--ok))"
-                  : "hsl(var(--bad))",
-              fontWeight: 600,
-            }}
-          >
-            {authText}
+          <span className={authInfo.cls} data-status-badge="">
+            {authInfo.text}
           </span>
         </span>
         {f.derived_from && (
@@ -150,10 +206,70 @@ function EvidenceItem({ f, index }: { f: Finding; index: number }) {
       </div>
 
       {f.rule_conflict && (
-        <div className="state state--warn" style={{ margin: "0.35rem 0 0" }}>
+        <div className="state state--warn">
           <strong>规则冲突</strong>
-          ：这条 finding 涉及两条互相矛盾的依据，<strong>须人工裁定</strong>，不静默取一。
+          ：这条 finding 涉及互相矛盾的依据，<strong>须人工裁定</strong>，不静默取一。
           {f.resolution_detail?.reason ? `（${f.resolution_detail.reason}）` : ""}
+          {conflictRefs.length > 0 && (
+            <div className="conflict-grid">
+              {conflictRefs.map((ref, idx) => (
+                <div key={idx} className="conflict-card font-data">
+                  依据 #{idx + 1}：{String(ref.ref_id ?? "未命名")}（状态：
+                  {String(ref.state ?? "未测")}）
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 证据链卡片内就地裁决（G-07 / 修 D-08） */}
+      {f.status === "candidate" && (
+        <div className="evidence__adjudicate" data-finding-adjudicate={f.finding_id}>
+          <div className="actions__row">
+            <Button
+              variant="secondary"
+              disabled={!canAdjudicate || busy !== null}
+              onClick={() => void handleAdjudicate("confirm")}
+            >
+              确认违规
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!canAdjudicate || busy !== null}
+              onClick={() => void handleAdjudicate("reject")}
+            >
+              驳回候选
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setShowReason(!showReason)}
+            >
+              {showReason ? "收起单条理由" : "附裁决理由"}
+            </Button>
+            {!canAdjudicate && (
+              <span className="hint">（认领案件后可就地裁决）</span>
+            )}
+          </div>
+          {showReason && (
+            <div className="evidence__reason-box">
+              <label htmlFor={`finding-reason-${f.finding_id}`} className="hint">
+                单条裁决理由（{f.finding_id}）
+              </label>
+              <input
+                id={`finding-reason-${f.finding_id}`}
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="输入确认或驳回该条候选的具体依据…"
+              />
+            </div>
+          )}
+          {itemMsg && (
+            <p className={itemMsg.ok ? "hint" : "error"} role="status">
+              {itemMsg.text}
+            </p>
+          )}
         </div>
       )}
     </li>
@@ -162,7 +278,6 @@ function EvidenceItem({ f, index }: { f: Finding; index: number }) {
 
 function NotEvaluatedList({ items }: { items: NotEvaluated[] }) {
   if (items.length === 0) {
-    // 没跑 vs 跑了没问题：这里「没有未评估项」才是真的全覆盖
     return <p className="hint">无未评估项（所有适用控制点都已跑过）。</p>;
   }
   return (
@@ -171,7 +286,7 @@ function NotEvaluatedList({ items }: { items: NotEvaluated[] }) {
         <li key={i}>
           <span>{it.what ?? "未命名控制点"}</span>
           <span className="notrun__why">
-            {WHY_TEXT[String(it.why)] ?? String(it.why ?? "未说明")}
+            {it.label ?? WHY_TEXT[String(it.why)] ?? String(it.why ?? "未说明")}
           </span>
         </li>
       ))}
@@ -179,16 +294,23 @@ function NotEvaluatedList({ items }: { items: NotEvaluated[] }) {
   );
 }
 
-export default function CaseDetailPage() {
-  const { caseId } = useParams<{ caseId: string }>();
+export interface CaseDetailViewProps {
+  embeddedCaseId?: string;
+}
+
+export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps = {}) {
+  const params = useParams<{ caseId: string }>();
+  const caseId = embeddedCaseId ?? params.caseId;
+  const isEmbedded = Boolean(embeddedCaseId);
   const { devEnabled, current, sessionEpoch } = useIdentity();
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
-  // ★ T-210：欠定条目数只在 dev 构建加载（生产构建里这段分支会被整块丢弃）。
+  const [activeFindingId, setActiveFindingId] = useState<string | null>(null);
   const [disputeCount, setDisputeCount] = useState(0);
+
   useEffect(() => {
-    if (!__REVIEW_DEV_IDENTITY__) return;   // 任何 build 都是 false
+    if (!__REVIEW_DEV_IDENTITY__) return;
     let alive = true;
     import("../data/taxonomyInternal").then((m) => {
       if (alive) setDisputeCount(m.boundaryDisputes.length);
@@ -252,24 +374,61 @@ export default function CaseDetailPage() {
     setDetail(null);
     setReports([]);
     setError(null);
+    setActiveFindingId(null);
     if (!devEnabled || current !== null) void load();
   }, [caseId, current, devEnabled, load, sessionEpoch]);
 
+  const handleLocateFinding = useCallback((findingId: string) => {
+    setActiveFindingId(findingId);
+    const markEl = document.getElementById(`unit-mark-${findingId}`);
+    if (markEl) {
+      markEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, []);
+
+  const handleSelectFromUnit = useCallback((findingId: string) => {
+    setActiveFindingId(findingId);
+    const itemEl = document.getElementById(`evidence-item-${findingId}`);
+    if (itemEl) {
+      itemEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, []);
+
+  const TitleTag = isEmbedded ? "h2" : "h1";
+
   if (error) {
-    const head = error.status === 403 ? "403 · 无权读取该案件" : error.status === 404 ? "404 · 案件不存在" : "读取失败";
+    const head =
+      error.status === 403
+        ? "403 · 无权读取该案件"
+        : error.status === 404
+          ? "404 · 案件不存在"
+          : "读取失败";
     return (
       <section className="case">
-        <h1>案件详情</h1>
+        <TitleTag>案件详情</TitleTag>
         <div
-          className={"state " + (error.status === 403 || error.status === 404 ? "state--forbidden" : "state--error")}
+          className={
+            "state " +
+            (error.status === 403 || error.status === 404
+              ? "state--forbidden"
+              : "state--error")
+          }
           role="alert"
         >
           <h2>{head}</h2>
-          <p>{error.status === 403 ? "当前身份不在该案件的可见范围内（tenant + product_line + assigned/actionable）。" : error.message}</p>
+          <p>
+            {error.status === 403
+              ? "当前身份不在该案件的可见范围内（tenant + product_line + assigned/actionable）。"
+              : error.message}
+          </p>
         </div>
-        <p>
-          <Link to="/queue">← 返回复核队列</Link>
-        </p>
+        {!isEmbedded && (
+          <p>
+            <Link to="/queue">
+              <Icon name="arrow-left" size={12} /> 返回复核队列
+            </Link>
+          </p>
+        )}
       </section>
     );
   }
@@ -277,7 +436,7 @@ export default function CaseDetailPage() {
   if (!detail) {
     return (
       <section className="case">
-        <h1>案件详情</h1>
+        <TitleTag>案件详情</TitleTag>
         <p className="hint">加载中…</p>
       </section>
     );
@@ -286,154 +445,199 @@ export default function CaseDetailPage() {
   const ir = detail.ir;
   const dec = ir.decision;
   const cov = ir.coverage;
-  const badge = stateBadge(dec.state);
-  const partial = cov.coverage_state === "partial";
+  const covBadge = resolveCoverageBadge(cov.coverage_state);
   const notEvaluated = cov.not_evaluated_reason ?? [];
   const review = detail.review;
   const leaseActive =
-    typeof review?.lease_expires === "number" && review.lease_expires > Date.now() / 1000;
+    typeof review?.lease_expires === "number" &&
+    review.lease_expires > Date.now() / 1000;
+  const canAdjudicate =
+    current !== null &&
+    review?.status === "claimed" &&
+    review.assignee === current.id &&
+    leaseActive;
 
   return (
-    <section className="case">
-      <div className="case__head">
-        <h1>案件详情</h1>
-        <span className={badge.cls}>{badge.text}</span>
-        <span className="font-data" style={{ fontSize: 12 }}>
-          {detail.case_id}
-        </span>
-      </div>
-      <p className="case__sub">
-        <span className="font-data">{ir.ir_id}</span>（{ir.ir_version}） · 回执{" "}
-        <span className="font-data">{ir.receipt_ref ?? "未测"}</span>
-        {ir.created_at && <> · {ir.created_at}</>}
-      </p>
-
-      <h2>判定</h2>
-      <dl className="facts">
-        <dt>对外标签</dt>
-        <dd>
-          {badge.text} <span className="hint">（{dec.layer} · 唯一判定由后端产出）</span>
-        </dd>
-        <dt>放行状态</dt>
-        <dd>
-          {dec.release_status}
-          <span className="hint"> —— 机器与前端都不得改；只由人经 release-decision 变更</span>
-        </dd>
-        <dt>并行义务</dt>
-        <dd>{(dec.obligations ?? []).join("、") || "无"}</dd>
-      </dl>
-
-      <h2>覆盖证明</h2>
-      <dl className="facts">
-        <dt>覆盖状态</dt>
-        <dd>
-          <span className={`badge ${partial ? "badge--partial" : "badge--pass"}`}>
-            {partial ? "partial" : cov.coverage_state}
-          </span>
-          {partial && (
-            <span style={{ marginLeft: "0.5rem", fontWeight: 600 }}>
-              仅已覆盖部分可判
-            </span>
+    <section className={isEmbedded ? "case case--embedded" : "case case--dual"}>
+      <div className="case__top-bar">
+        <div className="case__head">
+          <TitleTag>{isEmbedded ? `同屏分诊 · ${detail.case_id}` : "案件详情"}</TitleTag>
+          <StatusBadge axis="decision" value={dec.state} />
+          <span className="font-data">{detail.case_id}</span>
+          {isEmbedded && (
+            <Link
+              to={`/cases/${encodeURIComponent(detail.case_id)}`}
+              className="btn"
+            >
+              独立双栏深审 <Icon name="arrow-up-right" size={11} />
+            </Link>
           )}
-        </dd>
-        <dt>评过的模态</dt>
-        <dd>{(cov.modalities_evaluated ?? []).join("、") || "未测"}</dd>
-        <dt>适用控制点</dt>
-        <dd className="font-data">
-          {(cov.control_points_applied ?? []).join("、") || "无"}
-        </dd>
-        <dt>规则版本</dt>
-        <dd className="font-data" style={{ fontSize: 11 }}>
-          {cov.rules_version ?? "未测"}
-        </dd>
-        <dt>分类规范</dt>
-        <dd className="spec-version">
-          {/* ★ 断言 A9：spec_version 与 spec_fingerprint 必须同时出现 */}
-          <span>按 spec {meta.spec_version ?? "未测"}</span>
-          <span className="font-data">{meta.spec_fingerprint ?? "未测"}</span>
-        </dd>
-      </dl>
-
-      <h2>未评估（不是 0，是没跑）</h2>
-      <NotEvaluatedList items={notEvaluated} />
-
-      <h2>证据链（智能体时刻 · 本地渲染，不接模型）</h2>
-      <SpecSeamNote disputeCount={disputeCount} />
-      {(ir.findings ?? []).length === 0 ? (
-        <p className="hint">无 finding。</p>
-      ) : (
-        <ol className="evidence" style={{ paddingLeft: 0 }}>
-          {(ir.findings ?? []).map((f, i) => (
-            <EvidenceItem key={f.finding_id} f={f} index={i} />
-          ))}
-        </ol>
-      )}
-
-      <h2>报告</h2>
-      {reports.length === 0 ? (
-        <p className="hint">暂无报告。</p>
-      ) : (
-        <ul>
-          {reports.map((r) => (
-            <li key={r.report_id}>
-              <Link to={`/reports/${encodeURIComponent(r.report_id)}`}>{r.report_id}</Link>
-              {r.published_at ? ` · ${r.published_at}` : ""}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="actions">
-        <h2 style={{ marginTop: 0, border: "none", paddingBottom: 0 }}>复核动作</h2>
-        <dl className="facts">
-          <dt>台账状态</dt>
-          <dd>{review?.status ?? "未读取"}</dd>
-          <dt>负责人</dt>
-          <dd>{review?.assignee ?? "未认领"}</dd>
-          <dt>台账版本</dt>
-          <dd className="font-data">{review?.version ?? "未读取"}</dd>
-          <dt>租约</dt>
-          <dd>
-            {review?.lease_expires
-              ? `${leaseActive ? "有效至" : "已过期于"} ${new Date(review.lease_expires * 1000).toLocaleString()}`
-              : "无"}
-          </dd>
-          <dt>主草稿</dt>
-          <dd className="font-data">{review?.primary_draft_id ?? "无"}</dd>
-          <dt>正式记录</dt>
-          <dd>当前 GET 不返回 formal 摘要</dd>
-        </dl>
-        {__REVIEW_DEV_IDENTITY__ ? (
-          __REVIEW_WRITE_ENABLED__ && DevReviewActions ? (
-            current ? (
-              <Suspense fallback={<p className="hint">加载开发写动作…</p>}>
-                <DevReviewActions
-                  key={`${detail.case_id}:${current.id}`}
-                  detail={detail}
-                  refresh={refreshAfterWrite}
-                />
-              </Suspense>
-            ) : (
-              <div className="state state--warn" role="note">
-                只读：先显式启用本地开发身份。身份未建立前不会加载写动作。
-              </div>
-            )
-          ) : null
-        ) : (
-          <ReviewActions detail={detail} refresh={refreshAfterWrite} />
-        )}
-        <p className="actions__note">
-          {__REVIEW_DEV_IDENTITY__
-            ? current
-              ? `当前开发身份：${current.label}（${current.id}）。人工意见不改变机器标签或放行状态。`
-              : "当前没有开发 session；页面保持只读。"
-            : "生产：登录后可认领、存草稿、提交与逐条裁决；人工意见不改变机器标签或放行状态。"}
+        </div>
+        <p className="case__sub">
+          <span className="font-data">{ir.ir_id}</span>（{ir.ir_version}） · 回执{" "}
+          <span className="font-data">{ir.receipt_ref ?? "未测"}</span>
+          {ir.created_at && <> · {ir.created_at}</>}
         </p>
       </div>
 
-      <p style={{ marginTop: "1.5rem" }}>
-        <Link to="/queue">← 返回复核队列</Link>
-      </p>
+      <div className="case__workspace">
+        {/* 左栏：ContentUnit 待审原件与覆盖边界高亮联动（G-02） */}
+        <ContentUnitViewer
+          unit={detail.content_unit}
+          unitRef={ir.content_unit_ref}
+          findings={ir.findings ?? []}
+          activeFindingId={activeFindingId}
+          onSelectFinding={handleSelectFromUnit}
+        />
+
+        {/* 右栏：判定、覆盖证明、证据链就地裁决与复核动作台账 */}
+        <div className="case__inspector">
+          <h2>判定</h2>
+          <dl className="facts">
+            <dt>对外标签</dt>
+            <dd>
+              <StatusBadge axis="decision" value={dec.state} />{" "}
+              <span className="hint">（{dec.layer} · 唯一判定由后端产出）</span>
+            </dd>
+            <dt>放行状态</dt>
+            <dd>
+              {dec.release_status}
+              <span className="hint">
+                {" "}
+                —— 机器与前端都不得改；只由人经 release-decision 变更{" "}
+              </span>
+              <Link
+                to={`/release/${encodeURIComponent(detail.case_id)}`}
+                className="btn"
+              >
+                前往签发台 G-1 <Icon name="arrow-up-right" size={11} />
+              </Link>
+            </dd>
+            <dt>并行义务</dt>
+            <dd>{(dec.obligations ?? []).join("、") || "无"}</dd>
+          </dl>
+
+          <h2>覆盖证明</h2>
+          <dl className="facts">
+            <dt>覆盖状态</dt>
+            <dd>
+              <StatusBadge axis="coverage" value={cov.coverage_state} />
+              {covBadge.isPartial && <strong> 仅已覆盖部分可判</strong>}
+            </dd>
+            <dt>评过的模态</dt>
+            <dd>{(cov.modalities_evaluated ?? []).join("、") || "未测"}</dd>
+            <dt>适用控制点</dt>
+            <dd className="font-data">
+              {(cov.control_points_applied ?? []).join("、") || "无"}
+            </dd>
+            <dt>规则版本</dt>
+            <dd className="font-data">{cov.rules_version ?? "未测"}</dd>
+            <dt>分类规范</dt>
+            <dd className="spec-version">
+              {/* ★ 断言 A9：spec_version 与 spec_fingerprint 必须同时出现 */}
+              <span>按 spec {meta.spec_version ?? "未测"}</span>
+              <span className="font-data">{meta.spec_fingerprint ?? "未测"}</span>
+            </dd>
+          </dl>
+
+          <h2>未评估（不是 0，是没跑）</h2>
+          <NotEvaluatedList items={notEvaluated} />
+
+          <h2>证据链（智能体时刻 · 本地渲染，不接模型）</h2>
+          <SpecSeamNote disputeCount={disputeCount} />
+          {(ir.findings ?? []).length === 0 ? (
+            <p className="hint">无 finding。</p>
+          ) : (
+            <ol className="evidence">
+              {(ir.findings ?? []).map((f, i) => (
+                <EvidenceItem
+                  key={f.finding_id}
+                  f={f}
+                  index={i}
+                  isActive={activeFindingId === f.finding_id}
+                  canAdjudicate={canAdjudicate}
+                  caseId={detail.case_id}
+                  version={review?.version ?? null}
+                  onLocate={handleLocateFinding}
+                  onAdjudicated={refreshAfterWrite}
+                />
+              ))}
+            </ol>
+          )}
+
+          <h2>报告</h2>
+          {reports.length === 0 ? (
+            <p className="hint">暂无报告。</p>
+          ) : (
+            <ul>
+              {reports.map((r) => (
+                <li key={r.report_id}>
+                  <Link to={`/reports/${encodeURIComponent(r.report_id)}`}>
+                    {r.report_id}
+                  </Link>
+                  {r.published_at ? ` · ${r.published_at}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="actions" data-action-bar="">
+            <h2>复核动作</h2>
+            <dl className="facts">
+              <dt>台账状态</dt>
+              <dd>{review?.status ?? "未读取"}</dd>
+              <dt>负责人</dt>
+              <dd>{review?.assignee ?? "未认领"}</dd>
+              <dt>台账版本</dt>
+              <dd className="font-data">{review?.version ?? "未读取"}</dd>
+              <dt>租约</dt>
+              <dd>
+                {review?.lease_expires
+                  ? `${leaseActive ? "有效至" : "已过期于"} ${new Date(review.lease_expires * 1000).toLocaleString()}`
+                  : "无"}
+              </dd>
+              <dt>主草稿</dt>
+              <dd className="font-data">{review?.primary_draft_id ?? "无"}</dd>
+              <dt>正式记录</dt>
+              <dd>当前 GET 不返回 formal 摘要</dd>
+            </dl>
+            {__REVIEW_DEV_IDENTITY__ ? (
+              __REVIEW_WRITE_ENABLED__ && DevReviewActions ? (
+                current ? (
+                  <Suspense fallback={<p className="hint">加载开发写动作…</p>}>
+                    <DevReviewActions
+                      key={`${detail.case_id}:${current.id}`}
+                      detail={detail}
+                      refresh={refreshAfterWrite}
+                    />
+                  </Suspense>
+                ) : (
+                  <div className="state state--warn" role="note">
+                    只读：先显式启用本地开发身份。身份未建立前不会加载写动作。
+                  </div>
+                )
+              ) : null
+            ) : (
+              <ReviewActions detail={detail} refresh={refreshAfterWrite} />
+            )}
+            <p className="actions__note">
+              {__REVIEW_DEV_IDENTITY__
+                ? current
+                  ? `当前开发身份：${current.label}（${current.id}）。人工意见不改变机器标签或放行状态。`
+                  : "当前没有开发 session；页面保持只读。"
+                : "生产：登录后可认领、存草稿、提交与逐条裁决；人工意见不改变机器标签或放行状态。"}
+            </p>
+          </div>
+
+          {!isEmbedded && (
+            <p>
+              <Link to="/queue">
+                <Icon name="arrow-left" size={12} /> 返回复核队列
+              </Link>
+            </p>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

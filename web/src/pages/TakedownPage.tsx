@@ -1,0 +1,625 @@
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { ApiError, request } from "../api/client";
+import { useIdentity } from "../components/IdentitySwitcher";
+import Button from "../ui/Button";
+import Icon from "../ui/icon";
+
+/**
+ * 下线任务台（P-08 · Wave D 落 UJ-5 与 TD-1…TD-21 / TF-1…TF-19）。
+ *
+ * 核心铁律（Invariant 6 & TD-8b）：
+ *   1. 下线任务无硬 deadline（no_hard_deadline），但未完成任务**绝不显示绿色或相关“未超期/安全”字样**；
+ *      一律持续展示任务年龄（天/小时）、提醒次数、积压与状态；
+ *   2. 完成回填（complete）强制校验：platform + executed_by + executed_at（不得晚于当前）
+ *      + 证据（receipt_id 或 result_url 或仓外 0700 截图引用）；
+ *   3. 豁免（waive）强制双人独立审批：Approver 1 !== Approver 2 !== Executor，原签发人不得唯一（TF-10…TF-14）。
+ */
+
+export interface TakedownTaskItem {
+  task_id: string;
+  case_id: string;
+  platform: string;
+  tenant?: string;
+  product_line?: string;
+  assignee?: string | null;
+  state: "pending" | "in_progress" | "completed" | "failed" | "waived" | string;
+  created_at?: string;
+  reminder_count?: number;
+  last_reminded_at?: string | null;
+  version?: number;
+  evidence?: Record<string, unknown> | null;
+  waived?: Record<string, unknown> | null;
+}
+
+function formatTaskAge(createdAt: string | undefined): string {
+  if (!createdAt) return "年龄未测（缺少 created_at）";
+  const ts = Date.parse(createdAt);
+  if (Number.isNaN(ts)) return "年龄未测";
+  const hours = Math.max(0, Math.floor((Date.now() - ts) / 3600000));
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `已持续 ${days} 天 ${remHours} 小时（无硬期限 · 持续追踪）`;
+}
+
+export default function TakedownPage() {
+  const { devEnabled, current, sessionEpoch } = useIdentity();
+  const [tasks, setTasks] = useState<TakedownTaskItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(
+    null,
+  );
+  const [busy, setBusy] = useState<boolean>(false);
+
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [modalKind, setModalKind] = useState<
+    "complete" | "waive" | "reassign" | null
+  >(null);
+
+  // 回填表单状态
+  const [evPlatform, setEvPlatform] = useState<string>("amazon");
+  const [evExecutedBy, setEvExecutedBy] = useState<string>("");
+  const [evExecutedAt, setEvExecutedAt] = useState<string>(() =>
+    new Date().toISOString().slice(0, 19) + "Z",
+  );
+  const [evReceiptId, setEvReceiptId] = useState<string>("");
+  const [evResultUrl, setEvResultUrl] = useState<string>("");
+
+  // 双人审批豁免状态
+  const [approver1, setApprover1] = useState<string>("");
+  const [approver2, setApprover2] = useState<string>("");
+  const [waiveReason, setWaiveReason] = useState<string>("");
+  const [waiveEvidence, setWaiveEvidence] = useState<string>("");
+
+  // 改派状态
+  const [newAssignee, setNewAssignee] = useState<string>("");
+
+  const loadTasks = useCallback(async () => {
+    try {
+      const data = await request<TakedownTaskItem[]>("/takedown-tasks");
+      setTasks(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      setError(err.message ?? String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (devEnabled && current === null) {
+      setTasks(null);
+      return;
+    }
+    void loadTasks();
+  }, [current, devEnabled, loadTasks, sessionEpoch]);
+
+  const runTransition = async (
+    taskId: string,
+    action: "start" | "fail" | "retry",
+  ) => {
+    if (busy) return;
+    setBusy(true);
+    setFlash(null);
+    try {
+      const updated = await request<TakedownTaskItem>(
+        `/takedown-tasks/${encodeURIComponent(taskId)}/${action}`,
+        {
+          method: "POST",
+          body: {},
+          idempotencyKey: crypto.randomUUID(),
+        },
+      );
+      setTasks((prev) =>
+        (prev ?? []).map((t) => (t.task_id === taskId ? updated : t)),
+      );
+      setFlash({
+        ok: true,
+        text: `下线任务 ${taskId} 已执行 ${action} → 当前状态：${updated.state}`,
+      });
+    } catch (cause: unknown) {
+      const msg =
+        cause instanceof ApiError
+          ? `HTTP ${cause.status}: ${cause.message}`
+          : String(cause);
+      setFlash({ ok: false, text: `任务动作未完成：${msg}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCompleteSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!activeTaskId || busy) return;
+    setBusy(true);
+    setFlash(null);
+    try {
+      const updated = await request<TakedownTaskItem>(
+        `/takedown-tasks/${encodeURIComponent(activeTaskId)}/complete`,
+        {
+          method: "POST",
+          body: {
+            evidence: {
+              platform: evPlatform.trim(),
+              executed_by: evExecutedBy.trim() || current?.id || "",
+              executed_at: evExecutedAt.trim(),
+              ...(evReceiptId.trim() ? { receipt_id: evReceiptId.trim() } : {}),
+              ...(evResultUrl.trim() ? { result_url: evResultUrl.trim() } : {}),
+            },
+          },
+          idempotencyKey: crypto.randomUUID(),
+        },
+      );
+      setTasks((prev) =>
+        (prev ?? []).map((t) => (t.task_id === activeTaskId ? updated : t)),
+      );
+      setModalKind(null);
+      setFlash({
+        ok: true,
+        text: `下线任务 ${activeTaskId} 已完成证据回填并结案（completed，停止每日提醒）。`,
+      });
+    } catch (cause: unknown) {
+      const msg =
+        cause instanceof ApiError
+          ? `HTTP ${cause.status}: ${cause.message}`
+          : String(cause);
+      setFlash({ ok: false, text: `回填校验未通过：${msg}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleWaiveSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!activeTaskId || busy) return;
+    setBusy(true);
+    setFlash(null);
+    try {
+      const updated = await request<TakedownTaskItem>(
+        `/takedown-tasks/${encodeURIComponent(activeTaskId)}/waive`,
+        {
+          method: "POST",
+          body: {
+            approvers: [
+              {
+                actor: approver1.trim(),
+                scopes: ["takedown.waive"],
+                scope_match: true,
+              },
+              {
+                actor: approver2.trim(),
+                scopes: ["takedown.waive"],
+                scope_match: true,
+              },
+            ],
+            reason: waiveReason.trim(),
+            evidence: { note: waiveEvidence.trim() },
+          },
+          idempotencyKey: crypto.randomUUID(),
+        },
+      );
+      setTasks((prev) =>
+        (prev ?? []).map((t) => (t.task_id === activeTaskId ? updated : t)),
+      );
+      setModalKind(null);
+      setFlash({
+        ok: true,
+        text: `下线任务 ${activeTaskId} 已通过双人独立审批豁免（waived）。`,
+      });
+    } catch (cause: unknown) {
+      const msg =
+        cause instanceof ApiError
+          ? `HTTP ${cause.status}: ${cause.message}`
+          : String(cause);
+      setFlash({ ok: false, text: `双人豁免校验拒绝：${msg}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReassignSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!activeTaskId || !newAssignee.trim() || busy) return;
+    setBusy(true);
+    setFlash(null);
+    try {
+      const updated = await request<TakedownTaskItem>(
+        `/takedown-tasks/${encodeURIComponent(activeTaskId)}/reassign`,
+        {
+          method: "POST",
+          body: { assignee: newAssignee.trim() },
+          idempotencyKey: crypto.randomUUID(),
+        },
+      );
+      setTasks((prev) =>
+        (prev ?? []).map((t) => (t.task_id === activeTaskId ? updated : t)),
+      );
+      setModalKind(null);
+      setFlash({
+        ok: true,
+        text: `下线任务 ${activeTaskId} 已改派给 ${newAssignee.trim()}。`,
+      });
+    } catch (cause: unknown) {
+      const msg =
+        cause instanceof ApiError
+          ? `HTTP ${cause.status}: ${cause.message}`
+          : String(cause);
+      setFlash({ ok: false, text: `改派被拒绝：${msg}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const renderTaskBadge = (state: string) => {
+    // ★ TD-8b 铁律：未完成任务（pending / in_progress / failed）绝不使用 badge--pass 绿色
+    if (state === "completed") {
+      return (
+        <span className="badge badge--pass" data-status-badge="">
+          completed（已回填结案）
+        </span>
+      );
+    }
+    if (state === "failed") {
+      return (
+        <span className="badge badge--block" data-status-badge="">
+          failed（下线失败 · 已升级统筹与法务）
+        </span>
+      );
+    }
+    if (state === "waived") {
+      return (
+        <span className="badge badge--sample" data-status-badge="">
+          waived（双人审批豁免）
+        </span>
+      );
+    }
+    return (
+      <span className="badge badge--warn" data-status-badge="">
+        {state}（待下线积压）
+      </span>
+    );
+  };
+
+  return (
+    <section className="cases-page" aria-labelledby="takedown-page-title">
+      <div className="cases-page__head">
+        <div>
+          <h1 id="takedown-page-title">下线任务台（P-08）</h1>
+          <p className="hint">
+            已发布内容在签发撤回（revoke）或自动失效（invalidated）后自动生成下线任务。
+            无硬期限（<code>no_hard_deadline</code>），持续展示任务年龄、每日提醒次数与平台积压（TD-8）。
+          </p>
+        </div>
+        <span className="font-data hint">
+          积压与历史任务：{(tasks ?? []).length} 项
+        </span>
+      </div>
+
+      {error && (
+        <div className="state state--error" role="alert">
+          读取下线任务失败：{error}
+        </div>
+      )}
+
+      {flash && (
+        <div
+          className={"state " + (flash.ok ? "" : "state--error")}
+          role="status"
+        >
+          {flash.text}
+        </div>
+      )}
+
+      {modalKind === "complete" && activeTaskId && (
+        <div className="actions" role="dialog" aria-label="完成下线证据回填">
+          <h2>完成下线证据回填 · {activeTaskId}（TD-4）</h2>
+          <p className="hint">
+            必填：执行平台、执行人、执行时间（不得晚于当前），以及回执编号{" "}
+            <code>receipt_id</code> 或可访问的 <code>result_url</code> 至少一项。
+          </p>
+          <form
+            className="submit-form"
+            onSubmit={(e) => void handleCompleteSubmit(e)}
+          >
+            <div className="submit-grid">
+              <div>
+                <label htmlFor="td-ev-platform">执行平台（platform）</label>
+                <input
+                  id="td-ev-platform"
+                  type="text"
+                  value={evPlatform}
+                  onChange={(e) => setEvPlatform(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="td-ev-by">执行人（executed_by）</label>
+                <input
+                  id="td-ev-by"
+                  type="text"
+                  value={evExecutedBy}
+                  onChange={(e) => setEvExecutedBy(e.target.value)}
+                  placeholder={current?.id ?? "输入执行人账号"}
+                />
+              </div>
+              <div>
+                <label htmlFor="td-ev-at">执行时刻（ISO UTC）</label>
+                <input
+                  id="td-ev-at"
+                  type="text"
+                  className="font-data"
+                  value={evExecutedAt}
+                  onChange={(e) => setEvExecutedAt(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="submit-grid">
+              <div>
+                <label htmlFor="td-ev-receipt">
+                  平台下线回执号（receipt_id，与 URL 二选一必填）
+                </label>
+                <input
+                  id="td-ev-receipt"
+                  type="text"
+                  className="font-data"
+                  value={evReceiptId}
+                  onChange={(e) => setEvReceiptId(e.target.value)}
+                  placeholder="例如 AMZ-RM-99281"
+                />
+              </div>
+              <div>
+                <label htmlFor="td-ev-url">
+                  下线结果核验链接（result_url）
+                </label>
+                <input
+                  id="td-ev-url"
+                  type="text"
+                  value={evResultUrl}
+                  onChange={(e) => setEvResultUrl(e.target.value)}
+                  placeholder="https://..."
+                />
+              </div>
+            </div>
+            <div className="actions__row">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={
+                  busy ||
+                  !evPlatform.trim() ||
+                  (!evReceiptId.trim() && !evResultUrl.trim())
+                }
+              >
+                提交回填并结案
+              </Button>
+              <Button variant="ghost" onClick={() => setModalKind(null)}>
+                取消
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {modalKind === "waive" && activeTaskId && (
+        <div className="actions" role="dialog" aria-label="双人独立审批豁免下线">
+          <h2>双人独立审批豁免（Waive） · {activeTaskId}（TF-10…TF-19）</h2>
+          <p className="hint">
+            规则：需两名不同的、具备匹配三维 scope 的 <code>takedown.waive</code> 审批人；
+            执行人本人不得自批；原签发人最多作为两名审批人之一，不得唯一。
+          </p>
+          <form
+            className="submit-form"
+            onSubmit={(e) => void handleWaiveSubmit(e)}
+          >
+            <div className="submit-grid">
+              <div>
+                <label htmlFor="td-waive-a1">第一审批人（Approver 1）</label>
+                <input
+                  id="td-waive-a1"
+                  type="text"
+                  value={approver1}
+                  onChange={(e) => setApprover1(e.target.value)}
+                  placeholder="例如 u_legal_1"
+                />
+              </div>
+              <div>
+                <label htmlFor="td-waive-a2">
+                  第二审批人（Approver 2，不得与第一审批人相同）
+                </label>
+                <input
+                  id="td-waive-a2"
+                  type="text"
+                  value={approver2}
+                  onChange={(e) => setApprover2(e.target.value)}
+                  placeholder="例如 u_coord_1"
+                />
+              </div>
+            </div>
+            <div className="submit-grid">
+              <div>
+                <label htmlFor="td-waive-reason">豁免书面理由（必填）</label>
+                <input
+                  id="td-waive-reason"
+                  type="text"
+                  value={waiveReason}
+                  onChange={(e) => setWaiveReason(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="td-waive-ev">豁免补充证据说明（必填）</label>
+                <input
+                  id="td-waive-ev"
+                  type="text"
+                  value={waiveEvidence}
+                  onChange={(e) => setWaiveEvidence(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="actions__row">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={
+                  busy ||
+                  !approver1.trim() ||
+                  !approver2.trim() ||
+                  approver1.trim() === approver2.trim() ||
+                  !waiveReason.trim() ||
+                  !waiveEvidence.trim()
+                }
+              >
+                提交双人豁免审批
+              </Button>
+              <Button variant="ghost" onClick={() => setModalKind(null)}>
+                取消
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {modalKind === "reassign" && activeTaskId && (
+        <div className="actions" role="dialog" aria-label="改派下线任务负责人">
+          <h2>改派下线任务 · {activeTaskId}（TD-12）</h2>
+          <form
+            className="submit-form"
+            onSubmit={(e) => void handleReassignSubmit(e)}
+          >
+            <div className="submit-field">
+              <label htmlFor="td-reassign-to">新执行负责人（需匹配平台与品线 scope）</label>
+              <input
+                id="td-reassign-to"
+                type="text"
+                value={newAssignee}
+                onChange={(e) => setNewAssignee(e.target.value)}
+                placeholder="输入新负责人 ID…"
+              />
+            </div>
+            <div className="actions__row">
+              <Button
+                type="submit"
+                variant="secondary"
+                disabled={busy || !newAssignee.trim()}
+              >
+                确认改派
+              </Button>
+              <Button variant="ghost" onClick={() => setModalKind(null)}>
+                取消
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {tasks === null ? (
+        <p className="hint">加载下线任务中…</p>
+      ) : tasks.length === 0 ? (
+        <div className="state">
+          <p className="hint">当前租户没有待执行的下线任务。</p>
+        </div>
+      ) : (
+        <ul className="handoff-list" data-takedown-list="">
+          {tasks.map((t) => (
+            <li key={t.task_id} className="state" data-takedown-task={t.task_id}>
+              <div className="evidence__head">
+                <span className="font-data">
+                  <strong>{t.task_id}</strong>
+                </span>
+                {renderTaskBadge(t.state)}
+                <span className="font-data hint">
+                  Scope: {t.platform} · {t.tenant ?? "t1"} ·{" "}
+                  {t.product_line ?? "未测"}
+                </span>
+              </div>
+
+              <dl className="facts">
+                <dt>关联案件</dt>
+                <dd className="font-data">
+                  <Link to={`/cases/${encodeURIComponent(t.case_id)}`}>
+                    {t.case_id}
+                  </Link>
+                </dd>
+                <dt>执行负责人</dt>
+                <dd className="font-data">{t.assignee ?? "未指派（默认投放侧）"}</dd>
+                <dt>任务年龄与积压</dt>
+                <dd className="font-data" data-takedown-age="">
+                  <Icon name="clock" size={11} /> {formatTaskAge(t.created_at)}
+                </dd>
+                <dt>提醒记录</dt>
+                <dd className="font-data">
+                  已提醒 {t.reminder_count ?? 0} 次
+                  {t.last_reminded_at ? ` · 上次 ${t.last_reminded_at}` : ""}
+                </dd>
+              </dl>
+
+              <div className="actions__row">
+                {t.state === "pending" && (
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void runTransition(t.task_id, "start")}
+                  >
+                    开始执行（Start）
+                  </Button>
+                )}
+                {t.state === "in_progress" && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setActiveTaskId(t.task_id);
+                        setEvPlatform(t.platform || "amazon");
+                        setModalKind("complete");
+                      }}
+                    >
+                      完成并回填证据（Complete）
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void runTransition(t.task_id, "fail")}
+                    >
+                      标记下线失败（Fail）
+                    </Button>
+                  </>
+                )}
+                {t.state === "failed" && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void runTransition(t.task_id, "retry")}
+                    >
+                      重新尝试（Retry）
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setActiveTaskId(t.task_id);
+                        setModalKind("waive");
+                      }}
+                    >
+                      双人审批豁免（Waive）
+                    </Button>
+                  </>
+                )}
+                {t.state !== "completed" && t.state !== "waived" && (
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setActiveTaskId(t.task_id);
+                      setModalKind("reassign");
+                    }}
+                  >
+                    改派（Reassign）
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

@@ -5,15 +5,9 @@ import { csrfHeaders, parseCookie } from "./auth-headers";
  *
  * 边界（web/README.md，2026-10-20 改定）：
  *   - **不重算判定**：state / coverage / authority / release_status 一律读后端返回。
- *   - **人工动作只经写 API**：claim / save_draft / submit / confirm / reject
- *     只走 api/write_api.py 已挂载的端点。
- *   - **release_status 不出现任何可写控件**：本文件不导出任何签发/撤回方法。
- *
- * 队列口径（2026-10-20 修复）：
- *   旧代码走 `/queue`，经 vite 代理落到后端的**联调别名** `/review-api/queue`，
- *   而那个端点列出的是「**全部可读案件**」—— BLOCK 与 PASS 也会出现。
- *   真正的待办队列是 `/api/v1/queue`：只返回 REVIEW 与 待自决。
- *   见 `api/review_api.py:459` 与断言 A1（含反向对照）。
+ *   - **人工动作只经写 API**：claim / unclaim / reassign / save_draft / adopt_draft /
+ *     reference_fragment / heartbeat / submit / confirm / reject 只走 api/write_api.py 已挂载的端点。
+ *   - **release_status 不在本通用读客户端出现任何可写方法**（A4）。
  */
 
 export const apiBase = (
@@ -46,6 +40,12 @@ export interface CaseSummary {
   tenant?: string | null;
   product_line?: string | null;
   assignee_id?: string | null;
+  sample?: boolean | null;
+  entry_channel?: string | null;
+  created_at?: string | null;
+  title_or_excerpt?: string | null;
+  high_severity_count?: number | null;
+  coverage_state?: string | null;
 }
 
 export interface Finding {
@@ -65,11 +65,44 @@ export interface Finding {
   detected_by?: string | null;
   produced_by?: string | null;
   derived_from?: string | null;
+  adjudicated_by?: string | null;
+  adjudicated_at?: string | null;
+  adjudication_reason?: string | null;
 }
 
 export interface NotEvaluated {
   what?: string | null;
   why?: string | null;
+  label?: string | null;
+}
+
+export interface DraftSnapshot {
+  case_id: string;
+  draft_id: string;
+  snapshot_seq: number;
+  snapshot_at: string;
+  content_hash: string;
+  author: string | null;
+  derived_from?: string | null;
+  snapshot_kind?: string;
+  adopted_at?: string | null;
+  form?: Record<string, unknown>;
+  notes: string;
+  evidence_selections?: unknown[];
+  references?: Array<{
+    source_draft_id: string;
+    field_path: string;
+    fragment: unknown;
+  }>;
+}
+
+export interface FragmentReference {
+  case_id: string;
+  source_draft_id: string;
+  field_path: string;
+  fragment: unknown;
+  author: string;
+  at: string;
 }
 
 export interface ReviewSummary {
@@ -83,6 +116,27 @@ export interface ReviewSummary {
   released_at: string | null;
   released_draft_id: string | null;
   primary_draft_id: string | null;
+  primary_draft?: DraftSnapshot | null;
+  drafts?: DraftSnapshot[];
+  fragment_references?: FragmentReference[];
+}
+
+export interface ContentUnitData {
+  unit_id: string;
+  kind?: string;
+  parse_status?: string;
+  failure_kind?: string | null;
+  text?: string | null;
+  has_text?: boolean;
+  fields?: Record<string, unknown> | null;
+  textification?: {
+    covers?: string[];
+    does_not_cover?: string[];
+  } | null;
+  fingerprint?: {
+    raw_sha256?: string;
+    text_sha256?: string;
+  } | null;
 }
 
 export interface CaseDetail {
@@ -91,6 +145,12 @@ export interface CaseDetail {
     ir_id: string;
     ir_version: string;
     source_ir_version?: string;
+    content_unit_ref?: {
+      unit_id: string;
+      kind: string;
+      parse_status?: string;
+      failure_kind?: string | null;
+    };
     findings: Finding[];
     decision: {
       state: string;
@@ -112,6 +172,7 @@ export interface CaseDetail {
     created_at?: string;
   };
   review?: ReviewSummary | null;
+  content_unit?: ContentUnitData | null;
 }
 
 export interface LedgerMutation {
@@ -123,14 +184,12 @@ export interface LedgerMutation {
 }
 
 export interface DraftMutation extends LedgerMutation {
-  draft: {
-    draft_id: string;
-    case_id: string;
-    author: string;
-    notes: string;
-    content_hash: string;
-  };
-  formal: null;
+  draft: DraftSnapshot;
+  formal?: null;
+}
+
+export interface ReferenceMutation extends LedgerMutation {
+  reference: FragmentReference;
 }
 
 export interface SubmitMutation extends LedgerMutation {
@@ -150,6 +209,17 @@ export interface ReportSummary {
   ir_id?: string | null;
   url?: string | null;
   published_at?: string | null;
+}
+
+export interface NotificationItem {
+  notification_id: string;
+  recipient?: string | null;
+  tenant?: string;
+  type?: string;
+  unread?: boolean;
+  read_at?: string | null;
+  acked_at?: string | null;
+  payload?: Record<string, unknown> | null;
 }
 
 /** 后端错误体（api/review_api.py 的 _http_error）：{code,message,details,request_id} */
@@ -241,6 +311,8 @@ export const reviewApi = {
 
   getReport: (reportId: string) =>
     request<ReportSummary>(`/reports/${encodeURIComponent(reportId)}`),
+
+  listNotifications: () => request<NotificationItem[]>("/notifications"),
 
   /** 当前登录主体（生产）。未登录 → 401。 */
   me: () => request<Me>("/me"),

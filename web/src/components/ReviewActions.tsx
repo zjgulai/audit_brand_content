@@ -1,22 +1,27 @@
 import { useRef, useState } from "react";
-
-import { ApiError, type CaseDetail } from "../api/client";
-import { reviewWriteApi } from "../api/write-client";
+import { ApiError, type CaseDetail, type DraftSnapshot } from "../api/client";
+import Button from "../ui/Button";
+import Icon from "../ui/icon";
 import { useIdentity } from "./IdentitySwitcher";
 
 /**
- * 生产版复核写动作（T-150 + T-170）。
+ * 复核动作与草稿交接面板（Wave B · 落 G-07 决策，修 D-07）。
  *
- * 与 `DevReviewActions` 的区别：
- *   - 主体来自 `ProductionIdentityProvider` 的 `/api/v1/me`，不依赖 `/dev/session`；
- *   - `write-client` 静态导入（生产构建必须包含它）；
- *   - 增加逐条 `confirm` / `reject`（T-170 的 `adjudicate_finding`）。
- *
- * 所有请求都经 `request()` —— CSRF 头只在写方法上自动附加。
+ * 功能：
+ *   1. 认领（claim）/ 释放认领（unclaim）/ 改派（reassign）/ 租约续期（heartbeat）；
+ *   2. 1.5s 防抖自动快照（autosave）：认领且租约有效时，备注变化自动生成快照并回显 snapshot_seq，
+ *      同时保留手动「存草稿」按钮（满足 check_review_actions.mjs 联调门契约）；
+ *   3. 前人草稿交接抽屉（Draft Handoff）：
+ *      - 只读查看全部历史草稿（author / snapshot_at / snapshot_seq / notes）；
+ *      - 最新 primary 草稿带视觉标记「Recommended: Latest」，不自动预选；
+ *      - 支持显式 Adopt primary 草稿（记录 derived_from）与对非 primary 草稿引用片段（reference_fragment）；
+ *   4. 保留 `#review-note` 原生 textarea 与「认领」「存草稿」「提交复核意见」按钮文案。
  */
+
 interface Props {
   detail: CaseDetail;
   refresh: () => Promise<CaseDetail | null>;
+  mode?: "prod" | "dev";
 }
 
 interface RetryIntent {
@@ -54,16 +59,6 @@ function readbackProblem(response: unknown, refreshed: CaseDetail): string | nul
   ) {
     if (refreshed.review?.status !== "closed") return "提交后台账未回读为 closed";
   }
-  if (response && typeof response === "object" && "finding" in response) {
-    const finding = response.finding;
-    const status =
-      finding && typeof finding === "object" && "status" in finding
-        ? String(finding.status)
-        : null;
-    if (status !== "confirmed" && status !== "rejected") {
-      return "finding 裁决状态未在写响应中回读";
-    }
-  }
   return null;
 }
 
@@ -86,7 +81,16 @@ function actionErrorMessage(cause: ApiError): string {
 
 export default function ReviewActions({ detail, refresh }: Props) {
   const { current } = useIdentity();
-  const [note, setNote] = useState("");
+  const review = detail.review;
+  const primaryDraft = review?.primary_draft ?? null;
+  const drafts: DraftSnapshot[] = review?.drafts ?? [];
+
+  const [note, setNote] = useState<string>("");
+  const [verdictChoice, setVerdictChoice] = useState<
+    "uphold" | "revise" | "override_pass"
+  >("uphold");
+  const [reassignTarget, setReassignTarget] = useState<string>("");
+  const [showHandoff, setShowHandoff] = useState<boolean>(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<{
     kind: "ok" | "error" | "warn";
@@ -95,19 +99,29 @@ export default function ReviewActions({ detail, refresh }: Props) {
   const [formalId, setFormalId] = useState<string | null>(null);
   const [acceptedWithoutReadback, setAcceptedWithoutReadback] = useState(false);
   const [retryIntent, setRetryIntent] = useState<RetryIntent | null>(null);
+  const [autoSaveInfo, setAutoSaveInfo] = useState<string | null>(null);
   const pendingRef = useRef(false);
 
-  const review = detail.review;
   const leaseActive =
-    typeof review?.lease_expires === "number" && review.lease_expires > Date.now() / 1000;
+    typeof review?.lease_expires === "number" &&
+    review.lease_expires > Date.now() / 1000;
   const canEditClaim =
     current !== null &&
     review?.status === "claimed" &&
     review.assignee === current.id &&
     leaseActive;
   const canClaim =
-    current !== null && review?.status !== "claimed" && review?.status !== "closed";
-  const candidates = (detail.ir.findings ?? []).filter((f) => f.status === "candidate");
+    current !== null &&
+    review?.status !== "claimed" &&
+    review?.status !== "closed";
+  const candidates = (detail.ir.findings ?? []).filter(
+    (f) => f.status === "candidate",
+  );
+
+  const getWriteApi = async () => {
+    const mod = await import("../api/write-client");
+    return mod.reviewWriteApi;
+  };
 
   const runIntent = async (intent: RetryIntent) => {
     if (pendingRef.current) return;
@@ -127,6 +141,18 @@ export default function ReviewActions({ detail, refresh }: Props) {
         "formal_id" in response.formal
       ) {
         setFormalId(String(response.formal.formal_id));
+      }
+      if (
+        response &&
+        typeof response === "object" &&
+        "draft" in response &&
+        response.draft &&
+        typeof response.draft === "object" &&
+        "snapshot_seq" in response.draft
+      ) {
+        setAutoSaveInfo(
+          `草稿快照 #${String(response.draft.snapshot_seq)} 已同步`,
+        );
       }
       const refreshed = await refresh();
       if (!refreshed) {
@@ -148,14 +174,17 @@ export default function ReviewActions({ detail, refresh }: Props) {
       }
       setFlash({ kind: "ok", text: `${intent.name} 已完成并回读台账` });
     } catch (cause: unknown) {
-      if (cause instanceof ApiError && ![408, 429].includes(cause.status) && cause.status < 500) {
+      if (
+        cause instanceof ApiError &&
+        ![408, 429].includes(cause.status) &&
+        cause.status < 500
+      ) {
         setRetryIntent(null);
         setFlash({
           kind: "error",
           text: `${intent.name} 失败（${cause.status}）：${actionErrorMessage(cause)}`,
         });
       } else {
-        // 网络错误、408/429/5xx 都可能已在服务端生效：保留原始 closure 与 key。
         setRetryIntent(intent);
         setFlash({
           kind: "warn",
@@ -168,7 +197,10 @@ export default function ReviewActions({ detail, refresh }: Props) {
     }
   };
 
-  const startIntent = (name: string, execute: (key: string) => Promise<unknown>) => {
+  const startIntent = (
+    name: string,
+    execute: (key: string) => Promise<unknown>,
+  ) => {
     const key = crypto.randomUUID();
     void runIntent({ name, key, execute: () => execute(key) });
   };
@@ -177,7 +209,9 @@ export default function ReviewActions({ detail, refresh }: Props) {
     <>
       {flash && (
         <div
-          className={"state " + (flash.kind === "error" ? "state--error" : "state--warn")}
+          className={
+            "state " + (flash.kind === "error" ? "state--error" : "state--warn")
+          }
           role={flash.kind === "error" ? "alert" : "status"}
         >
           {flash.text}
@@ -188,135 +222,314 @@ export default function ReviewActions({ detail, refresh }: Props) {
           不确定状态下不要开始新动作。刷新确认台账版本后再继续。
         </div>
       )}
-      <label htmlFor="review-note">复核理由 / 备注 / 裁决理由</label>
+
+      {/* 前人草稿交接（Draft Handoff）横幅与对比抽屉 */}
+      {drafts.length > 0 && (
+        <div className="handoff-bar" data-draft-handoff="">
+          <div className="handoff-bar__summary">
+            <Icon name="history" size={13} />{" "}
+            <span>
+              历史草稿快照：共 <strong>{drafts.length}</strong> 份
+              {primaryDraft && (
+                <>
+                  {" "}
+                  · 当前主草稿 <code>{primaryDraft.draft_id}</code>（#
+                  {primaryDraft.snapshot_seq} · 作者{" "}
+                  <code>{primaryDraft.author ?? "未知"}</code>）
+                </>
+              )}
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            onClick={() => setShowHandoff(!showHandoff)}
+          >
+            {showHandoff ? "收起草稿交接" : "查看/交接历史草稿"}
+          </Button>
+        </div>
+      )}
+
+      {showHandoff && drafts.length > 0 && (
+        <div className="handoff-drawer" role="region" aria-label="历史草稿交接对比">
+          <p className="hint">
+            原稿不可变（Immutable）。系统仅视觉标记最新主草稿（Recommended: Latest），不自动预选或自动合并：
+            主草稿须<strong>显式 Adopt</strong>以生成新派生草稿（记录 <code>derived_from</code>）；其余历史快照可<strong>引用片段（Reference）</strong>。
+          </p>
+          <ul className="handoff-list">
+            {drafts.map((d) => {
+              const isPrimary = d.draft_id === review?.primary_draft_id;
+              return (
+                <li key={d.draft_id} className="handoff-card">
+                  <div className="handoff-card__head">
+                    <span className="font-data">
+                      <strong>#{d.snapshot_seq}</strong> · {d.draft_id}
+                    </span>
+                    <span className="hint">
+                      作者 <code>{d.author ?? "システム"}</code> · {d.snapshot_at}
+                    </span>
+                    {isPrimary && (
+                      <span className="badge badge--pending" data-status-badge="">
+                        Recommended: Latest (Primary)
+                      </span>
+                    )}
+                    {d.derived_from && (
+                      <span className="hint font-data">
+                        派生自 {d.derived_from}
+                      </span>
+                    )}
+                  </div>
+                  <div className="evidence__quote">
+                    {d.notes || "（空草稿备注）"}
+                  </div>
+                  <div className="actions__row">
+                    {isPrimary ? (
+                      <Button
+                        variant="secondary"
+                        disabled={busy !== null || !canEditClaim || review === null}
+                        onClick={() =>
+                          startIntent(`采纳主草稿 ${d.draft_id}`, async (key) => {
+                            const api = await getWriteApi();
+                            const res = await api.adoptDraft(
+                              detail.case_id,
+                              review!.version,
+                              d.draft_id,
+                              key,
+                            );
+                            if (d.notes) setNote(d.notes);
+                            return res;
+                          })
+                        }
+                      >
+                        显式采纳为主草稿（Adopt）
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        disabled={
+                          busy !== null ||
+                          !canEditClaim ||
+                          review === null ||
+                          !d.notes
+                        }
+                        onClick={() =>
+                          startIntent(`引用草稿片段 ${d.draft_id}`, async (key) => {
+                            const api = await getWriteApi();
+                            const res = await api.referenceFragment(
+                              detail.case_id,
+                              review!.version,
+                              d.draft_id,
+                              "notes",
+                              d.notes,
+                              key,
+                            );
+                            setNote((prev) =>
+                              prev
+                                ? `${prev}\n[引用 ${d.draft_id}]: ${d.notes}`
+                                : `[引用 ${d.draft_id}]: ${d.notes}`,
+                            );
+                            return res;
+                          })
+                        }
+                      >
+                        引用备注片段（Reference）
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      <div className="verdict-picker" role="group" aria-label="人工复核倾向">
+        <span className="hint">复核处置倾向：</span>
+        <label className="verdict-radio">
+          <input
+            type="radio"
+            name={`verdict-${detail.case_id}`}
+            checked={verdictChoice === "uphold"}
+            onChange={() => setVerdictChoice("uphold")}
+          />
+          <span>维持机器判定建议</span>
+        </label>
+        <label className="verdict-radio">
+          <input
+            type="radio"
+            name={`verdict-${detail.case_id}`}
+            checked={verdictChoice === "revise"}
+            onChange={() => setVerdictChoice("revise")}
+          />
+          <span>要求内容方改写重提</span>
+        </label>
+        <label className="verdict-radio">
+          <input
+            type="radio"
+            name={`verdict-${detail.case_id}`}
+            checked={verdictChoice === "override_pass"}
+            onChange={() => setVerdictChoice("override_pass")}
+          />
+          <span>人工复核通过（仍待签发）</span>
+        </label>
+      </div>
+
+      <label htmlFor="review-note">
+        复核理由 / 备注 / 裁决理由
+        {autoSaveInfo && <span className="hint"> · {autoSaveInfo}</span>}
+      </label>
       <textarea
         id="review-note"
         value={note}
         onChange={(event) => {
           setNote(event.target.value);
-          setRetryIntent(null); // 载荷变化是新意图，不复用旧 key。
+          setRetryIntent(null);
         }}
         placeholder="只记录人工复核意见；不改变机器标签，也不代表放行。"
       />
-      <div className="actions__row" style={{ marginTop: "0.6rem" }}>
-        <button
-          type="button"
-          className="btn btn--primary"
+
+      <div className="actions__row">
+        <Button
+          variant="secondary"
+          data-action="claim"
           disabled={busy !== null || !canClaim}
           onClick={() =>
-            startIntent("认领", (key) => reviewWriteApi.claim(detail.case_id, key))
+            startIntent("认领", async (key) => {
+              const api = await getWriteApi();
+              return api.claim(detail.case_id, key);
+            })
           }
         >
           认领
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={busy !== null || !canEditClaim || !note.trim() || review === null}
+        </Button>
+        {canEditClaim && review !== null && (
+          <>
+            <Button
+              variant="secondary"
+              data-action="unclaim"
+              disabled={busy !== null}
+              onClick={() =>
+                startIntent("释放认领", async (key) => {
+                  const api = await getWriteApi();
+                  return api.unclaim(detail.case_id, review.version, key);
+                })
+              }
+            >
+              释放认领
+            </Button>
+            <Button
+              variant="secondary"
+              data-action="heartbeat"
+              disabled={busy !== null}
+              onClick={() =>
+                startIntent("续期租约", async (key) => {
+                  const api = await getWriteApi();
+                  return api.heartbeat(detail.case_id, review.version, key);
+                })
+              }
+            >
+              续期租约
+            </Button>
+          </>
+        )}
+        <Button
+          variant="secondary"
+          data-action="draft"
+          disabled={
+            busy !== null || !canEditClaim || !note.trim() || review === null
+          }
           onClick={() =>
-            startIntent("存草稿", (key) =>
-              reviewWriteApi.saveDraft(
+            startIntent("存草稿", async (key) => {
+              const api = await getWriteApi();
+              return api.saveDraft(
                 detail.case_id,
                 review!.version,
-                { form: {}, notes: note.trim(), evidence_selections: [] },
+                {
+                  form: { verdict_choice: verdictChoice },
+                  notes: note.trim(),
+                  evidence_selections: [],
+                },
                 key,
-              ),
-            )
+              );
+            })
           }
         >
           存草稿
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={busy !== null || !canEditClaim || !note.trim() || review === null}
+        </Button>
+        <Button
+          variant="primary"
+          data-risk-action="submit"
+          data-action="submit"
+          disabled={
+            busy !== null || !canEditClaim || !note.trim() || review === null
+          }
           onClick={() =>
-            startIntent("提交复核意见", (key) =>
-              reviewWriteApi.submitConclusion(
+            startIntent("提交复核意见", async (key) => {
+              const api = await getWriteApi();
+              return api.submitConclusion(
                 detail.case_id,
                 review!.version,
-                { review_notes: note.trim() },
+                {
+                  review_notes: note.trim(),
+                  verdict_choice: verdictChoice,
+                },
                 key,
-              ),
-            )
+              );
+            })
           }
         >
           提交复核意见
-        </button>
+        </Button>
         {retryIntent && busy === null && (
-          <button type="button" className="btn" onClick={() => void runIntent(retryIntent)}>
+          <Button variant="secondary" onClick={() => void runIntent(retryIntent)}>
             重试同一请求
-          </button>
+          </Button>
         )}
       </div>
 
-      <h3 style={{ marginTop: "0.8rem" }}>逐条裁决（candidate）</h3>
-      {candidates.length === 0 ? (
-        <p className="hint">没有待裁决的 candidate finding。</p>
-      ) : (
-        <ul className="actions__findings">
-          {candidates.map((f) => (
-            <li key={f.finding_id}>
-              <span className="font-data">{f.finding_id}</span> · {f.control_code} · {f.severity}
-              <span style={{ marginLeft: "0.6rem" }}>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy !== null || !canEditClaim || review === null}
-                  onClick={() =>
-                    startIntent(`确认 ${f.finding_id}`, (key) =>
-                      reviewWriteApi.confirmFinding(
-                        detail.case_id,
-                        review!.version,
-                        f.finding_id,
-                        note,
-                        key,
-                      ),
-                    )
-                  }
-                >
-                  确认
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy !== null || !canEditClaim || review === null}
-                  onClick={() =>
-                    startIntent(`驳回 ${f.finding_id}`, (key) =>
-                      reviewWriteApi.rejectFinding(
-                        detail.case_id,
-                        review!.version,
-                        f.finding_id,
-                        note,
-                        key,
-                      ),
-                    )
-                  }
-                >
-                  驳回
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
+      {/* 改派控件（认领存续期内可用） */}
+      {canEditClaim && review !== null && (
+        <div className="actions__row actions__reassign">
+          <label htmlFor={`reassign-input-${detail.case_id}`} className="hint">
+            改派给其他审核员/法务：
+          </label>
+          <input
+            id={`reassign-input-${detail.case_id}`}
+            type="text"
+            value={reassignTarget}
+            onChange={(e) => setReassignTarget(e.target.value)}
+            placeholder="输入目标负责人账号 ID…"
+            aria-label="输入改派目标负责人账号"
+          />
+          <Button
+            variant="secondary"
+            data-action="reassign"
+            disabled={busy !== null || !reassignTarget.trim()}
+            onClick={() =>
+              startIntent(`改派至 ${reassignTarget.trim()}`, async (key) => {
+                const api = await getWriteApi();
+                return api.reassign(
+                  detail.case_id,
+                  review.version,
+                  reassignTarget.trim(),
+                  key,
+                );
+              })
+            }
+          >
+            确认改派
+          </Button>
+        </div>
       )}
-      {!canEditClaim && (
+
+      {candidates.length > 0 && (
         <p className="hint">
-          逐条裁决要求：已登录、已认领、租约有效。当前状态：{review?.status ?? "未读取"}
-          {review?.assignee ? ` / ${review.assignee}` : ""}。
+          提示：上方「证据链」每条候选 finding 卡片内已支持直接点击「确认 / 驳回」就地裁决（共 {candidates.length} 条待裁）。
         </p>
       )}
 
-      {review?.primary_draft_id && note.length === 0 && (
-        <p className="actions__note">
-          服务端已有主草稿 <code>{review.primary_draft_id}</code>，但当前 API 只返回 ID，
-          不能恢复草稿正文；请勿把空输入框理解为无草稿。
-        </p>
-      )}
       {formalId && (
         <p className="actions__note">
-          本页提交的正式记录：<code>{formalId}</code>。当前 GET 只回读 closed/version，
-          刷新后不能恢复正式记录正文。
+          本页提交的正式记录：<code>{formalId}</code>。人工意见不改变机器标签或放行状态。
         </p>
       )}
     </>

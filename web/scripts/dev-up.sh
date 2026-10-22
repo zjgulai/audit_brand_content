@@ -61,7 +61,7 @@ test -s "${DATA}/reports.json"
 # 夹具：把 21 条确定性样例案件**合并**进临时投影（保留 case-smoke 这条真实案件）。
 # 不合并就没法看队列形态 —— smoke 只造 1 条，且它是 BLOCK，本身不该出现在待办队列里。
 # 夹具每条带 sample:true，界面据此显示「样例数据」。
-"${PY}" "${WEB}/scripts/seed_fixture.py" --out "${DATA}" --merge \
+"${PY}" "${WEB}/scripts/seed_fixture.py" --out "${DATA}" --merge --edge \
   >> "${RUN_DIR}/seed.log" 2>&1
 grep -q '"sample": true' "${DATA}/cases.json"
 
@@ -184,21 +184,22 @@ node "${WEB}/scripts/check_review_actions.mjs" \
   > "${RUN_DIR}/actions.json" 2> "${RUN_DIR}/actions.err"
 cat "${RUN_DIR}/actions.json"
 
-echo "[9/11] 无障碍自动检查（四页）"
+echo "[9/11] 无障碍自动检查（12 页全量扫描 + 1280x720 + 320px Reflow）"
 node "${WEB}/scripts/a11y_check.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --enable-dev-identity 1 \
-  --pages "/queue,/cases/${FIRST_CASE},/reports/report-smoke,/taxonomy" \
+  --pages "/submit,/inbox,/queue,/cases,/cases/${FIRST_CASE},/appeals,/release,/release/${FIRST_CASE},/takedown,/reports,/reports/report-smoke,/taxonomy,/admin/grants,/admin/sessions" \
   --out "${RUN_DIR}/a11y.json" \
   > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
 cat "${RUN_DIR}/a11y.stdout"
 
-echo "[10/11] 复核切片断言（A1–A9，含反向对照）"
+echo "[10/11] 复核切片断言（A1–A9，含反向对照与边界夹具）"
 node "${WEB}/scripts/check_review_slice.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --api "http://127.0.0.1:${API_PORT}" \
   --enable-dev-identity 1 \
-  --out "${RUN_DIR}/slice.json" 2>&1 | tail -20
+  --require-edge \
+  --out "${RUN_DIR}/slice.json" 2>&1 | tail -25
 SLICE_RC=${PIPESTATUS[0]}
 if [ "${SLICE_RC}" -ne 0 ]; then
   echo "复核切片断言未通过（rc=${SLICE_RC}；2=有未测，同样不算通过）"

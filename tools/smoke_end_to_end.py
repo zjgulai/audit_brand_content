@@ -223,6 +223,8 @@ def main():
             "final_reviewer_id": "u_dp3",
             "assignee_id": "u_dp3",
             "actionable": True,
+            "entry_channel": "群消息",
+            "content_unit": unit,
             "ir": ir,
         }
         with open(os.path.join(dump, "cases.json"), "w", encoding="utf-8") as f:

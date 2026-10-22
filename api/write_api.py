@@ -557,6 +557,32 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                     evidence_selections=draft.get("evidence_selections") or [],
                     references=draft.get("references") or [],
                     primary=bool(draft.get("primary", True))))
+            if body.action == "heartbeat":
+                return _ledger_call(lambda: ledger.heartbeat(
+                    id, principal["id"], body.version))
+            if body.action == "reassign":
+                if not isinstance(body.assignee, str) or not body.assignee.strip():
+                    raise HTTPException(400, "reassign 必须带 assignee")
+                if assignee_validator is not None and not assignee_validator(
+                        body.assignee, case):
+                    raise HTTPException(400, "assignee_not_eligible")
+                return _ledger_call(lambda: ledger.reassign(
+                    id, principal["id"], body.version, body.assignee.strip()))
+            if body.action == "adopt_draft":
+                if not isinstance(body.source_draft_id, str) or not body.source_draft_id.strip():
+                    raise HTTPException(400, "adopt_draft 必须带 source_draft_id")
+                return _ledger_call(lambda: ledger.adopt(
+                    id, principal["id"], body.version, body.source_draft_id.strip()))
+            if body.action == "reference_fragment":
+                if not isinstance(body.source_draft_id, str) or not body.source_draft_id.strip():
+                    raise HTTPException(400, "reference_fragment 必须带 source_draft_id")
+                if not isinstance(body.field_path, str) or not body.field_path.strip():
+                    raise HTTPException(400, "reference_fragment 必须带 field_path")
+                return _ledger_call(lambda: ledger.reference_fragment(
+                    id, principal["id"], body.version,
+                    source_draft_id=body.source_draft_id.strip(),
+                    field_path=body.field_path.strip(),
+                    fragment=body.fragment))
             if body.action == "submit":
                 if not isinstance(body.conclusion, dict):
                     raise HTTPException(400, "submit 必须带 conclusion")

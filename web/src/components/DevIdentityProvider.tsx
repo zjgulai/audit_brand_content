@@ -58,6 +58,8 @@ export default function DevIdentityProvider({ children }: { children: React.Reac
       setCurrent(next);
       window.localStorage.setItem(STORAGE_KEY, next.id);
       setSessionEpoch((value) => value + 1);
+      // 保留至少 150ms 的「正在切换开发身份」隔离帧，确保旧案件与备注在 DOM 观察面已清空
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
       throw cause;

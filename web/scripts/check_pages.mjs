@@ -233,7 +233,7 @@ async function main() {
 
   // 4) 分类规范页（只读骨架：七轴、七步、正交字段、rule_id 查找框）
   await cdp.send("Page.navigate", { url: `${base}/taxonomy` });
-  const taxonomyBody = await waitBody("分类规范");
+  const taxonomyBody = await waitBody("七步判定顺序");
   const taxonomyCodes = ["CHAN", "RIGHT", "SCENE", "DISC", "BRAND", "FACT", "CLAIM"];
   const taxonomyOk =
     taxonomyBody.includes("分类规范") &&
