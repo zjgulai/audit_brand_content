@@ -3000,55 +3000,116 @@ def main() -> int:
         #   而 Q22 要防的「一次研究被读成一次法务裁定」发生在**回答**里 —— 回答那一侧
         #   取决于模型当轮记不记得。选项 A：写进 `boundary_statement.unknowns`
         #   （与既有「每次都读 unknowns」的规矩接上），且**只在确实引用了未确认条款时加**。
-        _r55 = J.judge("Buy our breast pump, it cures mastitis and is FDA cleared!",
-                       origin="test")
-        _u55 = _r55["boundary_statement"]["unknowns"]
-        _q55 = [u for u in _u55 if "Q45" in u]
-        _notice55 = (_r55.get("receipt") or {}).get("unconfirmed_notice")
-        _plain55 = J.judge("Our bottle washer has a 6-cup capacity.", origin="test")
-        _u55b = _plain55["boundary_statement"]["unknowns"]
-        check("V55a", "★ 引用了未确认条款的判定，`boundary_statement.unknowns` 里必须有这条"
-                      "（机器产出 —— 不再取决于模型当轮记不记得）",
-              len(_q55) == 1 and "EXT-" in _q55[0],
-              f"{len(_q55)} 条 · 点名了外部标准编号={'EXT-' in (_q55[0] if _q55 else '')} · "
-              f"unknowns 共 {len(_u55)} 条")
-        check("V55b", "★ 反向对照：**零命中**（没引用任何条款）的判定**不许**带这条 —— "
-                      "否则它会变成一个天天响的信号（§2.1.1）",
-              not any("Q45" in u for u in _u55b),
-              f"零命中判定的 unknowns {len(_u55b)} 条，含 Q45 的 "
-              f"{sum(1 for u in _u55b if 'Q45' in u)} 条（应为 0）")
-        # ★ 同源要在**真写了回执**的那一次上比 —— 第一版这里没传 `receipt=True`，
-        #   于是 `unconfirmed_notice` 是 None、「同源」根本无从比（判据自己先说清这一点）。
-        with tempfile.TemporaryDirectory() as _t55d:
-            _r55c = J.judge("Buy our breast pump, it cures mastitis and is FDA cleared!",
-                            origin="test", receipt=True,
-                            receipt_path=Path(_t55d) / "r.jsonl")
-        _q55c = [u for u in _r55c["boundary_statement"]["unknowns"] if "Q45" in u]
-        _notice55 = (_r55c.get("receipt") or {}).get("unconfirmed_notice")
-        check("V55c", "★ 同源（§2.4.5）：boundary 里那一句只是**前缀 + 回执的原文**，"
-                      "不是另写一句 —— 两处各写一句迟早会有一句先改",
-              bool(_notice55) and len(_q55c) == 1 and _q55c[0].endswith(_notice55),
-              f"boundary 那条以回执 notice 结尾="
-              f"{bool(_q55c and _notice55 and _q55c[0].endswith(_notice55))}"
-              f" · notice {len(_notice55 or '')} 字")
+        #
+        # ★★ 2026-10-23 就地改真（T-144）。改前这四条断言**全都恒绿**，而且看起来
+        #    验得挺全：它们拿真实条款库跑，而库里的 62 条**全是 ratified**
+        #    （`grep status research/kb/外部标准库-v1.json` → 62/62）。
+        #    于是「引用未确认条款」这个触发条件**在真实数据上永远不成立** ——
+        #    V55a 期望 Q45 出现却一条都拿不到（一直红），V55d 期望 0 < n < 总数
+        #    却永远是 0（也一直红）。**红着没人管 = 与恒绿同样没用**，
+        #    而更坏的是：它挡住了「这条链路到底能不能用」这个问题本身。
+        #
+        #    修法不是把断言删掉或改成「允许为 0」，而是**注入未确认状态**，
+        #    让触发条件真的发生 —— 与 V54 用 `S.Engine(_synth54, ...)` 造合成引擎
+        #    是同一个手法。注入点必须是 `J.CR`（= judge 自己 import 的那一份
+        #    `clause_ref`）；在别处 `import clause_ref` 拿到的是**另一个模块对象**，
+        #    改它对 judge 无效 —— 这一点实测踩过一次。
+        _V55_TEXT = "Buy our breast pump, it cures mastitis and is FDA cleared!"
+        _v55_cr = J.CR
+        _v55_doc, _v55_idx, _v55_prob = _v55_cr.load_library()
+        if _v55_prob or _v55_idx is None:
+            untested("V55", "Q45 未确认声明", f"条款库读不出：{_v55_prob}")
+        else:
+            # 这条文案命中的规则引用了哪些条款 —— 由链路自己算，不写死。
+            _v55_refs, _, _ = _v55_cr.evidence_refs_of_rules(
+                ["T1.1.medical-cure"], J.engine().all_rules)
+            _v55_ids = [r.get("条目ID") for r in _v55_refs if r.get("条目ID")]
 
-        # ★ 语料规模上的反向对照：**不是每条都带上它**（否则「只在引用了未确认条款时加」
-        #   这半句是空的）。这里给的是一个**比例读数**，不是一个写死的常量。
-        _n55 = _t55 = 0
-        for _r55x in _recs54:
-            _tx55 = ((_r55x.get("Primary Text") or "") + "\n"
-                     + (_r55x.get("Headline") or "")).strip()
-            if not _tx55:
-                continue
-            _t55 += 1
-            if any("Q45" in u for u in
-                   J.judge(_tx55, origin="test")["boundary_statement"]["unknowns"]):
-                _n55 += 1
-        check("V55d", "★ 规模上的反向对照：带上这条的判定既**不是全部**也不是零"
-                      "（「只在引用了未确认条款时加」这半句因此不是空话）",
-              0 < _n55 < _t55,
-              f"语料有文本的 {_t55} 条里 {_n55} 条带上它（{_n55 / max(_t55, 1) * 100:.1f}%）"
-              f" —— ★ 这就是「天天响的信号」的量，Q45 选项 A 的代价是**量出来的**")
+            def _v55_with(status_map):
+                """把 idx 里指定条目改成给定 status，跑一次判定，返回 (r, q45, notice)。"""
+                idx2 = copy.deepcopy(_v55_idx)
+                for _i, _s in status_map.items():
+                    if _i in idx2["by_id"]:
+                        idx2["by_id"][_i]["status"] = _s
+                _orig_ll = _v55_cr.load_library
+                _v55_cr.load_library = lambda path=None: (_v55_doc, idx2, None)
+                try:
+                    with tempfile.TemporaryDirectory() as _t:
+                        _rr = J.judge(_V55_TEXT, origin="test", receipt=True,
+                                      receipt_path=Path(_t) / "r.jsonl")
+                finally:
+                    _v55_cr.load_library = _orig_ll
+                _qq = [u for u in _rr["boundary_statement"]["unknowns"] if "Q45" in u]
+                _nn = (_rr.get("receipt") or {}).get("unconfirmed_notice")
+                return _rr, _qq, _nn
+
+            # ① 注入：这些条款「未经法务确认」→ Q45 必须出现，且点名 EXT 编号
+            _r55, _q55, _ = _v55_with({i: "research" for i in _v55_ids})
+            check("V55a", "★ 引用了未确认条款的判定，`boundary_statement.unknowns` 里必须有这条"
+                          "（机器产出 —— 不再取决于模型当轮记不记得）",
+                  len(_q55) == 1 and "EXT-" in _q55[0] and bool(_v55_ids),
+                  f"注入 {len(_v55_ids)} 条 research 后：Q45 {len(_q55)} 条 · "
+                  f"点名了外部标准编号={'EXT-' in (_q55[0] if _q55 else '')} · "
+                  f"unknowns 共 {len(_r55['boundary_statement']['unknowns'])} 条")
+
+            # ② 反向对照：**零命中**的判定不许带这条（否则它会变成一个天天响的信号）
+            _plain55 = J.judge("Our bottle washer has a 6-cup capacity.", origin="test")
+            _u55b = _plain55["boundary_statement"]["unknowns"]
+            check("V55b", "★ 反向对照：**零命中**（没引用任何条款）的判定**不许**带这条 —— "
+                          "否则它会变成一个天天响的信号（§2.1.1）",
+                  not any("Q45" in u for u in _u55b),
+                  f"零命中判定的 unknowns {len(_u55b)} 条，含 Q45 的 "
+                  f"{sum(1 for u in _u55b if 'Q45' in u)} 条（应为 0）")
+
+            # ③ 同源（§2.4.5）：boundary 那句只是「前缀 + 回执原文」，不是另写一句
+            _, _q55c, _notice55 = _v55_with({i: "research" for i in _v55_ids})
+            check("V55c", "★ 同源（§2.4.5）：boundary 里那一句只是**前缀 + 回执的原文**，"
+                          "不是另写一句 —— 两处各写一句迟早会有一句先改",
+                  bool(_notice55) and len(_q55c) == 1 and _q55c[0].endswith(_notice55),
+                  f"boundary 那条以回执 notice 结尾="
+                  f"{bool(_q55c and _notice55 and _q55c[0].endswith(_notice55))}"
+                  f" · notice {len(_notice55 or '')} 字")
+
+            # ④ 规模上的成对读数：真实库（全 ratified）→ 一条都不该带；
+            #    注入后 → 带上的必须**不是全部**（只在真引用了未确认条款时才加）。
+            #    ★ 第一版写的是 `0 < n < 总数`，在真实库上永远是 0 —— 那是个**恒红**。
+            #      现在拆成两个方向，各自在它该成立的数据上断言。
+            _n55 = _t55 = 0
+            for _r55x in _recs54:
+                _tx55 = ((_r55x.get("Primary Text") or "") + "\n"
+                         + (_r55x.get("Headline") or "")).strip()
+                if not _tx55:
+                    continue
+                _t55 += 1
+                if any("Q45" in u for u in
+                       J.judge(_tx55, origin="test")["boundary_statement"]["unknowns"]):
+                    _n55 += 1
+            _real_all_ratified = all(e.get("status") == "ratified"
+                                     for e in _v55_idx["entries"])
+            _n_on, _t_on = 0, 0
+            _orig_ll2 = _v55_cr.load_library
+            _idx_all = copy.deepcopy(_v55_idx)
+            for _e in _idx_all["entries"]:
+                _e["status"] = "research"
+            _v55_cr.load_library = lambda path=None: (_v55_doc, _idx_all, None)
+            try:
+                for _r55y in _recs54:
+                    _ty = ((_r55y.get("Primary Text") or "") + "\n"
+                           + (_r55y.get("Headline") or "")).strip()
+                    if not _ty:
+                        continue
+                    _t_on += 1
+                    if any("Q45" in u for u in
+                           J.judge(_ty, origin="test")["boundary_statement"]["unknowns"]):
+                        _n_on += 1
+            finally:
+                _v55_cr.load_library = _orig_ll2
+            check("V55d", "★ 规模上的成对读数：真实库（全 ratified）→ 0 条带；"
+                          "注入后 → 带上的不是全部（「只在引用了未确认条款时加」不是空话）",
+                  (not _real_all_ratified or _n55 == 0) and _n_on < _t_on,
+                  f"真实库（全 ratified={_real_all_ratified}）{_t55} 条里 {_n55} 条带上它；"
+                  f"注入全库后 {_t_on} 条里 {_n_on} 条带上它"
+                  f"（{_n_on / max(_t_on, 1) * 100:.1f}%）—— ★ 这就是「天天响的信号」的量")
 
         # ── V56（Q42）「P1/P2 零落点」必须**量得出来**，不能只是一句登记 ──────────
         #   Q42 = 选项 A：本轮只登记不建。选项 A 的原文要的是「一条**带判据**的缺口」——
