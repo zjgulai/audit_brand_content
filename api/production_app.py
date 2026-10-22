@@ -491,7 +491,18 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
         except OAuthError as exc:
             raise HTTPException(401, exc.code)
         if identity.tenant_id not in settings.tenant_allowlist:
-            raise HTTPException(403, "tenant_not_allowed")
+            # ★ 2026-10-22：把**实际收到的** tenant_key 说出来。
+            #
+            # 原先只回 `tenant_not_allowed`，而配置者需要对上的是飞书返回的
+            # opaque 值（形如 `on_xxxx`，不是租户显示名）。瞎猜一次就要走一轮
+            # 「改 .env → 重启 → 扫码登录」，而扫码需要真人。
+            #
+            # 为什么可以回显：调用方**刚刚完成飞书授权**，这个值本来就属于他；
+            # 且它不是凭据 —— 拿到它不能换任何东西。反过来，把它藏起来会让
+            # 配置变成盲猜。
+            raise HTTPException(
+                403, "tenant_not_allowed:收到 %r，允许列表 %s"
+                     % (identity.tenant_id, sorted(settings.tenant_allowlist)))
         principal = runtime.directory.by_identity(identity.tenant_id, identity.open_id)
         if principal is None:
             raise HTTPException(403, "principal_not_authorized")
