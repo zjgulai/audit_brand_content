@@ -505,7 +505,17 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
                      % (identity.tenant_id, sorted(settings.tenant_allowlist)))
         principal = runtime.directory.by_identity(identity.tenant_id, identity.open_id)
         if principal is None:
-            raise HTTPException(403, "principal_not_authorized")
+            # ★ 2026-10-22：同一条理由 —— 把实际收到的身份回显给配置者。
+            #   与 tenant_not_allowed 那次是同一个病的第二次：
+            #   配置者要对上的是飞书返回的 opaque open_id（`ou_xxxx`），
+            #   而 `principals.json` 里现在填的是占位符。
+            #   不回显就要再走一轮「改文件 → 重启 → 扫码」，扫码要真人。
+            #
+            #   为什么可以回显：调用方**刚刚完成飞书授权**，这就是他自己的身份；
+            #   它不是凭据（拿 open_id 换不到 access_token）。
+            raise HTTPException(
+                403, "principal_not_authorized:tenant=%r open_id=%r name=%r"
+                     % (identity.tenant_id, identity.open_id, identity.name))
         csrf = os.urandom(24).hex()
         sid = runtime.session_store.create_session(
             principal["id"], tenant=identity.tenant_id,
