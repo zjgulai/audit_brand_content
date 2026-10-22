@@ -171,6 +171,13 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 >
 > 2026-10-21 的 7 份无入边文档（规则归类/披露重抽/gold 试点/skill 定性）：
 > [`PMO/implement/索引-20261021.md`](./PMO/implement/索引-20261021.md)。
+>
+> 2026-10-22 的上线就绪度盘点（六维审计 + 红队 + 最终 ticket 表）：
+> [`PMO/上线Ticket清单-20261022.md`](./PMO/上线Ticket清单-20261022.md)（**唯一权威清单**）、
+> [`PMO/上线前深度盘点-20261022.md`](./PMO/上线前深度盘点-20261022.md)（推理过程与我的错误记录）、
+> [`PMO/并行会话分工-20261022.md`](./PMO/并行会话分工-20261022.md)（按链路环节重编的分工）。
+> ★ 三份同一单元的产出。清单那份 §一 记着**红队推翻了合并清单的四处**，
+> 而盘点那份 §一 记着我**否掉了自己发起的一轮投票**（守衡不是产品，是协作助手）。
 
 **Playbook / PRD**
 
@@ -181,6 +188,11 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 - `Playbook/Playbook-v1-修订清单-20261017.md`
 - `PRD/内容审查Agent-PRD-优化版-v2.0.md`
 - `PRD/feishu/_history/内容审查Agent-PRD-v1.0@20260923T1806.md`
+
+> **哪一版是权威、哪一版只是快照**：[`Playbook/README.md`](./Playbook/README.md) 与
+> [`PRD/feishu/README.md`](./PRD/feishu/README.md)（2026-10-22）。
+> 一句话：**唯一权威是上游飞书 docx，本地没有任何一份同时满足「最新 + 逐字 + 完整」** ——
+> 本地那份文件名写 `v1.0` 的，正文实为 **v1.2**；上游已到 v1.3，但正文不在盘上。
 
 **PMO / audit / implement**
 
