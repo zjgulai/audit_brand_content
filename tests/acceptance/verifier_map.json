@@ -525,6 +525,12 @@
       "fixture": "{root}/tools/verify_evidence_sync.py",
       "command": "{venv} {root}/tools/verify_evidence_sync.py"
     },
+    "36": {
+      "test_id": "acceptance-36",
+      "criteria": "STOP-1 / STOP-2 / STOP-3 / STOP-4 / STOP-5 / STOP-6 / STOP-7 / STOP-9",
+      "fixture": "{root}/tools/verify_stop_conditions.py",
+      "command": "{venv} {root}/tools/verify_stop_conditions.py && {venv} {root}/tools/verify_stop_conditions.py --controls"
+    },
     "37": {
       "test_id": "acceptance-37",
       "criteria": "V1 / V2 / V4 / V5",
@@ -718,6 +724,14 @@
       "criteria": "TS-12",
       "fixture": "{root}/web/scripts/check_browser_scope.mjs",
       "command": "node {root}/web/scripts/check_browser_scope.mjs --controls",
+      "timeout": 15,
+      "cpu_seconds": 10
+    },
+    "129": {
+      "test_id": "acceptance-129",
+      "criteria": "TS-26",
+      "fixture": "{root}/web/scripts/check_no_metrics_dashboard.mjs",
+      "command": "node {root}/web/scripts/check_no_metrics_dashboard.mjs --controls",
       "timeout": 15,
       "cpu_seconds": 10
     }

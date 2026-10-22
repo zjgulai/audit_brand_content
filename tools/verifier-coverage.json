@@ -780,6 +780,45 @@
         "tools/verify_acceptance_run.py",
         "tools/acceptance-ratchet.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_lease_release.py",
+      "asserts": "行 136（reducer 一侧）：29 分钟仍独占 / 30 分 01 秒释放 / 释放前草稿保留且新领取人看得到 / 陈旧 expected_version 被拒（version_conflict）。3 项反向对照（改租约 1900 秒后 1801 秒不许放；正确 version 的写入必须成功）。**通知那半无对象**（生产无通知生产者），未断言",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_parse_convergence.py",
+      "asserts": "行 11（OCR 半边）：生产入口 image_file_row→judge_row 同图真跑 3 次，结论归一化成 (control_code, rule_key, 同名规则内序号) 集合，两两相等；正文前插空格后集合不变（逐字差异不许导致误判）；无 provider 时 VLM 必须落 untested。采样配置 model_id/temperature/seed **无对象**（Vision 编译期常量），#11 不映射",
+      "subjects": [
+        "base/media.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_stop_conditions.py",
+      "asserts": "行 36：Playbook §3.3.7 的停机条件登记恰好 6 条、编号 1..6、每条第一阶段状态为 not_applicable_stage1；真实判定入口五步各一次且 skipped 为空；回执 schema 的跳过原因枚举不含 early_stop/no_progress；剥注释后扫 base/ api/ 的可执行代码，不许出现 early_stop/no_progress/consecutive_rounds 行为。5 项反向对照",
+      "subjects": [
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+        "contracts/receipt-v1.schema.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_asr_no_diarization.py",
+      "asserts": "行 124（依赖侧）：pyproject 依赖组、uv.lock、base/api/tools 的 import 行都不许出现 diarization 包（pyannote/resemblyzer/wespeaker/nemo…逐名匹配，注释不算）。片段完整性 / start-end / speaker=unknown 三条**无对象**（无 ASR 后端、无音频素材、接口无分段位），#124 不映射。5 项反向对照",
+      "subjects": [
+        "pyproject.toml",
+        "uv.lock"
+      ]
+    },
+    {
+      "verifier": "tools/verify_media_portability.py",
+      "asserts": "行 118（静态半边）：剥注释/docstring/块注释后扫 base/ api/ 的 .py/.m/.mm/.swift/.sh，不许出现 Vision/Speech/AVFoundation/Quartz 等宿主原生媒体调用。**当前 rc=1**：仓内唯一 OCR 就是 macOS Vision（ocr_vision.m / build_ocr.sh），这是事实读数，不是新引入的问题；容器内真跑那半**无对象**（无 docker daemon、镜像无引擎、音视频素材 0 个）。3 项反向对照",
+      "subjects": [
+        "base/ocr_vision.m",
+        "base/build_ocr.sh"
+      ]
     }
   ]
 }
