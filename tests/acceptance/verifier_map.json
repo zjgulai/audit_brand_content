@@ -734,6 +734,14 @@
       "command": "node {root}/web/scripts/check_no_metrics_dashboard.mjs --controls",
       "timeout": 15,
       "cpu_seconds": 10
+    },
+    "87": {
+      "test_id": "acceptance-87",
+      "criteria": "戊 / SEC-6-GS-5 / SEC-8-6",
+      "fixture": "{root}/tools/verify_rule_change_regression.py",
+      "command": "{venv} {root}/tools/verify_rule_change_regression.py",
+      "timeout": 120,
+      "cpu_seconds": 90
     }
   }
 }

@@ -819,6 +819,14 @@
         "base/ocr_vision.m",
         "base/build_ocr.sh"
       ]
+    },
+    {
+      "verifier": "tools/verify_rule_change_regression.py",
+      "asserts": "行87/戊·SEC-6-GS-5·SEC-8-6：在 tempdir 副本上分别做规则**新增/删除/修改**各一次（不动仓内规则文件），每次跑冻结回归集 83 条，断言产出**同一组样本的 before 与 after 两份读数**及 changed_ids；缺 before（只有单点）、样本 ID 集不等、变更没改变任何样本 → 各自红。三层分开报：本文件是第三层（真跑出两份读数），不替代 GS-GATE（纯函数）与触发者（有没有东西在跑）",
+      "subjects": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/regression-set-v1.json"
+      ]
     }
   ]
 }
