@@ -204,10 +204,25 @@ def scan_remote(root: Path) -> dict:
 # ─────────────────────────── 判 ───────────────────────────
 
 
-def judge(ci: dict, hook: dict, remote: dict) -> tuple[list[str], list[str], list[str]]:
-    """返回 (reds, greens, untested)。三本账分开，永远不合并成一个数。"""
+def judge(ci: dict, hook: dict, remote: dict):
+    """返回 (reds, greens, notes, untested) —— 四本账分开，永远不合并成一个数。
+
+    ★ 2026-10-23 就地改（装上 CI 当天就踩到的两处，都不是笔误）：
+
+    **① 「hook 脚本在仓库里但没安装」不许是红。**
+       CI 里 `core.hooksPath` 永远是未设的（fresh clone），
+       所以这条一旦是红，CI 上的触发点自检就**恒红** ——
+       而那正是本文件开头批评的「永远红的 CI 会被无视」。
+       它是「一个可选项没被采用」，不是「配置说了假话」。降为 note。
+
+    **② 「已配但不跑执行器、且没提验收」也不许是红。**
+       一份只跑 pytest 的 CI 不是在骗人 —— 它从没声称自己跑验收。
+       真正的红只有两种：**假触发**（提了 acceptance 却不引用执行器），
+       与**没有任何通道跑它**。前者是骗，后者是缺。缺要在 greens 空时才红。
+    """
     reds: list[str] = []
     greens: list[str] = []
+    notes: list[str] = []
     untested: list[str] = []
 
     if ci["state"] == RUNS_GATE:
@@ -217,7 +232,8 @@ def judge(ci: dict, hook: dict, remote: dict) -> tuple[list[str], list[str], lis
             reds.append(f"★ 假触发（CI）：{ci['paths']} 里出现了「验收」字样，"
                         f"却**没有引用** {GATE} —— 读它的人会以为验收已经自动在跑")
         else:
-            reds.append(f"CI 已配但**不跑**验收执行器：{ci['paths']}")
+            notes.append(f"CI 已配但不跑验收执行器：{ci['paths']}"
+                         f"（它没有声称跑验收，所以不算假触发；但也不为验收提供触发）")
 
     if hook["state"] == RUNS_GATE:
         greens.append(f"本地 hook 会跑验收执行器：{hook['dir']}")
@@ -226,10 +242,13 @@ def judge(ci: dict, hook: dict, remote: dict) -> tuple[list[str], list[str], lis
             reds.append(f"★ 假触发（hook）：{hook['dir']} 里出现了「验收」字样，"
                         f"却**没有引用** {GATE}")
         else:
-            reds.append(f"本地 hook 已配但**不跑**验收执行器：{hook['dir']} {hook['files']}")
+            notes.append(f"本地 hook 已配但不跑验收执行器：{hook['dir']} {hook['files']}")
     elif hook["state"] == NOT_INSTALLED:
-        reds.append(f"**仓库里有 hook 脚本（{HOOK_SCRIPTS_DIR}）但没安装** ——"
-                    f"`git config core.hooksPath` 未设置，clone 下来也没有触发")
+        # ★ 不是红：见上面 ①。装上 `git config core.hooksPath tools/githooks` 才会生效，
+        #   而那会改变本工作区的推送行为 —— 那是使用者的决定，不是缺陷。
+        notes.append(f"**仓库里有 hook 脚本（{HOOK_SCRIPTS_DIR}）但未安装** ——"
+                     f"`git config core.hooksPath` 未设置。这是一个**未采用的选项**，"
+                     f"不是缺陷；CI 里它永远是未设的。")
     elif hook.get("why"):
         untested.append(f"本地 hook 通道读不出：{hook['why']}")
 
@@ -239,7 +258,7 @@ def judge(ci: dict, hook: dict, remote: dict) -> tuple[list[str], list[str], lis
     if not greens:
         reds.append("**没有任何通道会自动跑验收执行器** —— 它只在有人手动敲命令时跑。"
                     "验收判据再多，没人跑就等于没有（§2.4.2「判据与触发者两层」）")
-    return reds, greens, untested
+    return reds, greens, notes, untested
 
 
 def report_line(name: str, ch: dict) -> str:
@@ -301,7 +320,7 @@ def run_controls() -> int:
         # 4 ★ 假触发：提到 acceptance 却不引用执行器
         _fake_ci(root, "jobs:\n  acceptance:\n    steps:\n      - run: echo ok\n")
         ci = scan_ci(root)
-        reds, _, _ = judge(ci, {"state": NONE}, {"state": "untested", "why": "x"})
+        reds, _, _, _ = judge(ci, {"state": NONE}, {"state": "untested", "why": "x"})
         ok("★ 假触发：CI 写「acceptance」却不引用执行器 → 必须判红",
            ci["claims"] and not ci["runs_gate"] and any("假触发（CI）" in r for r in reds),
            repr(reds[:2]))
@@ -322,16 +341,17 @@ def run_controls() -> int:
         ok("★ 有 hook 脚本但 core.hooksPath 未设 → repo_scripts_not_installed",
            hook["state"] == NOT_INSTALLED, repr(hook["state"]))
 
-        # 8 ★ 三本账不许合并：未测时结论行必须报出未测
-        reds, greens, unt = judge({"state": RUNS_GATE, "paths": ["x"], "runs_gate": True,
-                                   "claims": True}, {"state": NONE},
-                                  {"state": "untested", "why": "本机读不到"})
+        # 8 ★ 四本账不许合并：未测时结论行必须报出未测
+        reds, greens, _notes, unt = judge(
+            {"state": RUNS_GATE, "paths": ["x"], "runs_gate": True, "claims": True},
+            {"state": NONE},
+            {"state": "untested", "why": "本机读不到"})
         ok("★ 有绿时也必须报出未测（远端不许静默消失）",
            bool(greens) and any("远端" in u for u in unt), repr(unt))
 
         # 9 ★ 无绿必红：没有任何通道跑它 → 必须红（否则这条票的整件事会静默通过）
-        reds, greens, _ = judge({"state": NONE}, {"state": NONE},
-                                {"state": "untested", "why": "x"})
+        reds, greens, _, _ = judge({"state": NONE}, {"state": NONE},
+                                   {"state": "untested", "why": "x"})
         ok("★ 没有任何通道会跑它 → 必须红（不是「未测就好」）",
            not greens and any("没有任何通道" in r for r in reds), repr(reds[-1:]))
 
@@ -357,15 +377,63 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--controls", action="store_true")
     ap.add_argument("--root", default=str(ROOT))
+    ap.add_argument("--scope", choices=("all", "ci"), default="all",
+                    help="all=三通道全读（默认，本地用）；"
+                         "ci=只判 CI 通道（CI 里用，见下）")
     args = ap.parse_args()
     if args.controls:
         return run_controls()
 
     root = Path(args.root)
     ci = scan_ci(root)
+
+    # ── `--scope ci`：CI 里只判它自己那一条通道 ──────────────────────────
+    #
+    # ★ 这个模式存在的理由，是**装上 CI 当天就踩到的一个自相矛盾**：
+    #   三通道全读时，hook 通道在 fresh clone 里永远是「未安装」，
+    #   远端分支保护永远读不到 —— 于是本脚本在 CI 里**必然退 2**。
+    #   而 CI 步骤退 2 就是失败，于是这条 job 会**永远红**。
+    #   那正是本文件开头批评的东西（「永远红的 CI 会被无视」），
+    #   只不过这次犯在**触发点自己的自检**上。
+    #
+    #   两种错误修法，都别用：
+    #     · 在 workflow 里写 `|| true` —— 假绿，等于没装；
+    #     · 把 hook/远端降成永不判红 —— 那本地就失去了这两条读数。
+    #
+    #   正确做法是**换判据，不是放宽判据**：CI 里唯一能判、且该判的是
+    #   「CI 配置存在且引用了验收执行器」。其余两条通道本机读不到就是读不到，
+    #   让 CI 去判它既做不到、判出来的也不是这件事。
+    if args.scope == "ci":
+        print("=" * 72)
+        print("T-145 · CI 通道自检（只看这一条；hook / 远端在 CI 里读不到，不在此判）")
+        print("=" * 72)
+        print(report_line("CI", ci))
+        print()
+        if ci["state"] == RUNS_GATE:
+            print(f"  ✅ CI 会跑验收执行器：{ci['paths']}")
+            print("-" * 72)
+            print("✅ 退 0：CI 通道成立。")
+            print("   ★ 不判 hook / 远端 —— 它们在这里读不到，判了也只是把"
+                  "「读不到」写成「不成立」。")
+            return 0
+        if ci["state"] == NO_GATE and ci["claims"]:
+            print(f"  ❌ ★ 假触发：{ci['paths']} 提了「验收」却不引用 {GATE}")
+            print("-" * 72)
+            print("❌ 退 1：这是「配置说了假话」，比没有 CI 更危险。")
+            return 1
+        if ci["state"] == NONE:
+            print("  ❌ 没有任何 CI 配置 —— 那本 job 就不该被跑到")
+            print("-" * 72)
+            print("❌ 退 1：CI 通道不成立。")
+            return 1
+        print(f"  ❌ CI 已配但不引用 {GATE}：{ci['paths']}")
+        print("-" * 72)
+        print("❌ 退 1：CI 通道不成立。")
+        return 1
+
     hook = scan_hook(root)
     remote = scan_remote(root)
-    reds, greens, untested = judge(ci, hook, remote)
+    reds, greens, notes, untested = judge(ci, hook, remote)
 
     print("=" * 72)
     print("T-142 · 验收执行器有没有自动触发点（三条通道分别读）")
@@ -379,6 +447,8 @@ def main() -> int:
         print(f"  ✅ {g}")
     for r in reds:
         print(f"  ❌ {r}")
+    for n in notes:
+        print(f"  · {n}")
     for u in untested:
         print(f"  ⚠ {u}")
 

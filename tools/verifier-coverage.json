@@ -772,6 +772,14 @@
         "tools/verify_acceptance_run.py",
         "tools/verify_regression_set.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_acceptance_ratchet.py",
+      "asserts": "T-145 验收执行门的**棘轮**判据。执行器今天退 2（untested=20，其中 7 条 manual 永远不会转 passed），所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视它。三条判据：① failed 必须为 0 ② 计数之和必须等于 136（防「删了几行所以看起来没倒退」——这条最容易漏：删行时 passed 没降、failed 也是 0）③ passed 不得低于 tools/acceptance-ratchet.json 的地板；地板只许上调，下调是一次有记录的决定。另有：分账之和必须等于 untested；没有分账行即红（分不开「该写 verifier」与「按人工验收」，两者动作相反）。★ 不判 CI 是否真在跑（那是 verify_acceptance_trigger.py），也不判 7 条 manual 有没有人工验收过（机器看不见）。9 项反向对照",
+      "subjects": [
+        "tools/verify_acceptance_run.py",
+        "tools/acceptance-ratchet.json"
+      ]
     }
   ]
 }

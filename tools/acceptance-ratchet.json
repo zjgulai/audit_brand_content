@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "policy": "T-145 · 验收棘轮地板",
+  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
+  "passed_floor": 116,
+  "recorded_at": "2026-10-23",
+  "recorded_reading": {
+    "passed": 116,
+    "failed": 0,
+    "untested": 20,
+    "untested_split": {
+      "machine": 13,
+      "manual": 7,
+      "unverifiable": 0,
+      "unknown": 0
+    }
+  },
+  "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
+  "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
+  "lower_history": []
+}
