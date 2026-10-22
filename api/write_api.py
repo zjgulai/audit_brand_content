@@ -29,10 +29,25 @@ from base.rbac import can_act
 from base.reviews_ledger import (
     LedgerConflict, LedgerNotFound, LedgerValidation,
 )
+from base.submission_service import SubmissionRejected
 
 
 class ClaimBody(BaseModel):
     pass
+
+
+class SubmissionBody(BaseModel):
+    """内容入库请求；四维字段与 base.contract / submission_router 同一取值域。"""
+    submission_id: str
+    content_type: str
+    content_stage: str
+    entry_channel: str
+    source: Dict[str, Any]
+    text: Optional[str] = None
+    fields: Optional[Dict[str, Any]] = None
+    product_line: str
+    tenant: Optional[str] = None
+    uri: Optional[str] = None
 
 
 class VersionBody(BaseModel):
@@ -214,6 +229,7 @@ class AppealStore(object):
 
 
 IMPLEMENTED_WRITE_PATHS = {
+    "/api/v1/submissions",
     "/api/v1/cases/{id}/claim",
     "/api/v1/cases/{id}/unclaim",
     "/api/v1/cases/{id}/reassign",
@@ -271,7 +287,8 @@ def _ledger_call(fn):
 
 
 def register_write_routes(app, *, principal_dep, review_command_service=None,
-                          enabled_capabilities=None, assignee_validator=None):
+                          enabled_capabilities=None, assignee_validator=None,
+                          submission_ingestor=None):
     repo = app.state.repository
     ledger = app.state.reviews_ledger
     findings = app.state.finding_store
@@ -322,6 +339,26 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                 return
         repo.takedown_tasks.append(task)
 
+    def raise_command_http(exc, command):
+        """领域错误转稳定 HTTP；未知异常原样抛。"""
+        code = getattr(exc, "code", None)
+        if code in ("writer_lease_lost", "writer_lease_missing",
+                    "writer_lease_held"):
+            raise HTTPException(503, code)
+        if code in ("version_conflict", "already_claimed", "case_closed",
+                    "not_assignee", "not_primary", "primary_requires_adopt",
+                    "lease_expired", "lease_active", "not_claimed",
+                    "idempotency_conflict", "already_ingested"):
+            if command == "ingest_submission" and code == "version_conflict":
+                raise HTTPException(409, "already_ingested: 该 submission 已建案")
+            raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
+        if code in ("draft_not_found",):
+            raise HTTPException(404, "%s: %s" % (code, getattr(exc, "detail", "")))
+        if code and (code.startswith("bad_") or code in
+                     ("idempotency_key_missing", "actor_missing")):
+            raise HTTPException(400, "%s: %s" % (code, getattr(exc, "detail", "")))
+        raise exc
+
     def run_review_command(*, request, principal, case_id, command,
                            expected_version, payload, idempotency_key,
                            legacy_fn):
@@ -343,21 +380,33 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                 idempotency_key=idempotency_key,
             )
         except Exception as exc:  # 领域错误在这里转成稳定 HTTP；未知异常继续抛
-            code = getattr(exc, "code", None)
-            if code in ("writer_lease_lost", "writer_lease_missing",
-                        "writer_lease_held"):
-                raise HTTPException(503, code)
-            if code in ("version_conflict", "already_claimed", "case_closed",
-                        "not_assignee", "not_primary", "primary_requires_adopt",
-                        "lease_expired", "lease_active", "not_claimed",
-                        "idempotency_conflict"):
-                raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
-            if code in ("draft_not_found",):
-                raise HTTPException(404, "%s: %s" % (code, getattr(exc, "detail", "")))
-            if code and (code.startswith("bad_") or code in
-                         ("idempotency_key_missing", "actor_missing")):
-                raise HTTPException(400, "%s: %s" % (code, getattr(exc, "detail", "")))
-            raise
+            raise_command_http(exc, command)
+        response = dict(outcome["result"])
+        response.update({
+            "authority_snapshot": outcome["authority_snapshot"],
+            "reconcile_token": outcome["reconcile_token"],
+            "projection_lag": outcome["projection_lag"],
+            "replayed": outcome["replayed"],
+        })
+        return JSONResponse(content=response, status_code=outcome["http_status"])
+
+    @app.post("/api/v1/submissions")
+    def create_submission(body: SubmissionBody, request: Request,
+                          principal=Depends(principal_dep),
+                          idempotency_key: Optional[str] = Header(
+                              None, alias="Idempotency-Key")):
+        """内容入库：校验 + 判定在 authority 提交之前完成；失败不建案。"""
+        require_enabled("/api/v1/submissions")
+        if review_command_service is None or submission_ingestor is None:
+            raise HTTPException(501, "capability_not_enabled")
+        try:
+            outcome = review_command_service.execute_submission(
+                ingestor=submission_ingestor, submission=body.model_dump(),
+                principal=principal, idempotency_key=idempotency_key)
+        except SubmissionRejected as exc:
+            raise HTTPException(exc.status, "%s: %s" % (exc.code, exc.detail))
+        except Exception as exc:  # 领域错误转 HTTP；未知异常继续抛
+            raise_command_http(exc, "ingest_submission")
         response = dict(outcome["result"])
         response.update({
             "authority_snapshot": outcome["authority_snapshot"],

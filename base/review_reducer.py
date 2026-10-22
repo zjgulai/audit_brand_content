@@ -55,7 +55,22 @@ def initial_state(case_id):
         "drafts": [],
         "fragment_references": [],
         "formal_reviews": [],
+        # 内容入库后由 ingest_submission 写入；authority 事件是完整状态快照，
+        # 投影重建就是重放这些快照，所以内容随 state 走，不另设第二个权威。
+        "submission_id": None,
+        "submission_hash": None,
+        "content": None,
+        "ir": None,
+        "judgment": None,
+        "tenant": None,
+        "product_line": None,
+        "submitter_id": None,
+        "ingested_at": None,
     }
+
+
+# 判定表五标签；ingest 时拒绝任何不在这五个值里的 label。
+DECISION_LABELS = ("PASS", "待自决", "REVIEW", "BLOCK", "未审查")
 
 
 def public_case(state):
@@ -122,6 +137,55 @@ def _event(command, state, actor, now, detail=None):
     }
 
 
+def _ingest_submission(state, actor, payload, now):
+    """把一次已判定的 submission 写进案件初始状态；只在 version 0 上执行一次。"""
+    if state["version"] != 0 or state.get("submission_id"):
+        raise LedgerConflict("already_ingested", "该 submission 已建案")
+    submission_id = _nonempty(payload.get("submission_id"), "submission_id")
+    submission_hash = _nonempty(payload.get("submission_hash"), "submission_hash")
+    content = payload.get("content")
+    if not isinstance(content, dict):
+        raise LedgerValidation("bad_content", "content 必须是 ContentUnit 对象")
+    if not isinstance(content.get("unit_id"), str) or not content["unit_id"].strip():
+        raise LedgerValidation("bad_content", "content.unit_id 必须是非空字符串")
+    fingerprint = content.get("fingerprint")
+    if not isinstance(fingerprint, dict) or not isinstance(
+            fingerprint.get("text_sha256"), str) or not fingerprint["text_sha256"].strip():
+        raise LedgerValidation("bad_content", "content.fingerprint.text_sha256 必须是非空字符串")
+    ir = payload.get("ir")
+    if not isinstance(ir, dict):
+        raise LedgerValidation("bad_ir", "ir 必须是 ReviewIR 对象")
+    if not isinstance(ir.get("ir_id"), str) or not ir["ir_id"].strip():
+        raise LedgerValidation("bad_ir", "ir.ir_id 必须是非空字符串")
+    findings = ir.get("findings")
+    if not isinstance(findings, list):
+        raise LedgerValidation("bad_ir", "ir.findings 必须是数组")
+    decision = ir.get("decision")
+    if not isinstance(decision, dict) or decision.get("state") not in DECISION_LABELS:
+        raise LedgerValidation("bad_ir", "ir.decision.state 必须在 %r" % (DECISION_LABELS,))
+    judgment = payload.get("judgment")
+    if not isinstance(judgment, dict):
+        raise LedgerValidation("bad_judgment", "judgment 必须是对象")
+    if judgment.get("run_state") != "OK":
+        raise LedgerValidation("bad_judgment", "judgment.run_state 必须是 OK")
+    if judgment.get("label") not in DECISION_LABELS:
+        raise LedgerValidation("bad_judgment", "judgment.label 必须在 %r" % (DECISION_LABELS,))
+    if judgment.get("label") != decision.get("state"):
+        raise LedgerValidation("bad_judgment", "judgment.label 与 ir.decision.state 不一致")
+    state.update({
+        "submission_id": submission_id,
+        "submission_hash": submission_hash,
+        "content": copy.deepcopy(content),
+        "ir": copy.deepcopy(ir),
+        "judgment": copy.deepcopy(judgment),
+        "tenant": _nonempty(payload.get("tenant"), "tenant"),
+        "product_line": _nonempty(payload.get("product_line"), "product_line"),
+        "submitter_id": _nonempty(payload.get("submitter_id"), "submitter_id"),
+        "ingested_at": _iso(now),
+    })
+    return submission_id, ir["ir_id"]
+
+
 def reduce_command(old_state, command, actor, expected_version, payload=None,
                    *, now=None, lease_seconds=LEASE_SECONDS):
     """返回 ``(new_state, [event], result)``；拒绝时不改变入参。"""
@@ -138,7 +202,10 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         )
 
     detail = {}
-    if command == "claim":
+    if command == "ingest_submission":
+        submission_id, ir_id = _ingest_submission(state, actor, payload, now)
+        detail.update({"submission_id": submission_id, "ir_id": ir_id})
+    elif command == "claim":
         if state["status"] == "claimed":
             raise LedgerConflict("already_claimed", "案件已被领取")
         if state["status"] == "closed":
@@ -268,6 +335,11 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
     state["version"] += 1
     event = _event(command, state, actor, now, detail)
     result = public_case(state)
+    if command == "ingest_submission":
+        result["submission_id"] = state["submission_id"]
+        result["submission_hash"] = state["submission_hash"]
+        result["ir_id"] = state["ir"]["ir_id"]
+        result["decision"] = copy.deepcopy(state["ir"]["decision"])
     if "draft_id" in detail:
         result["draft"] = copy.deepcopy(_draft(state, detail["draft_id"]))
     if "formal_id" in detail:

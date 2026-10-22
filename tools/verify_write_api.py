@@ -30,8 +30,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO_ROOT)
 
 try:
-    from api.review_api import create_app, InMemoryRepository
-    from api.write_api import AppealStore
+    from api.review_api import create_app, InMemoryRepository, WRITE_PATHS
+    from api.write_api import AppealStore, IMPLEMENTED_WRITE_PATHS
+    from api.production_app import PRODUCTION_WRITE_PATHS
     from base.auth_session import SessionStore
     from base.finding_store import FindingStore
     from base.reviews_ledger import ReviewsLedger
@@ -491,6 +492,47 @@ def main():
     ]
     report(disabled_results == [501] * len(disabled_results),
            "C7 显式空 capability 集合不回退全开", repr(disabled_results))
+
+    # T-102 写端点声明 ↔ 实现/占位 必须一致；release 不再有第二套口径。
+    declared = set(WRITE_PATHS)
+    implemented = set(IMPLEMENTED_WRITE_PATHS)
+    route_names = {}
+    for route in app.routes:
+        if "POST" in (getattr(route, "methods", None) or set()):
+            route_names.setdefault(route.path, set()).add(
+                route.endpoint.__name__)
+    wrong_impl = sorted(
+        path for path in implemented
+        if "placeholder" in route_names.get(path, set())
+        or not route_names.get(path))
+    wrong_placeholder = sorted(
+        path for path in declared - implemented
+        if "placeholder" not in route_names.get(path, set()))
+    report(not wrong_impl,
+           "T-102 已实现路径不得由 placeholder 兜底", repr(wrong_impl))
+    report(not wrong_placeholder,
+           "T-102 未实现路径必须有 placeholder", repr(wrong_placeholder))
+    report(declared <= set(route_names),
+           "T-102 Appendix B 写端点全部注册",
+           repr(sorted(declared - set(route_names))))
+    report("/api/v1/submissions" in implemented
+           and "/api/v1/submissions" in PRODUCTION_WRITE_PATHS,
+           "T-100 submissions 同时进入实现表与生产能力表",
+           "impl=%r prod=%r" % ("/api/v1/submissions" in implemented,
+                                "/api/v1/submissions" in PRODUCTION_WRITE_PATHS))
+
+    prod_app = create_app(
+        session_store=store, repository=repo, principals=principals,
+        finding_store=fs, appeals=AppealStore(),
+        enabled_write_capabilities=PRODUCTION_WRITE_PATHS)
+    st, body = call(prod_app, "POST",
+                    "/api/v1/cases/case-release/release-decision", signer,
+                    "K-prod-rel", {"decision": "sign", "version": 1})
+    message = str((body or {}).get("message") or "")
+    report(st == 501 and "capability_not_enabled" in message
+           and "release_gate 未实现" not in message,
+           "T-102 生产 capability 下 release 只报 capability_not_enabled",
+           "%s %r" % (st, message))
 
     print("----------------------------------------")
     if failed == 0:

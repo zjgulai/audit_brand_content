@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
 from api.oauth import FeishuWebOAuthProvider, OAuthError
-from api.review_api import FileProjectionRepository, create_app
+from api.review_api import AuthorityCaseSource, FileProjectionRepository, create_app
 from base.auth_session import SessionStore
 from base.business_event_store import BusinessEventStore, WriterLease
 from base.principal_directory import PrincipalDirectory
@@ -26,9 +26,11 @@ from base.projection_store import ProjectionStore
 from base.projector import Projector
 from base.rbac import can_act, can_read_content
 from base.review_command_service import ReviewCommandService
+from base.submission_service import SubmissionIngestor
 
 
 PRODUCTION_WRITE_PATHS = {
+    "/api/v1/submissions",
     "/api/v1/cases/{id}/claim",
     "/api/v1/cases/{id}/unclaim",
     "/api/v1/cases/{id}/reassign",
@@ -367,7 +369,9 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             runtime.stop()
 
     # 创建时只组装路由；真正的 store 在 lifespan.start 后通过代理 provider 使用。
-    frozen = FileProjectionRepository(settings.frozen_projection_root, strict=True)
+    # cases.json 不再是必需文件：新案件由 authority case source 提供。
+    frozen = FileProjectionRepository(
+        settings.frozen_projection_root, strict=True, require_cases=False)
 
     def principal_provider(principal_id, tenant):
         if runtime.directory is None:
@@ -398,6 +402,8 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             runtime.authority.state(case_id) if runtime.authority is not None else None),
         review_assignee_validator=lambda principal_id, case: bool(
             runtime.directory and runtime.directory.eligible_assignee(principal_id, case)),
+        case_source=AuthorityCaseSource(RuntimeProxy(runtime, "authority")),
+        submission_ingestor=SubmissionIngestor(),
         session_cookie_name=COOKIE_NAME,
         app_env="production",
         access_log_path=str(settings.access_log_path),

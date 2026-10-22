@@ -196,9 +196,13 @@ class InMemoryRepository:
 
 
 class FileProjectionRepository(InMemoryRepository):
-    """从仓外投影目录加载 JSON；strict 模式坏/缺文件直接拒绝。"""
+    """从仓外投影目录加载 JSON；strict 模式坏/缺文件直接拒绝。
 
-    def __init__(self, root, *, strict=False):
+    `require_cases=False` 供生产 authority case source 使用：新案件由 authority 提供，
+    frozen `cases.json` 不再是启动必需文件（缺失时按空列表，而不是启动失败）。
+    """
+
+    def __init__(self, root, *, strict=False, require_cases=True):
         def load(name, default, expected_type, *, required=False):
             path = os.path.join(root, name)
             try:
@@ -218,7 +222,7 @@ class FileProjectionRepository(InMemoryRepository):
                 return default
             return value
 
-        cases = load("cases.json", [], list, required=True)
+        cases = load("cases.json", [], list, required=require_cases)
         if strict:
             for index, case in enumerate(cases):
                 if not isinstance(case, dict):
@@ -248,6 +252,75 @@ class FileProjectionRepository(InMemoryRepository):
             sessions=load("sessions.json", [], list),
             release_readiness=load("release-readiness.json", {}, dict),
         )
+
+
+class AuthorityCaseSource:
+    """从 authority state 构造只读案件视图；没有 ir 的状态不算已建成的案件。"""
+
+    def __init__(self, authority):
+        self.authority = authority
+
+    @staticmethod
+    def _case(state):
+        if not isinstance(state, dict) or not isinstance(state.get("ir"), dict):
+            return None
+        ir = state["ir"]
+        return {
+            "case_id": state.get("case_id"),
+            "tenant": state.get("tenant"),
+            "product_line": state.get("product_line"),
+            "submitter_id": state.get("submitter_id"),
+            "assignee_id": state.get("assignee"),
+            "actionable": state.get("status") in ("unassigned", "released"),
+            "ir": ir,
+            "case_version": int(state.get("version") or 0),
+            "ir_id": ir.get("ir_id"),
+            "ir_version": ir.get("ir_version"),
+        }
+
+    def get_case(self, case_id):
+        return self._case(self.authority.state(case_id))
+
+    def list_cases(self):
+        out = []
+        for case_id in self.authority.aggregate_ids():
+            case = self._case(self.authority.state(case_id))
+            if case is not None:
+                out.append(case)
+        return out
+
+
+class CaseOverlayRepository:
+    """案件读取叠加层：authority 新建案件优先，其余集合仍走 frozen 仓库。
+
+    只覆盖 `get_case` / `list_cases`；其他属性原样委托，避免第二份投影实现。
+    """
+
+    def __init__(self, delegate, case_source):
+        self._delegate = delegate
+        self._case_source = case_source
+
+    def get_case(self, case_id):
+        case = self._case_source.get_case(case_id)
+        return case if case is not None else self._delegate.get_case(case_id)
+
+    def list_cases(self):
+        merged = {}
+        order = []
+        for case in self._delegate.list_cases():
+            case_id = case.get("case_id")
+            if case_id not in merged:
+                order.append(case_id)
+            merged[case_id] = case
+        for case in self._case_source.list_cases():
+            case_id = case.get("case_id")
+            if case_id not in merged:
+                order.append(case_id)
+            merged[case_id] = case
+        return [merged[case_id] for case_id in order]
+
+    def __getattr__(self, name):
+        return getattr(self._delegate, name)
 
 
 def _ir_state(case):
@@ -384,7 +457,8 @@ def create_app(*, session_store=None, repository=None, principals=None,
                reviews_ledger=None, review_read_store=None,
                review_command_service=None, enabled_write_capabilities=None,
                review_freshness_provider=None, case_state_provider=None,
-               review_assignee_validator=None,
+               review_assignee_validator=None, case_source=None,
+               submission_ingestor=None,
                session_cookie_name="session", finding_store=None, appeals=None,
                release_gate=None, app_env=None,
                allow_simulated_identity=None, access_log_path=None):
@@ -393,6 +467,8 @@ def create_app(*, session_store=None, repository=None, principals=None,
     repo = repository or FileProjectionRepository(
         os.environ.get("REVIEW_API_DATA_ROOT",
                        os.path.expanduser("~/.dsh/audit-data/projection")))
+    if case_source is not None:
+        repo = CaseOverlayRepository(repo, case_source)
 
     resolved_env = (app_env if app_env is not None
                     else os.environ.get("APP_ENV") or "production")
@@ -651,12 +727,10 @@ def create_app(*, session_store=None, repository=None, principals=None,
         app, principal_dep=principal_dep,
         review_command_service=review_command_service,
         enabled_capabilities=enabled_write_capabilities,
-        assignee_validator=review_assignee_validator)
+        assignee_validator=review_assignee_validator,
+        submission_ingestor=submission_ingestor)
 
     def placeholder(request: Request, _principal=Depends(principal_dep)):
-        if ("/release-decision" in request.url.path
-                or "/release-revoke" in request.url.path):
-            raise HTTPException(501, "release_gate 未实现，不能返回假成功")
         raise HTTPException(501, "写端点尚未实现")
 
     for path in WRITE_PATHS:

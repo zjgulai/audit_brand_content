@@ -563,6 +563,22 @@
    ]
   },
   {
+   "verifier": "tools/verify_submission_pipeline.py",
+   "asserts": "T-100…T-103：submission_router 四维校验 → judge_entry → authority → GET 案件读回；依据解析器让 BLOCK 路径可达；同 key 重放不重判、同 submission 异 key 不重复建案；REVIEW 与 PASS 不可达口径；坏输入/判定抛错/run_state≠OK 不建案；没有 IR 的案件不得冒充空 findings；空 frozen 目录且无 cases.json 也能建案；cases.json 写入扫描器正反例",
+   "subjects": [
+    "base/authority_query.py",
+    "base/submission_service.py",
+    "base/review_reducer.py",
+    "base/business_event_store.py",
+    "base/projection_store.py",
+    "base/review_command_service.py",
+    "api/write_api.py",
+    "api/review_api.py",
+    "api/production_app.py",
+    "research/kb/外部标准库-v1.json"
+   ]
+  },
+  {
    "verifier": "tools/verify_submission_router.py",
    "asserts": "submission_router + Attempt：四维取值域 / 8 字段 Attempt / unsupported 显式拒绝 / accepted+rejected+failed 恒等式",
    "subjects": [

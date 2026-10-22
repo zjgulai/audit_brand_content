@@ -284,6 +284,14 @@ class BusinessEventStore:
         return next((copy.deepcopy(row) for row in self._batches
                      if row["command_id"] == command_id), None)
 
+    def idempotent(self, actor, idempotency_key):
+        """按 (principal, tenant, key) 查已提交批次；不存在的 key 返回 None。"""
+        if not isinstance(actor, dict) or not isinstance(idempotency_key, str):
+            return None
+        key = (actor.get("principal_id"), actor.get("tenant_id"),
+               idempotency_key.strip())
+        return copy.deepcopy(self._idempotency.get(key))
+
     @staticmethod
     def request_hash(*, aggregate_id, command, actor, expected_version, payload):
         body = {
