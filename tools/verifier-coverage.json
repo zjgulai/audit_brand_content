@@ -669,6 +669,14 @@
    "subjects": [
     "PMO/implement/品牌用词规则-候选-v1.json"
    ]
+  },
+  {
+   "verifier": "tools/verify_waivers.py",
+   "asserts": "砍掉项 waiver：九字段齐备 / owner 恰好一个具名 / 到期即红（当天算到期）/ 出处 quote 必须在该文件里逐字找到 / 到期依据不许「顺延」/ 180 天上限 / 与 ticket 清单逐名对账；28 项反向对照含该红、该绿、该未测三侧",
+   "subjects": [
+    "PMO/audit/waiver-v1.json",
+    "PMO/上线Ticket清单-20261022.md"
+   ]
   }
  ]
 }
