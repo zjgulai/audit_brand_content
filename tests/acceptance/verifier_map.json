@@ -489,6 +489,14 @@
       "timeout": 60,
       "cpu_seconds": 45
     },
+    "132": {
+      "test_id": "acceptance-132",
+      "criteria": "TS-29",
+      "fixture": "{root}/tools/verify_production_app.py",
+      "command": "{venv} {root}/tools/verify_production_app.py && {venv} {root}/tools/verify_backend_recovery.py",
+      "timeout": 90,
+      "cpu_seconds": 60
+    },
     "133": {
       "test_id": "acceptance-133",
       "criteria": "TS-30",

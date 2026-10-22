@@ -5,7 +5,7 @@
 主体：api/production_app.py、api/oauth.py、api/review_api.py、api/write_api.py、
 base/auth_session.py、base/principal_directory.py、base/review_command_service.py。
 
-## 行 132 逐条对账（2026-10-23 T-132；**结论：仍有一件没有对象，故未映射**）
+## 行 132 逐条对账（2026-10-23 T-132；**八条全部有执行点，可映射**）
 
 验收表行 132 原文（`PMO/audit/验收表-v3-覆盖全部判据-20261017.md:275`）与
 `Playbook/内容审查Agent-产品Playbook-v1.1.md:1332`（TS-29）要求：
@@ -16,21 +16,29 @@ base/auth_session.py、base/principal_directory.py、base/review_command_service
 | 各自清理配置 | **C31a-2**（无策略时要求「无自动清理」被写下来） | ✅ |
 | 各自备份配置 | 不在本文件：`tools/verify_backend_recovery.py` 的 **C1/C7** 断言 session/projection/WAL 哨兵不进备份、恢复不带 session | ✅（跨 verifier） |
 | ① IR 读取仍正常 | **C31c**（读回 `ir_id=ir-prod` 且 decision/unit 对得上） | ✅ |
-| ① **manifest 读取**仍正常 | **无** —— 见下 | ❌ **缺对象** |
+| ① **manifest 读取**仍正常 | **C31d**（`manifest_readback()`：磁盘上的 `manifests/<run_id>.json` 在 session 库损坏后仍读得回 entries/run_id）+ **R5**（删掉 manifest 文件 → 判据必红） | ✅ |
 | ② 业务投影查询仍正常 | **C31b**（先 claim 让投影里真有东西，再读回那一条） | ✅ |
 | ③ 系统报 session 不可用而不是整体失败 | **C31**（`/readyz` 503 且 `session_db=false`） | ✅ |
 | 反向对照：损坏业务投影库 → session 认证仍可用 | **C32a** | ✅ |
 
-**为什么 manifest 那半条不补：** 行 132 / TS-29 说的 manifest 是 `base/artifact_store.py`
-的 `manifests/<run_id>.json`（技术解决方案 §3.3 的唯一可见提交点）。而**这套生产装配里
-根本没有接线 artifact_store**：`api/` 下 grep `artifact_store` 为 0 命中，
-`api/production_app.py` 的 `repository` 是 `FileProjectionRepository`（读冻结投影目录的
-JSON 文件，目录里也没有 manifest 文件）。也就是说：不是「没写断言」，是**当前装配里
-没有这个读对象**。为了一条验收措辞去凭空造一个 manifest 读路径，就是拿实现去迎合表格。
+### 一处误判的更正（2026-10-23，必须留着）
 
-结论：**#132 不填 `verifier_map`**（填了会让 runner 报 passed，而 manifest 那半条没人验）。
-两条出路由编排/产品裁定：① 把行 132 的 manifest 半句改掉或降级（架构已变）；
-② 单开票把 artifact_store 接进生产装配，再接映射。
+我第一版在这里写的是「manifest 没有读对象，装配没接线」，并据此建议**降级行 132 的
+manifest 半句**。**那是错的。** 我的输入是 `grep -rn artifact_store api/` 返回 0 命中，
+而结论说的是「当前装配里没有这个读对象」—— 中间隔着一步**传递依赖**：
+
+```
+api/production_app.py:24      from base.business_event_store import BusinessEventStore
+api/production_app.py:235         self.authority = BusinessEventStore(authority_root)
+base/business_event_store.py:19   from base.artifact_store import ArtifactStore
+base/business_event_store.py:133      self.artifacts = ArtifactStore(str(self.root))
+```
+
+`artifact_store` 经 business_event_store **两跳**接进生产装配，manifest 一直是个读对象。
+这正是 AGENTS §2.4.1 第 4 行：**否定结论的输入不是「我采的那条通道里没有」，而是
+「所有通道都采过」** —— 我只采了「直接 import」这一条。
+
+C31d 因此是本轮补上的执行点；R5 保证它会红（删文件 → read_manifest 返回 None）。
 """
 from __future__ import annotations
 
@@ -142,6 +150,37 @@ def dbs_physically_distinct(session_db, projection_db) -> bool:
     return os.path.realpath(str(session_db)) != os.path.realpath(str(projection_db))
 
 
+def manifest_readback(authority_root, run_id=None):
+    """从**磁盘**读一份已提交 manifest，返回 (ok, detail, run_id)。
+
+    ★ 2026-10-23 更正一处误判：我先前只 grep 了 `api/` 里有没有 `artifact_store`，
+      0 命中就断言「装配里没有这个读对象」。实际依赖是**两跳**：
+        api/production_app.py → base/business_event_store.py → base/artifact_store.py
+      （`BusinessEventStore.__init__` 里 `self.artifacts = ArtifactStore(root)`）。
+      这正是 §2.4.1 第 4 行的形状：否定结论的输入必须是「所有通道都采过」，
+      而我只采了直接 import 这一条通道。
+
+    这里**新建**一个 `ArtifactStore` 去读文件，不复用运行时那份内存对象 ——
+    否则「读得回」可能只是内存里还在，不证明盘上的提交点还在。
+    """
+    from base.artifact_store import ArtifactStore  # noqa: PLC0415
+
+    mdir = os.path.join(str(authority_root), "manifests")
+    if not os.path.isdir(mdir):
+        return False, "没有 manifests 目录：%s" % mdir, run_id
+    files = sorted(f for f in os.listdir(mdir) if f.endswith(".json"))
+    if not files:
+        return False, "manifests 目录里没有 .json（没有任何已提交批次）", run_id
+    rid = run_id or files[0][:-5]
+    man = ArtifactStore(str(authority_root)).read_manifest(rid)
+    if not isinstance(man, dict):
+        return False, "read_manifest(%r) 返回 None/非对象" % rid, rid
+    entries = man.get("entries") or []
+    ok = (man.get("run_id") == rid and bool(entries)
+          and all(isinstance(e, dict) and e.get("sha256") for e in entries))
+    return ok, "run_id=%r entries=%d" % (man.get("run_id"), len(entries)), rid
+
+
 def run_controls():
     """`--controls`：反向对照常驻项。
 
@@ -248,6 +287,24 @@ def run_controls():
         ok("R4 软链/相对路径对照可执行", False, "%s: %s" % (type(exc).__name__, exc))
     finally:
         shutil.rmtree(_r4root, ignore_errors=True)
+
+    # ── R5：C31d「manifest 读得回」这条判据自己会不会红 ────────────────────
+    _r5root = tempfile.mkdtemp(prefix="controls-manifest-")
+    try:
+        from base.artifact_store import ArtifactStore  # noqa: PLC0415
+
+        _st = ArtifactStore(_r5root)
+        _st.commit("run-control", [{"kind": "reports", "key": "r1", "data": b"hello"}])
+        _ok_read, _d1, _ = manifest_readback(_r5root)
+        ok("R5 manifest 读得回（好样本：entries/run_id 齐）", _ok_read, _d1)
+        os.unlink(os.path.join(_r5root, "manifests", "run-control.json"))
+        _ok_gone, _d2, _ = manifest_readback(_r5root)
+        ok("★ R5 删掉 manifest 文件 → 判据变 False（C31d 会红）",
+           _ok_gone is False, _d2)
+    except Exception as exc:  # noqa: BLE001
+        ok("R5 manifest 对照可执行", False, "%s: %s" % (type(exc).__name__, exc))
+    finally:
+        shutil.rmtree(_r5root, ignore_errors=True)
 
     print("=" * 72)
     print("verify_production_app · --controls（平台前提的反向对照）")
@@ -849,6 +906,17 @@ def main():
                        if _ir_ok else
                        "C31c IR 读取异常或读回的不是写进去那份：%s" % _ir_detail,
                        "" if _ir_ok else _ir_detail)
+
+                # ── TS-29 / 行 132 ①（manifest 半条）：session 坏掉后 manifest 仍读得回 ──
+                #   读对象 = base/artifact_store 的 manifests/<run_id>.json（唯一可见提交点）。
+                #   它不是直接 import 进来的：production_app → business_event_store →
+                #   artifact_store（两跳）。证据见 manifest_readback() 的注释。
+                _man_ok, _man_detail, _man_rid = manifest_readback(ready_cfg.authority_root)
+                report(_man_ok,
+                       "C31d session 库损坏后 manifest 仍读得回（entries/run_id 齐全）"
+                       if _man_ok else
+                       "C31d manifest 读不回或内容不全：%s" % _man_detail,
+                       "" if _man_ok else _man_detail)
 
                 runtime.projection.close()
                 r = ready_client.get("/readyz")
