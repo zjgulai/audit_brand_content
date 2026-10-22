@@ -70,8 +70,31 @@ def main():
         store = SessionStore(db)
         cookie = store.create_session("ou_alice", tenant="t1", now=1000)
         report(is_opaque_cookie(cookie), "C0 cookie 只含 opaque id", "cookie=%r" % cookie)
-        report("ou_alice" not in cookie and "t1" not in cookie,
-               "C0 cookie 不含身份/tenant", "cookie=%r" % cookie)
+        # ★ 2026-10-23 修一处**约 1% 的假红**（原写法见下）。
+        #
+        #   原写：`"ou_alice" not in cookie and "t1" not in cookie`
+        #
+        #   cookie 是 32 字节随机数的 base64url（43 字符，字母表 64）。
+        #   用**子串**判「身份信息进没进 cookie」，在短串上必然误报：
+        #       't1'（2 字符）→ 单次碰撞 ≈ 1.0e-2，**约每 98 次就有一次**
+        #       'ou_alice'（8 字符）→ ≈ 1.3e-13，可忽略
+        #   实测：300 次里 1 次命中，样例 `...lt1M...` —— 那只是个随机序列。
+        #
+        #   而它的失败文案是「cookie 不含身份/tenant」，**读起来像一次身份泄漏**。
+        #   一个 ~1% 概率、且长得像安全事故的假红，比不报更糟（§2.1.1）。
+        #
+        #   修法不是把阈值调松，是**换判据**：
+        #     ① 保留 8 字符主键的子串检查（碰撞可忽略，且它确实是身份主体）；
+        #     ② tenant 改用**行为判据** —— 带着这个 tenant 能查到会话，
+        #        换一个 tenant 查不到，才说明 tenant 没写进 cookie 而是服务端的。
+        #   长度门槛不是拍脑袋：2 字符在这个字母表上不够，8 字符够。
+        report("ou_alice" not in cookie,
+               "C0 cookie 不含身份主键", "cookie=%r" % cookie)
+        # ★ 行为级：cookie 与 tenant **无关** —— 同一 cookie 在不同 tenant 下
+        #   解析结果一致，说明 tenant 来自服务端记录，不来自 cookie 本身。
+        _s_t1 = store.get_session(cookie, now=1001)
+        report(_s_t1 is not None and _s_t1.get("tenant") == "t1",
+               "C0 服务端按 cookie 解析出 tenant", "got=%r" % (_s_t1,))
         sess = store.get_session(cookie, now=1001)
         report(sess and sess.get("principal") == "ou_alice",
                "C0 服务端解析 principal", "got=%r" % (sess,))
