@@ -758,6 +758,14 @@
       "command": "{venv} {root}/tools/verify_pycompat.py",
       "timeout": 900,
       "cpu_seconds": 600
+    },
+    "112": {
+      "test_id": "acceptance-112",
+      "criteria": "TS-9",
+      "fixture": "{root}/web/scripts/check_a11y_dual_gate.mjs",
+      "command": "node {root}/web/scripts/check_a11y_dual_gate.mjs && node {root}/web/scripts/check_a11y_dual_gate.mjs --controls",
+      "timeout": 30,
+      "cpu_seconds": 20
     }
   }
 }
