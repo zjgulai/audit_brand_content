@@ -144,7 +144,16 @@
             "required": ["what", "why"],
             "properties": {
               "what": { "type": "string", "minLength": 1 },
-              "why": { "type": "string", "enum": ["no_capability", "no_rule", "not_wired"] }
+              "why": {
+                "type": "string",
+                "enum": ["no_capability", "no_rule", "not_wired", "no_control_points"],
+                "description": "★ 2026-10-23 T-120b：空族的原因必须能原样落进 IR。此前枚举只有前三个，orchestrator 只能把它降级成 not_wired，于是产品把「这一族还没有控制点」说成了「没接线」——两个不同的缺口。"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "description": "可读标签，与 why 一一对应。空族必须是「未做·无控制点」（验收表 #73 ② 要求 IR 里读得到这个字面量）。可选：非空族的历史记录可以不带。"
+              }
             }
           }
         }

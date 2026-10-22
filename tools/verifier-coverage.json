@@ -737,6 +737,17 @@
         "research/governance/regression-set-v1.json",
         "research/governance/control-points-v1.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_coverage_reason_ir.py",
+      "asserts": "空族的「未做·无控制点」能不能从 IR 读到：schema 的 why 枚举含 no_control_points 且允许 label / 真实入口 judge_unit() 读回 IR 后逐族 why==no_control_points、label==未做·无控制点 / 整段符合分段契约 / **未知 why 的降级闸仍在** / 前端 WHY_TEXT 有独立文案（不再说成「没接线」）/ verifier_map #72/#73 指向本 verifier。16 项反向对照，含一条真·行为级：把 VALID_REASON 里的 no_control_points 临时拿掉后走真实入口，IR 必须退化且判据必红",
+      "subjects": [
+        "contracts/review-ir-v1.schema.json",
+        "base/orchestrator.py",
+        "research/governance/control-points-v1.json",
+        "web/src/pages/CaseDetailPage.tsx",
+        "tests/acceptance/verifier_map.json"
+      ]
     }
   ]
 }

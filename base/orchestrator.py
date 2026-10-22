@@ -42,7 +42,11 @@ REQUIRED_RECEIPT_FIELDS = (
     "control_points_version", "video_sampling", "disposition",
 )
 
-VALID_REASON = ("no_capability", "no_rule", "not_wired")
+#: 覆盖证明里「未跑的为什么」的已知集合。★ 2026-10-23 T-120b：加上
+#: `no_control_points` —— 空族的原因是「这一族还没有控制点」，与 `not_wired`
+#: （接线没做）是两件事。此前它不在这个元组里，于是走下面的**降级分支**，
+#: 产品侧读到的是 not_wired，界面把它说成「没接线」。
+VALID_REASON = ("no_capability", "no_rule", "not_wired", "no_control_points")
 UNKNOWN_BUCKET_KEYS = ("family", "scene_domain", "authority_source", "consequence")
 FAILURE_KIND_KEYS = ("fetch_error", "parse_error", "empty", "unsupported")
 
@@ -94,7 +98,13 @@ def _coverage_ir(value, request, unit):
             continue
         why = r.get("why")
         if why in VALID_REASON:
-            reasons.append({"what": str(r.get("what") or "未说明"), "why": why})
+            entry = {"what": str(r.get("what") or "未说明"), "why": why}
+            # ★ 2026-10-23 T-120b：label 是 why 的可读面（空族要求逐字「未做·无控制点」）。
+            #   上层给了就原样带下去；**不要**在这里重新生成，否则同一原因会有两份措辞。
+            label = r.get("label")
+            if isinstance(label, str) and label.strip():
+                entry["label"] = label
+            reasons.append(entry)
         else:
             reasons.append({
                 "what": "%s（%s）" % (r.get("what") or "未说明", why),
