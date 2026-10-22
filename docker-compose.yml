@@ -32,8 +32,13 @@ services:
     ports:
       - "172.20.0.1:18000:8000"
 
+    # ★ 凭据从**仓库外**的绝对路径读，不进 git 工作区。
+    #
+    # 最初写的是相对路径 `.env.production`，部署时得把 /opt/.../.env.production
+    # 复制进 repo/ 才能跑 —— 那让凭据落进了 git 工作区（虽然被 .gitignore 挡住，
+    # 但「靠 ignore 保护」不是保护）。改成绝对路径后，repo/ 里一个凭据文件都没有。
     env_file:
-      - .env.production
+      - /opt/momcozy-audit-platform/.env.production
 
     volumes:
       # 可写数据（authority / projection / session / principals / 日志）。
