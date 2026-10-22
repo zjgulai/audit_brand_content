@@ -764,6 +764,14 @@
         "web/src/api/client.ts",
         "web/src/pages/CaseDetailPage.tsx"
       ]
+    },
+    {
+      "verifier": "tools/verify_acceptance_trigger.py",
+      "asserts": "T-142 验收执行器有没有**自动触发点**：三条通道（CI / 本地 hook / 远端分支保护）**分别**给读数，不许一条盖掉另外两条。★ 把常被混成一句「我们配了 CI」的三件事分开报：① 配了 CI ② CI 会跑**验收执行器**（而不是只跑 pytest）③ CI 真能拦住合并。只报①会让人以为三件都成立。★「假触发」单列判红：配置里有 acceptance/验收 字样、却不引用 verify_acceptance_run —— 这比完全没有 CI 更危险，它让人相信验收已经自动在跑。★「仓库里有 hook 脚本但 core.hooksPath 未设」也单列，不与「没有」混为一谈。★ 远端分支保护本机读不到（无 gh、离线、带凭据详情 401）→ **永远落未测且照报**，不许静默消失。★ 没有任何通道跑它 → **必须红**，不是「未测就好」。11 项反向对照",
+      "subjects": [
+        "tools/verify_acceptance_run.py",
+        "tools/verify_regression_set.py"
+      ]
     }
   ]
 }

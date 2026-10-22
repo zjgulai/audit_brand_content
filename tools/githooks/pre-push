@@ -1,0 +1,83 @@
+#!/bin/sh
+# tools/githooks/pre-push —— T-142：让「推之前跑一次验收」成为可能
+#
+# 为什么是 pre-push 而不是 pre-commit：
+#   `tools/verify_acceptance_run.py` 要跑 115 条映射，实测分钟级。
+#   挂在 pre-commit 上会让每一次提交都变慢，于是**下一个人会把它绕过**——
+#   而被绕过的钩子与没装过的钩子，效果完全一样。
+#   pre-push 只在代码要离开本机时跑一次，代价与收益才对得上。
+#
+# ★ 这个文件受版本控制，但**不会自动生效**。安装要一行命令（见下），
+#   而 `tools/verify_acceptance_trigger.py` 会把「装了 / 没装」分别报出来 ——
+#   存在但未安装是一个**不同于「没有」**的状态，不许混为一谈。
+#
+# 安装（每个 clone 各做一次；`core.hooksPath` 不是版本控制的一部分）：
+#
+#     git config core.hooksPath tools/githooks
+#
+# 卸载：
+#
+#     git config --unset core.hooksPath
+#
+# 跳过一次（明知会红但必须先推上去时，**留痕**）：
+#
+#     SKIP_ACCEPTANCE=1 git push
+#
+# ★ 跳过必须留痕：下面会打印一行到 stderr，并把它写进 .git/SKIP-ACCEPTANCE.log。
+#   这里的取舍是明确的——**允许跳过，但不允许悄悄跳过**。
+
+set -u
+
+LOG="$(git rev-parse --git-dir 2>/dev/null || echo .git)/SKIP-ACCEPTANCE.log"
+
+if [ "${SKIP_ACCEPTANCE:-0}" = "1" ]; then
+  _stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  echo "⚠ SKIP_ACCEPTANCE=1 —— 本次推送**未跑**验收执行器（${_stamp}）" >&2
+  echo "${_stamp}  skipped  user=$(git config user.name || echo unknown)" >> "$LOG" 2>/dev/null || true
+  echo "  已记入 ${LOG}" >&2
+  exit 0
+fi
+
+# 找仓库根：hook 的 cwd 不一定是根，`--show-toplevel` 才是准的。
+_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "⚠ pre-push：读不到仓库根，跳过验收（这本身是一个缺陷，请修 hook）" >&2
+  exit 0
+}
+
+_gate="$_root/tools/verify_acceptance_run.py"
+if [ ! -f "$_gate" ]; then
+  echo "⚠ pre-push：找不到 $_gate —— 跳过验收（**不是通过**）" >&2
+  exit 0
+fi
+
+# 用 .venv 的解释器（验收执行器依赖 fastapi 等），没有就退回 python3。
+if [ -x "$_root/.venv/bin/python" ]; then
+  _py="$_root/.venv/bin/python"
+else
+  _py="python3"
+fi
+
+echo "pre-push：跑验收执行器…（跳过请用 SKIP_ACCEPTANCE=1 git push）" >&2
+"$_py" "$_gate"
+_rc=$?
+
+# 三态退出码（全项目约定）：
+#   0 = 全过 → 放行
+#   1 = 有红 → **拦住**
+#   2 = 未测 → **拦住**。未测 ≠ 通过 ≠ 红，两者都不是放行的理由。
+case "$_rc" in
+  0)
+    echo "✅ 验收执行器：全过，放行" >&2
+    exit 0
+    ;;
+  2)
+    echo "⚠ 验收执行器退 2（未测）—— **拦住**。未测不是通过。" >&2
+    echo "  要么补上未测项，要么 SKIP_ACCEPTANCE=1 并留痕。" >&2
+    exit 1
+    ;;
+  *)
+    echo "❌ 验收执行器退 $_rc —— 拦住。" >&2
+    echo "  明细见上面输出；确需推送请 SKIP_ACCEPTANCE=1 git push（会留痕）。" >&2
+    exit 1
+    ;;
+esac
