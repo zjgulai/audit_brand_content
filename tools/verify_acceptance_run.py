@@ -109,6 +109,24 @@ def apply_mapping(rows, mapping):
     return rows
 
 
+def _context(res, *, limit=1200):
+    """把子进程的 stderr/stdout 尾部折进 detail —— 失败必须可诊断。
+
+    ★ 只截尾部 `limit` 字节：验证器报错时最有用的那几行在最后，
+      而整段塞进 detail 会让一行失败占满整个输出。
+    """
+    parts = []
+    err = (res.get("stderr") or "").strip()
+    out = (res.get("stdout") or "").strip()
+    if err:
+        parts.append("stderr=" + err[-limit:])
+    if out:
+        parts.append("stdout=" + out[-limit:])
+    if not parts:
+        return "（子进程无输出）"
+    return "｜" + "｜".join(parts)
+
+
 def run_row(row):
     if not row["test_id"] or not row["fixture"] or not row["command"]:
         return "untested", "缺 test_id/fixture/command"
@@ -141,7 +159,13 @@ def run_row(row):
     #   第一句就写着「未测 ≠ 通过 ≠ 红」，这里必须一致。
     if res["exit_code"] == 2:
         return "untested", "命令退 2（未测）"
-    return "failed", "exit=%s" % res["exit_code"]
+    # ★ 失败必须带现场（2026-10-23 加）。
+    #   改前这里只返回 `exit=%s`，而 run_untrusted 明明返回了 stdout/stderr
+    #   两个字段（base/sandbox.py:249-250），调用点一个都没接。
+    #   后果实测过：`#135` 偶发红了一次，报告的全文只有「exit=1」——
+    #   三个人各查一遍、各自从零重建上下文，仍然没有结论。
+    #   **失败现场被丢掉的时候，这个失败就不是「难查」，是「查不了」。**
+    return "failed", "exit=%s%s" % (res["exit_code"], _context(res))
 
 
 # ───────────────────────── 自测（三态映射）─────────────────────────

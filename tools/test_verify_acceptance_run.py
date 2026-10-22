@@ -56,16 +56,32 @@ def main():
             print("FAIL: %s %s" % (name, detail), file=sys.stderr)
             failed += 1
 
-    # 真实表：已接验证器的行通过，其余仍 untested；总数仍 136，rc=2
+    # 真实表：断言的是**执行器的三态语义**，不是某一时刻的快照。
+    #
+    # ★ 2026-10-23 改（T-141 同批）。原文要求 `rc==2` 且 `failed==0`，
+    #   那是 #78 还绿着时的读数。自那一刻起 #78 被裁定 dormant
+    #   （它要求「引用了未确认条款 → unknowns 要有 Q45」，而 62 条全改 ratified
+    #   之后触发条件永不成立），于是这条断言**一直在红**——而它红了很久没人管，
+    #   因为 `tools/test_*.py` 既不在验证器名册里，也没有任何触发点会跑它。
+    #
+    #   改成断言三态语义本身：计数之和必须是总行数、退出码必须与计数一致。
+    #   这样 #78 转绿时它照样成立，别的行新红时它也照样成立。
+    #   **一个把某天读数写死的断言，会在那天之后一直骗人。**
     rc, out = _run(REAL_TABLE)
     mm = re.search(r"mapped=(\d+)", out)
     mp = re.search(r"passed=(\d+) failed=(\d+) untested=(\d+)", out)
-    ok_real = (rc == 2 and mm and int(mm.group(1)) > 0 and mp
-               and int(mp.group(1)) > 0 and int(mp.group(2)) == 0
-               and int(mp.group(3)) > 0
-               and int(mp.group(1)) + int(mp.group(3)) == 136)
-    report(ok_real, "真实表 → 映射行通过、其余 untested、rc=2",
-           "rc=%s out=%s" % (rc, out[-200:]))
+    if mm and mp:
+        n_passed, n_failed, n_untested = (int(mp.group(i)) for i in (1, 2, 3))
+        total = n_passed + n_failed + n_untested
+        # 三态退出码的约定（本文件 docstring 第一句）：0 过 / 1 有红 / 2 未测
+        want_rc = 1 if n_failed else (2 if n_untested else 0)
+        ok_real = (rc == want_rc and int(mm.group(1)) > 0 and total == 136)
+        detail = ("rc=%s want=%s passed=%d failed=%d untested=%d total=%d"
+                  % (rc, want_rc, n_passed, n_failed, n_untested, total))
+    else:
+        ok_real = False
+        detail = "rc=%s 解析不出 mapped/passed（out 尾部 %r）" % (rc, out[-200:])
+    report(ok_real, "真实表 → 三态语义自洽（计数之和=136、rc 与计数一致）", detail)
 
     # 反向对照 1：test_id + fixture + command true → passed=1 rc=0
     fixture = tempfile.NamedTemporaryFile(delete=False)
@@ -120,7 +136,33 @@ def main():
     else:
         report(False, "R-cwd 无法导入 base.sandbox", "")
 
-    for p in (t1, t2, t3, t4, fixture.name):
+    # T-141（2026-10-23）：失败必须带现场。
+    #   改前 run_row 只返回 `exit=%s`，把 run_untrusted 已经拿到的
+    #   stdout/stderr 全丢了 —— `#135` 偶发红过一次，全文只有「exit=1」，
+    #   三个人各查一遍仍然没有结论。
+    #   判据是行为级：子进程打一个独有标记再 exit 1，标记必须出现在 detail 里。
+    #   ★ 标记脚本写进独立文件，不写成 `python3 -c "..."`：
+    #     parse_table 的 RE_COMMAND 以 `;` 为结束符，内联脚本会被截断
+    #     （实测过，第一次就踩了）。
+    MARK = "T141-DIAG-MARKER-%d" % os.getpid()
+    marker_py = tempfile.NamedTemporaryFile(
+        "w", suffix=".py", delete=False, encoding="utf-8")
+    marker_py.write("import sys\nprint(%r, file=sys.stderr)\nsys.exit(1)\n" % MARK)
+    marker_py.close()
+    t5 = _make_table("test_id: T-5; fixture: %s; command: python3 %s"
+                     % (fixture.name, marker_py.name))
+    rc, out = _run(t5)
+    report(rc == 1 and MARK in out,
+           "T-141 失败时必须带子进程 stderr（标记可见）",
+           "rc=%s marker_found=%s out=%s" % (rc, MARK in out, out[-400:]))
+
+    # T-141 反向对照：通过的行不许被塞进无关输出（否则「带现场」= 一律打印）
+    t6 = _make_table("test_id: T-6; fixture: %s; command: true" % fixture.name)
+    rc, out = _run(t6)
+    report(rc == 0 and "passed=1 failed=0 untested=0" in out,
+           "T-141 反向对照：通过的行 detail 为空", "rc=%s out=%s" % (rc, out[-200:]))
+
+    for p in (t1, t2, t3, t4, t5, t6, fixture.name, marker_py.name):
         try:
             os.unlink(p)
         except OSError:
