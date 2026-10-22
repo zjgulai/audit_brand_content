@@ -39,9 +39,7 @@ tests
 .ua
 .vendor
 web/node_modules
-web/src
-web/scripts
-web/docs
+web/dist
 
 # 杂项
 .DS_Store
