@@ -177,14 +177,15 @@
       "ticket": "W3",
       "approved_by": "W3（PMO/上线Ticket清单-20261022.md:93）",
       "到期日依据": "签署日 2026-10-22 + 30 天 = 首次复核日 2026-11-22",
-      "状态": "active",
+      "状态": "closed",
       "出处": [
         {
           "kind": "ticket",
           "path": "PMO/上线Ticket清单-20261022.md:93",
           "quote": "冻结回归集 / 正例样本 / 规则覆盖率 / 金标准确率"
         }
-      ]
+      ],
+      "收回原因": "2026-10-23 已交付：T-85 建了冻结回归集（research/governance/regression-set-v1.json，83 条 public_synthetic 样本）+ tools/verify_regression_set.py（8 项断言，rc=0）+ 已映射进 verifier_map 的验收行 85。本条豁免的对象已不存在，故收回。★ 残余（不在豁免范围内、仍待办）：样本语义未经法务/产品签署；第 ⑤ 条「CI/分支保护把回归集设为必需检查」在配置层今天不成立。"
     },
     {
       "id": "WV-08",
