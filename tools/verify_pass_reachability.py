@@ -156,6 +156,26 @@ def run_samples() -> tuple[list[dict], dict]:
             "findings": len(r.get("findings") or []),
         })
 
+    # 解析失败样本：走真实入口的「未审查/DP0」那一支，让输出空间不只一种标签。
+    try:
+        failed_unit = C.from_media("image", b"image", "", uri="inline:failed",
+                                   extractor="verify", covers=["失败观测"], does_not_cover=[])
+        failed_unit.update({"parse_status": "failed", "failure_kind": "parse_error",
+                            "reason": "verify fixture"})
+        rf = judge_unit(failed_unit, clock=lambda: 1000)
+    except Exception as e:  # noqa: BLE001
+        raise Untested(f"解析失败样本跑不出：{type(e).__name__}: {e}")
+    cov_f = (rf.get("ir") or {}).get("coverage") or {}
+    out.append({
+        "name": "解析失败",
+        "parse_failed": True,
+        "label": rf.get("label"),
+        "layer": rf.get("layer"),
+        "coverage_state": cov_f.get("coverage_state"),
+        "reasons": list(cov_f.get("not_evaluated_reason") or []),
+        "findings": len(rf.get("findings") or []),
+    })
+
     # BLOCK 可达性夹具：只把 authority_query 换成「依据可查」，其余走同一入口。
     # 目的：证明「出不了 PASS」不是引擎整体失效 —— BLOCK 打得出来，PASS 仍打不出来。
     try:
@@ -210,6 +230,14 @@ def check_samples(table: dict, samples: list[dict]) -> list[str]:
     declared = list(table["declared_empty"])
 
     for s in samples:
+        if s.get("parse_failed"):
+            # 解析失败按 §3.3.5 一律 missing（先于 partial），这是另一条支路；
+            # 它证明「未审查」也在这条链上，但不是空族造成的。
+            if s.get("coverage_state") != "missing":
+                problems.append(
+                    f"U2 解析失败样本「{s['name']}」的 coverage_state = "
+                    f"{s.get('coverage_state')!r}，预期 missing")
+            continue
         if declared:
             if s.get("coverage_state") != "partial":
                 problems.append(
@@ -230,8 +258,8 @@ def check_samples(table: dict, samples: list[dict]) -> list[str]:
                 if r.get("why") not in ("no_control_points", "not_wired"):
                     problems.append(
                         f"U2 样本「{s['name']}」里「{fam}」的 why = {r.get('why')!r}，"
-                        "预期 no_control_points（IR 契约目前只允许 no_capability/no_rule/not_wired，"
-                        "所以产品侧会看到 not_wired —— 见 U10）")
+                        "预期 no_control_points 或 not_wired（IR 契约目前只允许"
+                        " no_capability/no_rule/not_wired，空族到产品侧会被降级成 not_wired）")
         else:
             # 空族已补齐：此时**不该**还是 partial —— 否则说明另有阻塞。
             if s.get("coverage_state") != "full":
@@ -251,12 +279,16 @@ def check_samples(table: dict, samples: list[dict]) -> list[str]:
                 problems.append(
                     f"U3 样本「{s['name']}」出了 PASS，但表里还有 {len(declared)} 个空族"
                     f"（{declared}）—— 空族按规则必须落 partial，partial 永不 PASS")
-        # 防桩：不要求出现两种标签（真实链路上 authority 未接时 BLOCK 出不来），
-        # 但要求样本确实走到了判定里 —— findings 数必须不是常量。
+        # 防桩两条：① findings 数必须不是常量（样本真打到规则上了）；
+        # ② 标签必须不止一种（输出空间的断言不能因为样本全落同一条支路而退化成恒真）。
         if len({s.get("findings") for s in samples}) < 2:
             problems.append(
                 f"U3 全部样本的 findings 数都是 {samples[0].get('findings')} ——"
                 " 这更像判定被桩成了常量，样本没有真正打到规则上")
+        if len(set(labels)) < 2:
+            problems.append(
+                f"U3 全部样本只出了 1 种标签 {set(labels)} —— 输出空间的断言会退化成恒真；"
+                " 至少要让「复核」与「未审查」两条支路各有一个样本")
     else:
         # U8 未来分支：空族补齐了 ⇒ 干净样本必须能 PASS。
         clean = [s for s in samples if s.get("name") == CLEAN]
