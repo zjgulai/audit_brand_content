@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 构建上下文排除项
+#
+# 每一条都有理由：发进构建上下文的字节，不只让构建变慢，**还会被 COPY 进镜像**。
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 版本库（可能含历史里已被清理但仍在对象库里的东西）
+.git
+.gitignore
+
+# 依赖与产物（镜像内会重新装 / 重新构建）
+node_modules
+**/node_modules
+web/dist
+.venv
+**/__pycache__
+**/*.pyc
+
+# ★ 凭据：一个字节都不许进镜像
+.env
+.env.production
+.env.local
+*.pem
+*.key
+id_rsa*
+
+# 项目里那些**不是运行时依赖**的目录（不进镜像，省空间也减少攻击面）
+PMO
+ADR
+Playbook
+PRD
+skill
+skills
+research/repos
+research/live
+research/landing/_evidence
+tools
+tests
+.ua
+.vendor
+web/node_modules
+web/src
+web/scripts
+web/docs
+
+# 杂项
+.DS_Store
+*.log

@@ -131,3 +131,12 @@ research/live/snapshot-*.json
 PMO/audit/momcozy-catalog/
 规则清单-P0-P3-按等级-20261016.xlsx
 PMO/守衡-创建全景图与知识库体系-讨论稿-v1.md.corrupt-tail.bin
+
+# ── 生产环境凭据 ─────────────────────────────────────────────────────────────
+# 模板（.env.production.example）入库；真实值不入库。
+# 判据：`git ls-files | grep -E '^\.env'` 必须只返回 .example。
+.env.production
+.env
+.env.local
+*.pem
+*.key

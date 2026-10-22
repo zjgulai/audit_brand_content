@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 内容审核工作台 · 生产 compose（独立项目，不碰服务器上其他容器）
+#
+# 隔离手段（对应委托方的「不要干扰其他 docker 应用」）：
+#   - 独立 project name：`momcozy-audit`（`COMPOSE_PROJECT_NAME` 由文件名前缀保证）
+#   - 独立网络：`momcozy-audit-net`，不与 bridge / bos_web_net / lighthouse_ai_video_net 共用
+#   - **只绑 127.0.0.1**：对外由宿主机现有的 ai_video_nginx 反代，不抢 80/443
+#   - 不用 `latest`，镜像打 commit tag
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: momcozy-audit
+
+services:
+  api:
+    image: ${AUDIT_IMAGE:-momcozy-audit:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: momcozy-audit-api
+    restart: unless-stopped
+
+    # ★ 只绑回环。80/443 是宿主机共享反代 `ai_video_nginx` 的，
+    #   这里一个字节都不碰；对外由反代 `proxy_pass http://127.0.0.1:18000`。
+    ports:
+      - "127.0.0.1:18000:8000"
+
+    env_file:
+      - .env.production
+
+    volumes:
+      # 可写数据（authority / projection / session / principals / 日志）。
+      # 宿主机目录，便于备份与人工检查；容器重建不丢数据。
+      - /opt/momcozy-audit-platform/data/authority:/data/authority
+      - /opt/momcozy-audit-platform/data/projection:/data/projection
+      - /opt/momcozy-audit-platform/data/logs:/data/logs
+      # principals.json **只读挂载**：这是权限源，容器不该改它
+      - /opt/momcozy-audit-platform/config/principals.json:/data/principals.json:ro
+      # SQLite 落在 data 下，与上面三个目录不重叠（ProductionSettings 会校验这一点）
+      - /opt/momcozy-audit-platform/data/db:/data/db
+
+    networks:
+      - momcozy-audit-net
+
+    # 容器内单进程：不写 --workers（Dockerfile CMD 已经保证）。
+    # 这里不设 cpus/memory 硬上限 —— 试点期先观察，避免因内存不足被 OOM 杀掉
+    # 而看起来像「服务自己挂了」。
+    stop_grace_period: 30s
+
+    healthcheck:
+      # /healthz 是固定低敏端点（不碰 authority / 不查库），
+      # /readyz 才是真探。健康检查用 /healthz，避免把依赖抖动算成容器不健康。
+      test: ["CMD", "python3", "-c",
+             "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+networks:
+  momcozy-audit-net:
+    name: momcozy-audit-net
+    driver: bridge
