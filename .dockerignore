@@ -34,7 +34,11 @@ skills
 research/repos
 research/live
 research/landing/_evidence
+# ★ tools/ 整体排除（75 个 verifier 不该进镜像），但 bj_time.py 是**运行时依赖**：
+#   base/takedown.py 与 base/notifications.py 都 `from bj_time import`。
+#   .dockerignore 的 `!` 例外必须写在排除行之后才生效。
 tools
+!tools/bj_time.py
 tests
 .ua
 .vendor
