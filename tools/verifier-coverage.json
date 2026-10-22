@@ -729,6 +729,14 @@
         "research/governance/control-points-v1.json",
         "Playbook/内容审查Agent-产品Playbook-v1.1.md"
       ]
+    },
+    {
+      "verifier": "tools/verify_regression_set.py",
+      "asserts": "行85/SEC-6-GS-*：冻结回归集规模 50-100（含端点）；四个陷阱字面量（Best Seller / 100% cotton / 最新 / first-time mom）都在且标成负样本；按族覆盖——有控制点族 ≥3 条、空族 0 条（**运行时读 control-points-v1.json 的 empty_families**，不写死「四族」）；控制点主表 status_note 与 empty_families 不许自相矛盾；每条样本指纹可复算；changelog 三项（operator/at/reason）；规则变更合并门判定函数（无回执拒/坏回执拒/非规则变更放行）。不证明远端分支保护真的拦住合并（本仓无 CI、main 无保护），不证明样本语义正确（83 条为人工编写的通用广告语）",
+      "subjects": [
+        "research/governance/regression-set-v1.json",
+        "research/governance/control-points-v1.json"
+      ]
     }
   ]
 }

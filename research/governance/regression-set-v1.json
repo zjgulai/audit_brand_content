@@ -1,0 +1,1184 @@
+{
+ "schema_version": 1,
+ "set_version": "rs-2026-10-22-v1",
+ "generated_from": "人工编写的通用广告语（public_synthetic）；不含任何客户内容、不取自 research/live/",
+ "why": "行 85 要求冻结回归集 50-100 条、含四个陷阱字面量、按族覆盖、每条有可复算指纹、变更须有操作人/时间/原因。",
+ "trap_literals": [
+  "Best Seller",
+  "100% cotton",
+  "最新",
+  "first-time mom"
+ ],
+ "samples": [
+  {
+   "id": "GS-001",
+   "text": "Best Seller baby monitor with 2.4G wireless",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "trap_negative",
+    "note": "行85 点名的陷阱字面量 'Best Seller'：看起来像违规词，实际不该判违规"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "b17ae1f05149731dc46b0bf94dbec74ea86bd8f6a6287802749eb88266e46a0a"
+   }
+  },
+  {
+   "id": "GS-002",
+   "text": "100% cotton breathable nursing cover",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "trap_negative",
+    "note": "行85 点名的陷阱字面量 '100% cotton'：看起来像违规词，实际不该判违规"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "5ecf2cef249982aaffc2685794d888151c70a9c21553972ffc75d38c1058668c"
+   }
+  },
+  {
+   "id": "GS-003",
+   "text": "最新款婴儿监护器，实时高清夜视",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "trap_negative",
+    "note": "行85 点名的陷阱字面量 '最新'：看起来像违规词，实际不该判违规"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "15689e047169cad39e7f6b58f4b1b874aa3b98daaed9b0b8436ce763ec0bac43"
+   }
+  },
+  {
+   "id": "GS-004",
+   "text": "A thoughtful gift for a first-time mom",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "trap_negative",
+    "note": "行85 点名的陷阱字面量 'first-time mom'：看起来像违规词，实际不该判违规"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "7939ff41205c4395ea145b9d73322e673704630823f4ec16b6250d6204746c21"
+   }
+  },
+  {
+   "id": "GS-005",
+   "text": "This breast pump cures mastitis in three days",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "医疗宣称 cure"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "901ee68f2e3112a018d95f7415eaab889c3baeb4d81e30b0b8e40aec7e8e70fb"
+   }
+  },
+  {
+   "id": "GS-006",
+   "text": "Our formula prevents allergies in infants",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "医疗宣称 prevent"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "9a96003ea205368236a45bece21fe33db51552dda210ed60d478416a285803d3"
+   }
+  },
+  {
+   "id": "GS-007",
+   "text": "Clinically proven to treat colic",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "医疗宣称 treat"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "8a8948b160e15a94aee1fbf26003ce16888ae49b7f57f7f05596a0baf3f2b396"
+   }
+  },
+  {
+   "id": "GS-008",
+   "text": "The safest baby monitor on the market",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "绝对化 最安全"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "af2f672e4af3781c3b98052662d92533089265193c399a8cfebefadbe1a0af99"
+   }
+  },
+  {
+   "id": "GS-009",
+   "text": "100% safe for newborns",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "绝对化 100% safe"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "6e567cd8eda3b7bddcbd598a728d64e1226466731111881b1473b051c047f9c9"
+   }
+  },
+  {
+   "id": "GS-010",
+   "text": "The only pump you will ever need",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "绝对化 唯一"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "7fe96d86c065337229e151313277206937b6e7dd8a30ee20db142c2bf87a5fbc"
+   }
+  },
+  {
+   "id": "GS-011",
+   "text": "FDA cleared medical device for home use",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "监管状态引用"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "e03c918a7425abdfbfd33161d3b5b8a25db381ed14aa1900c2704c8a57cae129"
+   }
+  },
+  {
+   "id": "GS-012",
+   "text": "Doctors recommend this bottle above all others",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "权威背书"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "2481d8877c8d2a1816027ffcd6b69ccb07b999f23f7222aeed6cdda7f2aea3cb"
+   }
+  },
+  {
+   "id": "GS-013",
+   "text": "Reduces SIDS risk by 80 percent",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "should_hit",
+    "note": "疾病风险宣称"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "31b7f9cb0f671f5554863020e022b26c71dff63a327db632e04ab564fecacdca"
+   }
+  },
+  {
+   "id": "GS-014",
+   "text": "Our bottle washer holds six bottles",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "普通规格描述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "e008037c8e0ea09712da4a98d1d12c4dc40be487e4000f03516c19e9efd937a3"
+   }
+  },
+  {
+   "id": "GS-015",
+   "text": "BPA-free food-grade silicone",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "材质说明"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "8a257d467aa35e4b1f2119009a6d83a0945f799e3e48aa6665b1e9e1b4a44f81"
+   }
+  },
+  {
+   "id": "GS-016",
+   "text": "Dishwasher safe on the top rack",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "使用说明"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "0aaef456e23d52077ede8b86132302c0c744c5837f508fe0b42af2e17fa528cd"
+   }
+  },
+  {
+   "id": "GS-017",
+   "text": "Made in Vietnam",
+   "family": "事实控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "产地陈述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "178c25bca44454ba4544b6c7a43c4a6cbc7ae30e8db0c290e6a0f866bc4ffb2c"
+   }
+  },
+  {
+   "id": "GS-018",
+   "text": "Capacity 240 ml, weight 180 g",
+   "family": "事实控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "规格陈述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "c03e21fc106eb9ee12e7a0baa8d05848ce430bb27cc576dda8fc69362daca62d"
+   }
+  },
+  {
+   "id": "GS-019",
+   "text": "Battery lasts up to 12 hours",
+   "family": "事实控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "续航陈述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "00d656cb57b1a61210ed5adba3e4bcd5e0dab457c4ba80363088b7d4c12351ea"
+   }
+  },
+  {
+   "id": "GS-020",
+   "text": "Contains no parabens or phthalates",
+   "family": "事实控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "成分否定陈述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "09279c86ef777b0e995129509198ffaa5bf7adecd67ed61379db19a6dce997ea"
+   }
+  },
+  {
+   "id": "GS-021",
+   "text": "Certified by the EU safety standard EN 14350",
+   "family": "事实控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "认证陈述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "c2081949abbf4e44d79055fc7837cdc2505b79321f60ae94a321316bc9d0c2f9"
+   }
+  },
+  {
+   "id": "GS-022",
+   "text": "Awarded the 2026 design prize",
+   "family": "事实控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "获奖陈述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "5245e64c5ce7ca08e8ddd20c2cb5135d87d04eba9bf0a0819d56f4f7d3eea154"
+   }
+  },
+  {
+   "id": "GS-023",
+   "text": "Affiliate link: we may earn a commission",
+   "family": "披露控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "联盟披露"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "82657bc4218490ee5c305629dae3e1577d0639abde67c6ca220a79a49542ffae"
+   }
+  },
+  {
+   "id": "GS-024",
+   "text": "Sponsored content produced with Brand X",
+   "family": "披露控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "赞助披露"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "0998fd743e4d67770491a414cb909ffaf9ce1c8f7c38452b5d6d5bc2f122a59f"
+   }
+  },
+  {
+   "id": "GS-025",
+   "text": "Results may vary between users",
+   "family": "披露控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "效果免责"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "50e81c63b8b841a4350ff06a37d0c970988626a39ff50c1ac05dce8dcdf8681b"
+   }
+  },
+  {
+   "id": "GS-026",
+   "text": "Consult your pediatrician before use",
+   "family": "披露控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "医疗建议免责"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "2bd8a7eac48b8d63b7c9766f2fe766e3270b5c5ed6547f9004ea9a88905bd20e"
+   }
+  },
+  {
+   "id": "GS-027",
+   "text": "Prices include VAT where applicable",
+   "family": "披露控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "价格披露"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "926a74883541e9363f914fadcc288141488d75b2255237ada54d8b01d2a2ab81"
+   }
+  },
+  {
+   "id": "GS-028",
+   "text": "Free returns within 30 days",
+   "family": "披露控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "退货政策"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "752fab0456f1ba45f17f05985adf1a1770759532dcb353a76314bd7413e6cb8f"
+   }
+  },
+  {
+   "id": "GS-029",
+   "text": "Use our brand name exactly as Momcozy",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "品牌用词"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "8c7c0cc1e80105bd52805648d0abd9bcc983ef154116ba7e851e0d044bbb0bb5"
+   }
+  },
+  {
+   "id": "GS-030",
+   "text": "Momcozy is a registered trademark",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "商标声明"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "32b27fb5766122c4ab07605165e84d5d09e46ec172b5a273c7a79b47714f669b"
+   }
+  },
+  {
+   "id": "GS-031",
+   "text": "Do not shorten the brand to Mocozy",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "错误拼写对照"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "6138c66c07587d54cde685038fde5f71c3042c809275468b9f999208ea132cda"
+   }
+  },
+  {
+   "id": "GS-032",
+   "text": "Our tagline: Comfort for every feeding",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "标语"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "785d19336c716ed5ea7ba1864e243f5e216b7b1c159a3fa809e96f5e0c9fdec1"
+   }
+  },
+  {
+   "id": "GS-033",
+   "text": "Compare with OtherBrand feeders",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "竞品对比"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "eda8e799d39104fbb5d40d7354b7d72112994d1d01c9f67c66bb3b220304981a"
+   }
+  },
+  {
+   "id": "GS-034",
+   "text": "Momcozy official store on the marketplace",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "correctly_exempted",
+    "note": "渠道表述"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "a1d93e4e83930ce4bf23649534c478d161a1adeab751478d516475022c74952d"
+   }
+  },
+  {
+   "id": "GS-035",
+   "text": "Soft silicone nipple with anti-colic vent",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "2eb10dd3a5d6fc208994dbbf7e2831ee492587e25477d644461a825438d1ac5e"
+   }
+  },
+  {
+   "id": "GS-036",
+   "text": "One-hand operation while holding your baby",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "83b99b732c991e9ca4b68e2fe665a2cef4fa0715170455f187b880e849287890"
+   }
+  },
+  {
+   "id": "GS-037",
+   "text": "Compact design fits most cup holders",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "415ae8792e4ab4cada795a1f5eb026c4893dce765438b39a50f9b89c9231eafb"
+   }
+  },
+  {
+   "id": "GS-038",
+   "text": "Easy to clean with warm soapy water",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "138acbe07ef40f709a8fd84f562faba44483aead77fc74ac401878f950d099ca"
+   }
+  },
+  {
+   "id": "GS-039",
+   "text": "Includes two bottles and a travel cap",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "102390fba9be07a68fd1180b93c136631727c6260ac4b5f6f7655d6d711b55ab"
+   }
+  },
+  {
+   "id": "GS-040",
+   "text": "Available in three pastel colours",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "ed6fe5065d6322844b6d77a73aafa163f7692fa486622a3bfe35ddf7ba6e11ae"
+   }
+  },
+  {
+   "id": "GS-041",
+   "text": "Ships in recyclable packaging",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "41a092d066463fbcc9d0f20a042728a985a314f1ad630c4bcffd92e31d430671"
+   }
+  },
+  {
+   "id": "GS-042",
+   "text": "Designed for babies from birth to 12 months",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "3d27cae91531b4e5d0cb8a64e2a871a600fd8dc2d3dad59ea68cc6bbf4cd43be"
+   }
+  },
+  {
+   "id": "GS-043",
+   "text": "Quiet motor under 35 decibels",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "2b9825993d9f8e4f0cd8043365fa899222b882a4ee7b4131adf2fd83d75df8c1"
+   }
+  },
+  {
+   "id": "GS-044",
+   "text": "Adjustable suction with nine levels",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "b3e499e5e691099125872c12921c7bc0791818d1379344f110bf80074f167b1a"
+   }
+  },
+  {
+   "id": "GS-045",
+   "text": "Rechargeable via USB-C in two hours",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "e09de873d82ea1f7c6a1b4c72f56511c9e793e94d2291c83abf10fcc53254068"
+   }
+  },
+  {
+   "id": "GS-046",
+   "text": "BPA-free polypropylene housing",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "ce20423d9f4f7e73d3c38fb32126161784e05dd205ffb717d8efbaee43451122"
+   }
+  },
+  {
+   "id": "GS-047",
+   "text": "Night light with three brightness settings",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "ee268c62a0f3bef29b17bf92659b0240487a9dbdaa73ceba80b0e9b4e6bb4e99"
+   }
+  },
+  {
+   "id": "GS-048",
+   "text": "Temperature display in Celsius or Fahrenheit",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "608a6d5a4f27fee1b12ae4ef0966b7571b7ac4af4666abe36a06b564f99e4b2e"
+   }
+  },
+  {
+   "id": "GS-049",
+   "text": "Memory function restores last settings",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "4859e5d2fa163d4a594f57f719ecd21441cf9c154d9b2192ef3a059d95c4f28a"
+   }
+  },
+  {
+   "id": "GS-050",
+   "text": "Automatic shut-off after thirty minutes",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "244b27d51f3523c49d233741053cfc027e71bebf4c01744ec9b945bc20a0b5f5"
+   }
+  },
+  {
+   "id": "GS-051",
+   "text": "Sterilises with steam in eight minutes",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "1caacf36410b76ce54a3026f837364cb24139d7b533587bc1cf3ae5a1ec1281d"
+   }
+  },
+  {
+   "id": "GS-052",
+   "text": "Fits standard wide-neck bottles",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "fab42880195333f9341cc2d27952bfe65baed7eb68e8120f6b88776cf113fcbc"
+   }
+  },
+  {
+   "id": "GS-053",
+   "text": "Hand wash recommended for the valve",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "5df6b2350933adaea748d55b6321e72b33450939a24ac0fefb7644cde97d8794"
+   }
+  },
+  {
+   "id": "GS-054",
+   "text": "Two-year limited warranty included",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "c97b58c20c5defc6c991ba08cd79b4bc5f54c1a8a65ff45c9da71426a2ba7343"
+   }
+  },
+  {
+   "id": "GS-055",
+   "text": "Free replacement parts for the first year",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "0631997695fb3e7caba975fa927daeabb6cf370fc81d7ac203c79a258118fec9"
+   }
+  },
+  {
+   "id": "GS-056",
+   "text": "Compatible with most breast pump brands",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "b3030ec32f0409953ae11b192265aa5b84d6ea2344bb25a9f3ab718953f84e53"
+   }
+  },
+  {
+   "id": "GS-057",
+   "text": "Lightweight at just 220 grams",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "bff54e960a888f7f605b56389fdeff470031a821d1ab01d90d86e57e2c737cf1"
+   }
+  },
+  {
+   "id": "GS-058",
+   "text": "Foldable frame for easy storage",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "42267f07ef9f96bda96cbd33adf852f56b8f0b76988ed9eaca5a50a255babf59"
+   }
+  },
+  {
+   "id": "GS-059",
+   "text": "Water-resistant fabric cover",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "a4e17c6a2835eba1443c384676583cb11925f4861fcb96130cf288a63e264481"
+   }
+  },
+  {
+   "id": "GS-060",
+   "text": "Tool-free assembly in under a minute",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "80afb2946934442f33bc0f232ea4bb1d499b040fa5ba413af7102043346c8298"
+   }
+  },
+  {
+   "id": "GS-061",
+   "text": "Meets CPSC safety requirements",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "f631c90ce08c95d79897771ad651829092a8888358c3770781b9ef4a39e73838"
+   }
+  },
+  {
+   "id": "GS-062",
+   "text": "Available for delivery within five days",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "30a0d0a575fc246b3af0864a97f34be1f4f49ae8395be382d7d32bd36e49e93f"
+   }
+  },
+  {
+   "id": "GS-063",
+   "text": "Customer support in English and Spanish",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "561ac6e01c782056a6ad7837d61013248fbec0f859389e2ef96ba7b9d4d4000e"
+   }
+  },
+  {
+   "id": "GS-064",
+   "text": "Instruction manual with QR video guide",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "02f018e5acc7cc9aa2f22652f07a8ccac3686530042347c07c4bb263bb03006f"
+   }
+  },
+  {
+   "id": "GS-065",
+   "text": "Spare valve and membrane included",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "af308df50a37e736424499f0e45d4cb80953c67fe83144ce5a3ccf63fd7ed1c8"
+   }
+  },
+  {
+   "id": "GS-066",
+   "text": "Dishwasher-safe on the top rack only",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "d3f630ebc87955422e88786cc9bc8599fff4db44f299ea92ccf837540012e581"
+   }
+  },
+  {
+   "id": "GS-067",
+   "text": "Designed and tested with lactation consultants",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "e8d24860730f03a60405bd0d139e947a940eaf314244fa2bcfe9bb64914aaa8b"
+   }
+  },
+  {
+   "id": "GS-068",
+   "text": "Soft-touch handle reduces hand fatigue",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "6c59619d99a792b2c4255fb3c3dd0650ee0931f6ea91906a042b0f45e785104c"
+   }
+  },
+  {
+   "id": "GS-069",
+   "text": "Transparent chamber shows milk flow",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "f2b5297b4eec90384c5bc7d4e2d1b26644ba15ed273dede6b5cf0a36bd3297a8"
+   }
+  },
+  {
+   "id": "GS-070",
+   "text": "Leak-proof lid with silicone seal",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "568fd0501c0657a5438187f7cd7a6157f23d22d8689e6ea9da785436d804b87a"
+   }
+  },
+  {
+   "id": "GS-071",
+   "text": "Stackable for fridge storage",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "0a3124378147bda1ea3904a7e05ef797ceee5c107ffbbf53c979ed0cb0e553ca"
+   }
+  },
+  {
+   "id": "GS-072",
+   "text": "Fits most car seat cup holders",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "1b04fa200f16eb7f1dc6639aa2540bfd2f912916707c1775e14476ffd8326b7e"
+   }
+  },
+  {
+   "id": "GS-073",
+   "text": "Includes a matching storage bag",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "eddf9fb272ca519b0391c65217208db55466f6d95086c86e36ab0aba2b4482dc"
+   }
+  },
+  {
+   "id": "GS-074",
+   "text": "Colour-coded parts for easy assembly",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "134690662cf218fdf004255fd294168399451769fc3dcbef2392d7d4853f9351"
+   }
+  },
+  {
+   "id": "GS-075",
+   "text": "Moulded grip for wet hands",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "e7634507e84c816591feed80cc96af0e55df5e50a83a598f17724240902079a6"
+   }
+  },
+  {
+   "id": "GS-076",
+   "text": "Bubble-free feeding with vented teat",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "fdafbe81b44e3f7b4ff669eebdecac1d5af96bfd838488421ea3c8796713546f"
+   }
+  },
+  {
+   "id": "GS-077",
+   "text": "Smooth flow control for newborns",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "d96a056250267ca2a1951dc976f1737f49afd33637ab375da33f28774aa8a20c"
+   }
+  },
+  {
+   "id": "GS-078",
+   "text": "Ergonomic angle reduces wrist strain",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "3fe6e5f1b83dd015c5e44fd8c9bc49dd65a7f2379fc136c5e9e37aa9a3b9d1e1"
+   }
+  },
+  {
+   "id": "GS-079",
+   "text": "Replaceable silicone parts sold separately",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "8d9fe74d17a9fa9dcca29fd7dcf7ede78e56cdd9d77f036150aea61047ff79ce"
+   }
+  },
+  {
+   "id": "GS-080",
+   "text": "Recyclable cardboard packaging only",
+   "family": "事实控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "028f27d9ff448b709b2712c494ca8baf2fc0e4ded00dd499e486cbc55102713e"
+   }
+  },
+  {
+   "id": "GS-081",
+   "text": "No animal-derived materials used",
+   "family": "披露控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "d9b8363eff18cb4a8ed88cc10e2538e4e16e54132d04417d16f7e74df0c287e7"
+   }
+  },
+  {
+   "id": "GS-082",
+   "text": "Manufactured in a ISO 9001 facility",
+   "family": "品牌控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "a4e4eb0cf44f6c34b25618ae6f480b2da38e05f53434a4fc9c95751240d97c85"
+   }
+  },
+  {
+   "id": "GS-083",
+   "text": "Batch number printed on the base",
+   "family": "宣称控制",
+   "expected": {
+    "kind": "no_rule_coverage",
+    "note": "通用广告语，规则库今天不覆盖 —— 用来测「零命中 ≠ 合规」"
+   },
+   "provenance": "public_synthetic",
+   "fingerprint": {
+    "algorithm": "sha256",
+    "value": "750bcc3580a949860c7ab75d6a6cfe815399acdd820a3a3edbd78cc60b480a66"
+   }
+  }
+ ],
+ "changelog": [
+  {
+   "at": "2026-10-22T00:00:00Z",
+   "operator": "audit-multi-content-58",
+   "reason": "初始建集：90 条 public_synthetic 样本，覆盖四个陷阱字面量与四个有控制点的族",
+   "after_fingerprint": null
+  }
+ ]
+}

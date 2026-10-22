@@ -682,6 +682,14 @@
       "command": "{venv} {root}/tools/verify_ts15_deploy.py",
       "timeout": 60,
       "cpu_seconds": 45
+    },
+    "85": {
+      "test_id": "acceptance-85",
+      "criteria": "SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4",
+      "fixture": "{root}/tools/verify_regression_set.py",
+      "command": "{venv} {root}/tools/verify_regression_set.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     }
   }
 }
