@@ -747,6 +747,46 @@ def main():
                        "C31b session 故障不影响权威读与业务投影直读（读回的是真实那条）",
                        repr(projected_state))
 
+                # ── TS-29 / 行 132 ①：**IR 与 manifest 读取仍正常** ──────────────
+                #   ★ 2026-10-22 补（T-140 定性 → 05 裁定「先不映射，记缺 IR 一条」）。
+                #     这是 132 三件事里唯一还没有执行点的一条：
+                #       ① IR 与 manifest 读取仍正常  ← 本条
+                #       ② 业务投影查询仍正常          ← 上一条 C31b（已改真）
+                #       ③ 系统报 session 不可用而不是整体失败 ← C31
+                #     IR 走 `app.state.repository.get_case()`（CaseOverlayRepository）：
+                #     它**不是** SQLite 投影，是独立读路径 —— 所以 session 挂了它应当照常可读。
+                #     ★ 不许写成「IR 读取正常」而不给内容：那样 `get_case` 返回空 dict 也会绿。
+                #       这里断言的是**读回的那份 IR 的字段值与夹具写进去的一致**。
+                _repo = getattr(ready_app.state, "repository", None)
+                _ir_ok = False
+                _ir_detail = "no repository on app.state"
+                if _repo is not None:
+                    try:
+                        _case = _repo.get_case("case-prod")
+                        _ir = (_case or {}).get("ir") or {}
+                        _ir_ok = (
+                            isinstance(_case, dict)
+                            and _case.get("case_id") == "case-prod"
+                            and isinstance(_ir, dict)
+                            and _ir.get("ir_id") == "ir-prod"
+                            # manifest 链：权威 state 与 IR 指的是同一个案子
+                            and authority_state.get("case_id") == _case.get("case_id")
+                            # 内容锚点：decision 还在，且是我们写进去的那档
+                            and (_ir.get("decision") or {}).get("state") == "REVIEW"
+                            and bool((_ir.get("content_unit_ref") or {}).get("unit_id"))
+                        )
+                        _ir_detail = ("ir_id=%r decision.state=%r unit_id=%r"
+                                      % (_ir.get("ir_id"),
+                                         (_ir.get("decision") or {}).get("state"),
+                                         (_ir.get("content_unit_ref") or {}).get("unit_id")))
+                    except Exception as _exc:  # noqa: BLE001
+                        _ir_detail = "%s: %s" % (type(_exc).__name__, _exc)
+                report(_ir_ok,
+                       "C31c session 故障不影响 IR 读取（读回 ir-prod 且 decision/unit 对得上）"
+                       if _ir_ok else
+                       "C31c IR 读取异常或读回的不是写进去那份：%s" % _ir_detail,
+                       "" if _ir_ok else _ir_detail)
+
                 runtime.projection.close()
                 r = ready_client.get("/readyz")
                 report(r.status_code == 503
