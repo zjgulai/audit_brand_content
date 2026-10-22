@@ -666,6 +666,22 @@
       "criteria": "TS-17",
       "fixture": "{root}/tools/verify_cpu_first.py",
       "command": "{venv} {root}/tools/verify_cpu_first.py"
+    },
+    "106": {
+      "test_id": "acceptance-106",
+      "criteria": "TS-3",
+      "fixture": "{root}/tools/verify_dependency_lock.py",
+      "command": "{venv} {root}/tools/verify_dependency_lock.py",
+      "timeout": 60,
+      "cpu_seconds": 45
+    },
+    "117": {
+      "test_id": "acceptance-117",
+      "criteria": "TS-15",
+      "fixture": "{root}/tools/verify_ts15_deploy.py",
+      "command": "{venv} {root}/tools/verify_ts15_deploy.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     }
   }
 }

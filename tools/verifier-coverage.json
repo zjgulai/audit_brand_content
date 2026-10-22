@@ -700,6 +700,25 @@
         "tools/benchmark_media.py",
         "base/media.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_dependency_lock.py",
+      "asserts": "行106/TS-3：pyproject 与 uv.lock 都在盘上且被 git 跟踪；requires-python 逐字相等；每个直接依赖精确 == 且与 lock 里 resolved version 一致，**且与 lock 自带的 metadata.requires-dist/requires-dev 声明逐字一致**（两道都过才算一致 —— 只比 resolved 抓不到「锁文件没跟上 pyproject」）；行为面有锁 rc=0、**无锁（只拷 pyproject 不拷 lock）必须 rc≠0 且 stderr 提到 lockfile**；Dockerfile 每条 uv sync 必须带 --locked 且不许 pip install（G-02 的执行点）；uv.lock 不被 .dockerignore 排除",
+      "subjects": [
+        "pyproject.toml",
+        "uv.lock",
+        "Dockerfile",
+        ".dockerignore"
+      ]
+    },
+    {
+      "verifier": "tools/verify_ts15_deploy.py",
+      "asserts": "行117/TS-15：按缩进解析 compose（不扫全文）断 restart 真实取值为 unless-stopped/always；healthcheck 段完整（test/interval/timeout/retries）且打 /healthz（剥整行注释后再判，与 verify_deploy D11 的全文子串匹配不同）；**行为级 0700**：把生产数据目录 chmod 0777 → /readyz 503 且 data_permissions=false，恢复后回 200/True（成对，避免「readiness 恒 503」冒充）；Dockerfile 基础镜像无浮动 tag、依赖走 npm ci / uv sync --locked。不证明容器真被拉起、不证明镜像可复现、不证明目标机 compose 与仓内一致",
+      "subjects": [
+        "docker-compose.yml",
+        "Dockerfile",
+        "api/production_app.py"
+      ]
     }
   ]
 }

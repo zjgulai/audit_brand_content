@@ -395,12 +395,22 @@ def main() -> int:
     print("-" * 72)
     passed = sum(1 for _, ok, _ in results if ok)
     failed = len(results) - passed
-    print("  共 %d 项 · 通过 %d · 失败 %d" % (len(results), passed, failed))
+    # ★ 结论行必须**标明构成**（2026-10-22）：`10/10` 这个数字本身会被读成
+    #   「10 条覆盖」。实际其中 2 条（A4 / C2）是「剥注释口径」的**成对反向对照**，
+    #   不是覆盖项 —— 它们证明的是扫描器不误报、不漏报，不是被测系统合规。
+    #   这里按断言 id 实时分组，不手写数字（§2.2 第 1 条：数字要算出来）。
+    _control_ids = {"A4", "C2"}
+    n_cover = sum(1 for cid, _, _ in results if cid not in _control_ids)
+    n_ctrl = len(results) - n_cover
+    print("  共 %d 项 · 通过 %d · 失败 %d（其中 %d 条覆盖 + %d 条成对反向对照）"
+          % (len(results), passed, failed, n_cover, n_ctrl))
     if failed:
         print("  ❌ 退 1（有红）")
         return 1
-    print("  ✅ 全过（**只证明**：编排与依赖里没有 GPU 依赖、不达标时会出读数、"
-          "不自动扩容、不自动放行）")
+    print("  ✅ 全过 —— 其中 %d 条覆盖 + %d 条成对反向对照"
+          "（注释样本必须绿、真配置必须红）" % (n_cover, n_ctrl))
+    print("     全过只证明：编排与依赖里没有 GPU 依赖、不达标会出读数、"
+          "不自动扩容、不自动放行")
     print("     ★ 不证明「在无 GPU 的机器上真的起得来」—— 那要起容器看 RestartCount，")
     print("       属 verify_deploy.py --remote / 部署批次，本文件不冒充。")
     return 0
