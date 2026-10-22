@@ -55,6 +55,13 @@ COPY api/ ./api/
 COPY base/ ./base/
 COPY contracts/ ./contracts/
 
+# ★ tools/bj_time.py 是**运行时依赖**，不是开发工具。
+#   `base/takedown.py:56` 与 `base/notifications.py:56` 都会把 `tools/` 加进 sys.path
+#   然后 `from bj_time import BJ, bj_today` —— 本项目「今天」的唯一来源（2026-10-21 统一）。
+#   第一次真实启动时报的错：ModuleNotFoundError: No module named 'bj_time'。
+#   只拷这一个文件，不拷整个 tools/（那里有 75 个 verifier 与一堆非运行时脚本）。
+COPY tools/bj_time.py ./tools/bj_time.py
+
 # 运行时数据（规则库 / 控制点 / 路由 / 外部标准库）。
 # 这些是**只读输入**，与 authority 那种可写数据分开：
 #   - research/ 打进镜像（发版即固化，规则变了必须重建镜像 —— 这是有意的）
