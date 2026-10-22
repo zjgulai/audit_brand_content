@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -711,7 +711,25 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
     #   先挂会让 /api/ 与 /auth/ 一起被当成静态文件。
     _web_root = os.environ.get("AUDIT_WEB_ROOT") or "/app/web_dist"
     if os.path.isdir(_web_root):
-        app.mount("/", StaticFiles(directory=_web_root, html=True), name="spa")
+        _index = os.path.join(_web_root, "index.html")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        def spa_fallback(full_path: str):
+            """SPA 深链接回落。
+
+            `StaticFiles(html=True)` 只在**目录**请求上返回 index.html，
+            不会为 `/queue`、`/cases/xxx` 这类客户端路由回落 —— 实测直接 404。
+            而单页应用的这些路径必须由前端路由接管。
+
+            优先级：真实静态文件 > index.html。绝不接管 /api/ 与 /auth/
+            （它们在 mount 之前已注册，走不到这里；这条注释是给未来改的人看的）。
+            """
+            candidate = os.path.normpath(os.path.join(_web_root, full_path))
+            # 防目录穿越：规范化后必须仍在 _web_root 内
+            if (candidate.startswith(_web_root + os.sep) or candidate == _web_root) \
+                    and os.path.isfile(candidate):
+                return FileResponse(candidate)
+            return FileResponse(_index)
 
     return app
 
