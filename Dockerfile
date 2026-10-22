@@ -68,12 +68,13 @@ COPY research/kb/外部标准库-v1.json ./research/kb/外部标准库-v1.json
 COPY --from=web /build/dist ./web_dist
 
 # 非 root 运行
+# ★ /data 挂载点必须在 USER audit 之前由 root 建好并授权，
+#   否则切换用户后 mkdir 会 Permission denied。
 RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin audit \
- && chown -R audit:audit /app
+ && mkdir -p /data/authority /data/projection /data/logs \
+ && chown -R audit:audit /app /data
 USER audit
 
-# 数据挂载点（compose 会把宿主机目录挂到这里）
-RUN mkdir -p /data/authority /data/projection /data/logs
 VOLUME ["/data"]
 
 EXPOSE 8000
