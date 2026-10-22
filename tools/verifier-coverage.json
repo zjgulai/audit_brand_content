@@ -748,6 +748,22 @@
         "web/src/pages/CaseDetailPage.tsx",
         "tests/acceptance/verifier_map.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_report_coverage_reason.py",
+      "asserts": "报告里读不读得到「未做·无控制点」：真实路径 judge_unit() → IR → RenderSnapshot → tools/audit/report_render.mjs 的 renderReport()；覆盖证明段逐族出现「族名（未做·无控制点）」/ 正文不许出现原始枚举串 no_control_points / **溯源**：把 IR 的 label 拿掉后重渲染，句子必须降级（若仍显示中文标签则说明渲染器有第二份映射）/ 降级后必须显示原始 why，不许静默变成「未说明」。7 项反向对照",
+      "subjects": [
+        "tools/audit/report_render.mjs",
+        "research/governance/control-points-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_ui_coverage_label.py",
+      "asserts": "前端读不读得到 IR 的 label：interface NotEvaluated 声明 label / CaseDetailPage 渲染理由的表达式读 label（不是只查 WHY_TEXT[why]）/ WHY_TEXT 里空族文案与 not_wired 不同句。**源码级**，不启动浏览器；web/ 归 ea，本脚本只测量。6 项反向对照",
+      "subjects": [
+        "web/src/api/client.ts",
+        "web/src/pages/CaseDetailPage.tsx"
+      ]
     }
   ]
 }

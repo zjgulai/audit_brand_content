@@ -299,7 +299,7 @@
       "test_id": "acceptance-72",
       "criteria": "SEC-5-8 / SEC-5-10b / DER-2 / DER-2b",
       "fixture": "{root}/tools/verify_coverage_reason_ir.py",
-      "command": "{venv} {root}/tools/verify_coverage_composer.py && {venv} {root}/tools/verify_pass_reachability.py && {venv} {root}/tools/verify_coverage_reason_ir.py"
+      "command": "{venv} {root}/tools/verify_coverage_composer.py && {venv} {root}/tools/verify_pass_reachability.py && {venv} {root}/tools/verify_coverage_reason_ir.py && {venv} {root}/tools/verify_report_coverage_reason.py"
     },
     "73": {
       "test_id": "acceptance-73",

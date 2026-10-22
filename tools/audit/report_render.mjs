@@ -82,7 +82,11 @@ function locationText(loc) {
   return textOrNone(loc);
 }
 
-function reasonText(why) {
+function reasonText(why, label) {
+  // ① IR 自带的可读标签优先（唯一来源）；② 老快照没有 label 时退回 REASON_ZH；
+  // ③ 都没有就原样显示 why，不许静默说成「未说明」——那是另一种把缺口藏起来。
+  const own = typeof label === "string" ? label.trim() : "";
+  if (own) return own;
   return REASON_ZH[why] || textOrNone(why);
 }
 
@@ -233,8 +237,12 @@ export function renderReport(snapshot) {
   lines.push(`- 评过的模态：${textOrNone(coverage.modalities_evaluated)}`);
   lines.push(`- 规则版本：${textOrNone(coverage.rules_version)}`);
   lines.push(`- 适用控制点：${textOrNone(coverage.control_points_applied)}`);
+  // ★ 2026-10-23 T-120c：措辞优先取 IR 里的 `label`（与 why 一一对应、由
+  //   coverage_composer 给出），REASON_ZH 只是**老快照**的兜底。
+  //   不在这里再维护一份 no_control_points → 中文的映射：那会让同一条原因有两份措辞，
+  //   而报告与界面各说各的正是这次要修的病。
   const reasons = asArray(coverage.not_evaluated_reason)
-    .map((r) => `${r.what}（${reasonText(r.why)}）`);
+    .map((r) => `${r.what}（${reasonText(r.why, r.label)}）`);
   lines.push(`- 未跑的为什么：${reasons.length ? reasons.join("；") : "无"}`);
   if (video) {
     lines.push(`- 视频已审：${V1_KEYS.map((k) => `${k}=${video.covers[k]}`).join("；")}`);
