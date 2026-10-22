@@ -15,6 +15,7 @@ from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from api.oauth import FeishuWebOAuthProvider, OAuthError
@@ -699,6 +700,18 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
                                samesite="lax")
         response.delete_cookie("csrf", path="/", secure=True, samesite="lax")
         return response
+
+    # ── SPA 静态产物 ────────────────────────────────────────────────────
+    # ★ 2026-10-22：原计划由宿主机共享反代 `ai_video_nginx` 直接 serve，
+    #   但实测它在**容器里**，看不到宿主机新目录（`/opt/momcozy-audit-platform/web`
+    #   不在它的挂载表里）。给共享反代加挂载点等于改动 40+ 站点的容器配置，
+    #   风险不成比例。改为**由本服务自己 serve**：反代只需 proxy_pass 到 :18000。
+    #
+    # ★ 必须挂在**最后**：mount 会吃掉该前缀下的所有路由，
+    #   先挂会让 /api/ 与 /auth/ 一起被当成静态文件。
+    _web_root = os.environ.get("AUDIT_WEB_ROOT") or "/app/web_dist"
+    if os.path.isdir(_web_root):
+        app.mount("/", StaticFiles(directory=_web_root, html=True), name="spa")
 
     return app
 
