@@ -67,9 +67,9 @@ def main():
     #   改成断言三态语义本身：计数之和必须是总行数、退出码必须与计数一致。
     #   这样 #78 转绿时它照样成立，别的行新红时它也照样成立。
     #   **一个把某天读数写死的断言，会在那天之后一直骗人。**
-    rc, out = _run(REAL_TABLE)
-    mm = re.search(r"mapped=(\d+)", out)
-    mp = re.search(r"passed=(\d+) failed=(\d+) untested=(\d+)", out)
+    rc, real_out = _run(REAL_TABLE)
+    mm = re.search(r"mapped=(\d+)", real_out)
+    mp = re.search(r"passed=(\d+) failed=(\d+) untested=(\d+)", real_out)
     if mm and mp:
         n_passed, n_failed, n_untested = (int(mp.group(i)) for i in (1, 2, 3))
         total = n_passed + n_failed + n_untested
@@ -162,7 +162,34 @@ def main():
     report(rc == 0 and "passed=1 failed=0 untested=0" in out,
            "T-141 反向对照：通过的行 detail 为空", "rc=%s out=%s" % (rc, out[-200:]))
 
-    for p in (t1, t2, t3, t4, t5, t6, fixture.name, marker_py.name):
+    # T-143（2026-10-23）：`untested=N` 必须配口径 —— N 不是一个东西。
+    #   表里有 7 条的可验性列写着 manual（「不作为执行验收项 / 按人工验收」），
+    #   它们**永远不会有** machine 执行点；另外 17 条是 machine、执行点待建。
+    #   两者下一步动作相反，却共用一个读数。执行器必须分开报。
+    split = re.search(
+        r"untested_split: machine=(\d+) manual=(\d+) unverifiable=(\d+) unknown=(\d+)",
+        real_out)
+    total_split = sum(int(split.group(i)) for i in (1, 2, 3, 4)) if split else -1
+    n_untested = int(mp.group(3)) if mp else -1
+    report(split is not None and total_split == n_untested,
+           "T-143 untested 分两本账且分项之和 == untested",
+           "split=%r total_split=%s untested=%s"
+           % (split.group(0) if split else None, total_split, n_untested))
+
+    # 反向对照：manual 与 machine 的**分界必须来自表里的那一列**，不是常量。
+    #   造一张只有 manual 行的表 → machine 必须是 0。
+    t7 = _make_table("test_id: T-7; fixture: %s; command: true" % fixture.name)
+    # 把可验性列改成 manual
+    _txt = open(t7, encoding="utf-8").read().replace("| machine |", "| manual |")
+    with open(t7, "w", encoding="utf-8") as _f:
+        _f.write(_txt)
+    rc, out7 = _run(t7)
+    s7 = re.search(r"untested_split: machine=(\d+) manual=(\d+)", out7)
+    report(rc == 0 and s7 is not None and s7.group(1) == "0",
+           "T-143 反向对照：manual 行不计入 machine 账",
+           "rc=%s split=%r out=%s" % (rc, s7.group(0) if s7 else None, out7[-200:]))
+
+    for p in (t1, t2, t3, t4, t5, t6, t7, fixture.name, marker_py.name):
         try:
             os.unlink(p)
         except OSError:

@@ -62,6 +62,16 @@ def parse_table(path):
                 "action": parts[2],
                 "criteria": parts[3],
                 "method": method,
+                # ★ 2026-10-23：把「可验性」这一列读进来。
+                #   它一直在表里（machine / manual / unverifiable），而 parse_table
+                #   只把它写在注释里，从不读取。后果：`untested=24` 把两种完全
+                #   不同的东西混进同一个数 ——
+                #     · 7 条是 manual：表里明写「不作为执行验收项 / 按人工验收」，
+                #       它们**永远不会有** machine 执行点；
+                #     · 17 条是 machine：执行点待建，**该有人去建**。
+                #   两者下一步动作相反（前者去补人工记录，后者去写 verifier），
+                #   却共用一个读数。这正是 §2.4.8「同一个量有两个口径」。
+                "verifiability": parts[5] if len(parts) > 5 else "",
                 "test_id": test_id.group(1) if test_id else None,
                 "fixture": fixture.group(1) if fixture else None,
                 "command": command.group(1).strip().strip("`") if command else None,
@@ -272,14 +282,27 @@ def main():
     mapped = sum(1 for r in rows
                  if r.get("test_id") and r.get("fixture") and r.get("command"))
     counts = {"passed": 0, "failed": 0, "untested": 0}
+    # ★ 2026-10-23：未测按「可验性」分两本账（§2.4.8 同一个量有两个口径）。
+    #   它们下一步的动作相反，混在一起看会做错事：
+    #     untested_manual  → 表里明写「不作为执行验收项 / 按人工验收」，
+    #                        **永远不会有 machine 执行点**；该做的是补人工记录。
+    #     untested_machine → 执行点待建，**该有人去写 verifier**。
+    untested_by_kind = {"machine": 0, "manual": 0, "unverifiable": 0, "": 0}
     for row in rows:
         status, detail = run_row(row)
         counts[status] += 1
         if status != "passed":
             print("%s #%s %s %s" % (status.upper(), row["n"], row["action"], detail))
+            if status == "untested":
+                k = row.get("verifiability") or ""
+                untested_by_kind[k if k in untested_by_kind else ""] += 1
     print("mapped=%d" % mapped)
     print("passed=%d failed=%d untested=%d" % (
         counts["passed"], counts["failed"], counts["untested"]))
+    # 这一行是给「untested=24」这个数配口径的：24 不是一个东西。
+    print("untested_split: machine=%d manual=%d unverifiable=%d unknown=%d" % (
+        untested_by_kind["machine"], untested_by_kind["manual"],
+        untested_by_kind["unverifiable"], untested_by_kind[""]))
 
     if counts["failed"]:
         return 1
