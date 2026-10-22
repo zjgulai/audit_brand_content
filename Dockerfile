@@ -53,7 +53,7 @@ RUN uv sync --locked --no-dev --no-install-project
 # 代码层
 COPY api/ ./api/
 COPY base/ ./base/
-COPY contracts/ ./contracts/ 2>/dev/null || true
+COPY contracts/ ./contracts/
 
 # 运行时数据（规则库 / 控制点 / 路由 / 外部标准库）。
 # 这些是**只读输入**，与 authority 那种可写数据分开：
