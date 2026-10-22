@@ -123,18 +123,21 @@ def main():
           "CMD 带 --factory（入口是 app_from_env() 工厂，不是模块级 app）"
           if has_factory else "CMD 缺 --factory —— app_from_env 是函数，uvicorn 会加载失败")
 
-    # ── D4 compose 只绑 127.0.0.1 ───────────────────────────────────────
-    if compose is None:
-        check("D4", False, "docker-compose.yml 不存在")
-        check("D5", False, "docker-compose.yml 不存在")
-        return 1
+    # ── D4 compose 不许绑 0.0.0.0 ───────────────────────────────────────
+    # ★ 2026-10-22 修正：原先要求「只绑 127.0.0.1」，实测不成立 ——
+    #   反向代理跑在**容器**里（`ai_video_nginx`，网关 `172.20.0.1`），
+    #   容器里的 127.0.0.1 是它自己，不是宿主机。绑 loopback 会让
+    #   `proxy_pass http://172.20.0.1:18000` 连不上。
+    #   宿主机现有服务全部绑 `172.20.0.1:<port>`，本项目照同一形状。
+    #   真正的约束是：**不许绑 0.0.0.0**（会直接暴露公网、绕过反代）。
     bindings = re.findall(r'-\s*"([^"]*:\d+)"', compose)
     api_binds = [b for b in bindings if ":8000" in b]
-    loopback_only = bool(api_binds) and all(b.startswith("127.0.0.1:") for b in api_binds)
-    check("D4", loopback_only,
-          "api 只绑回环 → %s（不抢 80/443，对外由反代）" % (api_binds or "无绑定")
-          if loopback_only else
-          "api 绑定含非回环地址 → %s —— 会与宿主机共享反代抢端口" % (api_binds or "无"))
+    wildcard = [b for b in api_binds if b.startswith("0.0.0.0:") or b.startswith(":::")]
+    ok4 = bool(api_binds) and not wildcard
+    check("D4", ok4,
+          "api 不绑 0.0.0.0 → %s（公网只能经反代 443 进来）" % (api_binds or "无绑定")
+          if ok4 else
+          "api 绑了通配地址 → %s —— 会绕过反代直接暴露公网" % (api_binds or "无"))
 
     # ── D5 独立 project / 独立网络 ──────────────────────────────────────
     proj = re.search(r"^name:\s*(\S+)", compose, re.M)
