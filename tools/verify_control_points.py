@@ -473,7 +473,18 @@ def fp_evidence_problems(rule, today=None):
         if not path:
             bad.append(f"{rk}: corpora[{i}] 缺 path")
         else:
+            # ★ 2026-10-22 修：相对路径必须按 ROOT 解析，不能按 cwd。
+            #   证据里的 path 是**仓库内相对路径**（写成 `research/governance/…`），
+            #   而验收执行器把命令放进沙箱跑，沙箱 cwd 是临时目录
+            #   （`base/sandbox.py` 实测 CWD=/tmp/sandbox-xxxx）。按 cwd 解析 →
+            #   `Path('research/…').exists()` 恒为 False → 本行的**好样本**被判红。
+            #   实测症状：仓库根跑 `--selftest` 退 0；`cd /tmp` 跑同一文件退 1，
+            #   且只红 B-10 这一项 —— 看起来像「断言不成立」，实际是「路径读错了」。
+            #   这与同文件 `:620` 的 `(ROOT / x).exists()` 是同一条口径，两处必须一致
+            #   （AGENTS.md §2.5：同一个判断只许有一处写法）。
             pth = Path(path).expanduser()
+            if not pth.is_absolute():
+                pth = ROOT / pth
             if not pth.exists():
                 bad.append(f"{rk}: corpora[{i}].path 不在盘上：{path}")
         vals = {}

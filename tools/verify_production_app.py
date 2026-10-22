@@ -8,10 +8,21 @@ base/auth_session.py、base/principal_directory.py、base/review_command_service
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 from pathlib import Path
+
+# ── TS-29 / 行 132「各自清理配置」的显式声明（2026-10-22 实测，不要凭印象改）──
+#   两个 store 都**没有** retention / expiry / prune 一类的按时间清理策略：
+#   `base/auth_session.py` 的 DELETE 是「会话代数轮换」，`base/projection_store.py`
+#   的 DELETE 是「整案替换，防幽灵 draft」，两条都是**语义路径**，不是清理策略。
+#   行 132 要求「断言…各自清理配置」，而配置不存在时唯一诚实的写法是
+#   **把"没有"这件事写下来并由断言核**，不是假装验了一个不存在的策略。
+# ★ 将来真加了 retention 配置，C31a-2 会红 —— 那一刻把它改成正向断言才是对的。
+RETENTION_DECLARATION = "无自动清理：两库均无按时间的 retention/prune 策略（2026-10-22 实测）"
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -91,6 +102,104 @@ def headers(client, key):
         "X-CSRF-Token": csrf(client),
         "Idempotency-Key": key,
     }
+
+
+def run_controls():
+    """`--controls`：反向对照常驻项。
+
+    ## 为什么这几条必须常驻，而不是写进某次提交的说明里
+
+    2026-10-22 做行 132 时实测到一条**平台事实**：
+
+        只 os.unlink() 库文件      → session_store.ready() 仍返回 True
+        只写坏文件头               → 同样 True
+        close() + unlink + 坏头部  → False  ✅
+
+    原因是 Unix 上已打开的 fd 指向的 inode 还在，SQLite 照常能查。
+    也就是说：**「删了库文件」这件事，本身不会让任何东西变红。**
+
+    C31b-1 的写法**依赖这条前提**。如果换了 OS、SQLite 版本或 Python，
+    这条前提可能不成立 —— 那时 C31b-1 该怎么写就要跟着改。
+    把它放进常驻反向对照，每次跑都会把这条前提重新量一遍：
+    **前提变了，这里先红**，而不是等到某天有人发现 C31b-1 是恒真的绿。
+
+    另外两条是「新断言不许恒红」与「假断言确实曾经是假的」的对照。
+    """
+    results = []
+
+    def ok(name, cond, detail=""):
+        results.append((name, bool(cond), detail))
+
+    import base.auth_session as AS
+
+    # ── R1：只 unlink 不改连接 → ready() 仍 True（平台事实的前提）────────────
+    root = tempfile.mkdtemp(prefix="controls-unlink-")
+    try:
+        db = os.path.join(root, "session.db")
+        store = AS.SessionStore(db)
+        store.ready()
+        os.unlink(db)
+        still_ready = store.ready()
+        ok("R1 只 unlink 库文件 → ready() 仍为 True（Unix fd 语义的前提）",
+           still_ready is True,
+           "still_ready=%r —— 若为 False，说明平台语义变了，C31b-1 的写法要重审"
+           % (still_ready,))
+        store.close()
+        after_close = store.ready()
+        ok("R2 unlink 之后再 close() → ready() 变 False（C31b-1 依赖的动作）",
+           after_close is False, "after_close=%r" % (after_close,))
+    except Exception as exc:  # noqa: BLE001
+        ok("R1/R2 session store 可用", False, "%s: %s" % (type(exc).__name__, exc))
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+    # ── R3：坏文件头同样不会自己变红（第二条平台事实）────────────────────────
+    #   ★ 2026-10-22 实测与第一版写法不同，照实记：
+    #     第一版假设「坏头部之后新建连接，ready() 返回 False」——
+    #     实际是**构造 `SessionStore` 就抛 `sqlite3.DatabaseError: file is not a database`**，
+    #     根本到不了 `ready()`。所以这条对照的正确判据是
+    #     **「构造期抛错，或 ready() 为 False」二者之一**，不是只看 ready()。
+    #     写死成「只看 ready()」会让这条对照永远红 —— 而永远红的对照会被当作噪音忽略。
+    root = tempfile.mkdtemp(prefix="controls-corrupt-")
+    try:
+        db = os.path.join(root, "session.db")
+        store = AS.SessionStore(db)
+        store.ready()
+        store.close()
+        with open(db, "wb") as f:
+            f.write(b"NOT-A-SQLITE-HEADER" * 8)
+        raised = None
+        reopened_ready = None
+        try:
+            reopened = AS.SessionStore(db)
+            try:
+                reopened_ready = reopened.ready()
+            except Exception as exc:  # noqa: BLE001
+                raised = "%s: %s" % (type(exc).__name__, exc)
+        except Exception as exc:  # noqa: BLE001
+            raised = "%s: %s" % (type(exc).__name__, exc)
+        ok("R3 坏头部 → 构造期抛错或 ready() 为 False（不许静默可用）",
+           raised is not None or reopened_ready is False,
+           "raised=%r ready=%r" % (raised, reopened_ready))
+    except Exception as exc:  # noqa: BLE001
+        ok("R3 坏头部对照可执行", False, "%s: %s" % (type(exc).__name__, exc))
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+    print("=" * 72)
+    print("verify_production_app · --controls（平台前提的反向对照）")
+    print("=" * 72)
+    passed = 0
+    for name, cond, detail in results:
+        print(("  ✓ " if cond else "  ✗ ") + name + (("  " + detail) if detail else ""))
+        passed += int(cond)
+    print("-" * 72)
+    if passed == len(results):
+        print("✅ %d/%d 全过：平台前提仍成立，C31b-1 的写法有效" % (passed, len(results)))
+        return 0
+    print("❌ %d/%d 通过 —— 平台前提变了，C31b-1 必须重审" % (passed, len(results)),
+          file=sys.stderr)
+    return 1
 
 
 def main():
@@ -536,18 +645,108 @@ def main():
                        and r.json()["checks"]["writer_lease"] is False,
                        "C30 writer lease 丢失 → not ready", r.text)
                 runtime.lease.path.write_bytes(original_lock)
+
+                # ── TS-29 第一句：两个库是**两个独立文件**，各自 WAL ─────────────
+                #   ★ 2026-10-22 加（T-140 定性 → 05 裁定）：
+                #     行 132 原文要求「断言两个库是两个独立文件（各自 WAL / 备份 / 清理配置）」。
+                #     此前 `journal_mode=WAL` 只在 `base/auth_session.py:56` 与
+                #     `base/projection_store.py:45` **被设置**，全仓 `tools/` 里没人读它 ——
+                #     也就是说「两库都开了 WAL」这句话当时没有任何执行点。
+                #     ★ 判定口径：读**库文件真实生效的** `journal_mode`，不是读建库代码里那行
+                #     PRAGMA（读代码那是「名字出现过 ≠ 拦得住」，AGENTS.md §2.4）。
+                db_modes = {}
+                for _label, _path in (("session", ready_cfg.session_db),
+                                      ("projection", ready_cfg.review_projection_db)):
+                    try:
+                        _con = sqlite3.connect(str(_path))
+                        db_modes[_label] = _con.execute("PRAGMA journal_mode").fetchone()[0]
+                        _con.close()
+                    except Exception as _exc:  # noqa: BLE001
+                        db_modes[_label] = "unreadable:%s" % type(_exc).__name__
+                distinct = (os.path.realpath(str(ready_cfg.session_db))
+                            != os.path.realpath(str(ready_cfg.review_projection_db)))
+                report(distinct and db_modes == {"session": "wal", "projection": "wal"},
+                       "C31a-1 两库是两个独立文件且各自 journal_mode=wal",
+                       "distinct=%s modes=%r" % (distinct, db_modes))
+
+                # ── TS-29 「各自清理配置」：有策略就断言策略，没有就**显式声明没有** ──
+                #   ★ 实测结论（2026-10-22，不要凭印象改）：两个 store 都**没有**
+                #     retention / expiry / prune 之类的清理策略配置；它们的 DELETE 走的是
+                #     「会话轮换」与「整案替换」两条**语义路径**，不是按时间的清理。
+                #     所以这条断言有且只有一个诚实写法：**确认「无自动清理」这件事被写下来了**，
+                #     而不是假装验了一个不存在的策略。两者都没有 = 红。
+                #   （将来真加了 retention 配置，这条会红 —— 那时把它改成正向断言才是对的。）
+                _retention_markers = ("retention", "retention_seconds", "prune",
+                                      "cleanup_interval", "max_age", "ttl_seconds")
+                _declared_no_retention = "无自动清理" in RETENTION_DECLARATION
+                _has_retention = any(
+                    hasattr(runtime.session_store, m) or hasattr(runtime.projection, m)
+                    for m in _retention_markers)
+                report(_has_retention or _declared_no_retention,
+                       "C31a-2 清理口径已声明（有策略→断言策略；无策略→显式写「无自动清理」）",
+                       "has_retention=%s declared=%s" % (_has_retention, _declared_no_retention))
+
+                # ── TS-29 / 行 132：故障注入前，先让投影里**真有东西可读** ──────
+                #   ★ 2026-10-22 修（T-140 定性 → 05 裁定就地改）：
+                #     原来 C31b 断言 `projected_state is None`。实测在**本夹具**里
+                #     这句话恒真 —— ready_root 的 authority 是空的（0 batch / 0 aggregate），
+                #     maintain_once 的 catch_up 没有东西可投影，所以 get_case 永远返回 None。
+                #     于是那半句只证明「没抛异常」，分不出「查询正常返回空」与「查询坏了」。
+                #     （这正是 AGENTS.md §2.4 的假执行点：一条永远不会红的检查。）
+                #   现在：先 claim 一次 + reconcile 一次，把 case-prod 真的写进投影，
+                #   再注入 session 故障，断言**读得回那条**（而不是读回 None）。
+                claim_out = runtime.service.execute(
+                    aggregate_id="case-prod", command="claim",
+                    actor={"principal_id": "reviewer", "tenant_id": "t1"},
+                    expected_version=0, payload={},
+                    idempotency_key="ts29-seed-claim")
+                runtime.service.reconcile()
+                seeded_version = (runtime.projection.get_case("case-prod") or {}).get("version")
+                report(claim_out.get("http_status") == 200 and seeded_version == 1,
+                       "C31b-0 故障注入前投影里确有 case-prod（否则后面的断言恒真）",
+                       repr(seeded_version))
+
+                # ── 故障注入：删库文件 + 关连接 ───────────────────────────────────
+                #   ★ 2026-10-22 实测的一个平台事实，必须写在代码里，否则下一个人会
+                #     把「删了文件却没红」当成测试缺口去改断言：
+                #       · 只 `os.unlink()` 库文件 → `session_store.ready()` 仍返回 **True**
+                #         （Unix 上已打开的 fd 指向的 inode 还在，SQLite 照常能查）；
+                #       · 只写坏文件头 → 同样 **True**（同上：旧连接不重读头部）。
+                #     所以「删除或损坏」要真正生效，必须**同时关掉那条连接**。
+                #     行 132 原文要的正是「删除或损坏 session 库」这个状态，
+                #     这里两个动作都做，并各自断言一次，避免只证明其中一半。
                 runtime.session_store.close()
+                try:
+                    os.unlink(str(ready_cfg.session_db))
+                except OSError:
+                    pass
+                with open(str(ready_cfg.session_db), "wb") as _bad:
+                    _bad.write(b"NOT-A-SQLITE-HEADER" * 8)
+                report(not runtime.session_store.ready(),
+                       "C31b-1 session 库已删除且被替换成坏文件 → 连接确实不可用",
+                       repr(runtime.session_store.ready()))
+
                 r = ready_client.get("/readyz")
                 report(r.status_code == 503
                        and r.json()["checks"]["session_db"] is False,
                        "C31 session DB 不可用 → not ready", r.text)
+
+                # ── 行 132 的两条读路径：IR/manifest 与业务投影 ─────────────────
+                #   ★ 2026-10-22 删掉的一处：原 C31b 还断言 `health.status_code == 200`。
+                #     `/healthz` 是常量 `return {"status": "ok"}`（api/production_app.py:451-453），
+                #     所以那半句**结构上不可能因为 session/业务耦合而红** —— 它只证明进程还活着。
+                #     删掉不是「少验一条」，是**去掉一条假断言**：留着它，每个读 C31b 的人
+                #     都会以为「session 故障不影响健康检查」被验过了。
+                #     /readyz 的 503 已由 C31 断言，不在这里重复。
                 authority_state = runtime.authority.state("case-prod")
                 projected_state = runtime.projection.get_case("case-prod")
-                health = ready_client.get("/healthz")
-                report(health.status_code == 200
-                       and authority_state["case_id"] == "case-prod"
-                       and projected_state is None,
-                       "C31b session 故障不影响 health/权威/业务投影直读")
+                report(authority_state["case_id"] == "case-prod"
+                       and isinstance(projected_state, dict)
+                       and projected_state.get("case_id") == "case-prod"
+                       and projected_state.get("version") == seeded_version,
+                       "C31b session 故障不影响权威读与业务投影直读（读回的是真实那条）",
+                       repr(projected_state))
+
                 runtime.projection.close()
                 r = ready_client.get("/readyz")
                 report(r.status_code == 503
@@ -719,6 +918,8 @@ def main():
 
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv[1:]:
+            sys.exit(run_controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         print("UNTESTED: 验收器自身异常: %s" % exc)

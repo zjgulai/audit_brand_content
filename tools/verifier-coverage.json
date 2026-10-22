@@ -1,693 +1,693 @@
 {
- "schema": "verifier-coverage/v1",
- "why": [
-  "这文件存在的理由：图谱里 tested_by 边 = 0。25 个验算器覆盖了什么，",
-  "只活在每个 verifier 的源码文本里 —— 任何工具都读不到，改名/换路径不会有东西红。",
-  "所以这里把「谁验什么」显式声明成机器可读的，并由 tools/verify_coverage.py 反证：",
-  "① 每个 verify_* 必须在册（不许有孤儿验算器）；",
-  "② 每个 subjects 条目必须**在该 verifier 的源码里逐字出现**（改名/写错就红）；",
-  "③ 每个 subjects 条目必须在盘上存在，除非显式标 untracked 并写明原因；",
-  "④ 算不出静态目标的，必须显式写 dynamic 原因，不许留空。",
-  "★ 只声明不反证 = 又一处没有执行点的文档；本文件由 verify_coverage.py 消费。"
- ],
- "verifiers": [
-  {
-   "verifier": "base/verify_base.py",
-   "asserts": "基座自证：各模块自证通过 · L1 自足性 · 分级与 .gitignore 一致 · 无未登记产物",
-   "subjects": [
-    "base/contract.py",
-    "base/text_stage.py",
-    "base/judge_adapter.py",
-    "base/media.py"
-   ]
-  },
-  {
-   "verifier": "research/distill/verify_citations.py",
-   "asserts": "distill 分片的引用可回溯到来源快照",
-   "subjects": [],
-   "dynamic": "目标按 research/distill/ 目录内容在运行时枚举"
-  },
-  {
-   "verifier": "tools/verify_acceptance_index.py",
-   "asserts": "判据↔验收项机器对拍：文档 134 条编号判据全覆盖 / 验收表 136 项 / 引用但文档无的编号单列",
-   "subjects": [
-    "Playbook/内容审查Agent-产品Playbook-v1.1.md",
-    "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_acceptance_run.py",
-   "asserts": "只读验收表逐行执行：test_id/fixture/command 缺一或 fixture 不存在 → untested；command 非 0 → 红",
-   "subjects": [
-    "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_adr_status.py",
-   "asserts": "ADR 台账与 ADR 文件的状态逐条相等（双源冲突由构造不可能）：每个 ADR 恰好一条状态行、取值在规则 6 的四个里、台账集合 ≡ 磁盘集合、日期是 YYYY-MM-DD",
-   "subjects": [
-    "ADR/README.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_agents_budget.py",
-   "asserts": "AGENTS.md 工作区指令预算 ≤65536 且余量≥一条教训；搬走的填充态段落逐字仍在实测史、本文件 0 残留",
-   "subjects": [
-    "AGENTS.md",
-    "PMO/填充态-环境特性-实测史.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_api_integration.py",
-   "asserts": "API↔落盘 IR 联调：/review-api/queue 列出 smoke 案；GET /cases/{id} 的 decision/coverage/release_status 与落盘 IR 逐字段一致；IR 改哨兵值后 API 原样返回，证明 API 不重算",
-   "subjects": [
-    "api/review_api.py",
-    "tools/smoke_end_to_end.py",
-    "base/auth_session.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_assets_baseline.py",
-   "asserts": "momcozy-assets 基线恒等：manifest 可解析 / files_count / 每条 entry 目标存在 / 内容 sha256 对得上",
-   "subjects": [
-    "PMO/audit/momcozy-assets/manifest.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_atomic_commit.py",
-   "asserts": "P-1 原子提交：六个崩溃点 / 恢复四态 / stale lock 清理与活 PID 锁保留 / manifest 不覆盖 / 不可变对象同 hash 复用异 hash 拒绝 / artifact key 防路径穿越",
-   "subjects": [
-    "base/artifact_store.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_auth_session.py",
-   "asserts": "会话与 step-up：opaque cookie / idle 30m+absolute 8h / 撤销立即失效 / OAuth state 浏览器绑定 / hashed step-up 原子单次消费 / generation 拒旧 DB / 独立低敏 auth+step-up 审计",
-   "subjects": [
-    "base/auth_session.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_authority_change.py",
-   "asserts": "权威源变更 → 重审入队（行 103 / RL-15）：AUTHORITY_KINDS 与 on_authority_changed",
-   "subjects": [
-    "base/authority_change.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_backend_recovery.py",
-   "asserts": "权威备份/恢复：只收已提交 manifest+事件与长期审计，排除 session/projection/generation，坏 hash/夹带/半行拒绝，空目录恢复后重建 fresh 投影，失败不留半恢复",
-   "subjects": [
-    "base/backend_recovery.py",
-    "base/business_event_store.py",
-    "base/projection_store.py",
-    "base/projector.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_browser_ext_artifact.py",
-   "asserts": "L1 里那件 418KB 产物（Q39 选项 A）：跑一遍构建配方再逐文件 sha256 对回 dsh-browser-ext/ —— A2 产物都在且都被 git 跟踪 · A3 配方退 0 · A4 文件集合与内容全等 · A5 分母钉在 16；`.vendor/` 不在盘上（换台机器就是这样）→ **退 2 未测**，不是绿。★ 配方本体（`cd .vendor/dsh-browser-main/extensions/dsh-browser && node scripts/build.mjs`）就在这个文件的 docstring 里。★ 已知的口径缺口，明着写在这里而不是绕过去：本器**真正依赖的 `.vendor/…` 不在 subjects 里** —— verify_coverage.py 的 `untracked` 是**每条目一个开关**（face E 会对该条目的**所有** subjects 要求未被跟踪），所以「已跟踪主体 + 未跟踪主体」这个组合它目前表达不了；本器选前者。",
-   "subjects": [
-    "dsh-browser-ext/panel/assets/index.js",
-    "dsh-browser-ext/manifest.json",
-    "ADR/ADR-0013-基座接口冻结与仓库入库分级.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_business_event_store.py",
-   "asserts": "业务权威事件：不可变 command batch、重启幂等、manifest/hash 腐败拒绝、崩溃孤儿恢复与 OS flock 单写者",
-   "subjects": [
-    "base/business_event_store.py",
-    "base/artifact_store.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_cards.mjs",
-   "asserts": "模版 / 字段登记 / 文档三者一致 + 去 AI 味规则正反例 + 信封上限",
-   "subjects": [
-    "tools/reply-cards/cards.mjs",
-    "tools/reply-cards/registry.mjs",
-    "tools/reply-cards/contract.md",
-    "tools/reply-cards/README.md",
-    "PMO/守衡-回复卡片模版与语域规程.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_case_watch.py",
-   "asserts": "C-51 转出后超时升级：空表报 weekends_only / 假日历跨假期；未到期·到期·超期三态；缺 due_at 且缺 transferred_at → 未测而非 not_due；终态不升级；同 due_at 去重只发一条通知与台账；NotificationOutbox 唯一出口；删守卫必红",
-   "subjects": [
-    "base/case_watch.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_contracts.py",
-   "asserts": "五份 contracts/*.schema.json 的结构与正负样本；fresh seq/hash 恒等式；真实 judge_entry 图片 ReviewIR/receipt 分别经 B-8/B-9 喂 schema，旧 receipt step 字段名必须拒绝",
-   "subjects": [],
-   "dynamic": "五份 schema 名在源码 SCHEMAS 元组里列举、文件名运行时拼出（f\"{name}.schema.json\"），静态 subjects 无法逐字命中；运行期按该元组逐份加载并做正负样本"
-  },
-  {
-   "verifier": "tools/verify_control_points.py",
-   "asserts": "控制点主表与路由表契约：L6-1…L6-6 / L3-1 / L3-2；20 码 / 两表 control_code 集合恒等 / 空族",
-   "subjects": [
-    "research/governance/control-points-v1.json",
-    "research/governance/routing-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_coverage.py",
-   "asserts": "本登记表自身：名册双向完整 / 主体在盘上 / 主体在各自源码里可查 / 反向对照",
-   "subjects": [
-    "tools/verifier-coverage.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_coverage_composer.py",
-   "asserts": "coverage_composer：四项覆盖证明 / missing-partial-full 三态边界 / 空族记未做·无控制点 / partial 永不 PASS",
-   "subjects": [
-    "base/coverage_composer.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_decision_table.py",
-   "asserts": "decision_table：15 条链逐条可达 / I1–I7 / 五标签与并行义务 / 唯一判定实现",
-   "subjects": [
-    "base/decision_table.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_depad.py",
-   "asserts": "全仓生成物可读性：有没有文件被环境 +4096 填充成 read 工具打不开",
-   "subjects": [],
-   "dynamic": "目标是『全仓所有文本文件』，运行时递归枚举，没有可声明的静态子集"
-  },
-  {
-   "verifier": "tools/verify_disposition_router.py",
-   "asserts": "disposition_router：五档路由 / 不重算 state·layer / 不重生成 obligations / 五档待放行 / 冲突必须 DP4",
-   "subjects": [
-    "base/disposition_router.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_doc_reachability.py",
-   "asserts": "文档可达性：每份 ADR / 每篇 PMO/守衡-* 可达 · 不可达总数不超钉住值 · 非豁免的第一方文档全部可达 · 不可达集合被三个声明了判据的豁免类**分区**（分项之和 == 总数）",
-   "subjects": [
-    "README.md",
-    "AGENTS.md",
-    "skills-inventory/refs/README.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_download_governance.py",
-   "asserts": "下载治理 DG-1…DG-6：调用点登记 / landing_root 与字段 / 仓内二进制与 PII / 三条行为级反向对照",
-   "subjects": [
-    "tools/download_callers.json",
-    "tools/asset_baseline.json",
-    "tools/download_scan_py.py",
-    "tools/download_scan_js.py",
-    "tools/download_registry.py",
-    "tools/download_blobs.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_engine_contract.py",
-   "asserts": "引擎契约（V 组闸门）：规则表结构、指纹、未决项唯一书写位置、处置分层",
-   "subjects": [
-    "research/governance/skeleton/rules-v1.json",
-    "research/governance/skeleton/engine-manifest.json",
-    "research/governance/skeleton/legal-decisions-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_evidence_sync.py",
-   "asserts": "evidence_sync：ref 六态压回四值 / missing·expired→DP3、conflict→DP4 / 不 fail-open / 两个快照必填",
-   "subjects": [
-    "base/evidence_sync.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_external.py",
-   "asserts": "外部标准库：条目必须在来源快照中逐字命中（无形态差、无空位差）",
-   "subjects": [
-    "research/kb/外部标准库-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_feishu_index.py",
-   "asserts": "飞书可达资源索引：租户判定 / 可达性 / 原文抽取 / 可达清单完整",
-   "subjects": [
-    "tools/feishu_index.py",
-    "research/feishu/资源索引-v1.json",
-    "research/feishu/可达清单.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_feishu_web_oauth_live.py",
-   "asserts": "真实独立飞书 OAuth tri-state 联调门：无低敏 evidence 退2，不把 fake 冒充真实通过；evidence 必含 reauth consent、step-up hash/single-use 与 session generation",
-   "subjects": [
-    "api/oauth.py",
-    "api/production_app.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_finding_adjudication.py",
-   "asserts": "T-170a/b：confirm/reject 经 adjudicate_finding 写 authority 的 ir.findings；submit_review 对未裁决 candidate → 409 unadjudicated_findings；重启与投影重建后裁决仍在；/actions capability 未开 501 / 开启 200 成对；非法转移/不存在/未 claim 反向对照；无 candidate 的正常结案不误伤",
-   "subjects": [
-    "base/review_reducer.py",
-    "api/write_api.py",
-    "base/business_event_store.py",
-    "base/projection_store.py",
-    "base/review_command_service.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_finding_store.py",
-   "asserts": "finding_store：L2-5 三要素合取 / append-only / DF-1 Draft 拒收 / DF-2 confirmed 缺 authority 拒收 / DF-3",
-   "subjects": [
-    "base/finding_store.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_image_judgment.py",
-   "asserts": "Q4-② 图片接线：盘上120图 row→ContentUnit→RuleJudge/Orchestrator；实时中性后缀 file path + stable URI；成功/失败 parse_status、empty 四值、五标签、OCR文字边界与源码变异断线必红",
-   "subjects": [
-    "base/media.py",
-    "base/normalizer.py",
-    "base/judge_entry.py",
-    "base/orchestrator.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_job_dispatcher.py",
-   "asserts": "job_dispatcher：run_record 14 字段 / 恰好一个合法 ReviewOutput + run_id / 同 case 串行 / 超时 SIGKILL / 坏输出不 commit",
-   "subjects": [
-    "base/job_dispatcher.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_judge_entry.py",
-   "asserts": "ADR-0016 生产判定入口：RuleJudge 唯一引擎、Orchestrator 五步、确定 finding_id、恒待放行、partial 空命中不 PASS、failed 不调用判定",
-   "subjects": [
-    "base/judge_entry.py",
-    "base/rule_judge.py",
-    "base/orchestrator.py",
-    "base/decision_table.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_kb.py",
-   "asserts": "知识库：G1 存在性 / E1 证据 / E7 外部承诺未逾期",
-   "subjects": [
-    "tools/kb_build.py",
-    "tools/kb_facts.py",
-    "tools/kb_gaps.py",
-    "tools/kb_query.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_landing.py",
-   "asserts": "落地页抓取指标：一致性 / 稳定性 / 快照口径",
-   "subjects": [
-    "tools/lp_stability.py",
-    "research/landing/指标.json",
-    "research/landing/一致性分析.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_lark_share.py",
-   "asserts": "外部标准库分享表：permission_public 三态 / 表存在性 / 条数恒等；离线反向对照",
-   "subjects": [
-    "PMO/logs/ws_events.jsonl"
-   ],
-   "untracked": [
-    "PMO/logs/ws_events.jsonl"
-   ]
-  },
-  {
-   "verifier": "tools/verify_metrics_read_model.py",
-   "asserts": "metrics_read_model：四指标七要素 / 未测不是 0 / 样本不足不出比率 / 抽样层与 BLOCK 全量复核 / 目标线待基线",
-   "subjects": [
-    "base/metrics_read_model.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_no_media_in_repo.py",
-   "asserts": "deprecated 兼容入口：仓内内容直接委托现行 DG-3；AUDIT_MEDIA_ROOT 缺失/不存在落未测；未登记 PNG 红、正确 sha256 基线绿；三态退出码 0/1/2",
-   "subjects": [
-    "tools/verify_download_governance.py",
-    "AGENTS.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_normalizer.py",
-   "asserts": "normalizer / ContentUnit v1：12 个 required / 双指纹 / parse_status 域 / 复用 contract builder 不重算 unit_id",
-   "subjects": [
-    "base/normalizer.py",
-    "base/content-unit-v1.schema.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_notifications.py",
-   "asserts": "TS-22/RL-13 通知契约：invalidation/auto_rereview → inbox、takedown → 飞书；文案只许「已投递/已读」；每日键与状态键独立；去重持久化重启不重复；四条反向对照必红",
-   "subjects": [
-    "base/notifications.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_open_items.py",
-   "asserts": "未决项「等了多久、在等谁、沉默会发生什么」：每条 open 项带合法且非未来的 raised_at、带 owner 与 default_if_unanswered；未决项数 ≤ 棘轮",
-   "subjects": [
-    "research/governance/skeleton/legal-decisions-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_orchestrator.py",
-   "asserts": "orchestrator：五步固定顺序各一次 / ReviewIR 必填字段 / 回执 / 部件可注入且各调用一次 / 无提前停",
-   "subjects": [
-    "base/orchestrator.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_outbound.py",
-   "asserts": "出站留痕与入记忆：主动推送有没有落台账、回话前有没有把「我说过但记忆里没有的」折进会话（A 纯函数/临时台账 · B 接线含全仓发送者总表 · C 反向对照 · D 拿 2026-09-22 那次误答的真实台账+真实会话做回归 · G post/interactive 读得对不对）",
-   "subjects": [
-    "tools/agent/outbound.mjs",
-    "tools/agent/agent.mjs",
-    "tools/agent/feishu.mjs",
-    "tools/ws_daemon.mjs",
-    "tools/send_once.mjs",
-    "tools/outbound_ledger.mjs"
-   ]
-  },
-  {
-   "verifier": "tools/verify_pending.py",
-   "asserts": "待收清单：承诺必须指得出上游原话；我方提问不许写成对方承诺（C2/C3）",
-   "subjects": [
-    "PMO/待收清单-v1.json",
-    "tools/agent/prd_baseline.mjs"
-   ]
-  },
-  {
-   "verifier": "tools/verify_prd_baseline.py",
-   "asserts": "上游 PRD 基线漂移：L1 结构 / L2 副本=指纹 / L3 上游=指纹；L3 未测退 2",
-   "subjects": [
-    "PRD/feishu/索引-v1.json",
-    "tools/lark_find.py",
-    "tools/verify_depad.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_production_app.py",
-   "asserts": "生产装配：fake OAuth/reauth、持久复核、CSRF/Origin、freshness/RYW、动态 ACL、health/readiness、重启、writer lease 与故障注入",
-   "subjects": [
-    "api/production_app.py",
-    "api/oauth.py",
-    "api/review_api.py",
-    "api/write_api.py",
-    "base/auth_session.py",
-    "base/principal_directory.py",
-    "base/review_command_service.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_projection_store.py",
-   "asserts": "业务投影：权威重建、无投影幽灵、seq+manifest 前缀/最终 hash、新鲜度/202/RYW、线程并发顺序与 lease 到期转手",
-   "subjects": [
-    "base/business_event_store.py",
-    "base/projection_store.py",
-    "base/projector.py",
-    "base/review_command_service.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_rbac.py",
-   "asserts": "RBAC 与对象 ACL：角色能力 / 提交人仅自己 / DP3·DP4 tenant+product_line+assigned / SoD / 越权 403",
-   "subjects": [
-    "base/rbac.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_redact.py",
-   "asserts": "redact：必拦（凭据/PII/内部路径/tool_call_id）/ 必放（营销数字/型号/日期）/ 规则承重",
-   "subjects": [
-    "tools/redact.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_reference_census.py",
-   "asserts": "零引用可执行文件的棘轮：只许减不许增；基线不许拿不在册的文件充数；分母塌了（git 取不到 / 口径被改）要红，而不是伪装成「0 个零引用」；基线自身排除出提及池（否则它把自己钉住的名单刷成有人提及）",
-   "subjects": [
-    "tools/reference-census-baseline.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_release_gate.py",
-   "asserts": "T2-03/RL-1…RL-15 release_gate：状态机/全字段签名/SoD/五类失效/重审 job；step-up 原子单次消费，签名只存不可逆 ref 不存 bearer token；机器不可写 release_status；签名不可变",
-   "subjects": [
-    "base/release_gate.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_reply_context.py",
-   "asserts": "回复上文：话题回复的 parent_id 有没有被真的读进来（A 纯函数 / B 接线含 feishu 取形状 / C 反向对照 / D 拿 2026-09-22 那次误答的真实事件做回归）",
-   "subjects": [
-    "tools/agent/thread.mjs",
-    "tools/agent/agent.mjs",
-    "tools/agent/feishu.mjs"
-   ]
-  },
-  {
-   "verifier": "tools/verify_report_consistency.py",
-   "asserts": "C-59 报告↔ReviewIR 独立对拍：真实 report_render 生成 md；验证器自己解析 finding_id/control_code/decision.state；三类错配必红；空文本/删 finding 行 → unparsable；ReportStore.publish 不一致时物理阻断（不落盘、不追加索引、不给 URL）",
-   "subjects": [
-    "base/report_store.py",
-    "tools/audit/report_render.mjs"
-   ]
-  },
-  {
-   "verifier": "tools/verify_report_render.mjs",
-   "asserts": "report_render：六区块逐字 / 五标签 / L1-6 非法 IR 拒绝 / R1 front matter / 去 AI 味 / V1-V2",
-   "subjects": [
-    "tools/audit/report_render.mjs"
-   ]
-  },
-  {
-   "verifier": "tools/verify_report_store.py",
-   "asserts": "report_store：report_id 内容寻址 / 静态对象 / 索引只追加 / ACL 无权限不给 URL / R1 / 从 IR 重建",
-   "subjects": [
-    "base/report_store.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_review_api.py",
-   "asserts": "T2-01 只读 API：OpenAPI 3.1 / ReviewIR schema / session+principal 绑定 / 内容 ACL；通知、申诉、下线、grant、metrics 全按 tenant 过滤，orphan report 不泄漏；状态只读落盘 IR 不计算；正反对照",
-   "subjects": [
-    "api/review_api.py",
-    "contracts/review-ir-v1.schema.json",
-    "PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_review_reducer.py",
-   "asserts": "生产复核 reducer：九种命令、lease 到期、草稿采纳/片段引用、失败不修改旧状态",
-   "subjects": [
-    "base/review_reducer.py",
-    "base/reviews_ledger.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_reviews_ledger.py",
-   "asserts": "T2-02a 复核台账：claim 原子独占与重复拒绝；30 分钟 lease/心跳/版本冲突；draft 全字段快照且 autosave 不产 formal；adopt 派生且原稿不变；PASS/待自决/REVIEW/未审查四层抽样 + BLOCK 全量；五条反向对照",
-   "subjects": [
-    "base/reviews_ledger.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_rule_judge.py",
-   "asserts": "control_points + rule_judge：只收 active 码 / P0 字面命中 / quote==切片 / severity 必须 L*；exclude_patterns 只删重叠 span（含部分重叠反例），require_context 作 OR 前置；四组匹配器以非空样本证明装载时预编译；427 个真实 ContentUnit 接线前后稳定 JSON 字节流逐输出对拍及正反行为样本",
-   "subjects": [
-    "base/control_points.py",
-    "base/rule_judge.py",
-    "research/governance/control-points-v1.json",
-    "research/governance/skeleton/rules-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_sandbox.py",
-   "asserts": "sandbox G-5：CPU rlimit / 墙钟超时 / cwd 隔离 / env 清理 / 禁网 / 孙进程回收",
-   "subjects": [
-    "base/sandbox.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_secret_patterns.py",
-   "asserts": "仓内文本凭据形态扫描（私钥块 / 云密钥 / Bearer / 读凭据路径），按形态不按名字",
-   "subjects": [
-    "tools/verify_secret_patterns.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_semantic_judge.py",
-   "asserts": "semantic_judge：默认 candidate / C1–C4 与开关 / 5 类变异必须红（适配 449 行 semantic_settle）",
-   "subjects": [
-    "base/semantic_judge.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_send_gateway.py",
-   "asserts": "send_gateway：唯一形态决策 / 卡片被拒必须降级纯文本 / 超限搬折叠区不丢字符 / 内部标记不外泄",
-   "subjects": [
-    "base/send_gateway.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_shouheng_ops.py",
-   "asserts": "守衡运维：重启闸门默认拒绝 / 不许绕过 / KeepAlive 自愈 / 它现在还活着",
-   "subjects": [
-    "tools/ws_daemon.mjs",
-    "tools/restart_shouheng.sh",
-    "tools/com.shouheng.lark.plist"
-   ]
-  },
-  {
-   "verifier": "tools/verify_skill.py",
-   "asserts": "S0：验的对象必须在 git ls-files 里（没入库退 2，不是退 0）；然后才把规程文档里每条 bash 命令真跑一遍",
-   "subjects": [
-    "agent-skills/内容合规审查/SKILL.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_skill_inventory.py",
-   "asserts": "skill/ 清单治理：跟踪集恰等于放行清单 · 整体被忽略且无单点放行 · 放行文档在盘且无真凭据形态 · 成员目录数不低于下界",
-   "subjects": [
-    "skill/README.md",
-    "skill/标准化台账-20261017.md",
-    ".gitignore"
-   ]
-  },
-  {
-   "verifier": "tools/verify_solution_meta.py",
-   "asserts": "技术方案头部数字与文档实况：模块数 / 判据归属 / critical·high / 三方 hash 绑定 / 门状态 / owner 无重复",
-   "subjects": [
-    "Playbook/技术解决方案-v1.md",
-    "Playbook/内容审查Agent-产品Playbook-v1.1.md",
-    "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_submission_pipeline.py",
-   "asserts": "T-100…T-103：submission_router 四维校验 → judge_entry → authority → GET 案件读回；依据解析器让 BLOCK 路径可达；同 key 重放不重判、同 submission 异 key 不重复建案；REVIEW 与 PASS 不可达口径；坏输入/判定抛错/run_state≠OK 不建案；没有 IR 的案件不得冒充空 findings；空 frozen 目录且无 cases.json 也能建案；cases.json 写入扫描器正反例",
-   "subjects": [
-    "base/authority_query.py",
-    "base/submission_service.py",
-    "base/review_reducer.py",
-    "base/business_event_store.py",
-    "base/projection_store.py",
-    "base/review_command_service.py",
-    "api/write_api.py",
-    "api/review_api.py",
-    "api/production_app.py",
-    "research/kb/外部标准库-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_submission_router.py",
-   "asserts": "submission_router + Attempt：四维取值域 / 8 字段 Attempt / unsupported 显式拒绝 / accepted+rejected+failed 恒等式",
-   "subjects": [
-    "base/submission_router.py",
-    "base/contract.py",
-    "contracts/attempt-v1.schema.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_takedown.py",
-   "asserts": "RL-7/RL-8/RL-9/RL-13 下线任务：状态机与失败三处置；已发布才建/未发布 not_applicable；回填三必填+三选一+截图三项；waive 双人·scope·不自批·原签发人；每日键与事件键不许混；结构无 deadline 且指标无正常/未超时",
-   "subjects": [
-    "base/takedown.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_taxonomy.py",
-   "asserts": "`base/taxonomy.py` 的回归与门槛",
-   "subjects": [
-    "base/taxonomy.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_vocab_lark.py",
-   "asserts": "词表飞书 ↔ 本地逐词一致（回读值，不是写入返回码）",
-   "subjects": [
-    "research/governance/skeleton/context-guards-v1.json",
-    "research/governance/skeleton/whitelist-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_web_auth.py",
-   "asserts": "独立飞书 Web OAuth 离线协议：authorize response_type/state/redirect/scope/prompt consent、v2 token、v1 user_info、tenant+open_id 与错误脱敏",
-   "subjects": [
-    "api/oauth.py",
-    "api/production_app.py",
-    "base/auth_session.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_write_api.py",
-   "asserts": "T2-02 写端点：legacy review/finding/appeal/takedown/release 编排与错误语义；Idempotency-Key 绑定 actor/path/body 且单进程原子；生产 capability 显式空集不回退全开，首批外写面 fail closed；API 不计算判定",
-   "subjects": [
-    "api/review_api.py",
-    "api/write_api.py",
-    "base/reviews_ledger.py",
-    "base/finding_store.py",
-    "base/takedown.py"
-   ]
-  },
-  {
-   "verifier": "web/scripts/verify_manual_a11y.mjs",
-   "asserts": "人工无障碍证据门（TS-9 的另一半）：未签收项退 2（未测），不是绿也不是红",
-   "subjects": [
-    "web/a11y-manual-v1.json"
-   ],
-   "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
-  },
-  {
-   "verifier": "tools/verify_model_selection.py",
-   "asserts": "S1–S8 选型依据与 magpie 实时清单一致：vod/tokenhub 无 embedding 与 rerank、ASR 计数、glm-5.3-flash 无 audio 但有 video（按 id×provider 核）、音画对齐候选同时含 audio+video 且出现在 vod、两网关清单无价格元数据、可索引规模（字节+文件数双断言）。清单缺失判未测退 2；--controls 12 项（含 80/420 两端文件数与 0.1× 字节）",
-   "subjects": [
-    "PMO/implement/多模态与向量模型-选型-20261021.md"
-   ],
-   "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
-  },
-  {
-   "verifier": "tools/verify_multimodal_provider.py",
-   "asserts": "多模态契约：空注册表/空任务落 untested 而非通过 · 先授权后出境 · 出境清单可指认 · 12 条变异对照删守卫必红",
-   "subjects": [
-    "base/multimodal_provider.py"
-   ]
-  },
-  {
-   "verifier": "tools/verify_brand_rules.py",
-   "asserts": "品牌用词候选规则的 context_exclusion 与 match.exclude_patterns 集合恒等；每个 pattern 可编译；note/id 非空；两侧有/无一致",
-   "subjects": [
-    "PMO/implement/品牌用词规则-候选-v1.json"
-   ]
-  },
-  {
-   "verifier": "tools/verify_waivers.py",
-   "asserts": "砍掉项 waiver：九字段齐备 / owner 恰好一个具名 / 到期即红（当天算到期）/ 出处 quote 必须在该文件里逐字找到 / 到期依据不许「顺延」/ 180 天上限 / 与 ticket 清单逐名对账；28 项反向对照含该红、该绿、该未测三侧",
-   "subjects": [
-    "PMO/audit/waiver-v1.json",
-    "PMO/上线Ticket清单-20261022.md"
-   ]
-  },
-  {
-   "verifier": "tools/verify_deploy.py",
-   "asserts": "部署工件静态自证：Dockerfile 多阶段 / CMD 不含 --workers（flock writer lease）/ CMD 带 --factory / compose 不绑 0.0.0.0 / 独立 project name 与独立网络 / .env.production 被忽略而 .example 不被忽略 / 12 个必填键与 ProductionSettings.from_env 逐项一致 / 本文件写死的 REQUIRED_ENV 与源码无漂移 / 模板无凭据形态值 / 六个数据路径互不重叠且不在 /app 下 / .dockerignore 排除 .git 与凭据 / healthcheck 打 /healthz 而非依赖外部存储的 /readyz。结论行明写「只证明工件写对了，不证明镜像能构建、容器能起来」",
-   "subjects": [
-    "Dockerfile",
-    "docker-compose.yml",
-    ".env.production.example",
-    ".dockerignore",
-    "api/production_app.py"
-   ]
-  }
- ]
+  "schema": "verifier-coverage/v1",
+  "why": [
+    "这文件存在的理由：图谱里 tested_by 边 = 0。25 个验算器覆盖了什么，",
+    "只活在每个 verifier 的源码文本里 —— 任何工具都读不到，改名/换路径不会有东西红。",
+    "所以这里把「谁验什么」显式声明成机器可读的，并由 tools/verify_coverage.py 反证：",
+    "① 每个 verify_* 必须在册（不许有孤儿验算器）；",
+    "② 每个 subjects 条目必须**在该 verifier 的源码里逐字出现**（改名/写错就红）；",
+    "③ 每个 subjects 条目必须在盘上存在，除非显式标 untracked 并写明原因；",
+    "④ 算不出静态目标的，必须显式写 dynamic 原因，不许留空。",
+    "★ 只声明不反证 = 又一处没有执行点的文档；本文件由 verify_coverage.py 消费。"
+  ],
+  "verifiers": [
+    {
+      "verifier": "base/verify_base.py",
+      "asserts": "基座自证：各模块自证通过 · L1 自足性 · 分级与 .gitignore 一致 · 无未登记产物",
+      "subjects": [
+        "base/contract.py",
+        "base/text_stage.py",
+        "base/judge_adapter.py",
+        "base/media.py"
+      ]
+    },
+    {
+      "verifier": "research/distill/verify_citations.py",
+      "asserts": "distill 分片的引用可回溯到来源快照",
+      "subjects": [],
+      "dynamic": "目标按 research/distill/ 目录内容在运行时枚举"
+    },
+    {
+      "verifier": "tools/verify_acceptance_index.py",
+      "asserts": "判据↔验收项机器对拍：文档 134 条编号判据全覆盖 / 验收表 136 项 / 引用但文档无的编号单列",
+      "subjects": [
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+        "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_acceptance_run.py",
+      "asserts": "只读验收表逐行执行：test_id/fixture/command 缺一或 fixture 不存在 → untested；command 非 0 → 红",
+      "subjects": [
+        "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_adr_status.py",
+      "asserts": "ADR 台账与 ADR 文件的状态逐条相等（双源冲突由构造不可能）：每个 ADR 恰好一条状态行、取值在规则 6 的四个里、台账集合 ≡ 磁盘集合、日期是 YYYY-MM-DD",
+      "subjects": [
+        "ADR/README.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_agents_budget.py",
+      "asserts": "AGENTS.md 工作区指令预算 ≤65536 且余量≥一条教训；搬走的填充态段落逐字仍在实测史、本文件 0 残留",
+      "subjects": [
+        "AGENTS.md",
+        "PMO/填充态-环境特性-实测史.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_api_integration.py",
+      "asserts": "API↔落盘 IR 联调：/review-api/queue 列出 smoke 案；GET /cases/{id} 的 decision/coverage/release_status 与落盘 IR 逐字段一致；IR 改哨兵值后 API 原样返回，证明 API 不重算",
+      "subjects": [
+        "api/review_api.py",
+        "tools/smoke_end_to_end.py",
+        "base/auth_session.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_assets_baseline.py",
+      "asserts": "momcozy-assets 基线恒等：manifest 可解析 / files_count / 每条 entry 目标存在 / 内容 sha256 对得上",
+      "subjects": [
+        "PMO/audit/momcozy-assets/manifest.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_atomic_commit.py",
+      "asserts": "P-1 原子提交：六个崩溃点 / 恢复四态 / stale lock 清理与活 PID 锁保留 / manifest 不覆盖 / 不可变对象同 hash 复用异 hash 拒绝 / artifact key 防路径穿越",
+      "subjects": [
+        "base/artifact_store.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_auth_session.py",
+      "asserts": "会话与 step-up：opaque cookie / idle 30m+absolute 8h / 撤销立即失效 / OAuth state 浏览器绑定 / hashed step-up 原子单次消费 / generation 拒旧 DB / 独立低敏 auth+step-up 审计",
+      "subjects": [
+        "base/auth_session.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_authority_change.py",
+      "asserts": "权威源变更 → 重审入队（行 103 / RL-15）：AUTHORITY_KINDS 与 on_authority_changed",
+      "subjects": [
+        "base/authority_change.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_backend_recovery.py",
+      "asserts": "权威备份/恢复：只收已提交 manifest+事件与长期审计，排除 session/projection/generation，坏 hash/夹带/半行拒绝，空目录恢复后重建 fresh 投影，失败不留半恢复",
+      "subjects": [
+        "base/backend_recovery.py",
+        "base/business_event_store.py",
+        "base/projection_store.py",
+        "base/projector.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_browser_ext_artifact.py",
+      "asserts": "L1 里那件 418KB 产物（Q39 选项 A）：跑一遍构建配方再逐文件 sha256 对回 dsh-browser-ext/ —— A2 产物都在且都被 git 跟踪 · A3 配方退 0 · A4 文件集合与内容全等 · A5 分母钉在 16；`.vendor/` 不在盘上（换台机器就是这样）→ **退 2 未测**，不是绿。★ 配方本体（`cd .vendor/dsh-browser-main/extensions/dsh-browser && node scripts/build.mjs`）就在这个文件的 docstring 里。★ 已知的口径缺口，明着写在这里而不是绕过去：本器**真正依赖的 `.vendor/…` 不在 subjects 里** —— verify_coverage.py 的 `untracked` 是**每条目一个开关**（face E 会对该条目的**所有** subjects 要求未被跟踪），所以「已跟踪主体 + 未跟踪主体」这个组合它目前表达不了；本器选前者。",
+      "subjects": [
+        "dsh-browser-ext/panel/assets/index.js",
+        "dsh-browser-ext/manifest.json",
+        "ADR/ADR-0013-基座接口冻结与仓库入库分级.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_business_event_store.py",
+      "asserts": "业务权威事件：不可变 command batch、重启幂等、manifest/hash 腐败拒绝、崩溃孤儿恢复与 OS flock 单写者",
+      "subjects": [
+        "base/business_event_store.py",
+        "base/artifact_store.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_cards.mjs",
+      "asserts": "模版 / 字段登记 / 文档三者一致 + 去 AI 味规则正反例 + 信封上限",
+      "subjects": [
+        "tools/reply-cards/cards.mjs",
+        "tools/reply-cards/registry.mjs",
+        "tools/reply-cards/contract.md",
+        "tools/reply-cards/README.md",
+        "PMO/守衡-回复卡片模版与语域规程.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_case_watch.py",
+      "asserts": "C-51 转出后超时升级：空表报 weekends_only / 假日历跨假期；未到期·到期·超期三态；缺 due_at 且缺 transferred_at → 未测而非 not_due；终态不升级；同 due_at 去重只发一条通知与台账；NotificationOutbox 唯一出口；删守卫必红",
+      "subjects": [
+        "base/case_watch.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_contracts.py",
+      "asserts": "五份 contracts/*.schema.json 的结构与正负样本；fresh seq/hash 恒等式；真实 judge_entry 图片 ReviewIR/receipt 分别经 B-8/B-9 喂 schema，旧 receipt step 字段名必须拒绝",
+      "subjects": [],
+      "dynamic": "五份 schema 名在源码 SCHEMAS 元组里列举、文件名运行时拼出（f\"{name}.schema.json\"），静态 subjects 无法逐字命中；运行期按该元组逐份加载并做正负样本"
+    },
+    {
+      "verifier": "tools/verify_control_points.py",
+      "asserts": "控制点主表与路由表契约：L6-1…L6-6 / L3-1 / L3-2；20 码 / 两表 control_code 集合恒等 / 空族",
+      "subjects": [
+        "research/governance/control-points-v1.json",
+        "research/governance/routing-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_coverage.py",
+      "asserts": "本登记表自身：名册双向完整 / 主体在盘上 / 主体在各自源码里可查 / 反向对照",
+      "subjects": [
+        "tools/verifier-coverage.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_coverage_composer.py",
+      "asserts": "coverage_composer：四项覆盖证明 / missing-partial-full 三态边界 / 空族记未做·无控制点 / partial 永不 PASS",
+      "subjects": [
+        "base/coverage_composer.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_decision_table.py",
+      "asserts": "decision_table：15 条链逐条可达 / I1–I7 / 五标签与并行义务 / 唯一判定实现",
+      "subjects": [
+        "base/decision_table.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_depad.py",
+      "asserts": "全仓生成物可读性：有没有文件被环境 +4096 填充成 read 工具打不开",
+      "subjects": [],
+      "dynamic": "目标是『全仓所有文本文件』，运行时递归枚举，没有可声明的静态子集"
+    },
+    {
+      "verifier": "tools/verify_disposition_router.py",
+      "asserts": "disposition_router：五档路由 / 不重算 state·layer / 不重生成 obligations / 五档待放行 / 冲突必须 DP4",
+      "subjects": [
+        "base/disposition_router.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_doc_reachability.py",
+      "asserts": "文档可达性：每份 ADR / 每篇 PMO/守衡-* 可达 · 不可达总数不超钉住值 · 非豁免的第一方文档全部可达 · 不可达集合被三个声明了判据的豁免类**分区**（分项之和 == 总数）",
+      "subjects": [
+        "README.md",
+        "AGENTS.md",
+        "skills-inventory/refs/README.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_download_governance.py",
+      "asserts": "下载治理 DG-1…DG-6：调用点登记 / landing_root 与字段 / 仓内二进制与 PII / 三条行为级反向对照",
+      "subjects": [
+        "tools/download_callers.json",
+        "tools/asset_baseline.json",
+        "tools/download_scan_py.py",
+        "tools/download_scan_js.py",
+        "tools/download_registry.py",
+        "tools/download_blobs.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_engine_contract.py",
+      "asserts": "引擎契约（V 组闸门）：规则表结构、指纹、未决项唯一书写位置、处置分层",
+      "subjects": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/skeleton/engine-manifest.json",
+        "research/governance/skeleton/legal-decisions-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_evidence_sync.py",
+      "asserts": "evidence_sync：ref 六态压回四值 / missing·expired→DP3、conflict→DP4 / 不 fail-open / 两个快照必填",
+      "subjects": [
+        "base/evidence_sync.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_external.py",
+      "asserts": "外部标准库：条目必须在来源快照中逐字命中（无形态差、无空位差）",
+      "subjects": [
+        "research/kb/外部标准库-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_feishu_index.py",
+      "asserts": "飞书可达资源索引：租户判定 / 可达性 / 原文抽取 / 可达清单完整",
+      "subjects": [
+        "tools/feishu_index.py",
+        "research/feishu/资源索引-v1.json",
+        "research/feishu/可达清单.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_feishu_web_oauth_live.py",
+      "asserts": "真实独立飞书 OAuth tri-state 联调门：无低敏 evidence 退2，不把 fake 冒充真实通过；evidence 必含 reauth consent、step-up hash/single-use 与 session generation",
+      "subjects": [
+        "api/oauth.py",
+        "api/production_app.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_finding_adjudication.py",
+      "asserts": "T-170a/b：confirm/reject 经 adjudicate_finding 写 authority 的 ir.findings；submit_review 对未裁决 candidate → 409 unadjudicated_findings；重启与投影重建后裁决仍在；/actions capability 未开 501 / 开启 200 成对；非法转移/不存在/未 claim 反向对照；无 candidate 的正常结案不误伤",
+      "subjects": [
+        "base/review_reducer.py",
+        "api/write_api.py",
+        "base/business_event_store.py",
+        "base/projection_store.py",
+        "base/review_command_service.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_finding_store.py",
+      "asserts": "finding_store：L2-5 三要素合取 / append-only / DF-1 Draft 拒收 / DF-2 confirmed 缺 authority 拒收 / DF-3",
+      "subjects": [
+        "base/finding_store.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_image_judgment.py",
+      "asserts": "Q4-② 图片接线：盘上120图 row→ContentUnit→RuleJudge/Orchestrator；实时中性后缀 file path + stable URI；成功/失败 parse_status、empty 四值、五标签、OCR文字边界与源码变异断线必红",
+      "subjects": [
+        "base/media.py",
+        "base/normalizer.py",
+        "base/judge_entry.py",
+        "base/orchestrator.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_job_dispatcher.py",
+      "asserts": "job_dispatcher：run_record 14 字段 / 恰好一个合法 ReviewOutput + run_id / 同 case 串行 / 超时 SIGKILL / 坏输出不 commit",
+      "subjects": [
+        "base/job_dispatcher.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_judge_entry.py",
+      "asserts": "ADR-0016 生产判定入口：RuleJudge 唯一引擎、Orchestrator 五步、确定 finding_id、恒待放行、partial 空命中不 PASS、failed 不调用判定",
+      "subjects": [
+        "base/judge_entry.py",
+        "base/rule_judge.py",
+        "base/orchestrator.py",
+        "base/decision_table.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_kb.py",
+      "asserts": "知识库：G1 存在性 / E1 证据 / E7 外部承诺未逾期",
+      "subjects": [
+        "tools/kb_build.py",
+        "tools/kb_facts.py",
+        "tools/kb_gaps.py",
+        "tools/kb_query.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_landing.py",
+      "asserts": "落地页抓取指标：一致性 / 稳定性 / 快照口径",
+      "subjects": [
+        "tools/lp_stability.py",
+        "research/landing/指标.json",
+        "research/landing/一致性分析.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_lark_share.py",
+      "asserts": "外部标准库分享表：permission_public 三态 / 表存在性 / 条数恒等；离线反向对照",
+      "subjects": [
+        "PMO/logs/ws_events.jsonl"
+      ],
+      "untracked": [
+        "PMO/logs/ws_events.jsonl"
+      ]
+    },
+    {
+      "verifier": "tools/verify_metrics_read_model.py",
+      "asserts": "metrics_read_model：四指标七要素 / 未测不是 0 / 样本不足不出比率 / 抽样层与 BLOCK 全量复核 / 目标线待基线",
+      "subjects": [
+        "base/metrics_read_model.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_no_media_in_repo.py",
+      "asserts": "deprecated 兼容入口：仓内内容直接委托现行 DG-3；AUDIT_MEDIA_ROOT 缺失/不存在落未测；未登记 PNG 红、正确 sha256 基线绿；三态退出码 0/1/2",
+      "subjects": [
+        "tools/verify_download_governance.py",
+        "AGENTS.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_normalizer.py",
+      "asserts": "normalizer / ContentUnit v1：12 个 required / 双指纹 / parse_status 域 / 复用 contract builder 不重算 unit_id",
+      "subjects": [
+        "base/normalizer.py",
+        "base/content-unit-v1.schema.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_notifications.py",
+      "asserts": "TS-22/RL-13 通知契约：invalidation/auto_rereview → inbox、takedown → 飞书；文案只许「已投递/已读」；每日键与状态键独立；去重持久化重启不重复；四条反向对照必红",
+      "subjects": [
+        "base/notifications.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_open_items.py",
+      "asserts": "未决项「等了多久、在等谁、沉默会发生什么」：每条 open 项带合法且非未来的 raised_at、带 owner 与 default_if_unanswered；未决项数 ≤ 棘轮",
+      "subjects": [
+        "research/governance/skeleton/legal-decisions-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_orchestrator.py",
+      "asserts": "orchestrator：五步固定顺序各一次 / ReviewIR 必填字段 / 回执 / 部件可注入且各调用一次 / 无提前停",
+      "subjects": [
+        "base/orchestrator.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_outbound.py",
+      "asserts": "出站留痕与入记忆：主动推送有没有落台账、回话前有没有把「我说过但记忆里没有的」折进会话（A 纯函数/临时台账 · B 接线含全仓发送者总表 · C 反向对照 · D 拿 2026-09-22 那次误答的真实台账+真实会话做回归 · G post/interactive 读得对不对）",
+      "subjects": [
+        "tools/agent/outbound.mjs",
+        "tools/agent/agent.mjs",
+        "tools/agent/feishu.mjs",
+        "tools/ws_daemon.mjs",
+        "tools/send_once.mjs",
+        "tools/outbound_ledger.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_pending.py",
+      "asserts": "待收清单：承诺必须指得出上游原话；我方提问不许写成对方承诺（C2/C3）",
+      "subjects": [
+        "PMO/待收清单-v1.json",
+        "tools/agent/prd_baseline.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_prd_baseline.py",
+      "asserts": "上游 PRD 基线漂移：L1 结构 / L2 副本=指纹 / L3 上游=指纹；L3 未测退 2",
+      "subjects": [
+        "PRD/feishu/索引-v1.json",
+        "tools/lark_find.py",
+        "tools/verify_depad.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_production_app.py",
+      "asserts": "生产装配：fake OAuth/reauth、持久复核、CSRF/Origin、freshness/RYW、动态 ACL、health/readiness、重启、writer lease 与故障注入；TS-29/行132：两库独立文件 + 各自 journal_mode 实测为 wal + 清理口径显式声明（无策略须写明「无自动清理」）+ 删库+坏头部+关连接后 session 不可用而权威/业务投影读回真实那条",
+      "subjects": [
+        "api/production_app.py",
+        "api/oauth.py",
+        "api/review_api.py",
+        "api/write_api.py",
+        "base/auth_session.py",
+        "base/principal_directory.py",
+        "base/review_command_service.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_projection_store.py",
+      "asserts": "业务投影：权威重建、无投影幽灵、seq+manifest 前缀/最终 hash、新鲜度/202/RYW、线程并发顺序与 lease 到期转手",
+      "subjects": [
+        "base/business_event_store.py",
+        "base/projection_store.py",
+        "base/projector.py",
+        "base/review_command_service.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_rbac.py",
+      "asserts": "RBAC 与对象 ACL：角色能力 / 提交人仅自己 / DP3·DP4 tenant+product_line+assigned / SoD / 越权 403",
+      "subjects": [
+        "base/rbac.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_redact.py",
+      "asserts": "redact：必拦（凭据/PII/内部路径/tool_call_id）/ 必放（营销数字/型号/日期）/ 规则承重",
+      "subjects": [
+        "tools/redact.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_reference_census.py",
+      "asserts": "零引用可执行文件的棘轮：只许减不许增；基线不许拿不在册的文件充数；分母塌了（git 取不到 / 口径被改）要红，而不是伪装成「0 个零引用」；基线自身排除出提及池（否则它把自己钉住的名单刷成有人提及）",
+      "subjects": [
+        "tools/reference-census-baseline.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_release_gate.py",
+      "asserts": "T2-03/RL-1…RL-15 release_gate：状态机/全字段签名/SoD/五类失效/重审 job；step-up 原子单次消费，签名只存不可逆 ref 不存 bearer token；机器不可写 release_status；签名不可变",
+      "subjects": [
+        "base/release_gate.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_reply_context.py",
+      "asserts": "回复上文：话题回复的 parent_id 有没有被真的读进来（A 纯函数 / B 接线含 feishu 取形状 / C 反向对照 / D 拿 2026-09-22 那次误答的真实事件做回归）",
+      "subjects": [
+        "tools/agent/thread.mjs",
+        "tools/agent/agent.mjs",
+        "tools/agent/feishu.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_report_consistency.py",
+      "asserts": "C-59 报告↔ReviewIR 独立对拍：真实 report_render 生成 md；验证器自己解析 finding_id/control_code/decision.state；三类错配必红；空文本/删 finding 行 → unparsable；ReportStore.publish 不一致时物理阻断（不落盘、不追加索引、不给 URL）",
+      "subjects": [
+        "base/report_store.py",
+        "tools/audit/report_render.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_report_render.mjs",
+      "asserts": "report_render：六区块逐字 / 五标签 / L1-6 非法 IR 拒绝 / R1 front matter / 去 AI 味 / V1-V2",
+      "subjects": [
+        "tools/audit/report_render.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_report_store.py",
+      "asserts": "report_store：report_id 内容寻址 / 静态对象 / 索引只追加 / ACL 无权限不给 URL / R1 / 从 IR 重建",
+      "subjects": [
+        "base/report_store.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_review_api.py",
+      "asserts": "T2-01 只读 API：OpenAPI 3.1 / ReviewIR schema / session+principal 绑定 / 内容 ACL；通知、申诉、下线、grant、metrics 全按 tenant 过滤，orphan report 不泄漏；状态只读落盘 IR 不计算；正反对照",
+      "subjects": [
+        "api/review_api.py",
+        "contracts/review-ir-v1.schema.json",
+        "PMO/audit/内容审查Agent-UIUX前后端规格草案-v1.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_review_reducer.py",
+      "asserts": "生产复核 reducer：九种命令、lease 到期、草稿采纳/片段引用、失败不修改旧状态",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_reviews_ledger.py",
+      "asserts": "T2-02a 复核台账：claim 原子独占与重复拒绝；30 分钟 lease/心跳/版本冲突；draft 全字段快照且 autosave 不产 formal；adopt 派生且原稿不变；PASS/待自决/REVIEW/未审查四层抽样 + BLOCK 全量；五条反向对照",
+      "subjects": [
+        "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_rule_judge.py",
+      "asserts": "control_points + rule_judge：只收 active 码 / P0 字面命中 / quote==切片 / severity 必须 L*；exclude_patterns 只删重叠 span（含部分重叠反例），require_context 作 OR 前置；四组匹配器以非空样本证明装载时预编译；427 个真实 ContentUnit 接线前后稳定 JSON 字节流逐输出对拍及正反行为样本",
+      "subjects": [
+        "base/control_points.py",
+        "base/rule_judge.py",
+        "research/governance/control-points-v1.json",
+        "research/governance/skeleton/rules-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_sandbox.py",
+      "asserts": "sandbox G-5：CPU rlimit / 墙钟超时 / cwd 隔离 / env 清理 / 禁网 / 孙进程回收",
+      "subjects": [
+        "base/sandbox.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_secret_patterns.py",
+      "asserts": "仓内文本凭据形态扫描（私钥块 / 云密钥 / Bearer / 读凭据路径），按形态不按名字",
+      "subjects": [
+        "tools/verify_secret_patterns.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_semantic_judge.py",
+      "asserts": "semantic_judge：默认 candidate / C1–C4 与开关 / 5 类变异必须红（适配 449 行 semantic_settle）",
+      "subjects": [
+        "base/semantic_judge.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_send_gateway.py",
+      "asserts": "send_gateway：唯一形态决策 / 卡片被拒必须降级纯文本 / 超限搬折叠区不丢字符 / 内部标记不外泄",
+      "subjects": [
+        "base/send_gateway.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_shouheng_ops.py",
+      "asserts": "守衡运维：重启闸门默认拒绝 / 不许绕过 / KeepAlive 自愈 / 它现在还活着",
+      "subjects": [
+        "tools/ws_daemon.mjs",
+        "tools/restart_shouheng.sh",
+        "tools/com.shouheng.lark.plist"
+      ]
+    },
+    {
+      "verifier": "tools/verify_skill.py",
+      "asserts": "S0：验的对象必须在 git ls-files 里（没入库退 2，不是退 0）；然后才把规程文档里每条 bash 命令真跑一遍",
+      "subjects": [
+        "agent-skills/内容合规审查/SKILL.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_skill_inventory.py",
+      "asserts": "skill/ 清单治理：跟踪集恰等于放行清单 · 整体被忽略且无单点放行 · 放行文档在盘且无真凭据形态 · 成员目录数不低于下界",
+      "subjects": [
+        "skill/README.md",
+        "skill/标准化台账-20261017.md",
+        ".gitignore"
+      ]
+    },
+    {
+      "verifier": "tools/verify_solution_meta.py",
+      "asserts": "技术方案头部数字与文档实况：模块数 / 判据归属 / critical·high / 三方 hash 绑定 / 门状态 / owner 无重复",
+      "subjects": [
+        "Playbook/技术解决方案-v1.md",
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+        "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_submission_pipeline.py",
+      "asserts": "T-100…T-103：submission_router 四维校验 → judge_entry → authority → GET 案件读回；依据解析器让 BLOCK 路径可达；同 key 重放不重判、同 submission 异 key 不重复建案；REVIEW 与 PASS 不可达口径；坏输入/判定抛错/run_state≠OK 不建案；没有 IR 的案件不得冒充空 findings；空 frozen 目录且无 cases.json 也能建案；cases.json 写入扫描器正反例",
+      "subjects": [
+        "base/authority_query.py",
+        "base/submission_service.py",
+        "base/review_reducer.py",
+        "base/business_event_store.py",
+        "base/projection_store.py",
+        "base/review_command_service.py",
+        "api/write_api.py",
+        "api/review_api.py",
+        "api/production_app.py",
+        "research/kb/外部标准库-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_submission_router.py",
+      "asserts": "submission_router + Attempt：四维取值域 / 8 字段 Attempt / unsupported 显式拒绝 / accepted+rejected+failed 恒等式",
+      "subjects": [
+        "base/submission_router.py",
+        "base/contract.py",
+        "contracts/attempt-v1.schema.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_takedown.py",
+      "asserts": "RL-7/RL-8/RL-9/RL-13 下线任务：状态机与失败三处置；已发布才建/未发布 not_applicable；回填三必填+三选一+截图三项；waive 双人·scope·不自批·原签发人；每日键与事件键不许混；结构无 deadline 且指标无正常/未超时",
+      "subjects": [
+        "base/takedown.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_taxonomy.py",
+      "asserts": "`base/taxonomy.py` 的回归与门槛",
+      "subjects": [
+        "base/taxonomy.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_vocab_lark.py",
+      "asserts": "词表飞书 ↔ 本地逐词一致（回读值，不是写入返回码）",
+      "subjects": [
+        "research/governance/skeleton/context-guards-v1.json",
+        "research/governance/skeleton/whitelist-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_web_auth.py",
+      "asserts": "独立飞书 Web OAuth 离线协议：authorize response_type/state/redirect/scope/prompt consent、v2 token、v1 user_info、tenant+open_id 与错误脱敏",
+      "subjects": [
+        "api/oauth.py",
+        "api/production_app.py",
+        "base/auth_session.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_write_api.py",
+      "asserts": "T2-02 写端点：legacy review/finding/appeal/takedown/release 编排与错误语义；Idempotency-Key 绑定 actor/path/body 且单进程原子；生产 capability 显式空集不回退全开，首批外写面 fail closed；API 不计算判定",
+      "subjects": [
+        "api/review_api.py",
+        "api/write_api.py",
+        "base/reviews_ledger.py",
+        "base/finding_store.py",
+        "base/takedown.py"
+      ]
+    },
+    {
+      "verifier": "web/scripts/verify_manual_a11y.mjs",
+      "asserts": "人工无障碍证据门（TS-9 的另一半）：未签收项退 2（未测），不是绿也不是红",
+      "subjects": [
+        "web/a11y-manual-v1.json"
+      ],
+      "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
+    },
+    {
+      "verifier": "tools/verify_model_selection.py",
+      "asserts": "S1–S8 选型依据与 magpie 实时清单一致：vod/tokenhub 无 embedding 与 rerank、ASR 计数、glm-5.3-flash 无 audio 但有 video（按 id×provider 核）、音画对齐候选同时含 audio+video 且出现在 vod、两网关清单无价格元数据、可索引规模（字节+文件数双断言）。清单缺失判未测退 2；--controls 12 项（含 80/420 两端文件数与 0.1× 字节）",
+      "subjects": [
+        "PMO/implement/多模态与向量模型-选型-20261021.md"
+      ],
+      "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
+    },
+    {
+      "verifier": "tools/verify_multimodal_provider.py",
+      "asserts": "多模态契约：空注册表/空任务落 untested 而非通过 · 先授权后出境 · 出境清单可指认 · 12 条变异对照删守卫必红",
+      "subjects": [
+        "base/multimodal_provider.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_brand_rules.py",
+      "asserts": "品牌用词候选规则的 context_exclusion 与 match.exclude_patterns 集合恒等；每个 pattern 可编译；note/id 非空；两侧有/无一致",
+      "subjects": [
+        "PMO/implement/品牌用词规则-候选-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_waivers.py",
+      "asserts": "砍掉项 waiver：九字段齐备 / owner 恰好一个具名 / 到期即红（当天算到期）/ 出处 quote 必须在该文件里逐字找到 / 到期依据不许「顺延」/ 180 天上限 / 与 ticket 清单逐名对账；28 项反向对照含该红、该绿、该未测三侧",
+      "subjects": [
+        "PMO/audit/waiver-v1.json",
+        "PMO/上线Ticket清单-20261022.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_deploy.py",
+      "asserts": "部署工件静态自证：Dockerfile 多阶段 / CMD 不含 --workers（flock writer lease）/ CMD 带 --factory / compose 不绑 0.0.0.0 / 独立 project name 与独立网络 / .env.production 被忽略而 .example 不被忽略 / 12 个必填键与 ProductionSettings.from_env 逐项一致 / 本文件写死的 REQUIRED_ENV 与源码无漂移 / 模板无凭据形态值 / 六个数据路径互不重叠且不在 /app 下 / .dockerignore 排除 .git 与凭据 / healthcheck 打 /healthz 而非依赖外部存储的 /readyz。结论行明写「只证明工件写对了，不证明镜像能构建、容器能起来」",
+      "subjects": [
+        "Dockerfile",
+        "docker-compose.yml",
+        ".env.production.example",
+        ".dockerignore",
+        "api/production_app.py"
+      ]
+    }
+  ]
 }
