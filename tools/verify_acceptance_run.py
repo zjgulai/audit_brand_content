@@ -168,7 +168,15 @@ def run_row(row):
     #   把它记成 failed 会重演「未测被报成失败」——本执行器自己的 docstring
     #   第一句就写着「未测 ≠ 通过 ≠ 红」，这里必须一致。
     if res["exit_code"] == 2:
-        return "untested", "命令退 2（未测）"
+        # ★ 2026-10-23：退 2 也必须带现场。**T-141 那次只修了 failed 分支，漏了这一条。**
+        #   两个「未测」长得一模一样，含义完全不同：
+        #     · 整条没跑起来 → 退 2，没有任何输出
+        #     · 跑起来了、机器半边绿、只差人工签收 → 也退 2，有明确输出
+        #   只写「命令退 2（未测）」时，读报告的人分不出这两种。
+        #   实测过（#112）：`check_a11y_dual_gate.mjs` 打出
+        #   「机器半边 0 违规 / 人工半边 9 项待真人签收」后退出 2，
+        #   而执行器把它整段吞掉，只留一句「命令退 2（未测）」。
+        return "untested", "命令退 2（未测）%s" % _context(res)
     # ★ 失败必须带现场（2026-10-23 加）。
     #   改前这里只返回 `exit=%s`，而 run_untrusted 明明返回了 stdout/stderr
     #   两个字段（base/sandbox.py:249-250），调用点一个都没接。
@@ -288,7 +296,17 @@ def main():
     #                        **永远不会有 machine 执行点**；该做的是补人工记录。
     #     untested_machine → 执行点待建，**该有人去写 verifier**。
     untested_by_kind = {"machine": 0, "manual": 0, "unverifiable": 0, "": 0}
+    # ★ 2026-10-23 再加一层（ea 报的缺陷 B，我核实属实）：
+    #   **「未映射」与「映射了但退 2」是两件完全不同的事，而它们此前共用一个数。**
+    #     unmapped      → 表里没有执行点，**该有人去建**
+    #     executed_rc2  → 执行点已接上并真跑了，**它退出 2 是判据的一部分**
+    #                     （例如 #112：机器半边已绿、只差真人签收）
+    #   实测：`#112` 接进 `verifier_map` 后 `mapped` 120 → 121，
+    #   而底部 `untested=16 (machine=9, manual=7)` **一个数都没变** ——
+    #   只看末尾三行的人，看不出有一条已经跑了 13 项 AA。
+    untested_by_origin = {"unmapped": 0, "executed_rc2": 0}
     for row in rows:
+        has_exec = bool(row.get("test_id") and row.get("fixture") and row.get("command"))
         status, detail = run_row(row)
         counts[status] += 1
         if status != "passed":
@@ -296,6 +314,7 @@ def main():
             if status == "untested":
                 k = row.get("verifiability") or ""
                 untested_by_kind[k if k in untested_by_kind else ""] += 1
+                untested_by_origin["executed_rc2" if has_exec else "unmapped"] += 1
     print("mapped=%d" % mapped)
     print("passed=%d failed=%d untested=%d" % (
         counts["passed"], counts["failed"], counts["untested"]))
@@ -303,6 +322,9 @@ def main():
     print("untested_split: machine=%d manual=%d unverifiable=%d unknown=%d" % (
         untested_by_kind["machine"], untested_by_kind["manual"],
         untested_by_kind["unverifiable"], untested_by_kind[""]))
+    # 第二本账：这个「未测」是**没人建执行点**，还是**建了、跑了、退出 2**。
+    print("untested_origin: unmapped=%d executed_rc2=%d" % (
+        untested_by_origin["unmapped"], untested_by_origin["executed_rc2"]))
 
     if counts["failed"]:
         return 1

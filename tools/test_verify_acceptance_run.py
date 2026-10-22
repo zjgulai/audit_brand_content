@@ -176,6 +176,38 @@ def main():
            "split=%r total_split=%s untested=%s"
            % (split.group(0) if split else None, total_split, n_untested))
 
+    # T-146（2026-10-23，ea 报的缺陷 B，我核实属实）：
+    #   **「未映射」与「映射了但退 2」共用一个数。**
+    #   `#112` 接进 verifier_map 后 mapped 120 → 121，而底部
+    #   `untested=16 (machine=9, manual=7)` 一个数都没变 ——
+    #   只看末尾三行的人，看不出有一条已经跑了 13 项 AA。
+    origin = re.search(r"untested_origin: unmapped=(\d+) executed_rc2=(\d+)", real_out)
+    o_total = (int(origin.group(1)) + int(origin.group(2))) if origin else -1
+    report(origin is not None and o_total == n_untested,
+           "T-146 untested 按来源分两本账（未映射 / 已执行但退 2），且之和 == untested",
+           "origin=%r total=%s untested=%s"
+           % (origin.group(0) if origin else None, o_total, n_untested))
+
+    # 反向对照：造一行**没有执行点** → unmapped 必须是 1、executed_rc2 必须是 0。
+    t8 = _make_table("无 test_id 的一行")
+    rc, out8 = _run(t8)
+    o8 = re.search(r"untested_origin: unmapped=(\d+) executed_rc2=(\d+)", out8)
+    report(o8 is not None and o8.group(1) == "1" and o8.group(2) == "0",
+           "T-146 反向对照：没有执行点 → 记 unmapped，不记 executed_rc2",
+           "rc=%s origin=%r" % (rc, o8.group(0) if o8 else None))
+
+    # 反向对照：造一行**有执行点但退 2** → executed_rc2 必须是 1、unmapped 必须是 0。
+    rc2py = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8")
+    rc2py.write("import sys\nsys.exit(2)\n")
+    rc2py.close()
+    t9 = _make_table("test_id: T-9; fixture: %s; command: python3 %s"
+                     % (fixture.name, rc2py.name))
+    rc, out9 = _run(t9)
+    o9 = re.search(r"untested_origin: unmapped=(\d+) executed_rc2=(\d+)", out9)
+    report(o9 is not None and o9.group(1) == "0" and o9.group(2) == "1",
+           "T-146 反向对照：有执行点但退 2 → 记 executed_rc2，不记 unmapped",
+           "rc=%s origin=%r" % (rc, o9.group(0) if o9 else None))
+
     # 反向对照：manual 与 machine 的**分界必须来自表里的那一列**，不是常量。
     #   造一张只有 manual 行的表 → machine 必须是 0。
     t7 = _make_table("test_id: T-7; fixture: %s; command: true" % fixture.name)
