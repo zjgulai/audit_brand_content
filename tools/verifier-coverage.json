@@ -719,6 +719,16 @@
         "Dockerfile",
         "api/production_app.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_pass_reachability.py",
+      "asserts": "PASS 为什么出不来，逐环可核：声明空族==数据空族（该族 0 条控制点）→ 真实样本 coverage 恒 partial 且 IR 里逐族指得出 → 输出空间 ⊆ {BLOCK,REVIEW,未审查,待自决} 且不含 PASS → 因果对（empty_families=[] 时合成器出 full、判定表出 PASS）→ Playbook 三句原文仍在 → 源码不许写死空族数；**空族补齐后自动改口要求干净样本必须出 PASS**（U8，不误报）；BLOCK 夹具证明引擎没坏。21 项反向对照",
+      "subjects": [
+        "base/coverage_composer.py",
+        "base/decision_table.py",
+        "research/governance/control-points-v1.json",
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md"
+      ]
     }
   ]
 }

@@ -38,7 +38,10 @@
 
 **四、当前真实数据下 `full` 不可达 —— 这是事实，不是 bug**
 
-    `research/governance/control-points-v1.json` 现在有 4 个空族（场景/权利/渠道/品牌）。
+    `research/governance/control-points-v1.json` 的 `empty_families` 现在列着
+    场景控制 / 权利控制 / 渠道控制三族 —— **数量以表为准，这里不写数字**
+    （Playbook §5.3 明令「空族数一律读 empty_families，不要写死三族或四族」；
+      本行原先写成四族（场景/权利/渠道/品牌），与表不符，2026-10-22 已删）。
     按规则，空族计入 partial，所以**每一份内容都是 partial、PASS 永远出不来**。
     这与 Playbook §5.3 的连带结论一致。
 
