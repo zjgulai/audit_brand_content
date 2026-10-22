@@ -67,6 +67,7 @@ class ActionBody(VersionBody):
     field_path: Optional[str] = None
     fragment: Any = None
     assignee: Optional[str] = None
+    reason: Optional[str] = None
 
 
 class AppealCreate(BaseModel):
@@ -348,11 +349,12 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         if code in ("version_conflict", "already_claimed", "case_closed",
                     "not_assignee", "not_primary", "primary_requires_adopt",
                     "lease_expired", "lease_active", "not_claimed",
-                    "idempotency_conflict", "already_ingested"):
+                    "idempotency_conflict", "already_ingested",
+                    "unadjudicated_findings", "invalid_finding_transition"):
             if command == "ingest_submission" and code == "version_conflict":
                 raise HTTPException(409, "already_ingested: 该 submission 已建案")
             raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
-        if code in ("draft_not_found",):
+        if code in ("draft_not_found", "finding_not_found"):
             raise HTTPException(404, "%s: %s" % (code, getattr(exc, "detail", "")))
         if code and (code.startswith("bad_") or code in
                      ("idempotency_key_missing", "actor_missing")):
@@ -526,7 +528,20 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                              "fragment": body.fragment},
                     idempotency_key=idempotency_key,
                     legacy_fn=lambda: None)
-            # finding confirm/reject 不在首批生产能力内
+            if body.action in ("confirm", "reject"):
+                if not body.finding_id:
+                    raise HTTPException(400, "confirm/reject 必须带 finding_id")
+                return run_review_command(
+                    request=request, principal=principal, case_id=id,
+                    command="adjudicate_finding", expected_version=body.version,
+                    payload={
+                        "finding_id": body.finding_id,
+                        "decision": ("confirmed" if body.action == "confirm"
+                                     else "rejected"),
+                        "reason": body.reason or "",
+                    },
+                    idempotency_key=idempotency_key,
+                    legacy_fn=lambda: None)
             raise HTTPException(501, "capability_not_enabled")
 
         def run():

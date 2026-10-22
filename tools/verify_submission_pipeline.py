@@ -50,6 +50,9 @@ try:
     from base.submission_service import SubmissionIngestor
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入入库链路依赖: %s" % exc)
+    print("提示：本验证器需要 fastapi/httpx；请用 `uv run` 或 "
+          "`.venv/bin/python tools/verify_submission_pipeline.py` 运行，"
+          "系统 python3 缺依赖时退 2 不代表实现坏了。")
     sys.exit(2)
 
 TENANT = "t1"

@@ -249,6 +249,17 @@
    ]
   },
   {
+   "verifier": "tools/verify_finding_adjudication.py",
+   "asserts": "T-170a/b：confirm/reject 经 adjudicate_finding 写 authority 的 ir.findings；submit_review 对未裁决 candidate → 409 unadjudicated_findings；重启与投影重建后裁决仍在；/actions capability 未开 501 / 开启 200 成对；非法转移/不存在/未 claim 反向对照；无 candidate 的正常结案不误伤",
+   "subjects": [
+    "base/review_reducer.py",
+    "api/write_api.py",
+    "base/business_event_store.py",
+    "base/projection_store.py",
+    "base/review_command_service.py"
+   ]
+  },
+  {
    "verifier": "tools/verify_finding_store.py",
    "asserts": "finding_store：L2-5 三要素合取 / append-only / DF-1 Draft 拒收 / DF-2 confirmed 缺 authority 拒收 / DF-3",
    "subjects": [

@@ -256,11 +256,13 @@ def main():
             r = client.post("/api/v1/appeals", headers=headers(client, "appeal-1"),
                             json={"case_id": "case-prod", "reason": "x"})
             report(r.status_code == 501, "C14 appeal capability 关闭", r.text)
-            r = client.post("/api/v1/cases/case-prod/actions",
+            r = client.post("/api/v1/cases/case-other/actions",
                             headers=headers(client, "confirm-1"),
-                            json={"action": "confirm", "version": 3,
+                            json={"action": "confirm", "version": 0,
                                   "finding_id": "f-missing"})
-            report(r.status_code == 501, "C15 finding confirm capability 关闭", r.text)
+            report(r.status_code == 409 and "not_assignee" in r.text,
+                   "C15 confirm 已接生产路径（未 claim → 409 not_assignee，不再是 501）",
+                   r.text)
 
             # logout 后旧 session 立即 401
             r = client.post("/api/v1/logout", headers={

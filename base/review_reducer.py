@@ -291,6 +291,36 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         }
         state["fragment_references"].append(ref)
         detail["reference"] = ref
+    elif command == "adjudicate_finding":
+        _require_claim(state, actor, expected_version, now)
+        finding_id = _nonempty(payload.get("finding_id"), "finding_id")
+        decision = payload.get("decision")
+        if decision not in ("confirmed", "rejected"):
+            raise LedgerValidation(
+                "bad_decision", "decision 必须是 confirmed/rejected")
+        ir = state.get("ir")
+        if not isinstance(ir, dict) or not isinstance(ir.get("findings"), list):
+            raise LedgerNotFound("finding_not_found", "案件没有可裁决的 IR findings")
+        index = next((i for i, finding in enumerate(ir["findings"])
+                      if isinstance(finding, dict)
+                      and finding.get("finding_id") == finding_id), None)
+        if index is None:
+            raise LedgerNotFound("finding_not_found", "finding 不存在：%s" % finding_id)
+        finding = ir["findings"][index]
+        if finding.get("status") != "candidate":
+            raise LedgerConflict(
+                "invalid_finding_transition",
+                "只有 candidate 可以做确认/驳回，当前是 %r" % finding.get("status"))
+        updated = copy.deepcopy(finding)
+        updated.update({
+            "status": decision,
+            "adjudicated_by": actor,
+            "adjudicated_at": _iso(now),
+            "adjudication_reason": payload.get("reason") or "",
+        })
+        ir["findings"][index] = updated
+        state["ir"] = ir
+        detail.update({"finding_id": finding_id, "finding_status": decision})
     elif command == "submit_review":
         _require_claim(state, actor, expected_version, now)
         conclusion = payload.get("conclusion")
@@ -298,6 +328,28 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
             raise LedgerValidation("bad_conclusion", "conclusion 必须是 dict")
         if not isinstance(conclusion.get("review_notes"), str) or not conclusion["review_notes"].strip():
             raise LedgerValidation("bad_conclusion", "review_notes 必须是非空字符串")
+        # ★ 橡皮图章守卫：还有 candidate 未裁决，不许直接结案。
+        #   candidate 只可能来自 semantic（rule 命中即 confirmed）；不认识的状态
+        #   一律按未裁决处理（fail-closed），不把坏数据当成「已裁决」。
+        pending = []
+        ir = state.get("ir")
+        if isinstance(ir, dict) and isinstance(ir.get("findings"), list):
+            for finding in ir["findings"]:
+                if not isinstance(finding, dict):
+                    pending.append("<malformed>")
+                    continue
+                status = finding.get("status")
+                # 当前 authority 链只会产出 confirmed/rejected（adjudicate_finding）。
+                # `superseded` 只有旧 FindingStore 的独立路径会写，不属于本 reducer
+                # 的状态；不把它算作已裁决（fail-closed）。将来若加 supersede 命令，
+                # 必须在这里补上它的权威来源。
+                if status not in ("confirmed", "rejected"):
+                    pending.append(finding.get("finding_id") or "<unknown>")
+        if pending:
+            raise LedgerConflict(
+                "unadjudicated_findings",
+                "还有 %d 条 finding 未裁决：%s" % (
+                    len(pending), ", ".join(str(x) for x in pending[:5])))
         formal_id = "formal-" + _hash({
             "case_id": state["case_id"], "actor": actor,
             "version": state["version"] + 1, "conclusion": conclusion,
@@ -346,6 +398,10 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         result["formal"] = copy.deepcopy(state["formal_reviews"][-1])
     if "reference" in detail:
         result["reference"] = copy.deepcopy(detail["reference"])
+    if command == "adjudicate_finding":
+        result["finding"] = copy.deepcopy(next(
+            finding for finding in state["ir"]["findings"]
+            if finding.get("finding_id") == detail["finding_id"]))
     return state, [event], result
 
 
