@@ -660,6 +660,12 @@
       "criteria": "SEC-5-1 / SEC-5-1b",
       "fixture": "{root}/tools/verify_control_points.py",
       "command": "{venv} {root}/tools/verify_control_points.py --row 69"
+    },
+    "119": {
+      "test_id": "acceptance-119",
+      "criteria": "TS-17",
+      "fixture": "{root}/tools/verify_cpu_first.py",
+      "command": "{venv} {root}/tools/verify_cpu_first.py"
     }
   }
 }

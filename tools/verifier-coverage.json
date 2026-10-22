@@ -688,6 +688,18 @@
         ".dockerignore",
         "api/production_app.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_cpu_first.py",
+      "asserts": "行119/TS-17：编排定义（compose/Dockerfile）剥整行注释后无 GPU 预留键与 GPU 基础镜像；依赖清单无 GPU-only 包；不达标时出显式读数（ms + cer/wer，缺 gold/引擎异常落 untested+reason 且读数必须 null 不是 0）；无不自动扩容写法；media 路径无自动放行。A4/C2 成对反向对照每次主检查都跑（注释里提到→不报，真配置→报）",
+      "subjects": [
+        "docker-compose.yml",
+        "Dockerfile",
+        "pyproject.toml",
+        "uv.lock",
+        "tools/benchmark_media.py",
+        "base/media.py"
+      ]
     }
   ]
 }
