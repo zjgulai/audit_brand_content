@@ -84,3 +84,40 @@ Web 已完成本地单进程 claim → draft → submit 验收，但 `ReviewsLed
 - `/healthz` 固定低敏，`/readyz` 真探 authority/projection/session/lease/权限/主体目录。
 
 本地 fake/离线协议与临时仓外目录的验证器可通过；**真实独立飞书应用仍未创建/配置，真实 code exchange、redirect allowlist、scope 和 HTTPS cookie 联调保持退 2 未测**。容器化、目标机、DNS/TLS 也仍未测。本 ADR 的实现完成不代表可部署；部署另需明确授权与环境验收。
+
+## 六、2026-10-22 补记：内容入库是第二条生产写面
+
+> 本节是对 D5「首批只开放复核台账」的**带日期扩展**，不改写上面的旧结论。
+> 触发原因：`PMO/上线前深度盘点-20261022.md` 实测 `api/` 下 `judge_unit` 零命中，
+> 判定引擎与案件系统之间的边是断的；没有内容入库，复核台账只能读夹具。
+
+新增 `POST /api/v1/submissions` 作为内容进入系统的唯一 HTTP 入口：
+
+- 四维校验复用 `base/submission_router.py`；本轮只接 `free_text` / `ad_text`，
+  其他载体显式 `unsupported_source_kind`（422），不假装已接；
+- **判定在 authority 提交之前同步完成**：判定抛错、`run_state != OK` 或 label 非法 →
+  不建案、不写 authority，避免「有案件、无判定」的残件；
+- 案件 state 携带 ContentUnit + ReviewIR；SQLite 投影仍只是可删除、可重建投影，
+  权威仍是不可变 command batch + manifest；
+- 同一 Idempotency-Key 重放先按提交输入哈希命中已提交批次，**不重判**；
+  同一 submission 换 key 重提 → 409 `already_ingested`；
+- `base/authority_query.py` 以 `research/kb/外部标准库-v1.json` 解析控制点依据。
+  `status: research` 条目**可解析为 ok**，但 `resolution_detail.ratification`
+  原样保留「未法务确认」；把它压成 missing 会让 BLOCK 结构性不可达。
+- PASS 在空族（场景/权利/渠道 + 品牌无 active 规则）存在期间**结构性不可达**；
+  干净文本仍落 REVIEW，不以任何方式伪造 PASS。
+
+本轮**不**开放 release / appeal / takedown 的生产写面；
+release-decision 在默认装配走真实 `ReleaseGate`，在生产 capability 下返回
+`501 capability_not_enabled`，不再有「release_gate 未实现」的第二套口径。
+
+> ★ **2026-10-22 当日更正**：上面这句原写「不开放 release / appeal / takedown /
+> **finding confirm-reject**」，而同一天的 `bcf6432` 把 finding confirm-reject
+> **接进了生产**（`adjudicate_finding` 走 authority 命令，不是内存态 `FindingStore`）。
+> 所以本 ADR 若保留原文，会留一条**与代码相反**的记录。
+>
+> 实际状态：**finding 裁决已开放**；release / appeal / takedown 仍未开放。
+> `submit_review` 同时加了橡皮图章守卫 —— 存在未裁决 finding 时拒绝结案
+> （`unadjudicated_findings`，409）。理由见 `bcf6432` 的提交信息：
+> 在此之前，「复核」在结构上是个橡皮图章，而且它可以被合法地跳过。
+
