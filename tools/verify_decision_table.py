@@ -99,6 +99,36 @@ SCAN_WHITELIST = {
 }
 DECISION_FIELDS = {"state", "external_label", "layer"}
 
+# ★ 2026-10-24：第二套判定逻辑不一定叫 `state`。
+#
+#   原扫描器只认**变量名**（或 dict 键名）在 `DECISION_FIELDS` 里时才算命中。
+#   于是 `verdict = "待自决" if ... else "PASS"` 这种写法**整个漏网** ——
+#   它产出的就是对外标签，只是换了个名字。实测变异：
+#     `chain, state, layer = 14, "待自决", "DP1"`
+#     → `verdict = "待自决" if max_sev == "L1" else "PASS"; chain, state, layer = 14, verdict, "DP1"`
+#   改前 survived，改后必须红。
+#
+#   修法：**按产出值判**，与变量名无关 —— 只要有赋值把五标签或 DP 字面量
+#   落到一个非 DECISION_FIELDS 的名字上，同样记命中。
+#
+#   误报靠白名单逐个点名（不做模糊豁免）：
+#     ① `base/reviews_ledger.py:27` `BLOCK_LAYER = "BLOCK"` —— 台账的枚举常量，
+#        不是判定出口；它被 NON_BLOCK_LAYERS 组合成 ALL_LABELS 供校验用。
+#     ② `base/decision_table.py:307` `target_layer = "DP4"/"DP3"` —— DP3/DP4
+#        正是在**唯一那套判定表内部**选层，属于同一处的实现，不是第二套。
+#   白名单只对「产出值」这一支生效；按变量名的旧判据仍然不许豁免。
+SCAN_VALUE_WHITELIST = {
+    ("base/reviews_ledger.py", "BLOCK_LAYER"): (
+        "台账枚举常量（NON_BLOCK_LAYERS 的补集，供 ALL_LABELS 校验用），"
+        "不是判定出口。"),
+}
+
+# ★ 这里原本还写过一条 `("base/decision_table.py", "target_layer")` 的白名单，
+#   2026-10-24 当场删掉 —— 因为 `_scan_excluded()` **明确跳过
+#   `base/decision_table.py`**（它是唯一合法的判定入口，扫它等于自己扫自己）。
+#   那条白名单**永远不会生效**：它和它要豁免的命中一样，都是零消费者的装饰。
+#   这正是 §2.4 那个病 —— 而我是为了修 §2.4 才写的它。
+
 
 def F(fid="f1", status="confirmed", sev="L4", auth="ok", rc=False):
     return {
@@ -137,8 +167,21 @@ def _allowed(field, node):
         and node.value in values
 
 
-def decision_writes_in_text(text):
-    """返回 [(lineno, field)]：命中「状态/层/对外标签被写成五标签或 DP 值」。"""
+def decision_writes_in_text(text, path=""):
+    """返回 [(lineno, field)]：命中「状态/层/对外标签被写成五标签或 DP 值」。
+
+    `path` 只用于「按产出值判」那一支的白名单匹配（`SCAN_VALUE_WHITELIST`
+    以 **仓内相对路径** 为键，例如 `base/reviews_ledger.py`）；传绝对路径也行，
+    内部会归一化成相对 ROOT 的形式。不给 path 时白名单不生效 —— 只会更严不会更松。
+    """
+    key_path = path
+    if path:
+        try:
+            rel = os.path.relpath(os.path.abspath(path), ROOT)
+            if not rel.startswith(".."):
+                key_path = rel.replace(os.sep, "/")
+        except (OSError, ValueError):
+            key_path = path
     try:
         tree = ast.parse(text)
     except SyntaxError as e:
@@ -146,6 +189,16 @@ def decision_writes_in_text(text):
     hits = []
 
     class V(ast.NodeVisitor):
+        def _note_value(self, name, node, lineno, path):
+            """按**产出值**判：与变量名无关。白名单逐个点名。"""
+            for x in ([node.body, node.orelse]
+                      if isinstance(node, ast.IfExp) else [node]):
+                if isinstance(x, ast.Constant) and isinstance(x.value, str) \
+                        and (x.value in FIVE_STATES or x.value in LAYERS):
+                    if (path, name) in SCAN_VALUE_WHITELIST:
+                        continue
+                    hits.append((lineno, "%s=%s" % (name, x.value)))
+
         def visit_Assign(self, node):
             for target in node.targets:
                 name = None
@@ -159,6 +212,8 @@ def decision_writes_in_text(text):
                                              and (_allowed(name, v.body)
                                                   or _allowed(name, v.orelse))):
                         hits.append((node.lineno, name))
+                elif isinstance(name, str):
+                    self._note_value(name, node.value, node.lineno, key_path)
             self.generic_visit(node)
 
         def visit_AnnAssign(self, node):
@@ -174,6 +229,8 @@ def decision_writes_in_text(text):
                                                 and (_allowed(k.value, v.body)
                                                      or _allowed(k.value, v.orelse))):
                         hits.append((node.lineno, k.value))
+                elif isinstance(k, ast.Constant) and isinstance(k.value, str):
+                    self._note_value(k.value, v, node.lineno, key_path)
             self.generic_visit(node)
 
     V().visit(tree)
@@ -183,7 +240,7 @@ def decision_writes_in_text(text):
 def decision_writes_in_file(path):
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
-            return decision_writes_in_text(f.read())
+            return decision_writes_in_text(f.read(), path)
     except OSError:
         return [("unreadable", 0)]
 
@@ -941,6 +998,23 @@ def main():
             f.write(rogue)
         T("J5 临时副本塞入 state=BLOCK if ... → 扫描必须命中",
           decision_writes_in_file(rogue_path) != [], str(decision_writes_in_file(rogue_path)))
+        # ★ J5b（2026-10-24）：按**产出值**判的那一支的执行点。
+        #
+        #   上面 J5 写的是 `state = ...`，走的是「变量名在 DECISION_FIELDS 里」
+        #   的旧分支 —— 它对「换个名字的第二套逻辑」是盲的。这一条写 `verdict = ...`，
+        #   名字不在 DECISION_FIELDS，只有按产出值判才抓得到。
+        #   **只加 J5 不加 J5b，新分支就永远没被验过。**
+        rogue2 = (original
+                  + '\nverdict = "BLOCK" if True else "REVIEW"\n')
+        rogue2_path = os.path.join(tmp, "review_api_verdict.py")
+        with open(rogue2_path, "w", encoding="utf-8") as f:
+            f.write(rogue2)
+        j5b = decision_writes_in_file(rogue2_path)
+        T("J5b ★ 换名（verdict=标签）也必须命中 —— 按产出值判，与变量名无关",
+          j5b != [], str(j5b))
+        # 且它必须被记在**那个新名字**上，而不是别的：
+        T("J5c J5b 的命中记在 verdict 上（不是碰巧被旧分支记成别的）",
+          any("verdict" in str(f) for _, f in j5b), str(j5b))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     T("J6 原文件删掉变异后不命中（反向对照不是恒红）",
