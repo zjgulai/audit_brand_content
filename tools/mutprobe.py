@@ -144,6 +144,8 @@ def run_cmd(wt, cmd, timeout):
 
 
 RE_FILE_FRAME = re.compile(r'^\s+File "([^"]+)", line \d+', re.M)
+# 异常类型那一行：`TypeError: ...` / `AssertionError: ...` / `SystemExit: 1`
+RE_EXC_LINE = re.compile(r"^([A-Za-z_][A-Za-z0-9_.]*)(?::|\s*$)", re.M)
 
 
 def _last_frame(output):
@@ -152,31 +154,65 @@ def _last_frame(output):
     return frames[-1] if frames else None
 
 
+def _exc_type(output):
+    """Traceback 尾部的异常类型名（`TypeError` 等）。取不到 → None。"""
+    tb = output.rfind("Traceback (most recent call last)")
+    if tb < 0:
+        return None
+    for line in output[tb:].splitlines()[1:]:
+        s = line.strip()
+        if not s or s.startswith('File "') or s.startswith("^") or s.startswith("~"):
+            continue
+        m = RE_EXC_LINE.match(s)
+        if m and not s.startswith(("raise ", "return", "assert ")):
+            return m.group(1)
+    return None
+
+
+# ★ 只有这几种「异常」能算断言抓住。其它一律算崩。
+#
+#   为什么不是「按文件判」：我第一版就是按「崩溃点落在被变异的文件里」判的，
+#   而 _last_frame 落在**验证器自己**身上时就判 killed —— 于是
+#   `verify_decision_table.py` 的 F2 有一个与变异无关的潜在 TypeError
+#   （`sorted({None, "待自决"})`），任何把输入推进 NO_CHAIN 的变异都会让它崩，
+#   而我的工具会把这个崩溃记成 killed。**假 killed 比假绿更坏**：
+#   假绿会被审计抓出来，假 killed 会让一条没验的判据心安理得地留在 passed。
+#   （这条由 mutation-probe 的探针 agent 当场报出来：verify_decision_table F2。）
+#
+#   判据改成**看异常类型**：验收器的断言失败是 AssertionError；
+#   改崩了是 NameError/TypeError/KeyError/AttributeError；语法错是 SyntaxError。
+#   只有 AssertionError 说明「有人写了断言并且它不成立」。
+OK_EXC = frozenset({"AssertionError", "SystemExit"})
+
+
 def judge(rc, output, mutated_paths=()):
     """命令结果 → 三态。**崩溃不算抓住。**
 
-    ★ 这里有个我一开始写错的地方，值得留在这里：
-      `Traceback` 这个形状本身分不出三种完全不同的情况 ——
-        ① 验收器的 `assert` 失败了          → 这是 killed（我们的目标）
-        ② 变异把生产代码改崩了（NameError） → 这不是 killed
-        ③ 变异写出语法错误（SyntaxError）   → 这也不是 killed
-      三者的输出**都以 `Traceback (most recent call last)` 开头**。
-      所以判据不能是「有没有 Traceback」，而是**最后一帧落在哪个文件**：
-        · 落在被变异的文件里 → 那是②③，变异自己崩了，不算抓住
-        · 落在别处（验收器/harness）→ 那是①，验收器发现不对了，算 killed
+    三种输出会一起出现，必须分开：
+
+      · 验收器打印 `✗ ...` 后 `return 1`  —— **没有 Traceback**，最常见的形态 → killed
+      · 验收器的 `assert` 不成立           —— `AssertionError`            → killed
+      · 改崩了 / 变异写出语法错 / 验收器自身潜在 bug
+                                          —— 其它异常类型                → untested
     """
     if rc == 0:
         return SURVIVED, "变异后命令仍退 0 —— 这条判据没有活着的执行点"
     if not RE_TRACEBACK.search(output):
-        # 绝大多数验收器是「打印 ✗ 再 exit 1」，根本不抛异常。
         return KILLED, "变异后命令退 %d 且无 Traceback —— 有断言拦住了它" % rc
+
+    exc = _exc_type(output)
     frame = _last_frame(output)
-    if frame and mutated_paths and any(
-            os.path.realpath(frame) == os.path.realpath(p) for p in mutated_paths):
-        return UNTESTED, ("变异后命令退 %d，但崩溃点在**被变异的文件**里（%s）—— "
-                          "那是改崩了，不是断言抓住了。不算 killed。" % (rc, frame))
-    return KILLED, ("变异后命令退 %d，崩溃点在验收器一侧（%s）—— "
-                    "是它自己的断言抓住了" % (rc, frame or "未知"))
+    if exc in OK_EXC:
+        return KILLED, ("变异后命令退 %d，异常是 %s 挂在 %s —— 断言不成立，抓住了"
+                        % (rc, exc, frame or "未知"))
+    return UNTESTED, (
+        "变异后命令退 %d，但异常是 **%s**（最后一帧 %s）—— 那是崩了，不是断言抓住了。"
+        "不许算 killed。%s"
+        % (rc, exc or "未知", frame or "未知",
+           "（崩溃点在被变异的文件里，是变异自己改崩的）"
+           if frame and mutated_paths and any(
+               os.path.realpath(frame) == os.path.realpath(p) for p in mutated_paths)
+           else "（崩溃点在别处 —— 可能是验收器的潜在缺陷，与本次变异无关）"))
 
 
 def probe(wt, muts, cmd, timeout):
@@ -253,8 +289,33 @@ def selftest():
 
     # S5：变异让模块崩掉 → 命令退非零，但那是 Traceback，不是断言
     crashed = go([{"file": "mod.py", "old": "def g():", "new": "def g(:"}])
-    ok("S5 ★ 变异导致崩溃 → untested（崩溃不许冒充「断言抓住了」）",
+    ok("S5 ★ 变异导致崩溃（NameError）→ untested（崩溃不许冒充「断言抓住了」）",
        crashed == UNTESTED, str(crashed))
+
+    # ★ S7：这一条是 mutation-probe 的探针 agent 当场报出来的真缺陷。
+    #   验收器自己有一个**与变异无关**的潜在 TypeError 时，任何把它推进那条路径的
+    #   变异都会让它崩 —— 第一版判据按「崩溃点落在哪个文件」判，于是把崩溃记成 killed。
+    #   这里直接构造那个形状：断言 + 一个会抛 TypeError 的排序。
+    with open(os.path.join(tmp, "checker_crash.py"), "w") as f:
+        f.write("import mod\nassert mod.f() == 2, 'f 变了'\nprint(sorted({None, 'x'}))\n")
+    crashy = "python3 checker_crash.py"
+    v7 = UNTESTED
+    try:
+        v7 = probe(tmp, [{"file": "mod.py", "old": "return 1 + 1",
+                          "new": "return 1 + 3"}], crashy, 60)[0]
+    except Untested as exc:
+        v7 = "Untested: %s" % exc
+    # 基线就崩 → probe 会判 untested，这也是「不许算数」的正确方向之一
+    ok("S7 ★ 验收器自身有无关崩溃点时，不许把崩溃记成 killed",
+       v7 in (UNTESTED,) or str(v7).startswith("Untested"), str(v7))
+
+    # ★ S8：验收器用 assert 时，AssertionError 必须算 killed（别把 S5/S7 修过头）
+    with open(os.path.join(tmp, "checker_assert.py"), "w") as f:
+        f.write("import mod\nassert mod.f() == 2\n")
+    v8 = probe(tmp, [{"file": "mod.py", "old": "return 1 + 1",
+                      "new": "return 1 + 3"}], "python3 checker_assert.py", 60)[0]
+    ok("S8 反向对照：验收器的 AssertionError **必须**算 killed（别修过头）",
+       v8 == KILLED, str(v8))
 
     ok("S6 ★ 主检出目录（.git 是目录）→ 拒绝",
        _expect_refuse() == "refused")
