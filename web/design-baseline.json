@@ -2,20 +2,15 @@
  "schema_version": 1,
  "$note": "DT-3 的裸值基线（file+selector+property+value，shrink-only）。只由 check_design_tokens.mjs --rebase-baseline 生成；手改会被下一次 --check 当成「新增裸值」。visual 段由 check_visual.mjs --update 维护。",
  "generated_by": "web/scripts/check_design_tokens.mjs --rebase-baseline",
- "generated_at": "2026-10-22",
+ "generated_at": "2026-10-23",
+ "max_tokens": 95,
+ "category_caps": {
+  "hex_literals": 0,
+  "non_var_rgb_hsl": 0,
+  "hsl_var_wrappers_all_props": 96,
+  "px_literals_all_props": 37
+ },
  "tokens": [
-  {
-   "file": "src/styles.css",
-   "selector": "html",
-   "prop": "color",
-   "value": "hsl(var(--foreground))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": "html",
-   "prop": "background",
-   "value": "hsl(var(--background))"
-  },
   {
    "file": "src/styles.css",
    "selector": "a",
@@ -27,12 +22,6 @@
    "selector": "a:focus-visible, a:focus, button:focus-visible, button:focus, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible",
    "prop": "outline",
    "value": "3px solid hsl(var(--ring))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": "a:focus-visible, a:focus, button:focus-visible, button:focus, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible",
-   "prop": "outline-offset",
-   "value": "2px"
   },
   {
    "file": "src/styles.css",
@@ -51,12 +40,6 @@
    "selector": ".skip-link:focus",
    "prop": "outline",
    "value": "3px solid hsl(var(--ring))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".skip-link:focus",
-   "prop": "outline-offset",
-   "value": "2px"
   },
   {
    "file": "src/styles.css",
@@ -175,12 +158,6 @@
   {
    "file": "src/styles.css",
    "selector": ".btn--primary",
-   "prop": "border-color",
-   "value": "hsl(var(--brand))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".btn--primary",
    "prop": "color",
    "value": "hsl(var(--brand-foreground))"
   },
@@ -188,12 +165,6 @@
    "file": "src/styles.css",
    "selector": ".btn--primary:hover:not(:disabled)",
    "prop": "background",
-   "value": "hsl(var(--brand-hover))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".btn--primary:hover:not(:disabled)",
-   "prop": "border-color",
    "value": "hsl(var(--brand-hover))"
   },
   {
@@ -378,12 +349,6 @@
   },
   {
    "file": "src/styles.css",
-   "selector": ".queue__row[aria-current=\"true\"]",
-   "prop": "border-left-color",
-   "value": "hsl(var(--brand))"
-  },
-  {
-   "file": "src/styles.css",
    "selector": ".queue__row-meta",
    "prop": "color",
    "value": "hsl(var(--muted-foreground))"
@@ -531,12 +496,6 @@
    "selector": ".state--forbidden",
    "prop": "border-color",
    "value": "hsl(var(--bad))"
-  },
-  {
-   "file": "src/styles.css",
-   "selector": ".state--forbidden",
-   "prop": "border-width",
-   "value": "2px"
   },
   {
    "file": "src/styles.css",

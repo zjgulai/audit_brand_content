@@ -235,6 +235,20 @@ function loadJson(p, fallback) {
   }
 }
 
+/**
+ * 全文件口径统计 legacy CSS（如 web/src/styles.css，不含 tokens.css）的字面量分布：
+ * 区分「真裸值（非 var 的色值、字号/间距 px）」与「函数包装器 / 边框线宽 / 药丸圆角 / 44px 触控底线 / @media 断点」。
+ */
+function countCssLiterals(src) {
+  const clean = src.replace(/\/\*[\s\S]*?\*\//g, "");
+  const hex = (clean.match(/#[0-9a-fA-F]{3,8}\b/g) || []).length;
+  const fnAll = clean.match(/\b(?:rgba?|hsla?)\([^)]*\)/g) || [];
+  const fnWithVar = fnAll.filter((m) => /var\(--/.test(m)).length;
+  const fnBare = fnAll.length - fnWithVar;
+  const pxAll = (clean.match(/\b\d*\.?\d+px\b/g) || []).length;
+  return { hex, fnAll: fnAll.length, fnWithVar, fnBare, pxAll };
+}
+
 // ── 主检查 ───────────────────────────────────────────────────────────────
 function runCheck(root) {
   const files = gitFiles(root);
@@ -286,8 +300,39 @@ function runCheck(root) {
       if (!known.has(k)) newOnes.push(`${e.file}: ${e.selector} { ${e.prop}: ${e.value} }`);
     }
     const removed = [...known].filter((k) => !seen.has(k)).length;
+    const maxTokens = typeof baseline.max_tokens === "number" ? baseline.max_tokens : known.size;
+    if (seen.size > maxTokens) {
+      newOnes.push(`历史裸值存量越过天花板：当前 ${seen.size} > 上限 ${maxTokens}（严禁增长）`);
+    }
+    if (known.size > maxTokens) {
+      newOnes.push(`design-baseline.json 的 tokens 条数（${known.size}）超出上限 max_tokens（${maxTokens}）`);
+    }
+    const lit = { hex: 0, fnAll: 0, fnWithVar: 0, fnBare: 0, pxAll: 0 };
+    for (const f of legacyCss) {
+      const c = countCssLiterals(read(f));
+      lit.hex += c.hex;
+      lit.fnAll += c.fnAll;
+      lit.fnWithVar += c.fnWithVar;
+      lit.fnBare += c.fnBare;
+      lit.pxAll += c.pxAll;
+    }
+    if (lit.hex > 0 || lit.fnBare > 0) {
+      newOnes.push(`legacy CSS 出现真颜色裸值：hex=${lit.hex}, non_var_rgb_hsl=${lit.fnBare}`);
+    }
+    const caps = baseline.category_caps;
+    if (caps && typeof caps === "object") {
+      if (typeof caps.px_literals_all_props === "number" && lit.pxAll > caps.px_literals_all_props) {
+        newOnes.push(`legacy CSS 全文件 px 字面量增长：当前 ${lit.pxAll} > 上限 ${caps.px_literals_all_props}`);
+      }
+      if (typeof caps.hsl_var_wrappers_all_props === "number" && lit.fnWithVar > caps.hsl_var_wrappers_all_props) {
+        newOnes.push(`legacy CSS 全文件 hsl(var(--*)) 包装数增长：当前 ${lit.fnWithVar} > 上限 ${caps.hsl_var_wrappers_all_props}`);
+      }
+    }
     push("DT-3", newOnes, [], [],
-      [`基线 ${known.size} 条 · 当前 ${seen.size} 条 · 新增 ${newOnes.length} · 已删除 ${removed}（删除允许，shrink-only）`]);
+      [
+        `基线 ${known.size} 条（上限 ${maxTokens}）· 当前 ${seen.size} 条 · 新增 ${newOnes.length} · 已删除 ${removed}（shrink-only）`,
+        `全文件分项读数：裸 hex=${lit.hex} · 非 var rgb/hsl=${lit.fnBare} · hsl(var(--*))=${lit.fnWithVar} · px 字面量=${lit.pxAll}`,
+      ]);
   }
 
   // DT-4 / DT-5 / DT-7：判据对象是 tokens.css（Stage 2 才建）
@@ -491,11 +536,28 @@ function rebaseBaseline(root) {
     }
   }
   const old = loadJson(path.join(WEB, "design-baseline.json"), {}) || {};
+  const lit = { hex: 0, fnAll: 0, fnWithVar: 0, fnBare: 0, pxAll: 0 };
+  for (const f of files.filter((x) => /^web\/src\/.*\.css$/.test(x))) {
+    if (f === "web/src/styles/tokens.css") continue;
+    const c = countCssLiterals(fs.readFileSync(path.join(root, f), "utf8"));
+    lit.hex += c.hex;
+    lit.fnAll += c.fnAll;
+    lit.fnWithVar += c.fnWithVar;
+    lit.fnBare += c.fnBare;
+    lit.pxAll += c.pxAll;
+  }
   const doc = {
     schema_version: 1,
     "$note": "DT-3 的裸值基线（file+selector+property+value，shrink-only）。只由 check_design_tokens.mjs --rebase-baseline 生成；手改会被下一次 --check 当成「新增裸值」。visual 段由 check_visual.mjs --update 维护。",
     "generated_by": "web/scripts/check_design_tokens.mjs --rebase-baseline",
     "generated_at": new Date().toISOString().slice(0, 10),
+    max_tokens: tokens.length,
+    category_caps: {
+      hex_literals: lit.hex,
+      non_var_rgb_hsl: lit.fnBare,
+      hsl_var_wrappers_all_props: lit.fnWithVar,
+      px_literals_all_props: lit.pxAll,
+    },
     tokens,
     visual: old.visual ?? null,
   };

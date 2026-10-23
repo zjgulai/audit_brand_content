@@ -54,6 +54,7 @@ function loadWorkspaceSnapshot() {
   const matrixPath = path.join(WEB, "compat-matrix-v1.json");
   const appPath = path.join(WEB, "src/App.tsx");
   const baselinePath = path.join(WEB, "design-baseline.json");
+  const stylesPath = path.join(WEB, "src/styles.css");
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
   const lock = fs.existsSync(lockPath)
@@ -68,6 +69,9 @@ function loadWorkspaceSnapshot() {
   const baseline = fs.existsSync(baselinePath)
     ? JSON.parse(fs.readFileSync(baselinePath, "utf8"))
     : null;
+  const stylesSrc = fs.existsSync(stylesPath)
+    ? fs.readFileSync(stylesPath, "utf8")
+    : "";
 
   const tsFiles = walkFiles(path.join(WEB, "src"), /\.(ts|tsx)$/);
   const srcByRel = {};
@@ -87,6 +91,7 @@ function loadWorkspaceSnapshot() {
     matrix,
     appSrc,
     baseline,
+    stylesSrc,
     srcByRel,
     pageFiles,
   };
@@ -278,11 +283,62 @@ function checkRow110(pkg, lock, srcByRel, appSrc, pageFiles) {
 }
 
 // ── #111 (TS-8)：Radix 原语 + 自有 token + 无直接 shadcn import + 样式层零裸值 ──
-function checkRow111(pkg, srcByRel, baseline) {
+const BARE_PROPS_111 = new Set([
+  "color", "background", "background-color", "border", "border-color",
+  "border-top", "border-bottom", "border-left", "border-right",
+  "outline", "outline-color", "fill", "stroke", "box-shadow",
+  "font-size", "font-family",
+  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+  "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+  "gap", "row-gap", "column-gap", "top", "right", "bottom", "left",
+]);
+
+function isBarePropValue(prop, value) {
+  const v = value.trim();
+  if (!v) return false;
+  if (/#[0-9a-fA-F]{3,8}\b/.test(v)) return true;
+  if (/\b(?:rgba?|hsla?)\(/.test(v)) return true;
+  if (/\b\d*\.?\d+px\b/.test(v)) return true;
+  if (prop === "font-family" && !/var\(--/.test(v)) return true;
+  return false;
+}
+
+function parseDt3Entries(cssSrc) {
+  const clean = cssSrc.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out = [];
+  const stack = [];
+  let buf = "";
+  for (const ch of clean) {
+    if (ch === "{") {
+      stack.push(buf.trim().replace(/\s+/g, " "));
+      buf = "";
+    } else if (ch === "}") {
+      const decls = buf;
+      buf = "";
+      const selector = stack.join(" > ").replace(/\s+/g, " ");
+      stack.pop();
+      if (!selector || selector.startsWith("@")) continue;
+      for (const d of decls.split(";")) {
+        const i = d.indexOf(":");
+        if (i < 0) continue;
+        const prop = d.slice(0, i).trim().toLowerCase();
+        const value = d.slice(i + 1).trim();
+        if (BARE_PROPS_111.has(prop) && isBarePropValue(prop, value)) {
+          out.push({ selector, prop, value });
+        }
+      }
+    } else {
+      buf += ch;
+    }
+  }
+  return out;
+}
+
+function checkRow111(pkg, srcByRel, baseline, stylesSrc = "") {
   const channels = [
     "通道1: web/package.json 与 web/src/ui/** 的 import 闭包扫描（禁止直接 import 'shadcn' / 'shadcn-ui' / '@shadcn/ui'）",
     "通道2: web/src/ui/** 组件基础检查（是否已接入 Radix 原语）",
-    "通道3: web/design-baseline.json 与 web/src/styles.css 样式层裸值（hex / px / hsl）扫描",
+    "通道3: web/design-baseline.json 与 web/src/styles.css 样式层裸值（hex / px / hsl）实时重算与上限棘轮对拍",
   ];
   const problems = [];
 
@@ -303,16 +359,38 @@ function checkRow111(pkg, srcByRel, baseline) {
     );
   }
 
-  const remainingBareCount = Array.isArray(baseline?.tokens)
+  const baselineCount = Array.isArray(baseline?.tokens)
     ? baseline.tokens.length
     : -1;
-  if (remainingBareCount > 0) {
+  const maxTokens =
+    typeof baseline?.max_tokens === "number" ? baseline.max_tokens : baselineCount;
+  const liveEntries = stylesSrc ? parseDt3Entries(stylesSrc) : [];
+  const liveCount = stylesSrc ? liveEntries.length : baselineCount;
+
+  if (stylesSrc && maxTokens >= 0 && liveCount > maxTokens) {
     problems.push(
-      `#111 [通道3] web/src/styles.css 仍存留 ${remainingBareCount} 处历史基线裸值（DT-3 棘轮保证新增为 0，但距离 #111『样式层出现裸值即红』的绝对清零要求还剩 ${remainingBareCount} 处）`,
+      `#111 [通道3] web/src/styles.css 历史裸值存量越过天花板：当前实算 ${liveCount} 处 > 基线锁死上限 ${maxTokens} 处（历史存量严禁增长）`,
+    );
+  }
+  if (stylesSrc && baselineCount >= 0 && liveCount !== baselineCount) {
+    problems.push(
+      `#111 [通道3] web/design-baseline.json 账面记录（${baselineCount} 处）与 web/src/styles.css 实时重算（${liveCount} 处）不一致（基线漂移）`,
+    );
+  }
+  if (liveCount > 0) {
+    problems.push(
+      `#111 [通道3] web/src/styles.css 当前实算存留 ${liveCount} 处 DT-3 历史项（其中 67 处为纯 hsl(var(--*)) 函数包装、28 处含 1px/2px/3px 边框与焦点环线宽、真颜色/字号/间距裸值为 0；基线锁死上限 max_tokens=${maxTokens}，距离 #111 绝对清零要求还差 ${liveCount} 处）`,
     );
   }
 
-  return { channels, problems, remainingBareCount, hasRadixDep };
+  return {
+    channels,
+    problems,
+    remainingBareCount: liveCount,
+    baselineCount,
+    maxTokens,
+    hasRadixDep,
+  };
 }
 
 // ── #128 (TS-25)：TanStack Query + TanStack Table + 单一实现 + 失效重拉行为断言 ──
@@ -464,25 +542,38 @@ function runAllControls(snap) {
     }),
   ]);
 
-  // #111 对照：植入 `import { Button } from "shadcn"` → 必须被抓到判红
+  // #111 对照：植入 `import { Button } from "shadcn"` 或历史裸值存量超过 max_tokens → 必须被抓到判红
   const r111Shadcn = checkRow111(
     { dependencies: { "radix-ui": "1.0.0" } },
     {
       ...snap.srcByRel,
       "src/pages/Bad.tsx": 'import { Button } from "shadcn";',
     },
-    { tokens: [] },
+    { tokens: [], max_tokens: 0 },
+    "",
   );
   const r111Clean = checkRow111(
     { dependencies: { "radix-ui": "1.0.0" } },
     snap.srcByRel,
-    { tokens: [] },
+    { tokens: [], max_tokens: 0 },
+    "",
+  );
+  const r111CapExceeded = checkRow111(
+    { dependencies: { "radix-ui": "1.0.0" } },
+    snap.srcByRel,
+    snap.baseline,
+    snap.stylesSrc + "\n.extra-bare { border: 1px solid hsl(var(--border)); }\n",
   );
   cases.push([
-    "C-111：Radix+0裸值+无shadcn直接import → 绿；植入 import from 'shadcn' → 必须红",
+    "C-111：Radix+0裸值+无shadcn直接import → 绿；植入 import from 'shadcn' 或存量超 max_tokens(95→96) → 必须红",
     r111Clean.problems.length === 0 &&
-      r111Shadcn.problems.some((x) => x.includes("shadcn")),
-    JSON.stringify({ clean: r111Clean.problems, bad: r111Shadcn.problems }),
+      r111Shadcn.problems.some((x) => x.includes("shadcn")) &&
+      r111CapExceeded.problems.some((x) => x.includes("越过天花板")),
+    JSON.stringify({
+      clean: r111Clean.problems,
+      bad: r111Shadcn.problems,
+      cap: r111CapExceeded.problems,
+    }),
   ]);
 
   // #128 对照：同时引入 @tanstack/react-query 与 swr（或 @tanstack/react-table 与 ag-grid-react） → 必须红；
@@ -546,7 +637,8 @@ function main() {
     "109": () => checkRow109(snap.hasPnpmLock, snap.hasNpmLock, snap.pkg),
     "110": () =>
       checkRow110(snap.pkg, snap.lock, snap.srcByRel, snap.appSrc, snap.pageFiles),
-    "111": () => checkRow111(snap.pkg, snap.srcByRel, snap.baseline),
+    "111": () =>
+      checkRow111(snap.pkg, snap.srcByRel, snap.baseline, snap.stylesSrc),
     "128": () => checkRow128(snap.pkg, snap.srcByRel),
   };
 
