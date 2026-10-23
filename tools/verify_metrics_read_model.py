@@ -39,7 +39,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "base"))
 
 try:
-    from metrics_read_model import MetricsReadModel
+    from metrics_read_model import MetricsReadModel, FAILURE_KINDS
 except Exception as e:  # noqa: BLE001
     print("❌ 导入 base/metrics_read_model.py 失败：%s" % e)
     sys.exit(1)
@@ -115,6 +115,26 @@ def dataset():
     return cases
 
 
+def dataset_for_failure_kinds():
+    """验收表 #9 的专用夹具：empty 2 / parse_error 3 / fetch_error 1 / unsupported 1。
+
+    ★ 与 `dataset()` 分开：那一份是给召回/误判/未覆盖口径用的，
+      四种 failure_kind 在里面只有 2 条 fetch_error。要验「四类分别可见」，
+      夹具必须**每一类都有已知条数**，否则测出来的只是「键存在」。
+    """
+    out = []
+    for kind, n in (("empty", 2), ("parse_error", 3),
+                    ("fetch_error", 1), ("unsupported", 1)):
+        for i in range(n):
+            out.append(case(
+                case_id="fk_%s_%d" % (kind, i),
+                state="未审查",
+                failure_kind=kind,
+                machine_conclusion="未审查",
+            ))
+    return out
+
+
 def coverage(**over):
     c = {
         "sampled_layers": ["PASS", "待自决", "REVIEW", "未审查"],
@@ -182,6 +202,43 @@ def main():
     T("A7 未覆盖分子不含 CLEAN-CANDIDATE / ERROR / fetch_error",
       unc.get("numerator") == 20 and unc.get("clean_candidate_count") == 3
       and unc.get("error_count") == 2 and unc.get("fetch_error_count") == 2, str(unc))
+
+    # ── A7b（验收表 #9 · L1-7 L1-8 SEC-8-10）四类 failure_kind 分别可见 ──
+    #
+    # 验收表原文：「造 empty 2 条、parse_error 3 条、fetch_error 1 条、
+    # unsupported 1 条的样本跑统计与报告；断言 empty=2 与其余 failed 合计=4
+    # 分别可见且可核对，而不是只有一个失败总数。」
+    #
+    # ★ 2026-10-24 补。此前 `_uncovered` **只算三个键**，`empty` / `parse_error`
+    #   / `unsupported` 一个都没有 —— 也就是说这条要求没有数据来源，
+    #   而验收表那一行一直挂在 passed 上。
+    #
+    # ★ 判据分两层，缺一层就有一个方向恒真：
+    #   ① 四键各自的计数**与夹具逐条对得上**（不是「有键就算」）；
+    #   ② 「其余 failed 合计」是**独立算出来**的，且恒等于四键之和减 empty
+    #      （防「只把总数抄给一个字段」这种假实现）。
+    unc9 = MetricsReadModel(
+        loader(cases=dataset_for_failure_kinds(), cov=coverage())
+    ).compute("2026-10")
+    m9 = unc9["metrics"]["uncovered_ratio"]
+    T("A7b① 四类 failure_kind 各自计数（empty=2 / parse_error=3 / "
+      "fetch_error=1 / unsupported=1）",
+      m9.get("empty_count") == 2 and m9.get("parse_error_count") == 3
+      and m9.get("fetch_error_count") == 1 and m9.get("unsupported_count") == 1,
+      str({k: m9.get(k) for k in
+           ("empty_count", "parse_error_count", "fetch_error_count", "unsupported_count")}))
+    # ★ 口径差异，照实记：验收表原文写「empty=2 与其余 failed 合计=4」，
+    #   但它自己给的条数是 parse_error 3 + fetch_error 1 + unsupported 1 = **5**。
+    #   两者对不上。这里按**条数**判（那是可复算的），不按原文那个 4 判 ——
+    #   写死 4 等于让判据去迁就一句算错的散文。
+    T("A7b② empty 与「其余 failed 合计」分别可见且可核对（不是只有一个失败总数）",
+      m9.get("empty_count") == 2
+      and m9.get("failed_other_than_empty") == 5       # 3 + 1 + 1
+      and m9.get("failed_other_than_empty")
+          == sum(m9.get("%s_count" % k) for k in FAILURE_KINDS if k != "empty"),
+      str({"empty": m9.get("empty_count"),
+           "other": m9.get("failed_other_than_empty")}))
+
     ov = ms["human_overturn_rate"]
     # 分母：有机器结论且有对应人工结论的条数 = 40 gold + 8 fp = 48
     T("A8 推翻率：分母 48，分子按人工/机器结论不同计",

@@ -38,6 +38,12 @@ MIN_N = 30
 MIN_N_UNCOVERED = 1
 HIGH_SEV = ("L4", "L5")
 
+#: 失败类型四分类（验收表 #9 / L1-7 L1-8 SEC-8-10）。
+#: ★ 与 `tools/audit/report_render.mjs` 的 `FAILURE_KINDS` **必须同名同序** ——
+#:   报告侧按这四键逐项打印，指标侧按这四键分别计数；两边一旦漂移，
+#:   报告会印出一个指标里根本没有的键（或反过来漏印）。
+FAILURE_KINDS = ("fetch_error", "parse_error", "empty", "unsupported")
+
 
 def _metric(mid, name, window, sampling_layer, min_n):
     return {
@@ -167,6 +173,25 @@ class MetricsReadModel(object):
         m["clean_candidate_count"] = sum(1 for c in cases if c.get("clean_candidate") is True)
         m["error_count"] = sum(1 for c in cases if c.get("run_state") == "ERROR")
         m["fetch_error_count"] = sum(1 for c in cases if c.get("failure_kind") == "fetch_error")
+        # ★ 2026-10-24 补（验收表 #9 / L1-7 L1-8 SEC-8-10）：
+        #   「造 empty 2 条、parse_error 3 条、fetch_error 1 条、unsupported 1 条的样本
+        #    跑统计与报告；断言 empty=2 与其余 failed 合计=4 分别可见且可核对，
+        #    而不是只有一个失败总数。」
+        #
+        #   此前这里**只算了三个键**（clean_candidate / error / fetch_error），
+        #   `empty` / `parse_error` / `unsupported` 一个都没有 —— 于是
+        #   「四个 failure_kind 分别可见」这件事**根本没有数据来源**，
+        #   而验收表那一行却一直挂在 passed 上。
+        #
+        #   三键与 fetch_error_count 同源（都读 `failure_kind`），互相独立可核对：
+        #   它们的和就是「按失败类型可归因的条数」，与 error_count（run_state=ERROR）
+        #   是两个正交口径 —— 一个按失败原因，一个按运行状态。
+        for _kind in FAILURE_KINDS:
+            m["%s_count" % _kind] = sum(
+                1 for c in cases if c.get("failure_kind") == _kind)
+        # 「其余 failed 合计」= 四类之和减去 empty（验收表要 empty 与「其余」分开可见）
+        m["failed_other_than_empty"] = sum(
+            m["%s_count" % k] for k in FAILURE_KINDS if k != "empty")
         return _finalize(m, numerator, denominator)
 
     # ── ④ 人工推翻率 ────────────────────────────────────────────────

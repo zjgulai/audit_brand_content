@@ -315,6 +315,48 @@ function worstFinding(findings) {
   )[0] || null;
 }
 
+/**
+ * 并行义务短标记（M4 / 验收表 #62）。
+ *
+ * 验收表原文：「构造『BLOCK + has_candidate=true』样本，断言消息在关键句后
+ * 出现对应并行义务标记（如『· 另有 1 条疑似待确认』）且数量/类别正确；
+ * 构造无并行义务样本，断言不出现该标记（反向对照）。」
+ *
+ * ★ 2026-10-24 补：此前 `renderMessage` **一次都没读过** `decision.obligations`，
+ *   也没数过 candidate —— 群消息里一个字都没有，而验证器也没有任何断言。
+ *   也就是说这条要求从未实现，读数却挂在 `passed` 上。
+ *
+ * ## 标记由什么决定（两条独立来源，都要）
+ *
+ *   1. `decision.obligations` 里的已知项 → 逐项出短标记（`partial_coverage` 等）；
+ *   2. `findings` 里 `status === "candidate"` 的条数 → 出「另有 N 条疑似待确认」。
+ *
+ * ## 什么情况下**不**出标记（这一半才是防「永远打标记」的）
+ *
+ *   · `obligations` 为空数组或缺失，且 0 条 candidate → 返回空串，调用方不拼接。
+ *   · 未知的 obligation 原样透出，不静默丢弃（丢字段 = 藏缺口）。
+ */
+const OBLIGATION_ZH = {
+  partial_coverage: "部分覆盖",
+};
+
+export function parallelObligationMark(ir) {
+  const parts = [];
+  const obligations = asArray((ir.decision || {}).obligations);
+  for (const ob of obligations) {
+    const text = typeof ob === "string" ? ob : textOrNone(ob);
+    if (!text) continue;
+    parts.push(OBLIGATION_ZH[text] ? `${OBLIGATION_ZH[text]}（${text}）` : text);
+  }
+  const candidateCount = asArray(ir.findings).filter(
+    (f) => f && f.status === "candidate",
+  ).length;
+  if (candidateCount > 0) {
+    parts.push(`另有 ${candidateCount} 条疑似待确认`);
+  }
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
 export function renderMessage(snapshot) {
   const errors = validateSnapshot(snapshot);
   if (errors.length) {
@@ -338,7 +380,9 @@ export function renderMessage(snapshot) {
   } else if (state === "PASS") {
     detail = `覆盖：${textOrNone((ir.coverage || {}).modalities_evaluated)}`;
   }
-  let text = `【${state}】${detail} · 报告：${snapshot.report_url || "无"}`;
+  // M4：并行义务短标记插在**关键句之后、报告链接之前**。
+  const mark = parallelObligationMark(ir);
+  let text = `【${state}】${detail}${mark} · 报告：${snapshot.report_url || "无"}`;
   text = text.replace(/[\r\n]+/g, " ");
 
   const claimErrors = [];

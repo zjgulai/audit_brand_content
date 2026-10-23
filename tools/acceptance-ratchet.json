@@ -2,20 +2,20 @@
  "schema_version": 1,
  "policy": "T-145 · 验收棘轮地板",
  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
- "passed_floor": 82,
- "recorded_at": "2026-10-23",
+ "passed_floor": 86,
+ "recorded_at": "2026-10-24",
  "recorded_reading": {
-  "passed": 82,
+  "passed": 86,
   "failed": 0,
-  "untested": 54,
+  "untested": 50,
   "untested_split": {
-   "machine": 47,
+   "machine": 43,
    "manual": 7,
    "unverifiable": 0,
    "unknown": 0
   },
   "untested_origin": {
-   "unmapped": 53,
+   "unmapped": 49,
    "executed_rc2": 1
   }
  },
@@ -73,6 +73,19 @@
    "to": "114",
    "at": "2026-10-23",
    "why": "#42 补齐后转 passed（f3 的 `verify_p_code_not_severity.py`，5/5 对照）。"
+  },
+  {
+   "from": "82",
+   "to": "86",
+   "at": "2026-10-24",
+   "why": "本轮补断言后转 passed 4 条：#9（#9 四类 failure_kind 计数，生产侧补齐 empty/parse_error/unsupported 三键）、#62（renderMessage 读 obligations 与 candidate 并渲染并行义务短标记）、#117（单写者约束，跨进程验）、#47 ④（LABELS 词表）。#66 **未转** —— 见下。"
+  }
+ ],
+ "notes": [
+  {
+   "at": "2026-10-24",
+   "about": "#66 的原始判断被证伪",
+   "text": "T-240 审计里我报「#66 把 worstFinding 改成 findings[0] 照样全绿」。实测：在**改前**的 HEAD 状态下做这个变异，`#60a`（双 finding 取 L5 不取 L1）会红 → 该变异本来就是 killed。#66 与 #60 覆盖同一行为，属重复记账，不是缺口。因此 #66 维持未映射，不补断言。这条要在审计报告里更正。"
   }
  ]
 }

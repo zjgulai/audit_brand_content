@@ -31,6 +31,12 @@
       "fixture": "{root}/tools/verify_normalizer.py",
       "command": "{venv} {root}/tools/verify_normalizer.py"
     },
+    "9": {
+      "test_id": "acceptance-9",
+      "criteria": "L1-7 / L1-8 / SEC-8-10",
+      "fixture": "{root}/tools/verify_metrics_read_model.py",
+      "command": "{venv} {root}/tools/verify_metrics_read_model.py"
+    },
     "10": {
       "test_id": "acceptance-10",
       "criteria": "L1-4a",
@@ -208,6 +214,12 @@
     "61": {
       "test_id": "acceptance-61",
       "criteria": "M1(§4.3.2) / M2(§4.3.2) / M3(§4.3.2)",
+      "fixture": "{root}/tools/verify_report_render.mjs",
+      "command": "node {root}/tools/verify_report_render.mjs"
+    },
+    "62": {
+      "test_id": "acceptance-62",
+      "criteria": "M4",
       "fixture": "{root}/tools/verify_report_render.mjs",
       "command": "node {root}/tools/verify_report_render.mjs"
     },

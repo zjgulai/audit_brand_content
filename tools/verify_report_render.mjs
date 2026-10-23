@@ -353,6 +353,131 @@ try {
   report(r4.ok && r4.markdown.includes("unsupported=1"),
          "C4 failure_kind 非 0 正确显示", "");
 
+  // ── C4b（验收表 #62 · M4）并行义务短标记：成对正反 ─────────────────────
+  //
+  // 验收表原文：「构造『BLOCK + has_candidate=true』样本，断言消息在关键句后
+  // 出现对应并行义务标记（如『· 另有 1 条疑似待确认』）且数量/类别正确；
+  // 构造无并行义务样本，断言不出现该标记（反向对照）。」
+  //
+  // ★ 2026-10-24 补。此前 `renderMessage` 一次都没读过 `decision.obligations`，
+  //   群消息里也没有 candidate 计数 —— 这条要求从未实现，验证器也 0 断言。
+  //
+  // ★ 只测「有义务时出现标记」是不够的：一个**永远打标记**的实现也能过。
+  //   所以第二条必须断言「无义务 + 0 candidate 时**不出现**」。
+  {
+    const withOb = baseSnapshot();
+    withOb.ir.decision.state = "BLOCK";
+    withOb.ir.decision.obligations = ["partial_coverage"];
+    withOb.ir.findings = [
+      { ...baseSnapshot().ir.findings[0] },
+      {
+        ...baseSnapshot().ir.findings[0],
+        finding_id: "f-2",
+        status: "candidate",
+        produced_by: "semantic",
+        confirmed_by_rule_class: true,
+      },
+    ];
+    const mOb = R.renderMessage(withOb);
+    const tOb = mOb.text || "";
+    // 数量必须对：1 条 candidate → 「另有 1 条」，不是「另有 2 条」也不是笼统一句
+    report(mOb.ok === true
+           && tOb.includes("另有 1 条疑似待确认")
+           && tOb.includes("部分覆盖")
+           // 标记必须在**关键句之后、报告链接之前**（不是拼在末尾当脚注）
+           && tOb.indexOf("另有 1 条") > tOb.indexOf("H01")
+           && tOb.indexOf("另有 1 条") < tOb.indexOf("· 报告："),
+           "C4b★ BLOCK+1 条 candidate → 并行义务短标记出现且数量正确",
+           JSON.stringify({ ok: mOb.ok, text: tOb }));
+
+    const noOb = baseSnapshot();
+    noOb.ir.decision.state = "BLOCK";
+    noOb.ir.decision.obligations = [];
+    noOb.ir.findings = [{ ...baseSnapshot().ir.findings[0] }];   // 0 条 candidate
+    const mNo = R.renderMessage(noOb);
+    const tNo = mNo.text || "";
+    report(mNo.ok === true
+           && !tNo.includes("另有")
+           && !tNo.includes("部分覆盖")
+           && !tNo.includes("疑似待确认"),
+           "C4b★ 反向对照：无并行义务 → 短标记不出现",
+           JSON.stringify({ ok: mNo.ok, text: tNo }));
+
+    // 第二条反向对照：2 条 candidate → 数量必须跟着变（证明它真在数）
+    const twoOb = baseSnapshot();
+    twoOb.ir.decision.state = "BLOCK";
+    twoOb.ir.decision.obligations = [];
+    twoOb.ir.findings = [
+      { ...baseSnapshot().ir.findings[0] },
+      { ...baseSnapshot().ir.findings[0], finding_id: "f-2", status: "candidate" },
+      { ...baseSnapshot().ir.findings[0], finding_id: "f-3", status: "candidate" },
+    ];
+    const mTwo = R.renderMessage(twoOb);
+    report(mTwo.ok === true && (mTwo.text || "").includes("另有 2 条疑似待确认"),
+           "C4b★ 2 条 candidate → 计数变成 2（证明真在数，不是写死）",
+           JSON.stringify({ text: mTwo.text }));
+  }
+
+  // ── C4c（验收表 #66 · L4-1 SEC-8-8）最严重 finding 不被数量吞掉 ─────────
+  //
+  // 验收表原文：「用 L 刻度构造『1 个 confirmed L4/L5 + 2 个 L1/L2』的样本
+  // （不用 P），跑输出，断言群里消息直接显示那条 L4/L5 的严重度、控制点、
+  // 逐字原文、位置，而不是只出分类汇总；若只出汇总或最严重条被数量盖掉即红。」
+  //
+  // ★ 2026-10-24 补。此前 `baseSnapshot()` 的 findings 数组**只有 1 条**，
+  //   于是「按 severity 挑最严重那条」这个行为**从未被测过** ——
+  //   把 `worstFinding` 改成 `findings[0]` 也照样全绿。
+  {
+    const mix = baseSnapshot();
+    mix.ir.decision.state = "BLOCK";
+    mix.ir.decision.obligations = [];
+    const L4 = {
+      ...baseSnapshot().ir.findings[0],
+      finding_id: "f-mid",
+      control_code: "H07",
+      severity: "L4",
+      quote: "国家级认证",
+      location: { type: "image", bbox: [0.3, 0.3, 0.5, 0.5] },
+    };
+    // ★ 顺序刻意让 L1/L2 排在最前 —— 若实现是「取第一条」，这里必红
+    mix.ir.findings = [
+      { ...baseSnapshot().ir.findings[0], finding_id: "f-low1", control_code: "H02",
+        severity: "L1", quote: "轻微提示一", location: { type: "image", bbox: [0.7, 0.7, 0.8, 0.8] } },
+      { ...baseSnapshot().ir.findings[0], finding_id: "f-low2", control_code: "H03",
+        severity: "L2", quote: "轻微提示二", location: { type: "image", bbox: [0.9, 0.1, 0.95, 0.2] } },
+      L4,
+    ];
+    const mMix = R.renderMessage(mix);
+    const tMix = mMix.text || "";
+    report(mMix.ok === true
+           && tMix.includes("L4")
+           && tMix.includes("H07")
+           && tMix.includes("国家级认证")
+           && tMix.includes("0.3")
+           // 不许被前两条吞掉：消息里不该出现低危那条的原文/控制点
+           && !tMix.includes("H02")
+           && !tMix.includes("H03"),
+           "C4c★ 1×L4 + 2×L1/L2 → 群里显示的是 L4 那条（不被顺序与数量吞掉）",
+           JSON.stringify({ ok: mMix.ok, text: tMix }));
+
+    // 反向对照：删掉 L4 那条，消息必须变（证明它真在按 severity 挑，
+    // 而不是「恰好因为数组里只有一条能打印」）
+    const noL4 = baseSnapshot();
+    noL4.ir.decision.state = "BLOCK";
+    noL4.ir.decision.obligations = [];
+    noL4.ir.findings = [
+      mix.ir.findings[0],
+      mix.ir.findings[1],
+    ];
+    const mNoL4 = R.renderMessage(noL4);
+    report(mNoL4.ok === true
+           && !(mNoL4.text || "").includes("H07")
+           && !(mNoL4.text || "").includes("国家级认证")
+           && (mNoL4.text || "").includes("L2"),
+           "C4c★ 反向对照：删掉 L4 → 消息随之改变（按 severity 挑，不是取第一条）",
+           JSON.stringify({ text: mNoL4.text }));
+  }
+
   // C5 未知桶计数
   report(r0.markdown.includes("未知桶计数"),
          "C5 空未知桶也写「未知桶计数」", "");
@@ -614,10 +739,18 @@ try {
     // ` · 报告：` + URL」。骨架外多出的尾巴（哪怕不带 。）→ 对拍不等 → 红。
     {
       const withState = (state) => withIr({
-        decision: { ...baseSnapshot().ir.decision, state },
+        decision: {
+          ...baseSnapshot().ir.decision,
+          state,
+          // ★ 2026-10-24：这一组测的是「模板骨架逐字」，不是并行义务标记
+          //   （那是 #62 / C4b 自己的成对角逐）。骨架对拍必须在不含标记的
+          //   样本上做，否则测的就变成「标记也拼进了骨架」——
+          //   而那是另一个断言，混在一起会让两条判据互相掩护。
+          obligations: [],
+        },
       });
       const five = [
-        ["BLOCK", baseSnapshot(), "L4 · H01 · “未坐安全座椅” · 位置：bbox=[0.1,0.2,0.4,0.6]"],
+        ["BLOCK", withState("BLOCK"), "L4 · H01 · “未坐安全座椅” · 位置：bbox=[0.1,0.2,0.4,0.6]"],
         ["REVIEW", withState("REVIEW"), "需要法务判断"],
         ["未审查", withState("未审查"), "视频音轨：无能力"],
         ["待自决", withState("待自决"), "是否修改文案"],
