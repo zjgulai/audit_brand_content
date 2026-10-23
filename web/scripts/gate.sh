@@ -56,6 +56,15 @@ run_rc_check() {
 
 if [ "${STAGE}" = "static" ]; then
   run_json_check design_tokens node "${HERE}/check_design_tokens.mjs" --check --json
+  # ★ 2026-10-23：登录二维码的 round-trip（生成 → Chrome 光栅化 → jsqr 解码 →
+  #   断言解出的字符串逐字等于登录 URL），含两条反向对照。
+  #
+  #   为什么不并进 design_tokens：两者失败后要查的东西完全不同 ——
+  #   一个是「样式层有没有裸值」，一个是「扫出来是不是那条 URL」。
+  #   合成一个退出码就分不清该改哪一侧（与 DG / verify_secret_patterns 的分工同一条理由）。
+  #
+  #   Chrome 起不来时它退 2 → 落「未测」，**不会**假装通过。
+  run_rc_check login_qr node "${HERE}/check_login_qr.mjs"
 else
   # build 阶段：dist 必须已经由 `npm run build` 产好（verify:build 的顺序就是这样）
   run_json_check bundle_budget node "${HERE}/check_bundle_budget.mjs" --dir "${WEB}/dist" --json

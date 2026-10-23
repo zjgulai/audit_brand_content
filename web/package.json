@@ -16,16 +16,18 @@
     "verify:auth": "node --experimental-strip-types scripts/check_auth_headers.mjs"
   },
   "dependencies": {
+    "qrcode": "1.5.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router-dom": "7.18.4"
   },
   "devDependencies": {
+    "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.2.0",
+    "jsqr": "1.4.0",
     "typescript": "5.9.3",
-    "vite": "7.3.7",
-    "@types/node": "24.19.2"
+    "vite": "7.3.7"
   }
 }

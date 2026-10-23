@@ -1163,6 +1163,68 @@ code {
   padding: 0.5rem 1rem;
 }
 
+/* 扫码 + 按钮并排：窄屏（<34rem）自动叠成一列 */
+.login__signin {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.login__signin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.login__qr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.login__qr-code {
+  padding: 0.35rem;
+  background: hsl(var(--card));
+  border: var(--border-subtle);
+  border-radius: var(--radius);
+  line-height: 0;
+}
+
+.login__qr-code svg {
+  display: block;
+  width: 8.25rem;
+  height: 8.25rem;
+}
+
+.login__qr-note {
+  max-width: 10rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.login__qr-pending,
+.login__qr-failed {
+  max-width: 10rem;
+}
+
+@media (max-width: 34rem) {
+  .login__signin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .login__qr {
+    align-items: flex-start;
+  }
+
+  .login__qr-note {
+    max-width: none;
+    text-align: left;
+  }
+}
+
 .login__note {
   margin: 0;
   font-size: var(--text-xs);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { appOrigin, reviewApi } from "../api/client";
 import BrowserSupportNotice from "../components/BrowserSupportNotice";
+import LoginQr from "../components/LoginQr";
 
 /**
  * 登录页（T-150 + #113 / TS-12 浏览器范围明示）。
@@ -93,13 +94,21 @@ export default function LoginPage() {
               <p className="login__lead">
                 本工作台不单独维护账号密码，统一使用飞书身份登录。
               </p>
-              <a className="btn btn--primary login__sso" href={`${appOrigin}/auth/login`}>
-                使用飞书账号登录
-              </a>
-              <p className="login__note">
-                将跳转到飞书完成授权，返回后自动进入复核队列。授权范围仅包含读取你的
-                飞书身份与所在租户，不读取聊天内容。
-              </p>
+              {/* ★ 扫码与按钮**同一个目标**（${appOrigin}/auth/login）。
+                  扫码在手机上完成授权，桌面仍需点一次按钮 —— 飞书 OAuth 没有
+                  反向通道，页面上必须写清楚，不能暗示「扫完桌面自动进入」。 */}
+              <div className="login__signin">
+                <LoginQr target={`${appOrigin}/auth/login`} />
+                <div className="login__signin-actions">
+                  <a className="btn btn--primary login__sso" href={`${appOrigin}/auth/login`}>
+                    使用飞书账号登录
+                  </a>
+                  <p className="login__note">
+                    将跳转到飞书完成授权，返回后自动进入复核队列。授权范围仅包含读取你的
+                    飞书身份与所在租户，不读取聊天内容。
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
