@@ -262,6 +262,131 @@ def probe_permissions():
         shutil.rmtree(root, ignore_errors=True)
 
 
+# ── 单写者约束（W1/W2）───────────────────────────────────────────────
+#
+# ★ 2026-10-23 补。起因是变异探针审计（`wf_90609270-540`）的一条 survived：
+#
+#   判据原文（验收表 v3 第 260 行）明确点名三件事，第三件是
+#   「**断言单写者约束在容器化后仍然成立**：起两个写者容器，必须有一个被挡住」。
+#   而本脚本原文里 `writer` / `单写` / `写者` / `business_event_store` **0 命中**。
+#
+#   探针实测：
+#     基线   ：第二个写者 → BLOCKED AuthorityConflict(writer_lease_held)
+#     变异后 ：`fcntl.flock(fd, LOCK_EX|LOCK_NB)` → `LOCK_SH|LOCK_NB`
+#              → 两个进程都 ACQUIRED，**单写者约束真的被破坏**
+#              → 而本脚本仍退 0
+#
+#   **这是最坏的一类缺口**：并发安全坏了，不会在任何读数里露出来。
+#
+# ## 为什么必须真起两个进程
+#
+#   `LOCK_SH` 与 `LOCK_EX` 的差别**只在「多个持有者」时显现**。
+#   同一个进程里开两个 fd 去抢，`LOCK_EX` 也会挡住第二个 —— 所以
+#   「同进程两次 acquire」这种写法对 LOCK_EX→LOCK_SH 的变异**是盲的**。
+#   必须让**两个不同的进程**各开各的 fd，才验得到判据点名的那件事。
+#
+# ## 这个断言不证明什么
+#
+#   它是**进程级**行为，不是容器级。判据原文说「起两个写者容器」——
+#   起真容器要 docker daemon 与镜像，属部署批次。这里证明的是
+#   「同一份数据目录上，第二个进程拿不到租约」；容器只是把进程隔开的一种方式，
+#   而 `flock` 的语义由**同一个文件系统上的 inode** 决定 —— 两个容器挂同一个
+#   宿主机目录时，走的就是这条路径。**但「容器真的跑起来之后还成立」仍未验。**
+
+_CHILD = r'''
+import sys, fcntl, json
+sys.path.insert(0, %(root)r)
+if %(shared)r:
+    _orig = fcntl.flock
+    def _flock(fd, op):
+        # 只把「排他」换成「共享」，保留 LOCK_NB —— 精确模拟那个变异
+        return _orig(fd, (op & ~fcntl.LOCK_EX) | fcntl.LOCK_SH)
+    fcntl.flock = _flock
+from base.business_event_store import WriterLease, AuthorityConflict
+try:
+    WriterLease(%(path)r).acquire()
+    print("ACQUIRED", flush=True)
+except AuthorityConflict as exc:
+    print("BLOCKED " + exc.code, flush=True)
+    sys.exit(0)
+sys.stdin.readline()
+'''
+
+
+def probe_single_writer(*, force_shared=False):
+    """W1/W2：真起第二个进程抢同一把租约，必须被挡住；释放后必须能拿到。
+
+    `force_shared=True` 是**给 --controls 用的**：它把两边都换成共享锁，
+    精确模拟「`LOCK_EX` → `LOCK_SH`」这个变异。探针在那种情况下**必须报红**，
+    否则这条断言对那个变异就是盲的（而那正是它要防的东西）。
+    """
+    import subprocess
+
+    sys.path.insert(0, str(ROOT))
+    root = tempfile.mkdtemp(prefix="ts15-writer-")
+    lock = os.path.join(root, "writer.lock")
+    child = None
+    try:
+        code = _CHILD % {"root": str(ROOT), "path": lock, "shared": force_shared}
+        child = subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True)
+        first = child.stdout.readline().strip()
+        if first != "ACQUIRED":
+            err = (child.stderr.read() or "").strip()[-400:]
+            return None, "第一个写者没能拿到租约（%r）—— 夹具有问题 %s" % (first, err)
+
+        # ── 第二个写者：另一个进程 ──
+        from base.business_event_store import WriterLease
+        if force_shared:
+            # ★ 只在 --controls 里走：把自己也换成共享锁，精确模拟那个变异
+            import fcntl as _f
+            _orig = _f.flock
+
+            def _flock_shared(fd, op):
+                return _orig(fd, (op & ~_f.LOCK_EX) | _f.LOCK_SH)
+
+            _f.flock = _flock_shared
+            try:
+                WriterLease(lock).acquire()
+                return False, ("两个进程同时拿到了写者租约 —— "
+                               "**单写者约束被破坏**（第二个也 ACQUIRED）")
+            finally:
+                _f.flock = _orig
+
+        try:
+            WriterLease(lock).acquire()
+            return False, ("第二个进程**也拿到了**写者租约 —— 单写者约束没有生效"
+                           "（若实现用的是共享锁，就会这样）")
+        except Exception as exc:  # noqa: BLE001
+            if getattr(exc, "code", None) != "writer_lease_held":
+                return False, ("第二个写者被拒了，但原因不是 `writer_lease_held`"
+                               "（%s）—— 拒绝的理由不对，等于不知道拒的是什么"
+                               % type(exc).__name__)
+
+        # ── 反向：释放之后必须能拿到（否则「永远拿不到」也会让上面那条恒绿）──
+        child.stdin.write("\n")
+        child.stdin.flush()
+        child.wait(timeout=20)
+        try:
+            WriterLease(lock).acquire()
+        except Exception as exc:  # noqa: BLE001
+            return False, ("第一个写者释放后仍拿不到租约（%s）—— "
+                           "只证明了「会拒」，没证明「拒的是那个仍活着的写者」"
+                           % type(exc).__name__)
+        return True, "第二个进程 BLOCKED writer_lease_held；释放后成功拿到"
+    except Exception as exc:  # noqa: BLE001
+        return None, "%s: %s" % (type(exc).__name__, exc)
+    finally:
+        if child is not None:
+            try:
+                child.kill()
+            except OSError:
+                pass
+        shutil.rmtree(root, ignore_errors=True)
+
+
 # ── 主检查 ────────────────────────────────────────────────────────────
 def main() -> int:
     results = []
@@ -305,6 +430,13 @@ def main() -> int:
           "基础镜像无浮动 tag、依赖安装走锁定路径（npm ci / uv sync --locked）"
           if not repro else str(repro[:3]))
 
+    # ★ W1/W2 单写者约束（2026-10-23 补，起因是一条 survived 变异）
+    w_ok, w_detail = probe_single_writer()
+    if w_ok is None:
+        print("  ⚠ W1/W2 无法起第二进程（%s）—— 未测" % w_detail)
+        return 2
+    check("W1/W2", w_ok, "单写者约束（跨进程）：%s" % w_detail)
+
     print("-" * 72)
     passed = sum(1 for _, ok, _ in results if ok)
     failed = len(results) - passed
@@ -322,6 +454,21 @@ def main() -> int:
 
 
 # ── --controls ────────────────────────────────────────────────────────
+def _red_or_none(probe_result):
+    """把 `probe_single_writer()` 的 (ok, detail) 折成 --controls 用的「红项列表」。
+
+    返回 [] = 绿；返回非空 = 红；返回 [None] 语义上是「未测」，但 --controls
+    的判据只有「预判红/绿」，所以未测在这里**必须表现为红** —— 一个未测的
+    反向对照不能算命中（否则「跑不起来」会被读成「如期变红」）。
+    """
+    ok, detail = probe_result
+    if ok is None:
+        return ["未测（不是绿也不是红）：%s" % detail]
+    if ok:
+        return []
+    return [detail]
+
+
 def run_controls() -> int:
     """反向对照。**每条先写预判、再跑、并列贴出。**
 
@@ -380,6 +527,17 @@ def run_controls() -> int:
         ("坏样本：uv sync 去掉 --locked",
          True, lambda: check_reproducible(
              dockerfile.replace("uv sync --locked", "uv sync"))),
+
+        # ★ 成对二：单写者约束（W1/W2）
+        #
+        #   这两条是 2026-10-23 补的，起因是变异探针审计发现
+        #   `LOCK_EX → LOCK_SH` 这个变异在本脚本里 survived。
+        #   **必须成对**：只测「真实现 → 绿」证明不了它验的是锁的排他性
+        #   （一个恒绿的断言也是绿）；只测「共享锁 → 红」证明不了真实现没问题。
+        ("好样本：真实实现的两个写者（第二个必须被挡）",
+         False, lambda: _red_or_none(probe_single_writer())),
+        ("★ 坏样本：两边都换共享锁（精确模拟 LOCK_EX→LOCK_SH）→ 必须红",
+         True, lambda: _red_or_none(probe_single_writer(force_shared=True))),
     ]
 
     print("=" * 72)
