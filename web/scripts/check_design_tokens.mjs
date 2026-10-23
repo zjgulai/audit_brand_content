@@ -36,6 +36,10 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+// ★ DT-3 裸值判据的**唯一实现**（2026-10-23 抽出）。
+//   此前 check_frontend_gates.mjs 里还有一份副本，改一处必漏另一处 ——
+//   实测就漏了：DT-3 改完口径归零，而 #111 通道3 仍按旧口径算出 95 处。
+import { BARE_PROPS, bareValue, parseBareEntries, keyOf } from "./dt3-bare.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const WEB = path.resolve(HERE, "..");
@@ -99,65 +103,31 @@ function dt2Hits(src) {
 }
 
 // ── DT-3 样式层裸值棘轮 ──────────────────────────────────────────────────
-const BARE_PROPS = new Set([
-  "color", "background", "background-color", "border", "border-color",
-  "border-top", "border-bottom", "border-left", "border-right",
-  "outline", "outline-color", "fill", "stroke", "box-shadow",
-  "font-size", "font-family",
-  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-  "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "gap", "row-gap", "column-gap", "top", "right", "bottom", "left",
-]);
-
-/** 一行声明是否含裸值：hex/rgb/hsl、px 长度、字体族字面量。 */
-function bareValue(prop, value) {
-  const v = value.trim();
-  if (!v) return false;
-  if (/#[0-9a-fA-F]{3,8}\b/.test(v)) return true;
-  if (/\b(?:rgba?|hsla?)\(/.test(v)) return true;
-  if (/\b\d*\.?\d+px\b/.test(v)) return true;
-  if (prop === "font-family" && !/var\(--/.test(v)) return true;
-  return false;
-}
-
-/**
- * 极简 CSS 解析：返回 [{selector, prop, value}]。
- * 用花括号栈处理 @media 嵌套；选择器带上层 at-rule 前缀，保证基线键稳定。
- */
-function parseCss(src) {
-  const clean = src.replace(/\/\*[\s\S]*?\*\//g, "");
-  const out = [];
-  const stack = [];
-  let buf = "";
-  for (const ch of clean) {
-    if (ch === "{") {
-      stack.push(buf.trim().replace(/\s+/g, " "));
-      buf = "";
-    } else if (ch === "}") {
-      const decls = buf;
-      buf = "";
-      const selector = stack.join(" > ").replace(/\s+/g, " ");
-      stack.pop();
-      if (!selector || selector.startsWith("@")) continue;    // @media 自身不是规则
-      for (const d of decls.split(";")) {
-        const i = d.indexOf(":");
-        if (i < 0) continue;
-        const prop = d.slice(0, i).trim().toLowerCase();
-        const value = d.slice(i + 1).trim();
-        if (BARE_PROPS.has(prop) && bareValue(prop, value)) {
-          out.push({ selector, prop, value });
-        }
-      }
-    } else {
-      buf += ch;
-    }
-  }
-  return out;
-}
-
-function keyOf(file, e) {
-  return `${file}\u0000${e.selector}\u0000${e.prop}\u0000${e.value}`;
-}
+//
+// ★ 2026-10-23 就地改判据（行 111 口径校正）。改前 DT-3 报「95 处裸值」，实测拆开是：
+//
+//     67 处  hsl(var(--brand))            ← **不是裸值**，颜色来自 tokens.css
+//     28 处  1px solid hsl(var(--border)) ← 线宽不是行 111 点名的三类之一
+//      0 处  真裸值（hex / 非 var 颜色函数 / 裸间距 / 裸字号）
+//
+//   两个毛病都出在**判据**，不在验收表：
+//
+//   ① **假阳性**：旧写 `/\b(?:rgba?|hsla?)\(/` 只看见函数名 `hsl(` 就判裸值，
+//      不看参数。而 `hsl(var(--brand))` 的通道值存在 tokens.css 里
+//      （`--brand: 346.5 41.3% 29.4%`），**它是 token 引用**。
+//   ② **越界**：行 111 原文是「**颜色/间距/字号**全部来自 token」。
+//      `border: 1px solid …` 里的 `1px` 是**边框线宽**，不在这三类里；
+//      但颜色若写死（`1px solid #ff0000`）仍然必须红 —— 所以不能整个属性跳过。
+//
+//   修法：**先把 token 引用整段抠掉，再在剩下的部分找裸值。**
+//   `1px solid hsl(var(--border))` 抠掉后剩 `1px solid ` → 无裸值；
+//   `1px solid #ff0000` 抠掉后仍含 `#ff0000` → 裸值。
+//   这不是放宽判据，是**先认得出 token 引用**。
+//
+// ★ 2026-10-23：判据与解析器已抽到 `web/scripts/dt3-bare.mjs`（唯一实现）。
+//   此前本文件与 `check_frontend_gates.mjs` 各有一份副本，改一处必漏另一处 ——
+//   实测就漏了：本文件改完口径归零，#111 通道3 仍按旧口径算出 95 处。
+//   现在两处都 import 同一份。**同一判断只许有一处实现（§2.5）。**
 
 /** JSX 内联样式里的裸值（style={{ color: "#fff", fontSize: 13 }}）。 */
 function inlineBare(src) {
@@ -283,7 +253,7 @@ function runCheck(root) {
     const current = [];
     for (const f of legacyCss) {
       const rel = f.replace(/^web\//, "");
-      for (const e of parseCss(read(f))) current.push({ file: rel, ...e });
+      for (const e of parseBareEntries(read(f))) current.push({ file: rel, ...e });
     }
     for (const f of tsx) {
       const rel = f.replace(/^web\//, "");
@@ -518,7 +488,7 @@ function rebaseBaseline(root) {
   for (const f of files.filter((x) => /^web\/src\/.*\.css$/.test(x))) {
     if (f === "web/src/styles/tokens.css") continue;
     const rel = f.replace(/^web\//, "");
-    for (const e of parseCss(fs.readFileSync(path.join(root, f), "utf8"))) {
+    for (const e of parseBareEntries(fs.readFileSync(path.join(root, f), "utf8"))) {
       const k = keyOf(rel, e);
       if (seen.has(k)) continue;
       seen.add(k);

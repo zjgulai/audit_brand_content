@@ -18,6 +18,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+// ★ DT-3 裸值判据的**唯一实现**（2026-10-23 抽出）。
+//   本文件此前自带一份副本，与 check_design_tokens.mjs 的那份分了叉 ——
+//   那边改完口径归零，这边仍按旧口径算出 95 处，同一条 styles.css 两个读数。
+import { parseBareEntries as parseDt3Entries } from "./dt3-bare.mjs";
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const WEB = path.resolve(HERE, "..");
@@ -283,56 +287,13 @@ function checkRow110(pkg, lock, srcByRel, appSrc, pageFiles) {
 }
 
 // ── #111 (TS-8)：Radix 原语 + 自有 token + 无直接 shadcn import + 样式层零裸值 ──
-const BARE_PROPS_111 = new Set([
-  "color", "background", "background-color", "border", "border-color",
-  "border-top", "border-bottom", "border-left", "border-right",
-  "outline", "outline-color", "fill", "stroke", "box-shadow",
-  "font-size", "font-family",
-  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
-  "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
-  "gap", "row-gap", "column-gap", "top", "right", "bottom", "left",
-]);
-
-function isBarePropValue(prop, value) {
-  const v = value.trim();
-  if (!v) return false;
-  if (/#[0-9a-fA-F]{3,8}\b/.test(v)) return true;
-  if (/\b(?:rgba?|hsla?)\(/.test(v)) return true;
-  if (/\b\d*\.?\d+px\b/.test(v)) return true;
-  if (prop === "font-family" && !/var\(--/.test(v)) return true;
-  return false;
-}
-
-function parseDt3Entries(cssSrc) {
-  const clean = cssSrc.replace(/\/\*[\s\S]*?\*\//g, "");
-  const out = [];
-  const stack = [];
-  let buf = "";
-  for (const ch of clean) {
-    if (ch === "{") {
-      stack.push(buf.trim().replace(/\s+/g, " "));
-      buf = "";
-    } else if (ch === "}") {
-      const decls = buf;
-      buf = "";
-      const selector = stack.join(" > ").replace(/\s+/g, " ");
-      stack.pop();
-      if (!selector || selector.startsWith("@")) continue;
-      for (const d of decls.split(";")) {
-        const i = d.indexOf(":");
-        if (i < 0) continue;
-        const prop = d.slice(0, i).trim().toLowerCase();
-        const value = d.slice(i + 1).trim();
-        if (BARE_PROPS_111.has(prop) && isBarePropValue(prop, value)) {
-          out.push({ selector, prop, value });
-        }
-      }
-    } else {
-      buf += ch;
-    }
-  }
-  return out;
-}
+//
+// ★ 2026-10-23：本文件原先**自带一份**裸值判据（`BARE_PROPS_111` + `isBarePropValue`
+//   + `parseDt3Entries`），与 `check_design_tokens.mjs` 的 `bareValue()` 是同一个判断的
+//   两份实现。实测就分了叉：那边改完口径归零，这边仍按旧口径算出 95 处，
+//   于是同一条 `styles.css` 在两处给出两个互相矛盾的读数。
+//
+//   现在统一 import `./dt3-bare.mjs`（唯一实现）。**同一判断只许有一处实现（§2.5）。**
 
 function checkRow111(pkg, srcByRel, baseline, stylesSrc = "") {
   const channels = [
@@ -558,14 +519,19 @@ function runAllControls(snap) {
     { tokens: [], max_tokens: 0 },
     "",
   );
+  // ★ 2026-10-23：基线改口径后归零，这条对照的「超天花板」样本必须换成**真裸值**。
+  //   旧样本是 `border: 1px solid hsl(var(--border))` —— 按新判据它**不是**裸值
+  //   （颜色来自 token，`1px` 是线宽，不在行 111 点名的三类里），
+  //   所以它不再能让存量超过 0 的上限，对照因此失效。
+  //   换成真裸值：写死的颜色 + 写死的间距。
   const r111CapExceeded = checkRow111(
     { dependencies: { "radix-ui": "1.0.0" } },
     snap.srcByRel,
     snap.baseline,
-    snap.stylesSrc + "\n.extra-bare { border: 1px solid hsl(var(--border)); }\n",
+    snap.stylesSrc + "\n.extra-bare { color: #ff0000; padding: 12px; }\n",
   );
   cases.push([
-    "C-111：Radix+0裸值+无shadcn直接import → 绿；植入 import from 'shadcn' 或存量超 max_tokens(95→96) → 必须红",
+    "C-111：Radix+0裸值+无shadcn直接import → 绿；植入 import from 'shadcn' 或存量超 max_tokens(0→2 真裸值) → 必须红",
     r111Clean.problems.length === 0 &&
       r111Shadcn.problems.some((x) => x.includes("shadcn")) &&
       r111CapExceeded.problems.some((x) => x.includes("越过天花板")),
