@@ -54,59 +54,75 @@ export default function LoginPage() {
 
   return (
     <main id="main" className="login">
-      <div className="login__card">
-        <div className="login__brand">
-          <span className="login__mark" aria-hidden="true" />
-          <div>
-            <p className="login__product">内容审核工作台</p>
-            <p className="login__tagline">
-              机器先判、人来复核。登录后可处理复核队列、审阅证据链并提交正式复核结论。
-            </p>
+      {/* 封面装饰层：纯 CSS 绘制，无位图、无外链、不阻塞首屏。
+          与 lute-tlz-dddd.top 的封面同构（点阵 + 斜向信号线 + 光扫过），
+          但配色改用本项目的 L1 token，不引入第二个品牌色板。 */}
+      <div className="login__cover" aria-hidden="true">
+        <span className="login__cover-grid" />
+        <span className="login__cover-sweep" />
+        <span className="login__cover-line login__cover-line--1" />
+        <span className="login__cover-line login__cover-line--2" />
+        <span className="login__cover-line login__cover-line--3" />
+      </div>
+
+      <div className="login__shell">
+        <header className="login__masthead">
+          <div className="login__brand">
+            <span className="login__mark" aria-hidden="true" />
+            <div>
+              <p className="login__product">内容审核工作台</p>
+              <p className="login__tagline">
+                机器先判、人来复核。登录后可处理复核队列、审阅证据链并提交正式复核结论。
+              </p>
+            </div>
           </div>
+          <span className="login__kicker font-data">CONTENT REVIEW · DP3/DP4</span>
+        </header>
+
+        <div className="login__card">
+          <div className="login__divider" role="presentation" />
+
+          {state === "checking" && (
+            <p className="login__status" role="status">
+              正在确认登录状态…
+            </p>
+          )}
+
+          {state === "anon" && (
+            <div className="login__action">
+              <p className="login__lead">
+                本工作台不单独维护账号密码，统一使用飞书身份登录。
+              </p>
+              <a className="btn btn--primary login__sso" href={`${appOrigin}/auth/login`}>
+                使用飞书账号登录
+              </a>
+              <p className="login__note">
+                将跳转到飞书完成授权，返回后自动进入复核队列。授权范围仅包含读取你的
+                飞书身份与所在租户，不读取聊天内容。
+              </p>
+            </div>
+          )}
+
+          {state === "error" && (
+            <div className="login__action">
+              <p className="login__lead login__lead--error" role="alert">
+                当前无法确认登录状态：{detail}
+              </p>
+              <p className="login__note">
+                这通常说明工作台后端暂时不可达，<strong>不是账号问题</strong>，
+                重新登录也不会恢复。请稍后刷新；若持续失败，请联系项目统筹并提供上面的错误信息。
+              </p>
+            </div>
+          )}
         </div>
 
-        <div className="login__divider" role="presentation" />
-
-        {state === "checking" && (
-          <p className="login__status" role="status">
-            正在确认登录状态…
-          </p>
-        )}
-
-        {state === "anon" && (
-          <div className="login__action">
-            <p className="login__lead">
-              本工作台不单独维护账号密码，统一使用飞书身份登录。
-            </p>
-            <a className="btn btn--primary login__sso" href={`${appOrigin}/auth/login`}>
-              使用飞书账号登录
-            </a>
-            <p className="login__note">
-              将跳转到飞书完成授权，返回后自动进入复核队列。授权范围仅包含读取你的
-              飞书身份与所在租户，不读取聊天内容。
-            </p>
-          </div>
-        )}
-
-        {state === "error" && (
-          <div className="login__action">
-            <p className="login__lead login__lead--error" role="alert">
-              当前无法确认登录状态：{detail}
-            </p>
-            <p className="login__note">
-              这通常说明工作台后端暂时不可达，<strong>不是账号问题</strong>，
-              重新登录也不会恢复。请稍后刷新；若持续失败，请联系项目统筹并提供上面的错误信息。
-            </p>
-          </div>
-        )}
-
-        <div className="login__footer">
+        <footer className="login__footer">
           <BrowserSupportNotice />
           <p className="login__note">
             机器判定与人工意见分开记账：人工意见不改变机器标签，也不等于放行；
             对外五标签一律止于「待放行」。
           </p>
-        </div>
+        </footer>
       </div>
     </main>
   );

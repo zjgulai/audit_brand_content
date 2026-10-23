@@ -989,27 +989,123 @@ code {
   margin-top: 1.25rem;
 }
 
-/* ── 登录页（2026-10-23 视觉校验重做） ──────────────────────────────────── */
+/* ── 登录页（2026-10-23 视觉校验重做 + 封面） ──────────────────────────── */
 
 .login {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
   box-sizing: border-box;
-  /* 未登录时没有外壳，用一个极淡的品牌底把卡片托起来 */
+  overflow: hidden;
+  isolation: isolate;
   background: hsl(var(--background));
+}
+
+/* 封面装饰层：点阵 + 斜向信号线 + 光扫过。
+   与 lute-tlz-dddd.top 的封面同构，配色改用本项目 L1 token。
+   ★ 全部纯 CSS，无位图/外链；aria-hidden，不进读屏。 */
+.login__cover {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.login__cover-grid {
+  position: absolute;
+  inset: -10%;
+  display: block;
+  background-image:
+    repeating-linear-gradient(90deg, hsl(var(--foreground) / 0.045) 0 1px, transparent 1px 3.25rem),
+    repeating-linear-gradient(0deg, hsl(var(--foreground) / 0.032) 0 1px, transparent 1px 3.25rem),
+    radial-gradient(ellipse at 22% 16%, hsl(var(--brand) / 0.14), transparent 46%),
+    radial-gradient(ellipse at 78% 82%, hsl(var(--sand) / 0.20), transparent 48%);
+  transform: rotate(-3deg);
+}
+
+.login__cover-sweep {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 38%,
+    hsl(var(--card) / 0.62) 48%,
+    transparent 58%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: login-sweep 11s ease-in-out infinite;
+}
+
+.login__cover-line {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  height: 1px;
+  display: block;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--brand) / 0.26),
+    hsl(var(--sand) / 0.36),
+    transparent
+  );
+  transform: rotate(-12deg);
+}
+
+.login__cover-line--1 { top: 22%; opacity: 0.55; }
+.login__cover-line--2 { top: 49%; opacity: 0.34; }
+.login__cover-line--3 { top: 72%; opacity: 0.42; }
+
+@keyframes login-sweep {
+  0%   { transform: translateX(-120%); }
+  55%  { transform: translateX(120%); }
+  100% { transform: translateX(120%); }
+}
+
+.login__shell {
+  position: relative;
+  width: 100%;
+  max-width: 34rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login__masthead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.login__kicker {
+  flex: none;
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  padding-top: 0.3rem;
 }
 
 .login__card {
   width: 100%;
-  max-width: 30rem;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / 0.92);
+  backdrop-filter: blur(6px);
+  border: var(--border-subtle);
   border-radius: var(--panel-radius);
-  box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.04), 0 8px 24px -12px hsl(var(--foreground) / 0.12);
+  box-shadow:
+    0 1px 2px 0 hsl(var(--foreground) / 0.04),
+    0 8px 24px -12px hsl(var(--foreground) / 0.12);
   padding: 1.75rem;
+  box-sizing: border-box;
 }
 
 .login__brand {
