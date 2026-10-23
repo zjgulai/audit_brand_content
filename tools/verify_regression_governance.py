@@ -43,12 +43,62 @@
 
 ## 退出码
 
-  0 全过 · 1 有红 · 2 未测（回归集或规则表读不出）
+  0 全过 · 1 有红 · 2 未测（回归集或规则表读不出 / 人工台账未签）
+
+  三条分支的语义（`main()` 里逐一实现，`--controls` 各有一条退出码对照）：
+
+  | 条件 | 退出码 |
+  |---|---|
+  | 机器半边（G-OWNER / G-LEGAL）有红 | **1** 红 |
+  | 机器半边全绿 + 人工台账**未签** | **2** 未测 |
+  | 机器半边全绿 + 台账全签 | **0** 通过 |
+
+## ⚠️ 本文件今天**没有映射进 `verifier_map`** —— 而台账里的读数是错的
+
+**这是一个必须写下来、否则下一个人看不到的状态**（与 `waiver-v1.json` 的「未闭项-触发点」
+同一个动作：一个只在对话里存在的状态，下一个人看不到）。
+
+1. **`untested` 那一栏对 #86 说的是错的。**
+   它显示「缺 test_id / fixture / command」，读起来像**执行点还没建**。
+   而实际上：**判据已建好、`--controls` 15/15 过、三条退出码分支都在跑。**
+   缺的只是 `verifier_map` 里那一行。
+
+2. **为什么不映射**（2026-10-23 实测，不是推测）：
+   本文件的机器半边**今天就是红的**（`G-OWNER` 产品归属未定、`G-LEGAL` 7 条法规条目
+   0 条 `legal_confirmation`），所以 `main()` 走第一条分支退 **1**。
+   映射之后 runner 记 `FAILED #86 exit=1`，而
+   **`verify_acceptance_ratchet.py` 要求 `failed == 0`** —— 整条棘轮红。
+
+   ```
+   $ .venv/bin/python tools/verify_acceptance_ratchet.py --run
+   ❌ failed=1 —— 有红的验收项，一条都不许合入
+   ```
+
+   ★ 曾经考虑过「红也退 2」来绕过 —— **否决**。
+     那会把两条**真缺口**（没有人认领 owner、法规条目没有法务确认）藏进「未测」，
+     而「未测」在台账里读起来只是「还没做」，不像「这里有问题」。
+     **把红伪装成未测，比不映射糟得多。**
+
+3. **什么时候会变**：下面两件事到位之后，机器半边转绿 → 映射自然生效，
+   那时它会走「退 2（未签）」那条分支 —— 正是设计的行为。
+   - `owner.产品归属`：需要**产品 / 委托方书面认领**（不是我们能填的）
+   - 7 条法规条目的 `legal_confirmation`：需要**法务逐条确认**（同样不是我们能填的）
+
+   这两项的人工签收落点是 `research/governance/regression-set-manual-v1.json`
+   （4 条，现状全部 `not_run`）。
 
 ## 用法
 
     python3 tools/verify_regression_governance.py
     python3 tools/verify_regression_governance.py --controls
+
+## 已知盲区
+
+* 本文件判的是**引擎视角**的「涉及法规」（命中带 `external_ref` 的规则），
+  不是**法务视角**的 —— 一条样本可能在内容上触及法规但今天没有规则覆盖它
+  （本集合里 `no_rule_coverage` 那 49 条），那些**不计入**。
+* 人工台账里填了 `{by, at}` 就会让它变绿 —— 本文件**不验证签署真实性**，
+  那一格只能靠人核原件或审批流。
 """
 from __future__ import annotations
 
@@ -131,6 +181,57 @@ def find_legal_samples(reg, rules_doc, judge_fn=None):
     return out
 
 
+# ── 人工签收台账（行 86 的 ③：签署真实性只能人核原件）───────────────────
+MANUAL_LEDGER = ROOT / "research" / "governance" / "regression-set-manual-v1.json"
+
+#: `--controls` 用的哨兵：表示「这一格故意不给文件」，与「给了 None」不同。
+#: ★ 用独立哨兵而不是 None：None 是合法输入（表示用默认台账），
+#:   把两者混成一个值，就分不出「没传」与「传了个空」—— 本轮第 4 次同类错。
+_MISSING = object()
+
+
+def check_manual(path=None):
+    """读人工签收台账。返回 (problems, n_total, n_signed)。
+
+    `problems is None` → 台账读不出（调用方落**退 2**，不是红）。
+    `problems == []`   → 全部已签。
+
+    ★ 判据照抄 `web/a11y-manual-v1.json` 那一套：
+      `status ∈ accept_status` **且** `evidence` / `owner` / `date` 三项非空才算签收。
+      其余一律算**未测**（退 2），不算红、也不算通过。
+
+    ★ 为什么「未签」是退 2 而不是退 0：
+      行 86 的 ③「签署真实性」没有机器判据。把它算绿，等于说「没签 = 签了」。
+      而 runner 读退 2 会记 `命令退 2（未测）`，**不会冒充 passed**。
+    """
+    p = Path(path) if path is not None else MANUAL_LEDGER
+    if not p.is_file():
+        return None, 0, 0
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None, 0, 0
+    if not isinstance(d, dict):
+        return None, 0, 0
+    items = d.get("items")
+    accept = d.get("accept_status")
+    if not isinstance(items, list) or not items or not isinstance(accept, list):
+        return None, 0, 0
+
+    problems, signed = [], 0
+    for it in items:
+        if not isinstance(it, dict):
+            problems.append("台账条目不是对象")
+            continue
+        name = str(it.get("item") or "（未命名）")
+        if it.get("status") in accept and all(
+                str(it.get(k) or "").strip() for k in ("evidence", "owner", "date")):
+            signed += 1
+        else:
+            problems.append("%s（status=%r）" % (name, it.get("status")))
+    return problems, len(items), signed
+
+
 def check_legal(legal_samples):
     """G-LEGAL：涉及法规的条目必须带 `legal_confirmation`（确认人 + 时间）。"""
     problems = []
@@ -151,8 +252,18 @@ def check_legal(legal_samples):
 
 
 # ── 主检查 ────────────────────────────────────────────────────────────
-def main() -> int:
+def main(regression_path=None, rules_path=None, manual_path=None) -> int:
+    """三条分支，每条都要能被 `--controls` 反向对照 —— 所以路径可注入。
+
+    | 分支 | 条件 | 退出码 |
+    |---|---|---|
+    | 红 | 机器半边（G-OWNER / G-LEGAL）有红 | **1** |
+    | 未测 | 机器半边全绿，但人工台账**未签** | **2** |
+    | 绿 | 机器半边全绿 + 台账全签 | **0** |
+    """
     results = []
+    REG = Path(regression_path) if regression_path else REGRESSION
+    RUL = Path(rules_path) if rules_path else RULES
 
     def check(cid, ok, msg):
         results.append((cid, bool(ok), msg))
@@ -162,12 +273,12 @@ def main() -> int:
     print("行 86 / SEC-6-GS-4 · 回归集维护归属与法务确认（**机器半边**）")
     print("=" * 72)
 
-    if not REGRESSION.exists() or not RULES.exists():
+    if not REG.exists() or not RUL.exists():
         print("  ⚠ 读不到回归集或规则表 —— 未测，不是通过")
         return 2
     try:
-        reg = json.loads(REGRESSION.read_text(encoding="utf-8"))
-        rules = json.loads(RULES.read_text(encoding="utf-8"))
+        reg = json.loads(REG.read_text(encoding="utf-8"))
+        rules = json.loads(RUL.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         print("  ⚠ 解析失败：%s —— 未测" % exc)
         return 2
@@ -199,10 +310,43 @@ def main() -> int:
         print("       没有人认领 → 维护归属不清；没有人确认 → 法规条目无法务确认。")
         print("       它们如果不红，就永远不会被处理。")
         return 1
-    print("  ✅ 全过 —— 只证明：owner 字段指向产品、涉及法规的条目都填了")
-    print("     `legal_confirmation`。")
-    print("     ★ **不证明签署真实** —— 有人填上 {by, at} 就能让它变绿，")
-    print("       这一条只能靠人核原件或审批流。行 86 的 ③ 如实留 manual。")
+
+    # ── 机器半边过了，但**人工签收没做** → 退 2（未测），不是退 0 ──────────
+    #   ★ 2026-10-23（05 裁定，按 #112 的模式）：
+    #
+    #   映射的风险**不是「后半没验」，是「runner 报 passed 而读者以为全验了」**。
+    #   行 86 的 ③「签署真实性要人核原件」**没有任何机器判据** ——
+    #   有人把 `legal_confirmation` 填上 {by, at} 就能让 G-LEGAL 变绿，
+    #   而那证明不了签名是真的。
+    #
+    #   所以：机器半边全绿 + 人工台账未签 → **退 2**。
+    #   runner 会把它记成 `命令退 2（未测）`，落在 `untested_origin: executed_rc2`，
+    #   **不会冒充 passed**。
+    #
+    #   ★ 两种退 2 含义相反，结论行必须分开写：
+    #     · 「机器半边坏了」→ 退 1，是红
+    #     · 「机器半边过了、签署没做」→ 退 2，是未测
+    #   把后者写成前者会让人去查一个没坏的机器半边；
+    #   把后者写成退 0 会让「没签」看起来像「签了」。
+    manual_problems, n_total, n_signed = check_manual(manual_path)
+    if manual_problems is None:
+        print("  ⚠ 退 2：人工签收台账读不出 —— 未测（不是通过，也不是红）")
+        return 2
+    if manual_problems:
+        print("  ⚠ **机器半边已过，但人工签收未完成** → 退 2（未测，不是通过）")
+        print("     已签 %d / %d 项。未签的：" % (n_signed, n_total))
+        for p in manual_problems[:6]:
+            print("       · %s" % p)
+        print()
+        print("     ★ 这次退 2 的原因是**签署未做**，不是机器半边坏了 ——")
+        print("       两种退 2 含义相反：前者去催人，后者去查代码。")
+        print("       行 86 的 ③「签署真实性」只能人核原件或审批流。")
+        return 2
+
+    print("  ✅ 全过 —— 机器半边（owner 指向产品、法规条目填了 legal_confirmation）")
+    print("     + 人工签收台账 %d/%d 已签（含签署真实性核对）。" % (n_signed, n_total))
+    print("     ★ 仍**不证明**签署本身是真的 —— 台账是人写的，")
+    print("       它证明的是「有人对着原件核过并留下了姓名/日期/证据指针」。")
     return 0
 
 
@@ -265,6 +409,64 @@ def run_controls() -> int:
              if s["id"] == "B"]),
     ]
 
+    # ── 三条**退出码**分支的反向对照 ────────────────────────────────────
+    #   ★ 上面那组比的是「问题列表空不空」，这一组比的是 **main() 的退出码**。
+    #     两者不能混用：`check_*` 返回问题列表，而分支语义是 0/1/2 三态。
+    #     （这正是本轮第 4 次「符号语义错位」的教训：`[]` 不等于「红」，
+    #       而「有红」也不等于「退 1」—— 退 2 也是一种非零。）
+    #
+    #   三条分支各要一条对照，缺一条就有一个方向恒真：
+    #     · 机器有红 → 1
+    #     · 机器全绿 + 未签 → **2**（关键：不能是 0）
+    #     · 机器全绿 + 全签 → 0
+    import tempfile as _tf
+    code_cases = []
+
+    def _mk(reg_obj, manual_obj):
+        td = _tf.mkdtemp(prefix="rgv-ctl-")
+        rp = Path(td) / "reg.json"
+        mp = Path(td) / "manual.json"
+        rp.write_text(json.dumps(reg_obj, ensure_ascii=False), encoding="utf-8")
+        if manual_obj is _MISSING:
+            mp = Path(td) / "nope.json"          # 不给文件 → 读不出
+        elif manual_obj is not None:
+            mp.write_text(json.dumps(manual_obj, ensure_ascii=False), encoding="utf-8")
+        return rp, mp
+
+    # ★ 2026-10-23 修一处我自己的夹具错误：第一版 `good_reg` 的样本是 `"x"`，
+    #   它**命中不了任何规则** → G-LEGAL 判「0 条涉及法规 → 红」，
+    #   于是三条本该走到「人工台账」分支的用例全部退 1，看起来像分支写错了。
+    #   实际是**夹具没有造出「机器半边全绿」这个前提**。
+    #   现在用一个真能命中 `T1.1.medical-cure`（带 external_ref）的句子，
+    #   并给它 `legal_confirmation`，这样 G-OWNER 与 G-LEGAL 才都是绿的。
+    _LEGAL_TEXT = "This breast pump cures mastitis"
+    good_reg = {
+        "samples": [{"id": "S1", "text": _LEGAL_TEXT,
+                     "legal_confirmation": {"by": "法务", "at": "2026-10-22"}}],
+        "owner": {"产品归属": "产品（委托方）",
+                  "维护记录": [{"at": "2026-10-22", "by": "x", "what": "建集"}]},
+    }
+    bad_reg = {"samples": [{"id": "S1", "text": _LEGAL_TEXT}],
+               "owner": {"产品归属": None}}
+    unsigned = {"accept_status": ["signed"], "items": [
+        {"item": "a", "status": "not_run", "evidence": "", "owner": "", "date": ""}]}
+    signed = {"accept_status": ["signed"], "items": [
+        {"item": "a", "status": "signed", "evidence": "原件-001",
+         "owner": "张三", "date": "2026-10-23"}]}
+
+    def _run(reg_obj, manual_obj, want_code, name, expect_exit):
+        rp, mp = _mk(reg_obj, manual_obj)
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            got = main(regression_path=rp, rules_path=RULES, manual_path=mp)
+        code_cases.append((name, expect_exit, got))
+
+    _run(bad_reg, None, 1, "★ 机器半边有红 → 必须退 1", 1)
+    _run(good_reg, unsigned, 2, "★★ 机器全绿但人工台账未签 → 必须退 2（不是 0）", 2)
+    _run(good_reg, signed, 0, "★ 机器全绿 + 台账全签 → 必须退 0", 0)
+    _run(good_reg, _MISSING, 2, "★ 人工台账读不出 → 必须退 2（未测）", 2)
+
     print("=" * 72)
     print("verify_regression_governance · --controls（预判 vs 实测并列）")
     print("=" * 72)
@@ -287,10 +489,20 @@ def run_controls() -> int:
                  "✓" if ok else "✗", note))
 
     print("-" * 72)
+    print("  三条退出码分支（0 / 1 / 2）")
+    print("  " + "-" * 64)
+    for name, want, got in code_cases:
+        ok = (want == got)
+        bad += int(not ok)
+        print("  %-46s %-6s %-6s %s"
+              % (name[:46], "退 %d" % want, "退 %d" % got, "✓" if ok else "✗"))
+
+    print("-" * 72)
     if bad:
-        print("❌ %d/%d 与预判不符 —— 差异那几行就是该查的地方" % (bad, len(cases)))
+        print("❌ %d 项与预判不符 —— 差异那几行就是该查的地方" % bad)
         return 1
-    print("✅ %d/%d 预判全部命中" % (len(cases), len(cases)))
+    print("✅ 全部预判命中：%d 条问题列表对照 + %d 条退出码分支对照"
+          % (len(cases), len(code_cases)))
     return 0
 
 

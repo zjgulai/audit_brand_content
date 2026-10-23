@@ -1,0 +1,42 @@
+{
+ "schema_version": 1,
+ "$note": "行 86 / SEC-6-GS-4 的**人工签收台账**。机器半边由 tools/verify_regression_governance.py 验（G-OWNER / G-LEGAL）；签署的**真实性**只能人核原件或审批流，落在这里。★ 初值一律 not_run —— 签名是人给的，不是脚本给的。",
+ "$why_two_halves": "行 86 有三段：① owner 指向产品 ② 法规条目带法务确认记录 ③ 签署真实性需人工核对原件。①② 可机器判（verify_regression_governance.py），③ 只能人做。本台账就是 ③ 的落点。",
+ "$accept_note": "status ∈ accept_status 且 evidence / owner / date 三项非空才算签收；其余一律算未测（退 2），不算红，也不算通过。与 web/a11y-manual-v1.json 同一套判据。",
+ "$signing_rule": "★ 不许脚本代填。evidence 必须指得出原件或审批流（文件名/链接/审批单号），owner 必须是真人，date 必须是核对当天。填不出来的那条就让它停在 not_run。",
+ "accept_status": ["signed"],
+ "items": [
+  {
+   "item": "owner-points-to-product",
+   "label": "冻结回归集清单的 owner / 维护记录**指向产品**（行 86 第一段）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "legal-samples-declaration",
+   "label": "「涉及法规的条目」清单确认：7 条（GS-005/007/008/009/010/067/070）是否就是全部——判据是「命中带 external_ref 的规则」，可能与法务口径不同",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "legal-signature-authenticity",
+   "label": "7 条法规条目的法务确认记录**真实性**核对（人核签署原件或审批流，不只看字段填没填）",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  },
+  {
+   "item": "maintenance-record-review",
+   "label": "维护记录（谁改过这份清单、改了什么、为什么）与 git 历史对得上",
+   "status": "not_run",
+   "evidence": "",
+   "owner": "",
+   "date": ""
+  }
+ ]
+}
