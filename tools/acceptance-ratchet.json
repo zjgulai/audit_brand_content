@@ -1,62 +1,70 @@
 {
-  "schema_version": 1,
-  "policy": "T-145 · 验收棘轮地板",
-  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 114,
-  "recorded_at": "2026-10-23",
-  "recorded_reading": {
-    "passed": 114,
-    "failed": 0,
-    "untested": 22,
-    "untested_split": {
-      "machine": 15,
-      "manual": 7,
-      "unverifiable": 0,
-      "unknown": 0
-    },
-    "untested_origin": {
-      "unmapped": 21,
-      "executed_rc2": 1
-    }
+ "schema_version": 1,
+ "policy": "T-145 · 验收棘轮地板",
+ "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
+ "passed_floor": 84,
+ "recorded_at": "2026-10-23",
+ "recorded_reading": {
+  "passed": 84,
+  "failed": 0,
+  "untested": 52,
+  "untested_split": {
+   "machine": 45,
+   "manual": 7,
+   "unverifiable": 0,
+   "unknown": 0
   },
-  "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
-  "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
-  "lower_history": [
-    {
-      "from": "121",
-      "to": "116",
-      "at": "2026-10-23",
-      "reason": "读数审计发现 5 行是假绿，已回退映射：#9（指标没算 empty/parse_error/unsupported）、#29（决策表脚本不加载组合规则）、#42（无「P 当严重度」扫描器）、#62（群消息渲染不读 obligations/candidate）、#66（验证器全程只有 1 条 finding）。",
-      "why_not_a_regression": "这不是「功能退步」，是「原先那 5 条 passed 本来就不成立」。回退让读数变诚实，而不是让能力变弱。",
-      "how_to_restore": "按 PMO/audit 下三份审计报告的缺口清单逐条补断言，补一条涨一格。"
-    },
-    {
-      "from": "116",
-      "to": "113",
-      "at": "2026-10-23",
-      "reason": "58 的审计（12 agent 对抗复核，0 推翻）发现 release_gate 的 20 行里 0 行行为覆盖。回退其中 3 条 truly `uncovered`：#93（名单治理三主体留痕，脚本 C1–C5 是签发 SoD 与它无关）、#98（只有重审 job 状态机，产物一个都没有）、#123（脚本里没有「撤权」这个对象）。",
-      "why_not_a_regression": "同上一轮：不是功能退步，是原先那 3 条 passed 本来就不成立。",
-      "how_to_restore": "补断言后逐条转回。另 11 条 partial 保留 passed，在审计报告里标「部分覆盖」，补完再核。"
-    }
-  ],
-  "raise_history": [
-    {
-      "from": "116",
-      "to": "120",
-      "at": "2026-10-23",
-      "why": "T-85/T-87/#76/#36/#108/#129/#105 等陆续转 passed。地板不跟上会让余量掩盖下一次倒退。"
-    },
-    {
-      "from": "120",
-      "to": "121",
-      "at": "2026-10-23",
-      "why": "#105 的映射此前因 criteria 不匹配被静默跳过（f0c80ff 修），它终于真的跑起来了。地板跟上。"
-    },
-    {
-      "from": "113",
-      "to": "114",
-      "at": "2026-10-23",
-      "why": "#42 补齐后转 passed（f3 的 `verify_p_code_not_severity.py`，5/5 对照）。"
-    }
-  ]
+  "untested_origin": {
+   "unmapped": 51,
+   "executed_rc2": 1
+  }
+ },
+ "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
+ "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
+ "lower_history": [
+  {
+   "from": "121",
+   "to": "116",
+   "at": "2026-10-23",
+   "reason": "读数审计发现 5 行是假绿，已回退映射：#9（指标没算 empty/parse_error/unsupported）、#29（决策表脚本不加载组合规则）、#42（无「P 当严重度」扫描器）、#62（群消息渲染不读 obligations/candidate）、#66（验证器全程只有 1 条 finding）。",
+   "why_not_a_regression": "这不是「功能退步」，是「原先那 5 条 passed 本来就不成立」。回退让读数变诚实，而不是让能力变弱。",
+   "how_to_restore": "按 PMO/audit 下三份审计报告的缺口清单逐条补断言，补一条涨一格。"
+  },
+  {
+   "from": "116",
+   "to": "113",
+   "at": "2026-10-23",
+   "reason": "58 的审计（12 agent 对抗复核，0 推翻）发现 release_gate 的 20 行里 0 行行为覆盖。回退其中 3 条 truly `uncovered`：#93（名单治理三主体留痕，脚本 C1–C5 是签发 SoD 与它无关）、#98（只有重审 job 状态机，产物一个都没有）、#123（脚本里没有「撤权」这个对象）。",
+   "why_not_a_regression": "同上一轮：不是功能退步，是原先那 3 条 passed 本来就不成立。",
+   "how_to_restore": "补断言后逐条转回。另 11 条 partial 保留 passed，在审计报告里标「部分覆盖」，补完再核。"
+  },
+  {
+   "from": "113",
+   "to": "84",
+   "at": "2026-10-23",
+   "reason": "剩余 10 个 fan-out 组（33 行）的覆盖率审计完成：真覆盖仅 #97，30 行 partial、2 行 uncovered（#20/#22）。委托方裁定「全部回退 untested」。另一条独立复核证据：定向变异证明这些验证器对判据本身不敏感 —— 删掉 send_gateway 的裸「通过」分支后仍 34/34 绿；把 auth_session 的 STEP_UP_SECONDS 5 分钟改成 90 秒、ABSOLUTE_SECONDS 8 小时改成 2 小时，仍 40/40 绿；finding_store 接受悬空 derived_from、自指 derived_from 与 control_code=123。",
+   "why_not_a_regression": "不是功能退步，是这 30 条 passed 从来就不成立 —— 验证器只验了判据的一部分子条款，而 fan-out 把同一次绿同时记到了整组每一行上。",
+   "how_to_restore": "逐行补断言后转回。#97 已用两次定向变异证明真会红（摘必填字段校验 → 3b 三条红；只删『无取证即拒』→ 3c 红），保留 passed。"
+  }
+ ],
+ "raise_history": [
+  {
+   "from": "116",
+   "to": "120",
+   "at": "2026-10-23",
+   "why": "T-85/T-87/#76/#36/#108/#129/#105 等陆续转 passed。地板不跟上会让余量掩盖下一次倒退。"
+  },
+  {
+   "from": "120",
+   "to": "121",
+   "at": "2026-10-23",
+   "why": "#105 的映射此前因 criteria 不匹配被静默跳过（f0c80ff 修），它终于真的跑起来了。地板跟上。"
+  },
+  {
+   "from": "113",
+   "to": "114",
+   "at": "2026-10-23",
+   "why": "#42 补齐后转 passed（f3 的 `verify_p_code_not_severity.py`，5/5 对照）。"
+  }
+ ]
 }
