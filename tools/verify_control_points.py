@@ -117,6 +117,15 @@ REQUIRED_CP_FIELDS = (
     "authority_kind", "authority_ref", "parent", "version", "status",
 )
 
+# ★ 同一份九字段的**独立副本**（行 75 的 CP-1b 负样本对照从这里取探针字段）。
+#   为什么必须有两份：对照探针若直接从 REQUIRED_CP_FIELDS 取字段，
+#   那份清单被掏空时判据与对照**一起变瞎**（同源恒真）—— 变异 #75 正是掏清单。
+#   两份清单不一致时 CP-1b 红（见 check_control_points），所以它不会烂掉。
+CP_NINE_FIELDS = (
+    "control_code", "control_name", "family", "judge_type",
+    "authority_kind", "authority_ref", "parent", "version", "status",
+)
+
 # ★ routing 的字段是 6 个，不是 A-3 最初写的 4 个。
 #   2026-10-18 更正：原 4 字段（owner/due/escalation/appeal）漏了 `layer`，
 #   导致「谁结这一层」（DP3 审核员 vs DP4 法务）无处可查。
@@ -160,13 +169,13 @@ def load(path: Path):
 
 # ─────────────────────── 主表断言（L6）───────────────────────
 
-def check_control_points(cp: dict) -> list:
-    out = []
-    rows = cp.get("control_points")
-    if not isinstance(rows, list):
-        return [_check("CP-0", False, "control_points 不是数组 —— 结构坏到无法判断")]
+def _cp1_core(rows) -> tuple:
+    """CP-1 的本体（纯函数）：九字段齐全 + 枚举合法 + 全是对象。
 
-    # ── L6-1：九字段齐全且可解析 ──────────────────────────────
+    ★ 2026-10-24 从 check_control_points 里拆出来（变异探针 #75）：
+      CP-1b 的负样本对照要拿「打坏一行」的样本**再过一遍同一段判据** ——
+      不拆成纯函数，对照样本就得在 check_control_points 里递归自己。
+    """
     missing, bad_enum, bad_type = [], [], []
     for i, r in enumerate(rows):
         if not isinstance(r, dict):
@@ -184,9 +193,54 @@ def check_control_points(cp: dict) -> list:
             bad_enum.append(f"{code}.status={r.get('status')!r}")
         if not isinstance(r.get("authority_ref"), list):
             bad_enum.append(f"{code}.authority_ref 不是数组")
-    out.append(_check("CP-1", not (missing or bad_enum or bad_type),
-                      f"{len(rows)} 行；缺字段 {len(missing)}；枚举/类型错 {len(bad_enum)}；非对象 {len(bad_type)}"
-                      + (f" · 首个：{(missing + bad_enum + bad_type)[0]}" if (missing or bad_enum or bad_type) else "")))
+    ok = not (missing or bad_enum or bad_type)
+    detail = (f"{len(rows)} 行；缺字段 {len(missing)}；枚举/类型错 {len(bad_enum)}；非对象 {len(bad_type)}"
+              + (f" · 首个：{(missing + bad_enum + bad_type)[0]}" if (missing or bad_enum or bad_type) else ""))
+    return ok, detail
+
+
+def check_control_points(cp: dict) -> list:
+    out = []
+    rows = cp.get("control_points")
+    if not isinstance(rows, list):
+        return [_check("CP-0", False, "control_points 不是数组 —— 结构坏到无法判断")]
+
+    # ── L6-1：九字段齐全且可解析 ──────────────────────────────
+    ok1, detail1 = _cp1_core(rows)
+    out.append(_check("CP-1", ok1, detail1))
+
+    # ── CP-1b：CP-1 自己的负样本对照（行 75，2026-10-24）──────
+    #   变异探针 #75 实测：把 REQUIRED_CP_FIELDS 掏成 7 个字段
+    #   （control_name / version 免检）后，默认主检查**仍退 0** ——
+    #   真实数据是干净的，「必填」只剩文件里的一个字面量，没有任何东西拦它。
+    #   治法与 CD-5 同一条：**每次主检查都真喂坏样本** ——
+    #   对九字段里**每个**字段（探针从独立副本 CP_NINE_FIELDS 取，不与
+    #   REQUIRED_CP_FIELDS 同源 —— 掏那份清单时判据与对照不许一起瞎）：
+    #   从首行删掉它，过一遍同一段判据，必须红。任一字段删掉不红 = 免检；
+    #   两份清单不一致 = 必填表被改过没同步，也红。
+    if rows and isinstance(rows[0], dict):
+        if sorted(CP_NINE_FIELDS) != sorted(REQUIRED_CP_FIELDS):
+            out.append(_check(
+                "CP-1b", False,
+                "★ CP_NINE_FIELDS 与 REQUIRED_CP_FIELDS 不一致（%r vs %r）—— "
+                "负样本对照的探针清单与判据清单漂移了"
+                % (sorted(CP_NINE_FIELDS), sorted(REQUIRED_CP_FIELDS))))
+        else:
+            uncaught = []
+            for f in CP_NINE_FIELDS:
+                if f not in rows[0]:
+                    continue
+                bad = json.loads(json.dumps(rows))
+                bad[0].pop(f, None)
+                ok_bad, _ = _cp1_core(bad)
+                if ok_bad is not False:
+                    uncaught.append(f)
+            out.append(_check(
+                "CP-1b", not uncaught,
+                "★ 负样本对照：首行逐字段删除必须个个红；免检 %d %s"
+                % (len(uncaught), uncaught or "")
+                + ("" if not uncaught
+                   else " —— 不红 = 九字段必填没有活执行点，CP-1 对该字段恒真")))
 
     # ── L6-2：control_code 唯一 ──────────────────────────────
     codes = [r.get("control_code") for r in rows if isinstance(r, dict)]
@@ -1314,6 +1368,178 @@ def _is_real_table(cp) -> bool:
     return set(FAMILY_MISMATCH_EXPECT) <= codes
 
 
+# ───────── 行 20：finding 级准入 —— 非注册表 active 码必须被拒 ─────────
+#
+# ★ 2026-10-24 补（变异探针 #20）：判据原文是
+#   「Z99（不存在）与 status=deprecated 的码各一条 finding，断言均被拒；
+#   用主表 active 码构造的 finding，断言接受」。此前全部执行点在
+#   ControlPointRegistry.get_active（映射验证器里 0 处断言它），
+#   而变异把 judge_entry._draft_findings 绕开 get_active 之后，
+#   --selftest / verify_rule_judge / verify_judge_entry / smoke 全部退 0。
+#   治法：在这里真跑生产入口（_draft_findings + 真实注册表），
+#   把「准入拒绝」落成本验证器自己的行为级断言。
+
+def _finding_admission_problems(cp):
+    """跑生产 finding 构造入口，验准入三向。返回问题列表（空 = 通过）。
+
+    每个码的三向：
+      rejected  → _draft_findings 必须抛 ControlPointError（unknown/deprecated 都算）
+      accepted  → 必须返回 1 条 finding，且 authority_ref 从注册表带出（非空）
+
+    ★ 拒绝发生在 `registry.get_active`（生产代码里）。自证的坏样本不在这里
+      注入 —— 而是把类上的 `get_active` 换成「恒给占位、从不抛」的探针
+      （变异 #20 的真形状），在 selftest 里 patch 完必须还原。
+    """
+    problems = []
+    try:
+        from base.judge_entry import _draft_findings
+        from base.control_points import (ControlPointRegistry,
+                                         ControlPointError)
+    except Exception as exc:  # noqa: BLE001
+        return ["untested: base.judge_entry 导入失败（%s: %s）" % (type(exc).__name__, exc)]
+
+    registry = ControlPointRegistry()
+    unit = {"unit_id": "verify-a20"}
+    hit_tpl = {"rule_key": "verify.a20", "start": 0, "end": 1,
+               "quote": "verify", "severity": "L2", "detected_by": "verify_a20"}
+
+    def probe(code):
+        try:
+            fs = _draft_findings(unit, [dict(hit_tpl, control_code=code)], registry)
+            return fs
+        except ControlPointError:
+            return None
+
+    rows = [r for r in (cp.get("control_points") or []) if isinstance(r, dict)]
+    deprecated = next((r.get("control_code") for r in rows
+                       if r.get("status") == "deprecated"), None)
+    active = next((r.get("control_code") for r in rows
+                   if r.get("status") == "active" and (r.get("authority_ref") or [])),
+                  None)
+
+    fs = probe("Z99")
+    if fs is not None:
+        problems.append("Z99（不存在）的 finding 被接受（status=%r）—— "
+                        "准入拒绝没拦住未知码" % ((fs[0] or {}).get("status")
+                                                if fs else None))
+    if deprecated is not None:
+        fs = probe(deprecated)
+        if fs is not None:
+            problems.append("deprecated 码 %s 的 finding 被接受 —— 准入拒绝没拦住停用码"
+                            % deprecated)
+    else:
+        problems.append("untested: 主表没有 deprecated 码，deprecated 拒收没法验")
+    if active is None:
+        problems.append("untested: 主表没有带依据的 active 码，接受侧没法验")
+    else:
+        fs = probe(active)
+        if fs is None:
+            problems.append("active 码 %s 的 finding 被拒 —— 准入把好码也挡了" % active)
+        elif not fs:
+            problems.append("active 码 %s 构造返回空 findings" % active)
+        else:
+            refs = fs[0].get("authority_ref")
+            row = next(r for r in rows if r.get("control_code") == active)
+            if not isinstance(refs, list) or len(refs) != len(row.get("authority_ref") or []):
+                problems.append(
+                    "active 码 %s 的 authority_ref 未按注册表带出（注册表 %d 条 / finding %r）"
+                    % (active, len(row.get("authority_ref") or []), refs))
+    return problems
+
+
+def check_finding_admission(cp):
+    """行 20：准入三向（真实生产入口 + 真实注册表）。"""
+    probs = _finding_admission_problems(cp)
+    out = [_check(
+        "C-A20", not probs and all(not p.startswith("untested") for p in probs),
+        "行20 准入三向（Z99 拒 / deprecated 拒 / active 收且 authority_ref 带出）；"
+        "问题 %d：%s" % (len(probs), probs[:3] or "无"))]
+    return out
+
+
+# ───────── 行 79 ⑤：未知桶计数必须真的在数 ─────────
+#
+# ★ 2026-10-24 补（变异探针 #79）：行为级执行点在 verify_decision_table 的
+#   K1/K4/K5（未映射到本行命令），判据 L6-5 映射给本验证器后它是恒绿的：
+#   把 decision_table._collect_unknown_buckets 改成四桶恒 0，默认主检查退 0。
+#   治法：本验证器自己跑一遍生产 decide()，三向（有未知 / 逐桶 / 全零）。
+
+def _unknown_bucket_problems():
+    """跑生产判定表，验四桶计数三向。返回问题列表（空 = 通过）。"""
+    try:
+        from base.decision_table import decide, UNKNOWN_BUCKETS
+    except Exception as exc:  # noqa: BLE001
+        return ["untested: base.decision_table 导入失败（%s: %s）"
+                % (type(exc).__name__, exc)]
+
+    axes = list(UNKNOWN_BUCKETS)
+    unknowns = dict(UNKNOWN_BUCKETS)
+    cand = {"status": "candidate", "severity": "L2", "rule_conflict": False}
+
+    # ① 有未知（输入 + finding 各带一桶）：total 必须 > 0
+    inp = {"parse_status": "ok", "coverage_state": "partial",
+           "findings": [dict(cand, **unknowns)], **unknowns}
+    out = decide(inp)
+    if out.get("run_state") != "OK":
+        return ["untested: 未知桶探针样本被判 ERROR（%r）—— 输入形状与生产域不符"
+                % (out.get("invariant_violation"),)]
+    buckets, total = out.get("unknown_buckets"), out.get("unknown_bucket_total")
+    if not isinstance(buckets, dict) or sorted(buckets) != sorted(axes):
+        return ["unknown_buckets 键集=%r，期望四轴 %r" % (buckets, axes)]
+    if not total or set(buckets.values()) <= {0}:
+        return ["有未知样本（输入+finding 各带一桶）计数仍全零 —— "
+                "未知桶计数没有在数（total=%r buckets=%r）" % (total, buckets)]
+
+    # ② 逐桶：finding 只带一轴未知 → 该轴=1、其余轴=0、total=1；
+    #    换成已知值 → 全 0。四轴各验一遍，堵「跨轴顶替」的糊弄计数。
+    probs = []
+    for axis, known in (("family", "宣称控制"), ("scene_domain", "婴儿喂养"),
+                        ("authority_source", "外部标准库"), ("consequence", "误导")):
+        one = {"parse_status": "ok", "coverage_state": "partial",
+               "findings": [dict(cand, **{axis: unknowns[axis]})]}
+        o2 = decide(one)
+        b2 = o2.get("unknown_buckets") or {}
+        others_zero = all(b2.get(a, 0) == 0 for a in axes if a != axis)
+        if not (o2.get("run_state") == "OK" and b2.get(axis) == 1
+                and others_zero and o2.get("unknown_bucket_total") == 1):
+            probs.append("%s 单轴未知：buckets=%r total=%r（应该轴 1、其余 0、total 1）"
+                         % (axis, b2, o2.get("unknown_bucket_total")))
+        one_known = {"parse_status": "ok", "coverage_state": "partial",
+                     "findings": [dict(cand, **{axis: known})]}
+        o3 = decide(one_known)
+        b3 = o3.get("unknown_buckets") or {}
+        if not (o3.get("run_state") == "OK" and b3.get(axis) == 0
+                and all(b3.get(a, 0) == 0 for a in axes if a != axis)
+                and o3.get("unknown_bucket_total") == 0):
+            probs.append("%s 换已知值 %r：buckets=%r total=%r（应全 0）—— "
+                         "跨轴顶替或没在数" % (axis, known, b3, o3.get("unknown_bucket_total")))
+
+    # ③ 全零（判据原文：全为 0 的情况四个计数仍出现）
+    clean = {"parse_status": "ok", "coverage_state": "full",
+             "findings": [{"status": "confirmed", "severity": "L1",
+                           "rule_conflict": False, "authority_state": "ok"}]}
+    out3 = decide(clean)
+    if out3.get("run_state") != "OK":
+        probs.append("untested: 全零样本被判 ERROR（%r）" % (out3.get("invariant_violation"),))
+    else:
+        b3 = out3.get("unknown_buckets")
+        if not isinstance(b3, dict) or sorted(b3) != sorted(axes) \
+                or not all(v == 0 for v in b3.values()) \
+                or out3.get("unknown_bucket_total") != 0:
+            probs.append("全零样本 buckets=%r total=%r（期望四键齐且全 0）"
+                         % (b3, out3.get("unknown_bucket_total")))
+    return probs
+
+
+def check_unknown_buckets():
+    """行 79 ⑤：未知桶计数三向（真实生产判定表）。"""
+    probs = _unknown_bucket_problems()
+    return [_check(
+        "C-UB79", not probs and all(not p.startswith("untested") for p in probs),
+        "行79⑤ 未知桶三向（有未知→计数、逐桶归零、全零→四键齐）；问题 %d：%s"
+        % (len(probs), probs[:3] or "无"))]
+
+
 # ─────────────────────────── 汇总 ───────────────────────────
 
 def evaluate(cp, rt, history=None, rules=None, require_history=False,
@@ -1345,9 +1571,14 @@ def evaluate(cp, rt, history=None, rules=None, require_history=False,
 
     # ★ 行 76 ①④：只在**真实主表**上跑 —— 这两条依赖真实码（H06/H08/M03/M06/M07）
     #   与真实登记表；在自测夹具（F1/F2/F3）上跑会变成误报。
+    #   ★ 2026-10-24 加入同一道门：行 20 准入（C-A20，要真实注册表里的
+    #   deprecated / active 码）与行 79⑤ 未知桶（C-UB79，跑生产判定表）——
+    #   两条都是行为级探针，夹具（无 B04/M07、无 deprecated 或形状不符）会误报。
     if _is_real_table(cp):
         checks += check_family_attribution(cp)
         checks += check_single_mounting(cp)
+        checks += check_finding_admission(cp)
+        checks += check_unknown_buckets()
     reds = [c for c in checks if not c["ok"]]
     return {"checks": checks, "reds": reds,
             "verdict": "red" if reds else "ok",
@@ -1753,6 +1984,85 @@ def selftest(verbose: bool = False) -> int:
         results.append(("★ 反向对照：历史原样 → H-5a 不红（不是恒红）",
                         "H-5a" not in {c["id"] for c in check_history(_tcp4, _thist4)
                                        if not c["ok"]}, ""))
+
+    # ⑰b-2·E（#20 / #75 / #79 生产代码侧，2026-10-24）────────────
+    #   这三条的判据对象都在**生产代码**里（judge_entry 的准入、本文件自己的
+    #   REQUIRED_CP_FIELDS、decision_table 的未知桶计数）。真实数据是干净的，
+    #   只在真实数据上跑永远全绿 —— 治法与 ⑰b-2·C 同一条：自证里显式跑
+    #   「好样本必须绿 + 打坏必须红」，把执行点自己的活性钉在这里。
+    _tcp5, _e5 = load(TABLE)
+    if _tcp5 is None or not _is_real_table(_tcp5):
+        results.append(("真实数据侧", False,
+                        "untested：主表读不出或不像真实表（%s）—— "
+                        "行20/79 探针没法跑" % (_e5 or "5 条反例码缺失")))
+    else:
+        # A（行 20 好样本）：准入三向在真实表上必须绿
+        _a20 = check_finding_admission(_tcp5)
+        results.append(("真实数据侧：行20 准入三向（真实生产入口）→ 必须绿",
+                        all(c["ok"] for c in _a20),
+                        "；".join(c["detail"] for c in _a20)[:160]))
+        # A（行 20 坏样本）：准入放弃拒绝 —— 把注册表类上的 get_active 换成
+        #   「恒给占位、从不抛」的探针，正是变异 #20 的真形状
+        #   （`control = registry.get_active(...)` → `control = {}`）。用完必须还原。
+        from base.control_points import ControlPointRegistry as _CPR
+        _orig_get_active = _CPR.get_active
+
+        def _always_ok(self, code):
+            return {"authority_ref": [], "control_code": code, "status": "active"}
+
+        _CPR.get_active = _always_ok
+        try:
+            _a20_bad = _finding_admission_problems(_tcp5)
+        finally:
+            _CPR.get_active = _orig_get_active
+        results.append(("★ 行20 反向对照：准入放弃拒绝（get_active 恒真探针）→ 必须红",
+                        bool(_a20_bad),
+                        "放行探针没让准入红 —— C-A20 抓不住「Z99/deprecated 放行」"))
+        # A（行 20 坏样本②）：把 Z99 塞进主表（未登记码进登记表，另一形状）
+        _cp_z99 = _deep(_tcp5)
+        _cp_z99["control_points"] = [dict(_cp_z99["control_points"][0],
+                                          control_code="Z99")]
+        _a20b = _finding_admission_problems(_cp_z99)
+        results.append(("★ 行20 反向对照②：未登记码 Z99 混进表 → 必须红"
+                        "（Z99 不在反例五码里，C76-5a 不背锅）",
+                        bool(_a20b) and any("Z99" in p for p in _a20b),
+                        "问题=%s" % _a20b[:2]))
+        # B（行 75 坏样本）：必填表被掏掉两个字段（变异 #75 的真形状：
+        #   REQUIRED_CP_FIELDS 从 9 个掏成 7 个，control_name/version 免检）
+        #   → CP-1b 必须红。patch 的是本模块的清单本身，用完必须还原。
+        _orig_rcf = REQUIRED_CP_FIELDS
+        globals()["REQUIRED_CP_FIELDS"] = tuple(
+            f for f in _orig_rcf if f not in ("control_name", "version"))
+        try:
+            _cp1_bad = check_control_points(_deep(_tcp5))
+        finally:
+            globals()["REQUIRED_CP_FIELDS"] = _orig_rcf
+        results.append(("★ 行75 反向对照：REQUIRED_CP_FIELDS 掏掉 control_name/version "
+                        "→ CP-1b 必须红",
+                        any(c["id"] == "CP-1b" and not c["ok"] for c in _cp1_bad),
+                        "掏字段没让 CP-1b 红 —— 九字段必填回到恒真"))
+        # B（行 75 正向）：必填表齐全 → CP-1b 必须绿
+        results.append(("行75 正向：必填表齐全 → CP-1b 绿（上面那条不是恒红）",
+                        all(c["ok"] for c in check_control_points(_deep(_tcp5))
+                            if c["id"] == "CP-1b"), ""))
+        # C（行 79⑤ 好样本）：未知桶三向在真实生产判定表上必须绿
+        _ub = check_unknown_buckets()
+        results.append(("真实数据侧：行79⑤ 未知桶三向（真实生产判定表）→ 必须绿",
+                        all(c["ok"] for c in _ub),
+                        "；".join(c["detail"] for c in _ub)[:160]))
+        # C（行 79⑤ 坏样本）：把计数函数换成「四桶恒 0」的桩（变异 #79 的真形状）
+        #   → C-UB79 必须红。patch 模块属性，用完必须还原。
+        import base.decision_table as _DT
+        _orig_cub = _DT._collect_unknown_buckets
+        _DT._collect_unknown_buckets = lambda inp, findings: (
+            {axis: 0 for axis in _DT.UNKNOWN_BUCKETS}, 0)
+        try:
+            _ub_bad = check_unknown_buckets()
+        finally:
+            _DT._collect_unknown_buckets = _orig_cub
+        results.append(("★ 行79⑤ 反向对照：计数函数被换成恒 0 桩 → C-UB79 必须红",
+                        any(c["id"] == "C-UB79" and not c["ok"] for c in _ub_bad),
+                        "恒 0 桩没让 C-UB79 红 —— 未知桶计数回到恒真"))
 
     # ⑰ 跨族拆分有显式批准 → 不误报（反向对照：不是恒红）
     cp, rt = _deep(cp0), _deep(rt0)
