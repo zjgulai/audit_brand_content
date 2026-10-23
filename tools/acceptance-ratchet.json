@@ -2,20 +2,20 @@
   "schema_version": 1,
   "policy": "T-145 · 验收棘轮地板",
   "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 113,
+  "passed_floor": 114,
   "recorded_at": "2026-10-23",
   "recorded_reading": {
-    "passed": 113,
+    "passed": 114,
     "failed": 0,
-    "untested": 23,
+    "untested": 22,
     "untested_split": {
-      "machine": 16,
+      "machine": 15,
       "manual": 7,
       "unverifiable": 0,
       "unknown": 0
     },
     "untested_origin": {
-      "unmapped": 22,
+      "unmapped": 21,
       "executed_rc2": 1
     }
   },
@@ -51,6 +51,12 @@
       "to": "121",
       "at": "2026-10-23",
       "why": "#105 的映射此前因 criteria 不匹配被静默跳过（f0c80ff 修），它终于真的跑起来了。地板跟上。"
+    },
+    {
+      "from": "113",
+      "to": "114",
+      "at": "2026-10-23",
+      "why": "#42 补齐后转 passed（f3 的 `verify_p_code_not_severity.py`，5/5 对照）。"
     }
   ]
 }
