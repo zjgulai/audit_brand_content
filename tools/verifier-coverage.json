@@ -843,6 +843,14 @@
         "Playbook/内容审查Agent-产品Playbook-v1.1.md",
         "PMO/implement/阶段3-准备评估.md"
       ]
+    },
+    {
+      "verifier": "tools/verify_lease_notifications.py",
+      "asserts": "行 136 通知半边：真实 ReviewsLedger 的 claim→到期释放，lease_released 通知落 inbox、收件人是原领取人、**飞书 sender 调用次数 = 0**；遍历全部 INBOX_ONLY 类型断言 sender 不被调用；反向对照 dispatch(takedown) 必须让计数 +1（证明计数器不是恒 0）。**未覆盖**：生产装配无 outbox、新领取人无通知对象（claim 不在 NOTIFYING_KINDS），故 #136 不映射。5 项反向对照",
+      "subjects": [
+        "base/notifications.py",
+        "base/reviews_ledger.py"
+      ]
     }
   ]
 }
