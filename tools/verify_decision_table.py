@@ -74,6 +74,10 @@ except Exception as e:  # noqa: BLE001
     sys.exit(1)
 
 FIVE_STATES = {"BLOCK", "REVIEW", "未审查", "待自决", "PASS"}
+# ★ 2026-10-24：以下是**期望值**，不是判据。O4 拿它跟渲染器源码里真实的
+#   `LABELS` 逐字对拍。（此前它是死常量：只出现在定义行、零消费者，
+#   所以「LABELS 加宽」变异 survived，而一份补丁报告却声称已 killed ——
+#   实测两个方向都活。这正是 §2.4「常量定义了没人用」。）
 FIVE_LABELS_TEXT = '["BLOCK", "REVIEW", "未审查", "待自决", "PASS"]'
 LAYERS = {"DP0", "DP1", "DP2", "DP3", "DP4"}
 UNKNOWN_AXES = ("family", "scene_domain", "authority_source", "consequence")
@@ -376,6 +380,54 @@ def _render_snapshot(decision, ir_id="ir-c47"):
                     "skipped_steps": "无", "rule_snapshot": "rs-c47"},
         "report_url": "https://static.example.com/reports/c47.md",
     }
+
+
+def _labels_source():
+    """读渲染器源码里 `LABELS` 那一行的原始文本。读不到返回 None。"""
+    path = os.path.join(ROOT, "tools", "audit", "report_render.mjs")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+RE_LABELS_DEF = re.compile(
+    r"^export const LABELS\s*=\s*(\[[^\]]*\])", re.M)
+
+
+def _count_labels_defs():
+    src = _labels_source()
+    if src is None:
+        return -1
+    return len(RE_LABELS_DEF.findall(src))
+
+
+def _labels_problem_from(src_text):
+    """O4 的纯函数版：拿一段**给定文本**当渲染器源码判词表。
+
+    与 `_labels_problem()` 共用同一段判据（`_labels_problem` 只是先读盘再调它）——
+    这样 `--controls` 能直接喂坏样本，而主检查与自证判的是**同一件事**。
+    """
+    found = RE_LABELS_DEF.findall(src_text or "")
+    if len(found) != 1:
+        return ["LABELS 定义出现 %d 处（必须恰好 1 处）" % len(found)]
+    got = found[0].replace(" ", "").replace("'", '"')
+    want = FIVE_LABELS_TEXT.replace(" ", "").replace("'", '"')
+    if got != want:
+        return ["渲染器 LABELS=%s，期望=%s" % (got, want)]
+    return []
+
+
+def _labels_problem():
+    """O4：渲染器的 LABELS 必须**恰为**那五个标签，逐字按顺序。
+
+    返回 [] = 通过；返回非空 = 红（列出差在哪）。
+    """
+    src = _labels_source()
+    if src is None:
+        return ["读不到 tools/audit/report_render.mjs"]
+    return _labels_problem_from(src)
 
 
 def _render_via_node(snapshots):
@@ -837,6 +889,18 @@ def main():
               rendered[1] == (False, True, True), str(rendered[1]))
             T("O3 ★ state=null 的 IR 不许渲染",
               rendered[2] == (False, True, True), str(rendered[2]))
+            # ★ O4/O5（2026-10-24 加）：行 47 ④「报告中不出现五个标签中的任何一个」
+            #   的另一半 —— **渲染器的标签词表必须恰是那五个，多一个少一个都红**。
+            #
+            #   加它的原因：此前 `FIVE_LABELS_TEXT` 是个死常量（零消费者），
+            #   于是「LABELS 加宽」这个变异两方向都 survived，而 O1–O3 只按
+            #   BLOCK/ERROR/null 三个 state 走行为级，改词表对它们毫无影响。
+            #   **一个判据只在它点名的那个量上可证伪才算有执行点。**
+            labels_problem = _labels_problem()
+            T("O4 ★ 渲染器 LABELS 词表恰为五标签（多一个 / 少一个都红）",
+              not labels_problem, labels_problem)
+            T("O5 LABELS 定义恰好一处（不许有第二份词表）",
+              _count_labels_defs() == 1, "定义处数=%d" % _count_labels_defs())
         except Exception as e:  # noqa: BLE001
             T("O0 渲染器跑不起来（%s）—— 未测，不许当绿" % e, False, "")
 
@@ -1005,6 +1069,23 @@ def run_controls():
               str(res[1]))
             C("CO3 null-IR 必须被拦（喂坏样本）", res[2] == (False, True, True),
               str(res[2]))
+            # ★ CO4/CO5（2026-10-24）：O4/O5 的反向对照。
+            #   O4 的判据是「渲染器 LABELS 恰为五标签」。要证明它**真的在读**，
+            #   必须喂两种坏词表各一次（多一个 / 少一个），两次都得红。
+            #   ★ 不加这一对的话，O4 有可能退化成「读了个空列表也返回 []」——
+            #     那条路恒绿，而它看起来和「词表对」一模一样。
+            C("CO4 坏词表（多一个）必须红", bool(_labels_problem_from(
+                'export const LABELS = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS", "MAGIC"];')),
+              str(_labels_problem_from(
+                  'export const LABELS = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS", "MAGIC"];')))
+            C("CO5 坏词表（少一个）必须红", bool(_labels_problem_from(
+                'export const LABELS = ["BLOCK", "REVIEW", "未审查", "待自决"];')),
+              str(_labels_problem_from(
+                  'export const LABELS = ["BLOCK", "REVIEW", "未审查", "待自决"];')))
+            C("CO6 好词表必须绿（否则 O4 变成恒红）", not _labels_problem_from(
+                'export const LABELS = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"];'),
+              str(_labels_problem_from(
+                  'export const LABELS = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"];')))
         except Exception as e:  # noqa: BLE001
             untested += 1
             print("  ⚠ CO 未测：渲染器跑不起来（%s）" % e)
