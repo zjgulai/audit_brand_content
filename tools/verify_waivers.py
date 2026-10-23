@@ -543,6 +543,55 @@ def main(argv: list[str]) -> int:
     print("  ⚠️ 触发点：**没有守护进程会自动跑本脚本**（`tools/agent/` 归 8a、改动要重启）。")
     print("      到期是否能被发现，取决于有人跑它 —— 这一条是未闭项，不是已兑现的承诺。")
     print()
+
+    # ── `--expiry-warn-only`：把「到期」与「结构性错误」分开 ────────────────
+    #   ★ 2026-10-23 加，**为挂进 CI 而加**（T-230 收口）。
+    #
+    #   为什么不能直接把本脚本挂进 CI：
+    #     一到期，本脚本退 1，而 CI 里退 1 就是失败。那时只有两条路 ——
+    #     改到期日（等于作弊）或让 CI 长期红着（永远红的 CI 会被无视，§2.1.1）。
+    #
+    #   所以这里把两类问题分开：
+    #     · **结构性错误**（字段缺失、日期解析不出、owner 未定…）→ **仍然退 1，阻断**
+    #     · **到期**（W7）→ **不阻断**，但**必须大声打出来**并计数
+    #
+    #   ★ 这是在**换判据，不是放宽判据**（与 `verify_acceptance_trigger.py --scope ci`
+    #     同一个思路）：CI 能保证的是「台账结构没烂、读数算得出」；
+    #     「到期了该怎么办」是一次书面决定，不是 CI 能替人做的。
+    warn_only = any(a in ("--expiry-warn-only",) for a in argv)
+    w7 = [p for p in r["problems"] if str(p).startswith("W7 ")]
+    rest = [p for p in r["problems"] if not str(p).startswith("W7 ")]
+
+    if warn_only:
+        print("  ── `--expiry-warn-only`：到期不阻断，结构性错误照旧阻断 ──")
+        if w7:
+            print(f"  ⚠️ **{len(w7)} 条豁免已到期**（不阻断 CI，但必须有人处理）：")
+            for p in w7:
+                print(f"     ⚠️ {p}")
+            print("     → 处置：owner 做一次书面决定（续期要写新理由与新日期，或转 closed/revoked）。")
+        else:
+            print(f"  ✅ 无到期项（{r['n']} 条 active 全部未到期）。")
+        if rest:
+            print()
+            print(f"  ❌ 结构性错误 {len(rest)} 处 —— **这些仍然阻断**：")
+            for p in rest:
+                print(f"     ❌ {p}")
+            print()
+            print(f"❌ 退 1：{len(rest)} 处结构性问题（到期 {len(w7)} 条，已按 --expiry-warn-only 降为告警）")
+            return 1
+        if r["untested"]:
+            print()
+            print(f"  ⚠️ 未测 {len(r['untested'])} 处（**没测成**，不是通过）：")
+            for u in r["untested"]:
+                print(f"     ⚠️ {u}")
+            print()
+            print("⚠️ 退 2：有未测 —— 未测 ≠ 通过")
+            return 2
+        print()
+        print(f"✅ 退 0（expiry-warn-only）：台账结构完整、读数算得出；"
+              f"到期 {len(w7)} 条已告警，处置由 owner 做书面决定。")
+        return 0
+
     if r["problems"]:
         print(f"── 有问题 {len(r['problems'])} 处 ──")
         for p in r["problems"]:

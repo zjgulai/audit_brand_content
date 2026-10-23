@@ -851,6 +851,14 @@
         "base/notifications.py",
         "base/reviews_ledger.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_regression_governance.py",
+      "asserts": "行86/SEC-6-GS-4 的**机器半边**：① owner 段必须指向产品且维护记录含 at/by/what（当前红：产品归属未定、不替产品认领）；② 按**先定义后测量**的判据（命中任一 external_ref 非空的规则）找出涉及法规的样本，逐条要求 legal_confirmation{by,at}（当前红：7 条涉及法规、0 条有确认）；③ 签署真实性**无机器判据，如实留 manual**。不并进 verify_regression_set.py —— 那一支映射到行 85，混入会让 85 因不属于它的理由变红",
+      "subjects": [
+        "research/governance/regression-set-v1.json",
+        "research/governance/skeleton/rules-v1.json"
+      ]
     }
   ]
 }
