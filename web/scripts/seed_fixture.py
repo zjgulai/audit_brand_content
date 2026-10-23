@@ -161,22 +161,26 @@ def _finding(idx: int, row: int, rng: random.Random, state: str) -> dict:
 
     auth = AUTHORITY_STATES[(idx + row) % len(AUTHORITY_STATES)]
     conflict = (idx % 6 == 0 and row == 0)   # 规则冲突：每 6 条案件里第 1 条的首个 finding
+    status = "confirmed" if state in ("BLOCK", "PASS") else "candidate"
+    # ★ Playbook §3.3.4.1 / base/finding_store.py ALLOWED 白名单：
+    #   rule 命中即确认（不能是 candidate），只有 semantic 可以产出 candidate。
+    produced_by = "semantic" if status == "candidate" else ("rule" if row % 2 == 0 else "semantic")
 
     return {
         "finding_id": "f-%s" % _hash16(SEED, idx, row),
         "control_code": CONTROL_CODES[(idx + row) % len(CONTROL_CODES)],
-        "status": "confirmed" if state in ("BLOCK", "PASS") else "candidate",
+        "status": status,
         "severity": "L4" if state == "BLOCK" else rng.choice(("L2", "L3", "L4")),
-        "produced_by": "rule" if row % 2 == 0 else "semantic",
+        "produced_by": produced_by,
         # 逐条按 produced_by 分流：rule 必须带稳定 rule_key，semantic 必须为 null。
         # 它不是规范归轴键 r-xxxx，两者不做猜测映射。
         "rule_key": (
             "fixture.%s.%s" % (CONTROL_CODES[(idx + row) % len(CONTROL_CODES)].lower(), row)
-            if row % 2 == 0 else None
+            if produced_by == "rule" else None
         ),
         "detected_by": "P0" if row == 0 else "P1",
         "derived_from": None if row != 1 else "f-%s" % _hash16(SEED, idx, 0),
-        "confirmed_by_rule_class": False,
+        "confirmed_by_rule_class": bool(produced_by == "semantic" and status == "confirmed"),
         "quote": quote,
         "location": loc,
         "authority_ref": [{"ref_id": "EXT-%03d" % (21 + row)}],

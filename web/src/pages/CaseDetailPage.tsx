@@ -73,8 +73,12 @@ interface EvidenceItemProps {
   canAdjudicate: boolean;
   caseId: string;
   version: number | null;
+  adjudicatedStatus?: "confirmed" | "rejected";
   onLocate: (findingId: string) => void;
-  onAdjudicated: () => Promise<CaseDetail | null>;
+  onAdjudicated: (
+    findingId: string,
+    newStatus: "confirmed" | "rejected",
+  ) => Promise<CaseDetail | null>;
 }
 
 function EvidenceItem({
@@ -84,6 +88,7 @@ function EvidenceItem({
   canAdjudicate,
   caseId,
   version,
+  adjudicatedStatus,
   onLocate,
   onAdjudicated,
 }: EvidenceItemProps) {
@@ -92,6 +97,7 @@ function EvidenceItem({
   // ★ 修 D-01 / 断言 A2d：authority_state 缺失绝不默认 "ok"（可核），必须落「未测」
   const authInfo = resolveAuthorityState(f.authority_state);
   const conflictRefs = f.resolution_detail?.refs ?? [];
+  const effectiveStatus = adjudicatedStatus ?? f.status;
   const [reason, setReason] = useState("");
   const [showReason, setShowReason] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -123,7 +129,8 @@ function EvidenceItem({
           key,
         );
       }
-      await onAdjudicated();
+      const nextStatus = decision === "confirm" ? "confirmed" : "rejected";
+      await onAdjudicated(f.finding_id, nextStatus);
       setItemMsg({
         ok: true,
         text: `已${decision === "confirm" ? "确认" : "驳回"} ${f.finding_id}`,
@@ -152,14 +159,14 @@ function EvidenceItem({
         </span>
         <span className="font-data hint">{f.finding_id}</span>
         <StatusBadge axis="severity" value={f.severity} />
-        <span className="hint">
-          {f.status === "candidate"
+        <span className="hint" data-finding-status={effectiveStatus}>
+          {effectiveStatus === "candidate"
             ? "候选（待裁）"
-            : f.status === "confirmed"
+            : effectiveStatus === "confirmed"
               ? "已确认"
-              : f.status === "rejected"
+              : effectiveStatus === "rejected"
                 ? "已驳回"
-                : f.status}
+                : effectiveStatus}
         </span>
         {quote && (
           <Button
@@ -225,34 +232,36 @@ function EvidenceItem({
       )}
 
       {/* 证据链卡片内就地裁决（G-07 / 修 D-08） */}
-      {f.status === "candidate" && (
+      {(effectiveStatus === "candidate" || itemMsg !== null) && (
         <div className="evidence__adjudicate" data-finding-adjudicate={f.finding_id}>
-          <div className="actions__row">
-            <Button
-              variant="secondary"
-              disabled={!canAdjudicate || busy !== null}
-              onClick={() => void handleAdjudicate("confirm")}
-            >
-              确认违规
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!canAdjudicate || busy !== null}
-              onClick={() => void handleAdjudicate("reject")}
-            >
-              驳回候选
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setShowReason(!showReason)}
-            >
-              {showReason ? "收起单条理由" : "附裁决理由"}
-            </Button>
-            {!canAdjudicate && (
-              <span className="hint">（认领案件后可就地裁决）</span>
-            )}
-          </div>
-          {showReason && (
+          {effectiveStatus === "candidate" && (
+            <div className="actions__row">
+              <Button
+                variant="secondary"
+                disabled={!canAdjudicate || busy !== null}
+                onClick={() => void handleAdjudicate("confirm")}
+              >
+                确认违规
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!canAdjudicate || busy !== null}
+                onClick={() => void handleAdjudicate("reject")}
+              >
+                驳回候选
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setShowReason(!showReason)}
+              >
+                {showReason ? "收起单条理由" : "附裁决理由"}
+              </Button>
+              {!canAdjudicate && (
+                <span className="hint">（认领案件后可就地裁决）</span>
+              )}
+            </div>
+          )}
+          {showReason && effectiveStatus === "candidate" && (
             <div className="evidence__reason-box">
               <label htmlFor={`finding-reason-${f.finding_id}`} className="hint">
                 单条裁决理由（{f.finding_id}）
@@ -308,6 +317,9 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [error, setError] = useState<{ status: number; message: string } | null>(null);
   const [activeFindingId, setActiveFindingId] = useState<string | null>(null);
+  const [localFindingStatuses, setLocalFindingStatuses] = useState<
+    Record<string, "confirmed" | "rejected">
+  >({});
   const [disputeCount, setDisputeCount] = useState(0);
 
   useEffect(() => {
@@ -376,6 +388,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
     setReports([]);
     setError(null);
     setActiveFindingId(null);
+    setLocalFindingStatuses({});
     if (!devEnabled || current !== null) void load();
   }, [caseId, current, devEnabled, load, sessionEpoch]);
 
@@ -565,8 +578,15 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
                   canAdjudicate={canAdjudicate}
                   caseId={detail.case_id}
                   version={review?.version ?? null}
+                  adjudicatedStatus={localFindingStatuses[f.finding_id]}
                   onLocate={handleLocateFinding}
-                  onAdjudicated={refreshAfterWrite}
+                  onAdjudicated={async (fid, nextSt) => {
+                    setLocalFindingStatuses((prev) => ({
+                      ...prev,
+                      [fid]: nextSt,
+                    }));
+                    return refreshAfterWrite();
+                  }}
                 />
               ))}
             </ol>

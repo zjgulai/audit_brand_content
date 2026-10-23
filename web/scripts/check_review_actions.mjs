@@ -72,15 +72,28 @@ function connect(url) {
   });
 }
 let activeCookie = cookie;
+let cdp;
+async function currentSessionCookie() {
+  if (cdp) {
+    try {
+      const devCookies = await cdp.send("Network.getCookies", { urls: [base] });
+      const found = devCookies.cookies?.find((item) => item.name === "session")?.value;
+      if (found) activeCookie = found;
+    } catch {
+      /* ignore */
+    }
+  }
+  return activeCookie;
+}
 async function apiCase() {
+  const sess = await currentSessionCookie();
   const response = await fetch(`${api}/api/v1/cases/${encodeURIComponent(caseId)}`, {
-    headers: { Cookie: `session=${activeCookie}` },
+    headers: { Cookie: `session=${sess}` },
   });
   if (!response.ok) throw new Error(`GET case → HTTP ${response.status}`);
   return response.json();
 }
 
-let cdp;
 try {
   await waitChrome();
   const target = await (await fetch(
@@ -157,6 +170,25 @@ try {
     throw new Error(`认领回读不一致：${JSON.stringify(claimed.review)}`);
   }
 
+  // ★ D-3 修复与验证：证据链内 candidate finding 就地点击「确认违规」，后端不返回 404，前端显示「已确认 f-...」
+  await waitEval(
+    `[...document.querySelectorAll('[data-finding-adjudicate] button')].some(x=>x.textContent?.trim()==='确认违规' && !x.disabled)`,
+    "确认违规按钮可用",
+  );
+  const confirmedFindingId = await ev(`(() => {
+    const box = document.querySelector('[data-finding-adjudicate]');
+    if (!box) return null;
+    const fid = box.getAttribute('data-finding-adjudicate');
+    const btn = [...box.querySelectorAll('button')].find(x => x.textContent?.trim() === '确认违规' && !x.disabled);
+    if (!btn) return null;
+    btn.click();
+    return fid;
+  })()`);
+  if (!confirmedFindingId) {
+    throw new Error("未找到可点击的确认违规按钮");
+  }
+  await waitText(`已确认 ${confirmedFindingId}`);
+
   const typed = await ev(`(() => {
     const el=document.querySelector('#review-note'); if(!el) return false;
     const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;
@@ -185,9 +217,134 @@ try {
   if (!text.includes("人工意见不改变机器标签或放行状态")) {
     throw new Error("页面未显示 formal ID 或人工意见边界");
   }
+
+  // ★ D-4 新建 7 页（P-01 / P-02 / P-03 / P-06 / P-07 / P-08 / P-11 / P-12）真实浏览器交互覆盖：
+  const spaGoto = async (href) => {
+    const clickedNav = await ev(`(() => {
+      const a = [...document.querySelectorAll('a')].find(x => x.getAttribute('href') === ${JSON.stringify(href)});
+      if (a) { a.click(); return true; }
+      window.history.pushState({}, '', ${JSON.stringify(href)});
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return true;
+    })()`);
+    if (!clickedNav) throw new Error(`SPA 导航失败：${href}`);
+  };
+  const fillInput = async (selector, val) => {
+    await waitEval(
+      `Boolean(document.querySelector(${JSON.stringify(selector)}))`,
+      `等待控件渲染：${selector}`,
+    );
+    const ok = await ev(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return false;
+      const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      const set = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (!set) return false;
+      set.call(el, ${JSON.stringify(val)});
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    })()`);
+    if (!ok) throw new Error(`找不到输入框：${selector}`);
+  };
+
+  // 1) P-06 申诉中心（/appeals）：真实填写表单并提交发起申诉 + UI 状态与列表卡片回读
+  await spaGoto("/appeals");
+  await waitText("申诉中心（P-06）");
+  await fillInput("#appeal-case-id", caseId);
+  await fillInput("#appeal-reason", "CDP 浏览器真实提交申诉测试：请求复核上下文");
+  await click("提交申诉");
+  await waitText("已受理（状态：open，SLA：2 个工作日）");
+  const createdAppealId = await ev(`(() => {
+    const m = document.body.innerText.match(/申诉\\s+(appeal-[\\w-]+|ap-[\\w-]+)\\s+已受理/);
+    return m ? m[1] : null;
+  })()`);
+  if (!createdAppealId) {
+    throw new Error("P-06 未在页面上显示新建的 appeal_id（appeal-...）");
+  }
+
+  // 2) P-08 下线任务台（/takedown）：真实点击 Start → 弹出回填框 Complete → GET /api/v1/takedown-tasks 回读
+  await spaGoto("/takedown");
+  await waitText("下线任务台（P-08）");
+  await waitText("td-smoke-1");
+  await click("开始执行（Start）");
+  await waitText("已执行 start → 当前状态：in_progress");
+  await click("完成并回填证据（Complete）");
+  await waitText("完成下线证据回填 · td-smoke-1");
+  await fillInput("#td-ev-receipt", "AMZ-RM-CDP-001");
+  await click("提交回填并结案");
+  await waitText("已完成证据回填并结案（completed，停止每日提醒）");
+  const tdResp = await fetch(`${api}/api/v1/takedown-tasks`, {
+    headers: { Cookie: `session=${await currentSessionCookie()}` },
+  });
+  if (!tdResp.ok) throw new Error(`GET /takedown-tasks → HTTP ${tdResp.status}`);
+  const tdList = await tdResp.json();
+  const completedTd = Array.isArray(tdList)
+    ? tdList.find((t) => t.task_id === "td-smoke-1")
+    : null;
+  if (!completedTd || completedTd.state !== "completed") {
+    throw new Error(`下线任务回读不是 completed：${JSON.stringify(completedTd)}`);
+  }
+
+  // 3) P-07 签发中心（/release/:caseId）：真实填写理由与 step_up_token 并点击确认签发放行
+  await spaGoto(`/release/${encodeURIComponent(caseId)}`);
+  await waitText("飞书 SSO Step-Up 二次认证与受控签发");
+  await fillInput("#release-reason", "CDP 签发门测试理由");
+  await fillInput("#release-stepup", "stepup-test-token");
+  await click("确认签发放行");
+  await waitText("签发门拦截");
+
+  // 4) P-01 提交审查页（/submit）：真实填写正文并点击提交审查单
+  await spaGoto("/submit");
+  await waitText("提交内容审查（P-01）");
+  await fillInput("#submit-text", "Momcozy 穿戴式吸奶器日常护理说明");
+  await click("提交审查单");
+  await waitEval(
+    `document.body.innerText.includes('提交未通过') || document.body.innerText.includes('提交已受理')`,
+    "P-01 提交响应已渲染",
+  );
+
+  // 5) P-02 收件箱（/inbox）：真实点击「标记已读（Read）」
+  await spaGoto("/inbox");
+  await waitText("收件箱与我的内容（P-02）");
+  await waitText("notif-smoke-1");
+  await click("标记已读（Read）");
+  await waitText("notif-smoke-1 已");
+
+  // 6) P-03 案件总览（/cases）：真实点击五标签筛选按钮
+  await spaGoto("/cases");
+  await waitText("全量可读案件视图");
+  const filterClicked = await ev(`(() => {
+    const btn = [...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes('REVIEW'));
+    if (!btn) return false;
+    btn.click();
+    return true;
+  })()`);
+  if (!filterClicked) throw new Error("P-03 找不到 REVIEW 筛选按钮");
+  await waitEval(
+    `[...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes('REVIEW'))?.getAttribute('aria-pressed') === 'true'`,
+    "P-03 案件总览筛选按钮激活",
+  );
+
+  // 7) P-11 授权治理（/admin/grants）与 P-12 会话审计（/admin/sessions）
+  await spaGoto("/admin/grants");
+  await waitText("授权名单治理（P-11）");
+  await fillInput("#grant-user", "u_signer_2");
+  await fillInput("#grant-reason", "CDP 授权提案测试");
+  await click("提交授权提案");
+  await waitText("提交响应（HTTP");
+
+  await spaGoto("/admin/sessions");
+  await waitText("会话与安全审计（P-12）");
+  await waitText("安全与审计契约状态");
+
   console.log(JSON.stringify({
     ok: true,
     case_id: caseId,
+    adjudicated_finding_id: confirmedFindingId,
+    appeal_id: createdAppealId,
+    takedown_task: { id: completedTd.task_id, state: completedTd.state },
+    new_pages_interacted: ["P-01", "P-02", "P-03", "P-06", "P-07", "P-08", "P-11", "P-12"],
     versions: [before.review.version, claimed.review.version, drafted.review.version, submitted.review.version],
     draft_id: drafted.review.primary_draft_id,
     status: submitted.review.status,

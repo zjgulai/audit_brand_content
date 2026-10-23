@@ -9,8 +9,8 @@ import { useIdentity } from "./IdentitySwitcher";
  *
  * 功能：
  *   1. 认领（claim）/ 释放认领（unclaim）/ 改派（reassign）/ 租约续期（heartbeat）；
- *   2. 1.5s 防抖自动快照（autosave）：认领且租约有效时，备注变化自动生成快照并回显 snapshot_seq，
- *      同时保留手动「存草稿」按钮（满足 check_review_actions.mjs 联调门契约）；
+ *   2. 手动存草稿快照（save_draft）：认领且租约有效时，点击「存草稿」生成快照并回显服务端 snapshot_seq
+ *      （为保证乐观锁 version 单调可控与 check_review_actions.mjs 联调门契约一致，不启用后台定时自动保存）；
  *   3. 前人草稿交接抽屉（Draft Handoff）：
  *      - 只读查看全部历史草稿（author / snapshot_at / snapshot_seq / notes）；
  *      - 最新 primary 草稿带视觉标记「Recommended: Latest」，不自动预选；

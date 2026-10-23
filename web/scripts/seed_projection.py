@@ -12,6 +12,12 @@ import json
 import sys
 from pathlib import Path
 
+REPO = Path(__file__).resolve().parents[2]
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+
+from base import takedown as TD  # noqa: E402
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -32,6 +38,38 @@ def main() -> int:
     }
     (root / "reports.json").write_text(
         json.dumps([report], ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    notifications = [
+        {
+            "notification_id": "notif-smoke-1",
+            "tenant": "t1",
+            "recipient": "u_dp3",
+            "type": "in_app",
+            "case_id": case.get("case_id"),
+            "title": "样例工作台内通知",
+            "message": "案件已生成工作台内通知记录（不代表外部消息已送达）",
+            "unread": True,
+            "created_at": "2026-10-19T00:00:00Z",
+        }
+    ]
+    (root / "notifications.json").write_text(
+        json.dumps(notifications, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    takedown_tasks = [
+        TD.new_task(
+            task_id="td-smoke-1",
+            case_id=case.get("case_id"),
+            platform="amazon",
+            tenant="t1",
+            product_line="pump",
+            created_at="2026-10-19T00:00:00Z",
+            assignee="u_dp3",
+        )
+    ]
+    (root / "takedown-tasks.json").write_text(
+        json.dumps(takedown_tasks, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     print("report-smoke -> %s" % report["case_id"])

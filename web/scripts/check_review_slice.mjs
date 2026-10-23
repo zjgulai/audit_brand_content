@@ -469,66 +469,81 @@ async function main() {
   }
 
   // ── A6 品牌红不得用于状态徽标（**DOM 计算样式**，不是源码文本）──────
-  //   方案 §7.2：Stage 0 先改断言，Stage 5 才删 `.badge--*`。
-  //   源码文本在 Stage 5 会被删掉，那时旧判据会**恒真** —— 所以主判据必须是渲染结果。
-  await goto("/queue");
-  const a6 = await ev(`(() => {
-    const hueOf = (rgb) => {
-      const m = String(rgb).match(/rgba?\\(([^)]+)\\)/);
-      if (!m) return null;
-      const [r, g, b] = m[1].split(",").slice(0, 3).map(Number).map((x) => x / 255);
-      const max = Math.max(r, g, b), min = Math.min(r, g, b);
-      if (max === min) return null;
-      const d = max - min;
-      let h;
-      if (max === r) h = ((g - b) / d) % 6;
-      else if (max === g) h = (b - r) / d + 2;
-      else h = (r - g) / d + 4;
-      h *= 60;
-      return h < 0 ? h + 360 : h;
-    };
-    const probe = document.createElement("span");
-    probe.style.color = "hsl(" +
-      getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() + ")";
-    document.body.appendChild(probe);
-    const brandRaw = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim();
-    const probeColor = getComputedStyle(probe).color;
-    const brandHue = hueOf(probeColor);
-    probe.remove();
-    const scan = () => {
-      const nodes = [...document.querySelectorAll("[data-status-badge], .badge")];
-      const bad = [];
-      for (const el of nodes) {
-        const cs = getComputedStyle(el);
-        for (const prop of ["color", "backgroundColor", "borderTopColor"]) {
-          const h = hueOf(cs[prop]);
-          if (h === null || brandHue === null) continue;
-          let d = Math.abs(h - brandHue);
-          if (d > 180) d = 360 - d;
-          if (d < 5) bad.push({ prop, hue: Math.round(h), brandHue: Math.round(brandHue),
-                                text: (el.textContent || "").trim().slice(0, 20) });
+  //   方案 §7.2 / §5.2：扩围扫描 /queue、/cases/:id、/release、/takedown 四个核心页面。
+  const a6Pages = ["/queue", casePath || `/cases/${edgeOk}`, "/release", "/takedown"];
+  const a6PageDetails = [];
+  let a6TotalCount = 0;
+  const a6TotalBad = [];
+  let a6Meta = null;
+  for (const p of a6Pages) {
+    await goto(p);
+    const res = await ev(`(() => {
+      const hueOf = (rgb) => {
+        const m = String(rgb).match(/rgba?\\(([^)]+)\\)/);
+        if (!m) return null;
+        const [r, g, b] = m[1].split(",").slice(0, 3).map(Number).map((x) => x / 255);
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        if (max === min) return null;
+        const d = max - min;
+        let h;
+        if (max === r) h = ((g - b) / d) % 6;
+        else if (max === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+        h *= 60;
+        return h < 0 ? h + 360 : h;
+      };
+      const probe = document.createElement("span");
+      probe.style.color = "hsl(" +
+        getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() + ")";
+      document.body.appendChild(probe);
+      const brandRaw = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim();
+      const probeColor = getComputedStyle(probe).color;
+      const brandHue = hueOf(probeColor);
+      probe.remove();
+      const scan = () => {
+        const nodes = [...document.querySelectorAll("[data-status-badge], .badge")];
+        const bad = [];
+        for (const el of nodes) {
+          const cs = getComputedStyle(el);
+          for (const prop of ["color", "backgroundColor", "borderTopColor"]) {
+            const h = hueOf(cs[prop]);
+            if (h === null || brandHue === null) continue;
+            let d = Math.abs(h - brandHue);
+            if (d > 180) d = 360 - d;
+            if (d < 5) bad.push({ page: ${JSON.stringify(p)}, prop, hue: Math.round(h), brandHue: Math.round(brandHue),
+                                  text: (el.textContent || "").trim().slice(0, 20) });
+          }
         }
-      }
-      return { count: nodes.length, bad };
-    };
-    const before = scan();
-    const injected = document.createElement("span");
-    injected.className = "badge";
-    injected.setAttribute("data-status-badge", "");
-    injected.style.color = "#6A2C3A";
-    injected.textContent = "反向对照";
-    document.body.appendChild(injected);
-    const after = scan();
-    const injectedColor = getComputedStyle(injected).color;
-    injected.remove();
-    return { count: before.count, bad: before.bad, brandHue, brandRaw, probeColor,
-             afterCount: after.count, afterBad: after.bad.length,
-             injectedColor,
-             controlCaught: after.bad.length > before.bad.length };
-  })()`);
-  record("A6", "页面上至少一个状态徽标，且没有徽标用品牌红（DOM 计算样式，色相距离 <5°）",
-    Boolean(a6) && a6.count > 0 && a6.bad.length === 0,
-    a6 ? `徽标 ${a6.count} 个 · 品牌红命中 ${a6.bad.length} · brandHue=${a6.brandHue} ` +
+        return { count: nodes.length, bad };
+      };
+      const before = scan();
+      const injected = document.createElement("span");
+      injected.className = "badge";
+      injected.setAttribute("data-status-badge", "");
+      injected.style.color = "#6A2C3A";
+      injected.textContent = "反向对照";
+      document.body.appendChild(injected);
+      const after = scan();
+      const injectedColor = getComputedStyle(injected).color;
+      injected.remove();
+      return { count: before.count, bad: before.bad, brandHue, brandRaw, probeColor,
+               afterCount: after.count, afterBad: after.bad.length,
+               injectedColor,
+               controlCaught: after.bad.length > before.bad.length };
+    })()`);
+    if (res) {
+      a6TotalCount += res.count;
+      a6TotalBad.push(...res.bad);
+      a6PageDetails.push(`${p}:${res.count}`);
+      if (!a6Meta) a6Meta = res;
+    }
+  }
+  const a6 = a6Meta
+    ? { ...a6Meta, count: a6TotalCount, bad: a6TotalBad, pages: a6PageDetails }
+    : null;
+  record("A6", "四页（/queue·/cases/:id·/release·/takedown）状态徽标无一使用品牌红（DOM 计算样式，色相距离 <5°）",
+    Boolean(a6) && a6.count > 0 && a6PageDetails.length === 4 && a6.bad.length === 0,
+    a6 ? `四页 [${a6.pages.join(", ")}] 共 ${a6.count} 个徽标 · 品牌红命中 ${a6.bad.length} · brandHue=${a6.brandHue} ` +
          `· 注入后 ${a6.afterBad}（${a6.injectedColor}）${JSON.stringify(a6.bad.slice(0, 2))}`
        : "取不到 DOM");
   record("A6b", "反向对照：注入 style=color:#6A2C3A 的 .badge 必须被抓到",

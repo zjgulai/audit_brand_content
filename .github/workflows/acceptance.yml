@@ -1,0 +1,156 @@
+name: acceptance
+
+# T-145 · 验收执行器的触发点
+#
+# 存在的理由：`tools/verify_acceptance_run.py` 是全部验收判据的唯一执行入口，
+# 而在本文件出现之前，**没有任何东西会自动跑它**。
+# 判据再多，没人跑就等于没有（AGENTS.md §2.4.2「判据与触发者两层」）。
+#
+# ── 为什么不是「跑一遍，绿了就算过」──
+#
+# 执行器今天退 **2**（untested=20，其中 7 条 manual 永远不会转 passed）。
+# 所以这里不能断言「untested == 0」—— 那会**永远红**，而红了三个月之后
+# 所有人都会开始无视这条 CI（§2.1.1「一个会误报的检查器比没有更糟」）。
+#
+# 判据用**棘轮**（`tools/verify_acceptance_ratchet.py`）：
+#   · failed 必须为 0
+#   · 计数之和必须等于 136（防「删了几行所以看起来没倒退」）
+#   · passed 不得低于 `tools/acceptance-ratchet.json` 里的地板
+# 地板只许上调；下调是一次有记录的决定。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一分支上后来的推送取消先前那次 —— 验收全量是分钟级，不取消会排队堆起来。
+concurrency:
+  group: acceptance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 第一层：结构检查（秒级，先跑，快速失败）────────────────────────────
+  # 这一层不装依赖、不起服务，只查「配置与登记表对不对」。
+  # 它先跑的原因：后面两层每个都要几分钟，而这层红了通常意味着后面必然红。
+  static:
+    name: 静态与登记表
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "0.13.1"
+
+      # ★ `--locked`：不许无锁安装（G-02）。这条在 verify_dependency_lock.py 的 L6 里也断言，
+      #   但那里查的是「Dockerfile 有没有带 --locked」，**管不到本文件**。
+      #   所以本文件必须自己带 —— 两处各写一遍不算重复，是两个不同的执行点。
+      - name: 建 .venv（映射里 {venv} 指向它，105 处）
+        run: uv sync --locked
+
+      - name: 验证器名册双向完整
+        run: .venv/bin/python tools/verify_coverage.py --controls
+
+      - name: 无填充文件（read 工具打不开的那种）
+        run: .venv/bin/python tools/verify_depad.py
+
+      - name: 仓内文本无凭据形态
+        run: .venv/bin/python tools/verify_secret_patterns.py
+
+      - name: 依赖锁与 pyproject 一致
+        run: .venv/bin/python tools/verify_dependency_lock.py
+
+      # ★ 触发点自检：**只判 CI 这一条通道**（`--scope ci`）。
+      #
+      #   为什么不是三通道全读：hook 通道在 fresh clone 里永远是「未安装」，
+      #   远端分支保护永远读不到 —— 三通道全读时本脚本在 CI 里**必然退 2**，
+      #   而 CI 步骤退 2 就是失败，于是这条 job 会**永远红**。
+      #   那正是本票开头批评的东西（「永远红的 CI 会被无视」），
+      #   只不过会犯在触发点自己的自检上。
+      #
+      #   别写 `|| true`（假绿，等于没装），也别把 hook/远端降成永不判红
+      #   （那本地就失去这两条读数）。**换判据，不是放宽判据。**
+      - name: 触发点自检（只判 CI 通道）
+        run: .venv/bin/python tools/verify_acceptance_trigger.py --scope ci
+
+  # ── 第二层：验收执行门（分钟级）──────────────────────────────────────────
+  acceptance:
+    name: 验收棘轮
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: static
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: "22"
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "0.13.1"
+
+      # ★ 必须建在**仓库根**的 `.venv`：verifier_map 里 {venv} 出现 105 次，
+      #   `_render()` 把它拼成 `<root>/.venv/bin/python`。
+      #   uv 默认就建在这里，但显式写出来是为了让「为什么必须是这个路径」留在文件里。
+      - name: 建 .venv（uv 默认建在仓库根，与 {venv} 一致）
+        run: uv sync --locked
+
+      - name: 前端依赖
+        working-directory: web
+        run: npm ci
+
+      - name: 前端构建（#113/#116 的产物依赖它）
+        working-directory: web
+        run: npm run build
+
+      # Chrome：a11y_check.mjs 支持 CHROME_BIN，但 runner 的默认值写的是 macOS 路径。
+      # 不设这个环境变量，#116/#113 会以 rc=2（未测）退出 —— 那是**准确的红**，
+      # 但在 CI 上它意味着「这台机器上从没验过」，与「验了没通过」是两件事。
+      - name: 装 Chrome（#113 / #116 需要）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable || {
+            echo "::warning::Chrome 装不上 —— #113/#116 会落未测（rc=2），不会假装通过"
+            exit 0
+          }
+          echo "CHROME_BIN=$(command -v google-chrome-stable)" >> "$GITHUB_ENV"
+
+      # ★ 先把执行器跑一遍拿到读数，再喂给棘轮。
+      #   两步分开而不是一条管道：管道会吃掉退出码（`$?` 取的是最后一个命令），
+      #   而「执行器退 2」与「棘轮判红」是两件需要分开看的事。
+      - name: 跑验收执行器（它退 2 是正常的 —— 未测不等于红）
+        run: |
+          set +e
+          .venv/bin/python tools/verify_acceptance_run.py > acceptance-run.txt 2>&1
+          echo "executor_rc=$?" >> "$GITHUB_ENV"
+          tail -40 acceptance-run.txt
+          exit 0
+
+      - name: 棘轮判据
+        run: |
+          cat acceptance-run.txt | .venv/bin/python tools/verify_acceptance_ratchet.py
+
+      - name: 上传执行器全量输出
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: acceptance-run
+          path: acceptance-run.txt
+          retention-days: 14

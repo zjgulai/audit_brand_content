@@ -43,6 +43,7 @@ from fastapi.responses import JSONResponse  # noqa: E402
 
 from api.review_api import FileProjectionRepository, create_app  # noqa: E402
 from base.auth_session import SessionStore  # noqa: E402
+from base.finding_store import FindingRejected, FindingStore  # noqa: E402
 
 DATA_ROOT = os.environ.get("REVIEW_API_DATA_ROOT")
 if not DATA_ROOT:
@@ -92,10 +93,33 @@ DEV_IDENTITIES = [
 ]
 
 _store = SessionStore(SESSION_DB)
+_repo = FileProjectionRepository(DATA_ROOT)
+_finding_store = FindingStore()
+
+# ★ D-3 修复：把投影案件里的 finding 预热进 FindingStore（供本地联调就地 confirm/reject 使用）。
+#   1. 空 quote 的边界夹具（用于测试 UI 渲染「无原文引用」）不满足 FindingStore 非空 quote 准入，跳过；
+#   2. FindingStore.transition(new_status="confirmed") 在 produced_by="semantic" 时由 M1 要求
+#      confirmed_by_rule_class=True（与 tools/verify_write_api.py:123 同口径）。
+for _case in _repo.list_cases():
+    _ir = (_case or {}).get("ir") or {}
+    for _f in _ir.get("findings") or []:
+        if not isinstance(_f, dict):
+            continue
+        _fid = _f.get("finding_id")
+        if not _fid or _finding_store.get(_fid) is not None:
+            continue
+        _rec = dict(_f)
+        if _rec.get("produced_by") == "semantic" and _rec.get("status") == "candidate":
+            _rec["confirmed_by_rule_class"] = True
+        try:
+            _finding_store.insert(_rec)
+        except FindingRejected:
+            pass
 
 app = create_app(
     session_store=_store,
-    repository=FileProjectionRepository(DATA_ROOT),
+    repository=_repo,
+    finding_store=_finding_store,
     principals=PRINCIPALS,
     app_env="dev",
 )

@@ -175,11 +175,38 @@ async function main() {
     await waitBody("DP3 审核员（u_dp3）");
   }
 
-  // 1) 队列
+  // 1) 队列 + D-5 同屏分诊（.queue__preview-btn）与 J/K 键盘流切案
   await cdp.send("Page.navigate", { url: `${base}/queue` });
   const queueBody = await waitBody(expectCase);
-  const queueOk = queueBody.includes(expectCase) && queueBody.includes("复核队列");
   const queueShot = await shot("queue.png");
+
+  // ★ D-5 验证：点击「同屏分诊」展开右侧 CaseDetailPage，再按 j 键切到下一条待办
+  const previewTriggered = await evalValue(`(() => {
+    const btn = document.querySelector('.queue__preview-btn');
+    if (!btn) return false;
+    btn.click();
+    return true;
+  })()`);
+  const previewBody = previewTriggered ? await waitBody("待审原件（ContentUnit）", 10000) : "";
+  const previewUrl1 = await evalValue("location.search");
+  await evalValue(`(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true }));
+    return true;
+  })()`);
+  await sleep(250);
+  const previewUrl2 = await evalValue("location.search");
+  const queuePreviewOk =
+    Boolean(previewTriggered) &&
+    previewBody.includes("待审原件（ContentUnit）") &&
+    typeof previewUrl1 === "string" &&
+    previewUrl1.startsWith("?caseId=") &&
+    typeof previewUrl2 === "string" &&
+    previewUrl2.startsWith("?caseId=") &&
+    previewUrl2 !== previewUrl1;
+  const queueOk =
+    queueBody.includes(expectCase) &&
+    queueBody.includes("复核队列") &&
+    queuePreviewOk;
 
   // 2) 点进案件详情
   let clicked = false;
@@ -198,10 +225,37 @@ async function main() {
   //   于是读到的是加载态（body 里只有「加载中…」）。改成等一个数据态标志。
   await waitBody("证据链");
   const caseBody = await waitBody("证据链");
+
+  // ★ D-6 验证：点击左栏原件内第一个 [data-finding-mark] 高亮块，断言右栏对应 .evidence__item 激活
+  const clickedMarkId = await evalValue(`(() => {
+    const mark = document.querySelector('[data-finding-mark]');
+    if (!mark) return null;
+    const fid = mark.getAttribute('data-finding-mark');
+    mark.click();
+    return fid;
+  })()`);
+  await sleep(150);
+  const markLinkage = await evalValue(`(() => {
+    const fid = ${JSON.stringify(clickedMarkId)};
+    if (!fid) return { ok: false, reason: 'no_mark' };
+    const mark = document.querySelector('[data-finding-mark="' + fid + '"]');
+    const item = document.getElementById('evidence-item-' + fid);
+    return {
+      ok: Boolean(
+        mark &&
+        mark.classList.contains('unit-mark--active') &&
+        item &&
+        item.classList.contains('evidence__item--active')
+      ),
+      findingId: fid,
+    };
+  })()`);
+
   // ★ 不再硬编码 BLOCK / DP2 / H01 —— 取样案件来自真实队列，标签随数据变化。
   //   断言只锁「这一屏必须有的结构与铁律」，不锁某条案件的取值。
   const caseOk =
     clicked &&
+    Boolean(markLinkage?.ok) &&
     caseBody.includes("案件详情") &&
     caseBody.includes(expectCase) &&
     !caseBody.includes("加载中…") &&
@@ -321,10 +375,17 @@ async function main() {
 
   const result = {
     ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk && viewportOk,
-    queue: { ok: queueOk, shot: queueShot, body: queueBody.slice(0, 500) },
+    queue: {
+      ok: queueOk,
+      previewOk: queuePreviewOk,
+      previewUrls: [previewUrl1, previewUrl2],
+      shot: queueShot,
+      body: queueBody.slice(0, 500),
+    },
     case: {
       ok: caseOk,
       clicked,
+      markLinkage,
       path: casePath,
       shot: caseShot,
       body: caseBody.slice(0, 700),
