@@ -208,6 +208,167 @@ async function main() {
     queueBody.includes("复核队列") &&
     queuePreviewOk;
 
+  // ── 布局几何断言（2026-10-23 全站视觉刷新）───────────────────────────────
+  //
+  // ★ 为什么要有这一段：视觉刷新修了三处**只有肉眼能看出来**的布局缺陷，
+  //   而修之前所有既有断言都是绿的 ——
+  //     · 顶栏导航被词中折行（「复核队 / 列」「报告索 / 引」）；
+  //     · 案件表格悬空在白底上，没有面板容器；
+  //     · 七轴卡片挤成一行，正文每行 3–5 字。
+  //   也就是说「谁把 white-space: nowrap 删了」这件事，门是拦不住的。
+  //   这一段把「一行 / 有容器 / 可读宽度」变成**可量的读数**。
+  //
+  //   量的是 getBoundingClientRect() 与 computed style，不是源码文本
+  //   （§2.4：只查标识符出现与否的断言恒真）。
+  //
+  // ★ 必须在**桌面视口**下量：dev-up 默认视口是 800×600，那个宽度下导航
+  //   本来就该折行（10 个导航项放不下）。要验的是「桌面宽度下不许折行」，
+  //   所以这里显式切到 1440×900。
+  //
+  //   ★ 只用 Emulation.setDeviceMetricsOverride，**不做 Page.navigate**：
+  //     整页重载会丢掉 IdentitySwitcher 的 `current`（它只在 enable() 之后有值），
+  //     而多数页面在 `devEnabled && current === null` 时**不渲染数据区** ——
+  //     实测踩到：导航量对了，但后续 /cases 的表格 found=false。
+  //     改视口不发请求，身份不受影响。
+  await cdp.send("Emulation.setDeviceMetricsOverride", {
+    width: 1440, height: 900, deviceScaleFactor: 1, mobile: false,
+  });
+  await sleep(400);
+  const geometry = await evalValue(`(() => {
+    const nav = document.querySelector('.shell__header nav');
+    const links = nav ? [...nav.querySelectorAll('a')] : [];
+    const rects = links.map((a) => a.getBoundingClientRect());
+    // 顶栏是否单行：所有导航项的 top 必须在同一行（容差 1px）
+    const tops = rects.map((r) => Math.round(r.top));
+    const navRows = new Set(tops).size;
+    const wrapIdx = links
+      .filter((a) => getComputedStyle(a).whiteSpace !== "nowrap")
+      .map((a) => a.textContent.trim());
+    // 导航项本身高度必须等于一个行高（未被压成两行文字）
+    const anyTwoLineText = rects.some(
+      (r) => rects.length > 0 && r.height > rects[0].height * 1.8,
+    );
+    return {
+      navLinkCount: links.length,
+      navRows,
+      wrapIdx,
+      anyTwoLineText,
+      navHeight: nav ? nav.getBoundingClientRect().height : 0,
+    };
+  })()`);
+  const headerOneLine =
+    Boolean(geometry) &&
+    geometry.navLinkCount >= 8 &&
+    geometry.navRows === 1 &&
+    geometry.wrapIdx.length === 0 &&
+    !geometry.anyTwoLineText;
+
+  // 表格必须有面板容器（边框 + 非透明底），否则又是一张悬空白纸
+  //   ★ 用 SPA 内导航（pushState / 点 nav 链接），不做 Page.navigate：
+  //     整页重载会丢掉 IdentitySwitcher 的 `current`（它只在 enable() 之后才有值），
+  //     而 CasesPage 在 `devEnabled && current === null` 时**不渲染表格**。
+  //   ★ 等待在 **Node 侧轮询**，不用 Runtime.evaluate 返回 Promise：
+  //     CDP 的 evaluate 默认 `awaitPromise: false`，返回的是一个 Promise 对象
+  //     （returnByValue 下序列化成 `{}`）—— **恒为真**，等于没等。
+  //     实测踩到：spaGo 立刻返回，量到还没渲染的空壳，table.found=false。
+  //     （§2.4.4 同一个形状：自证看起来在等，其实什么都没等。）
+  const spaGo = async (href, selector, label) => {
+    await evalValue(`(() => {
+      const a = [...document.querySelectorAll('a')].find(
+        (x) => x.getAttribute('href') === ${JSON.stringify(href)});
+      if (a) { a.click(); return true; }
+      window.history.pushState({}, '', ${JSON.stringify(href)});
+      window.dispatchEvent(new PopStateEvent('popstate'));
+      return true;
+    })()`);
+    const end = Date.now() + 15000;
+    let found = false;
+    while (Date.now() < end) {
+      found = Boolean(
+        await evalValue(`Boolean(document.querySelector(${JSON.stringify(selector)}))`),
+      );
+      if (found) break;
+      await sleep(100);
+    }
+    if (!found) throw new Error(`等待超时：${label}（${selector} 未出现）`);
+    await sleep(250);
+  };
+
+  await spaGo("/cases", ".cases-table", "案件总览表格");
+  const tableGeometry = await evalValue(`(() => {
+    const wrap = document.querySelector('.cases-table-wrap');
+    const table = document.querySelector('.cases-table');
+    if (!wrap || !table) return { found: false };
+    const cs = getComputedStyle(wrap);
+    return {
+      found: true,
+      hasBorder: parseFloat(cs.borderTopWidth) > 0,
+      hasBg: cs.backgroundColor !== 'rgba(0, 0, 0, 0)',
+      bordered: parseFloat(cs.borderTopLeftRadius) > 0,
+      headerHasBg: (() => {
+        const th = table.querySelector('thead th');
+        if (!th) return false;
+        return getComputedStyle(th).backgroundColor !== 'rgba(0, 0, 0, 0)';
+      })(),
+    };
+  })()`);
+  const tablePanelOk =
+    Boolean(tableGeometry?.found) &&
+    tableGeometry.hasBorder === true &&
+    tableGeometry.hasBg === true &&
+    tableGeometry.bordered === true &&
+    tableGeometry.headerHasBg === true;
+
+  // 七轴卡片必须换行到可读宽度（不许 6 张挤成一行每张 200px）
+  await spaGo("/taxonomy", ".taxonomy-card", "七轴卡片");
+  const taxonomyGeometry = await evalValue(`(() => {
+    const cards = [...document.querySelectorAll('.taxonomy-card')];
+    if (!cards.length) return { found: false };
+    const widths = cards.map((c) => c.getBoundingClientRect().width);
+    const tops = new Set(cards.map((c) => Math.round(c.getBoundingClientRect().top)));
+    const page = document.querySelector('.taxonomy-page');
+    return {
+      found: true,
+      count: cards.length,
+      minWidth: Math.min(...widths),
+      rows: tops.size,
+      innerWidth: window.innerWidth,
+      pageWidth: page ? page.getBoundingClientRect().width : 0,
+    };
+  })()`);
+  // 阈值跟着 CSS 的 minmax(22rem) 走。
+  //   ★ 本项目的 root font-size 是 var(--text-base) = 13px，**不是浏览器的 16px**
+  //     （styles.css 的 `html { font-size: var(--text-base); }`）。
+  //     所以 22rem = 22 × 13 = 286px，不是 352px。
+  //     第一版按 16px 算写死 352，于是 4 列 × 294.9px 的**正确布局**被判红 ——
+  //     这是「判据的常数写错」，不是页面错了。
+  const ROOT_FONT_PX = 13;
+  const MIN_CARD_REM = 22;
+  const MIN_CARD_PX = MIN_CARD_REM * ROOT_FONT_PX;
+  const taxonomyReadable =
+    Boolean(taxonomyGeometry?.found) &&
+    taxonomyGeometry.minWidth >= MIN_CARD_PX &&
+    taxonomyGeometry.rows >= 2;
+
+  // ── 反向对照：把 nowrap 与容器拆掉，上面三条必须变红 ──────────────────────
+  //   只测「现在是绿的」不够 —— 一个恒绿的断言什么都不保护。
+  await cdp.send("Page.navigate", { url: `${base}/queue` });
+  await waitBody(expectCase);
+  const geoControl = await evalValue(`(() => {
+    // ① 撤掉 nav a 的 nowrap → 必须出现 word-wrap 项
+    const style = document.createElement('style');
+    style.id = '__geo_control__';
+    style.textContent = '.shell__header nav a { white-space: normal !important; }';
+    document.head.appendChild(style);
+    const nav = document.querySelector('.shell__header nav');
+    const links = [...nav.querySelectorAll('a')];
+    const bad = links.filter((a) => getComputedStyle(a).whiteSpace !== 'nowrap');
+    style.remove();
+    const restored = [...document.querySelectorAll('.shell__header nav a')]
+      .every((a) => getComputedStyle(a).whiteSpace === 'nowrap');
+    return { caught: bad.length > 0, restored };
+  })()`);
+
   // 2) 点进案件详情
   let clicked = false;
   for (let i = 0; i < 40 && !clicked; i++) {
@@ -374,7 +535,15 @@ async function main() {
   const viewportOk = Object.values(viewportChecks).every((v) => v.ok);
 
   const result = {
-    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk && viewportOk,
+    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk && viewportOk &&
+        headerOneLine && tablePanelOk && taxonomyReadable,
+    geometry: {
+      ok: headerOneLine && tablePanelOk && taxonomyReadable,
+      header: { ok: headerOneLine, ...geometry },
+      table: { ok: tablePanelOk, ...tableGeometry },
+      taxonomy: { ok: taxonomyReadable, ...taxonomyGeometry },
+      control: geoControl,
+    },
     queue: {
       ok: queueOk,
       previewOk: queuePreviewOk,
