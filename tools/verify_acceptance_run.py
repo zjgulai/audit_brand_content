@@ -99,7 +99,17 @@ def _render(value):
 
 
 def apply_mapping(rows, mapping):
-    """只填空缺的执行字段；行号 + criteria 必须双重匹配，避免表漂移后误接。"""
+    """只填空缺的执行字段；行号 + criteria 必须双重匹配，避免表漂移后误接。
+
+    ★ 2026-10-23：不匹配时**不再静默跳过**。
+      原来 `continue` 之后什么都不记，于是「映射写了但没生效」与「根本没写映射」
+      在输出里长得一模一样 —— 实测撞上过：`#105` 的 mapping 还在，但 `criteria`
+      写成了自拟说明（`（行 105 逐字点名 12 个检查器）`）而表格里是 `TS-2`，
+      于是它被静默跳过，而台账仍显示「缺 test_id/fixture/command」。
+      **我据此以为「映射过了」，实际从没生效。**
+      现在返回被跳过的清单，由调用方打进输出。
+    """
+    skipped: list[dict] = []
     for row in rows:
         if row.get("test_id") or row.get("fixture") or row.get("command"):
             continue
@@ -107,6 +117,13 @@ def apply_mapping(rows, mapping):
         if not isinstance(item, dict):
             continue
         if item.get("criteria") and item["criteria"] != row["criteria"]:
+            # ★ 表漂移信号：映射还在，但它指的是**另一行**。静默跳过会让
+            #   「映射坏了」看起来像「没映射」。记下来，让调用方报出来。
+            skipped.append({
+                "n": row["n"],
+                "mapping_criteria": item["criteria"],
+                "table_criteria": row["criteria"],
+            })
             continue
         row["test_id"] = item.get("test_id")
         row["fixture"] = _render(item.get("fixture") or "")
@@ -116,7 +133,7 @@ def apply_mapping(rows, mapping):
             row["timeout"] = int(item["timeout"])
         if isinstance(item.get("cpu_seconds"), (int, float)):
             row["cpu_seconds"] = int(item["cpu_seconds"])
-    return rows
+    return rows, skipped
 
 
 def _context(res, *, limit=1200):
@@ -249,7 +266,7 @@ def self_test() -> int:
     ok("S8 映射里的 timeout 会被 apply_mapping 带进 row",
        (lambda: (
            (lambda rows: [x for x in rows if x["n"] == 78][0].get("timeout"))
-           (apply_mapping(parse_table(DEFAULT_TABLE), load_mapping()))
+           (apply_mapping(parse_table(DEFAULT_TABLE), load_mapping())[0])
            or 0) >= 10)(), "")
 
     passed = sum(1 for _, p, _ in results if p)
@@ -286,9 +303,17 @@ def main():
         print("UNTESTED: 验收表读不出: %s" % exc)
         return 2
 
-    rows = apply_mapping(rows, load_mapping())
+    rows, skipped_maps = apply_mapping(rows, load_mapping())
     mapped = sum(1 for r in rows
                  if r.get("test_id") and r.get("fixture") and r.get("command"))
+    # ★ 2026-10-23：映射写了但**没生效**的行必须报出来。
+    #   原来 criteria 不匹配时静默 `continue`，于是「映射坏了」与「根本没映射」
+    #   在输出里长得一模一样 —— 实测撞上过（#105）。
+    if skipped_maps:
+        print("⚠️ 映射被跳过（行号对得上、但 criteria 与表格不一致 —— 表漂移了）：")
+        for s in skipped_maps:
+            print("   #%s  map=%r  表格=%r"
+                  % (s["n"], s["mapping_criteria"], s["table_criteria"]))
     counts = {"passed": 0, "failed": 0, "untested": 0}
     # ★ 2026-10-23：未测按「可验性」分两本账（§2.4.8 同一个量有两个口径）。
     #   它们下一步的动作相反，混在一起看会做错事：

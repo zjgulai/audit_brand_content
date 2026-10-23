@@ -753,7 +753,7 @@
     },
     "105": {
       "test_id": "acceptance-105",
-      "criteria": "（行 105 逐字点名 12 个检查器）",
+      "criteria": "TS-2",
       "fixture": "{root}/tools/verify_pycompat.py",
       "command": "{venv} {root}/tools/verify_pycompat.py",
       "timeout": 900,
