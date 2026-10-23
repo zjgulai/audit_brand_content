@@ -355,12 +355,6 @@
       "fixture": "{root}/tools/verify_release_gate.py",
       "command": "{venv} {root}/tools/verify_release_gate.py"
     },
-    "93": {
-      "test_id": "acceptance-93",
-      "criteria": "RL-5",
-      "fixture": "{root}/tools/verify_release_gate.py",
-      "command": "{venv} {root}/tools/verify_release_gate.py"
-    },
     "94": {
       "test_id": "acceptance-94",
       "criteria": "RL-6",
@@ -384,12 +378,6 @@
       "criteria": "RL-9",
       "fixture": "{root}/tools/verify_takedown.py",
       "command": "{venv} {root}/tools/verify_takedown.py"
-    },
-    "98": {
-      "test_id": "acceptance-98",
-      "criteria": "RL-10",
-      "fixture": "{root}/tools/verify_release_gate.py",
-      "command": "{venv} {root}/tools/verify_release_gate.py"
     },
     "99": {
       "test_id": "acceptance-99",
@@ -426,12 +414,6 @@
       "criteria": "TS-10",
       "fixture": "{root}/tools/verify_review_api.py",
       "command": "{venv} {root}/tools/verify_review_api.py"
-    },
-    "123": {
-      "test_id": "acceptance-123",
-      "criteria": "TS-20",
-      "fixture": "{root}/tools/verify_release_gate.py",
-      "command": "{venv} {root}/tools/verify_release_gate.py"
     },
     "125": {
       "test_id": "acceptance-125",

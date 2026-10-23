@@ -2,20 +2,20 @@
   "schema_version": 1,
   "policy": "T-145 · 验收棘轮地板",
   "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 116,
+  "passed_floor": 113,
   "recorded_at": "2026-10-23",
   "recorded_reading": {
-    "passed": 116,
+    "passed": 113,
     "failed": 0,
-    "untested": 20,
+    "untested": 23,
     "untested_split": {
-      "machine": 13,
+      "machine": 16,
       "manual": 7,
       "unverifiable": 0,
       "unknown": 0
     },
     "untested_origin": {
-      "unmapped": 19,
+      "unmapped": 22,
       "executed_rc2": 1
     }
   },
@@ -29,6 +29,14 @@
       "reason": "读数审计发现 5 行是假绿，已回退映射：#9（指标没算 empty/parse_error/unsupported）、#29（决策表脚本不加载组合规则）、#42（无「P 当严重度」扫描器）、#62（群消息渲染不读 obligations/candidate）、#66（验证器全程只有 1 条 finding）。",
       "why_not_a_regression": "这不是「功能退步」，是「原先那 5 条 passed 本来就不成立」。回退让读数变诚实，而不是让能力变弱。",
       "how_to_restore": "按 PMO/audit 下三份审计报告的缺口清单逐条补断言，补一条涨一格。"
+    },
+    {
+      "from": "116",
+      "to": "113",
+      "at": "2026-10-23",
+      "reason": "58 的审计（12 agent 对抗复核，0 推翻）发现 release_gate 的 20 行里 0 行行为覆盖。回退其中 3 条 truly `uncovered`：#93（名单治理三主体留痕，脚本 C1–C5 是签发 SoD 与它无关）、#98（只有重审 job 状态机，产物一个都没有）、#123（脚本里没有「撤权」这个对象）。",
+      "why_not_a_regression": "同上一轮：不是功能退步，是原先那 3 条 passed 本来就不成立。",
+      "how_to_restore": "补断言后逐条转回。另 11 条 partial 保留 passed，在审计报告里标「部分覆盖」，补完再核。"
     }
   ],
   "raise_history": [
