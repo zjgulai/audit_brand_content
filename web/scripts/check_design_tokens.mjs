@@ -289,19 +289,34 @@ function runCheck(root) {
     if (lit.hex > 0 || lit.fnBare > 0) {
       newOnes.push(`legacy CSS 出现真颜色裸值：hex=${lit.hex}, non_var_rgb_hsl=${lit.fnBare}`);
     }
+    // ★ 2026-10-23 更正：这两项**不再是上限，只作为读数**。
+    //
+    //   T-111 当初把 `hsl_var_wrappers_all_props` 与 `px_literals_all_props`
+    //   也写成了 category_caps。那是错的，而且错在同一处：
+    //     · `hsl(var(--x))` 是 **token 引用**（通道值在 tokens.css），不是裸值；
+    //     · 边框/焦点环上的 `1px / 2px / 3px` 是 **线宽**，不在行 111 点名的
+    //       「颜色 / 间距 / 字号」三类里（判据本身见 dt3-bare.mjs）。
+    //   拿它们当上限的后果实测到了：**新增一个页面的合法样式就会红** ——
+    //   也就是说这条「上限」不是在防裸值，是在禁止任何新 UI。
+    //
+    //   「历史存量不许增长」这件事由 `max_tokens`（真裸值，现在锁死 0）承担，
+    //   那才是这条规矩要防的东西。这两项留作分项读数，用来观察包体趋势，
+    //   但**不判红** —— 判红的判据必须指向它真正要防的行为。
     const caps = baseline.category_caps;
     if (caps && typeof caps === "object") {
-      if (typeof caps.px_literals_all_props === "number" && lit.pxAll > caps.px_literals_all_props) {
-        newOnes.push(`legacy CSS 全文件 px 字面量增长：当前 ${lit.pxAll} > 上限 ${caps.px_literals_all_props}`);
+      if (typeof caps.hex_literals === "number" && lit.hex > caps.hex_literals) {
+        newOnes.push(`legacy CSS 裸 hex 增长：当前 ${lit.hex} > 上限 ${caps.hex_literals}`);
       }
-      if (typeof caps.hsl_var_wrappers_all_props === "number" && lit.fnWithVar > caps.hsl_var_wrappers_all_props) {
-        newOnes.push(`legacy CSS 全文件 hsl(var(--*)) 包装数增长：当前 ${lit.fnWithVar} > 上限 ${caps.hsl_var_wrappers_all_props}`);
+      if (typeof caps.non_var_rgb_hsl === "number" && lit.fnBare > caps.non_var_rgb_hsl) {
+        newOnes.push(`legacy CSS 非 var 颜色函数增长：当前 ${lit.fnBare} > 上限 ${caps.non_var_rgb_hsl}`);
       }
     }
     push("DT-3", newOnes, [], [],
       [
         `基线 ${known.size} 条（上限 ${maxTokens}）· 当前 ${seen.size} 条 · 新增 ${newOnes.length} · 已删除 ${removed}（shrink-only）`,
-        `全文件分项读数：裸 hex=${lit.hex} · 非 var rgb/hsl=${lit.fnBare} · hsl(var(--*))=${lit.fnWithVar} · px 字面量=${lit.pxAll}`,
+        `全文件分项读数：裸 hex=${lit.hex} · 非 var rgb/hsl=${lit.fnBare} · ` +
+          `hsl(var(--*))=${lit.fnWithVar}（token 引用，非裸值，仅记录） · ` +
+          `px 字面量=${lit.pxAll}（含边框线宽与断点，仅记录）`,
       ]);
   }
 
@@ -523,8 +538,15 @@ function rebaseBaseline(root) {
     "generated_at": new Date().toISOString().slice(0, 10),
     max_tokens: tokens.length,
     category_caps: {
+      // 只有这两项是**裸值**类别，判红（行 111 的「颜色」类）。
       hex_literals: lit.hex,
       non_var_rgb_hsl: lit.fnBare,
+    },
+    // ★ 以下两项**不是裸值**，只作趋势读数，不判红（见 DT-3 主检查里的注释）：
+    //   · hsl(var(--*)) 是 token 引用；
+    //   · px 字面量含边框线宽、圆角、触控底线与 @media 断点。
+    //   放在单独的键里，避免下一个人误以为它们也是门。
+    category_observations: {
       hsl_var_wrappers_all_props: lit.fnWithVar,
       px_literals_all_props: lit.pxAll,
     },

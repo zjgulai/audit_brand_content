@@ -6,9 +6,11 @@
  "max_tokens": 0,
  "category_caps": {
   "hex_literals": 0,
-  "non_var_rgb_hsl": 0,
-  "hsl_var_wrappers_all_props": 96,
-  "px_literals_all_props": 37
+  "non_var_rgb_hsl": 0
+ },
+ "category_observations": {
+  "hsl_var_wrappers_all_props": 108,
+  "px_literals_all_props": 45
  },
  "tokens": [],
  "visual": null

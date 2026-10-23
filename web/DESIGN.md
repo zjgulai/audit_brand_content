@@ -180,8 +180,14 @@
 | `--motion-fast` | 120ms | 快速微交互过渡 |
 | `--motion-flash` | 600ms | 定位高亮闪底时长 |
 | `--surface-card` | hsl(var(--card)) | 卡片表面合成变量 |
+| `--surface-muted` | hsl(var(--muted)) | 弱化表面合成变量（表头 / 空态底） |
+| `--text-default` | hsl(var(--foreground)) | 主正文色合成变量 |
+| `--text-muted` | hsl(var(--muted-foreground)) | 弱化文字色合成变量（5.94:1） |
 | `--border-subtle` | 1px solid hsl(var(--border)) | 非交互细线合成变量 |
+| `--border-dashed` | 1px dashed hsl(var(--border)) | 空态虚线框合成变量 |
 | `--border-control` | 1px solid hsl(var(--input)) | 交互控件 3:1 边框合成变量 |
 | `--outline-active` | 0.125rem solid currentColor | 激活态轮廓合成变量 |
+| `--page-max` | 96rem | 工作台版心最大宽度 |
+| `--panel-radius` | 0.5rem | 面板圆角（大于控件圆角，形成层级） |
 <!-- TOKENS:END -->
 

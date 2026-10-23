@@ -325,8 +325,8 @@ export default function AppealsPage() {
         </div>
       ) : (
         <>
-          <div className="actions">
-            <h2>发起新申诉</h2>
+          <div className="panel">
+            <h2 className="panel__title">发起新申诉</h2>
             <form
               className="submit-form"
               onSubmit={(e) => void handleCreateAppeal(e)}
@@ -372,8 +372,9 @@ export default function AppealsPage() {
           {rows === null ? (
             <p className="hint">加载中…</p>
           ) : rows.length === 0 ? (
-            <div className="state">
-              <p className="hint">当前租户暂无申诉记录。</p>
+            <div className="empty">
+              <p className="empty__title">当前租户暂无申诉记录</p>
+              <p>申诉由内容提交方发起；提交后在此按 SLA 受理与迁移。</p>
             </div>
           ) : (
             <div className="cases-table-wrap">

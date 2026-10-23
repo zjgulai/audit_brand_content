@@ -9,9 +9,21 @@ import BrowserSupportNotice from "../components/BrowserSupportNotice";
  * 生产：后端 `/auth/login` 发起飞书 OAuth；回调后 `csrf` 与 session cookie 由服务端下发。
  * 开发：身份来自 `/dev/session`（只在 dev wrapper 存在），本页直接回队列，
  *       **不把任何 dev 身份逻辑带进这里**。
+ *
+ * ★ 2026-10-23 视觉校验重做：此前本页只有 `<h1>登录</h1>` + 三行字，是全站唯一
+ *   一个不带任何产品标识、没有卡片、也没有失败兜底的页面 —— 生产 500 时整页只剩
+ *   一行红字，读起来像「没做」。现在补齐：
+ *   1. 产品标识与一句话说明（这是什么系统、登录后能做什么）；
+ *   2. 一张登录卡（主行动 = 飞书 SSO，明确写出会跳转外部）；
+ *   3. 三种态各有自己的视觉：检查中 / 未登录 / 读取失败（失败**不**提供假的登录按钮，
+ *      而是说明「当前无法确认登录状态」，避免把网络故障当成「请重新登录」）；
+ *   4. 页脚保留五标签铁律与浏览器支持范围。
  */
+
+type LoginState = "checking" | "anon" | "authed" | "error";
+
 export default function LoginPage() {
-  const [state, setState] = useState<"checking" | "anon" | "authed" | "error">(
+  const [state, setState] = useState<LoginState>(
     __REVIEW_DEV_IDENTITY__ ? "authed" : "checking",
   );
   const [detail, setDetail] = useState("");
@@ -41,27 +53,61 @@ export default function LoginPage() {
   if (state === "authed") return <Navigate to="/queue" replace />;
 
   return (
-    <main id="main" className="case">
-      <section>
-        <h1>登录</h1>
-        <BrowserSupportNotice />
-        {state === "checking" && <p className="hint">正在检查登录状态…</p>}
-        {state === "anon" && (
-          <>
-            <p>使用飞书账号登录后即可进入复核队列。</p>
-            <p>
-              <a className="btn" href={`${appOrigin}/auth/login`}>
-                使用飞书登录
-              </a>
+    <main id="main" className="login">
+      <div className="login__card">
+        <div className="login__brand">
+          <span className="login__mark" aria-hidden="true" />
+          <div>
+            <p className="login__product">内容审核工作台</p>
+            <p className="login__tagline">
+              机器先判、人来复核。登录后可处理复核队列、审阅证据链并提交正式复核结论。
             </p>
-          </>
-        )}
-        {state === "error" && (
-          <p className="error" role="alert">
-            无法确认登录状态：{detail}
+          </div>
+        </div>
+
+        <div className="login__divider" role="presentation" />
+
+        {state === "checking" && (
+          <p className="login__status" role="status">
+            正在确认登录状态…
           </p>
         )}
-      </section>
+
+        {state === "anon" && (
+          <div className="login__action">
+            <p className="login__lead">
+              本工作台不单独维护账号密码，统一使用飞书身份登录。
+            </p>
+            <a className="btn btn--primary login__sso" href={`${appOrigin}/auth/login`}>
+              使用飞书账号登录
+            </a>
+            <p className="login__note">
+              将跳转到飞书完成授权，返回后自动进入复核队列。授权范围仅包含读取你的
+              飞书身份与所在租户，不读取聊天内容。
+            </p>
+          </div>
+        )}
+
+        {state === "error" && (
+          <div className="login__action">
+            <p className="login__lead login__lead--error" role="alert">
+              当前无法确认登录状态：{detail}
+            </p>
+            <p className="login__note">
+              这通常说明工作台后端暂时不可达，<strong>不是账号问题</strong>，
+              重新登录也不会恢复。请稍后刷新；若持续失败，请联系项目统筹并提供上面的错误信息。
+            </p>
+          </div>
+        )}
+
+        <div className="login__footer">
+          <BrowserSupportNotice />
+          <p className="login__note">
+            机器判定与人工意见分开记账：人工意见不改变机器标签，也不等于放行；
+            对外五标签一律止于「待放行」。
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

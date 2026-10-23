@@ -68,7 +68,15 @@
 
   /* 合成边框与表面变量（供新组件直接引用，零裸值） */
   --surface-card: hsl(var(--card));
+  --surface-muted: hsl(var(--muted));
+  --text-default: hsl(var(--foreground));
+  --text-muted: hsl(var(--muted-foreground));
   --border-subtle: 1px solid hsl(var(--border));
+  --border-dashed: 1px dashed hsl(var(--border));
   --border-control: 1px solid hsl(var(--input));
   --outline-active: 0.125rem solid currentColor;
+
+  /* 版心与栅格（2026-10-23 全站视觉刷新） */
+  --page-max: 96rem;
+  --panel-radius: 0.5rem;
 }

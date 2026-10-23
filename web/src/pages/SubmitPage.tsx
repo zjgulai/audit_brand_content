@@ -127,7 +127,7 @@ export default function SubmitPage({
 
   return (
     <section
-      className={embeddedInDrawer ? "submit-drawer-body" : "case case--dual"}
+      className={embeddedInDrawer ? "submit-drawer-body" : "cases-page"}
       aria-labelledby="submit-page-title"
     >
       <div className="cases-page__head">
@@ -144,6 +144,8 @@ export default function SubmitPage({
         )}
       </div>
 
+      <div className="panel">
+        <h2 className="panel__title">提交单</h2>
       <form className="submit-form" onSubmit={(e) => void handleSubmit(e)}>
         <div className="submit-grid">
           <div>
@@ -288,6 +290,7 @@ export default function SubmitPage({
           </Button>
         </div>
       </form>
+      </div>
 
       {submitErr && (
         <div className="state state--error" role="alert">

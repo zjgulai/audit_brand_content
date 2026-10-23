@@ -97,11 +97,16 @@ code {
   font-weight: 600;
   font-size: var(--text-lg);
   letter-spacing: -0.01em;
+  /* ★ 2026-10-23 视觉校验：品牌名曾被压成「内容审核工作 / 台」两行 */
+  white-space: nowrap;
+  flex: none;
 }
 
 .shell__header nav {
   display: flex;
   gap: 0.25rem;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .shell__header nav a {
@@ -109,6 +114,10 @@ code {
   text-decoration: none;
   padding: 0.3rem 0.55rem;
   border-radius: var(--radius);
+  /* ★ 2026-10-23 视觉校验：10 个导航项在 1440px 下被词中折行
+     （「复核队 / 列」「报告索 / 引」）。导航标签一律不折行；
+     宽度不够时让 flex 容器换行，而不是把词切开。 */
+  white-space: nowrap;
 }
 
 .shell__header nav a.active {
@@ -510,7 +519,11 @@ code {
 /* 关键读数：两列 dl，不堆 KPI 卡片 */
 .facts {
   display: grid;
-  grid-template-columns: 9rem 1fr;
+  /* ★ 2026-10-23 视觉校验：固定 9rem 标签列在签发台溢出，
+     实测渲染成 `control_points_vercp-fixture-1`、`used_authority_refEXT-021`
+     —— 标签与值粘连，读起来是两个不存在的字段名。
+     改成可伸缩标签列（上限 14rem），长标签在自己的格子里换行。 */
+  grid-template-columns: minmax(9rem, 14rem) 1fr;
   gap: 0.3rem 0.75rem;
   margin: 0;
   font-size: var(--text-sm);
@@ -522,6 +535,7 @@ code {
 
 .facts dt {
   color: hsl(var(--muted-foreground));
+  overflow-wrap: anywhere;
 }
 
 .facts dd {
@@ -662,11 +676,12 @@ code {
 
 /* 动作区与草稿交接（Handoff） */
 .actions {
-  margin-top: 1.5rem;
-  padding: 0.75rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--card));
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border: var(--border-subtle);
+  border-radius: var(--panel-radius);
+  background: var(--surface-card);
+  min-width: 0;
 }
 
 .handoff-bar {
@@ -766,7 +781,12 @@ code {
 /* ── 案件总览页（P-03 CasesPage） ─────────────────────────────────────── */
 
 .cases-page {
-  padding: 1rem 1.25rem 3rem;
+  /* ★ 2026-10-23 全站视觉刷新：此前每页各写各的 padding，超宽屏下内容贴左、
+     窄屏下又贴边。统一收到 --page-max 版心里居中。 */
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+  box-sizing: border-box;
 }
 
 .cases-page__head {
@@ -775,6 +795,14 @@ code {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.cases-page__head h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 
 .cases-toolbar {
@@ -802,6 +830,11 @@ code {
 
 .cases-table-wrap {
   overflow-x: auto;
+  /* ★ 2026-10-23 全站视觉刷新：表格原来悬空在白底上，没有容器，
+     与队列页的卡片层完全不是一个产品。统一给面板容器。 */
+  border: var(--border-subtle);
+  border-radius: var(--panel-radius);
+  background: var(--surface-card);
 }
 
 .cases-table {
@@ -810,11 +843,83 @@ code {
   font-size: var(--text-sm);
 }
 
+.cases-table thead th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+
 .cases-table th,
 .cases-table td {
   text-align: left;
   padding: 0.45rem 0.6rem;
   vertical-align: middle;
+}
+
+.cases-table tbody tr + tr th,
+.cases-table tbody tr + tr td {
+  border-top: var(--border-subtle);
+}
+
+.cases-table tbody tr:hover {
+  background: var(--surface-muted);
+}
+
+/* 面板：任何「一段独立内容」的统一容器（2026-10-23 全站视觉刷新） */
+.panel {
+  background: var(--surface-card);
+  border: var(--border-subtle);
+  border-radius: var(--panel-radius);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.9rem;
+  min-width: 0;
+}
+
+.panel__title {
+  margin: 0 0 0.6rem;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.panel__hint {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* 页面级版心：把内容收在 --page-max 内并居中，避免超宽屏下内容贴左 */
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
+  box-sizing: border-box;
+}
+
+/* 空态：不是一句灰字，而是一个有边界的说明块 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+  padding: 1.25rem 1rem;
+  border: var(--border-dashed);
+  border-radius: var(--panel-radius);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.empty__title {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.empty p {
+  margin: 0;
 }
 
 .cases-table__excerpt {
@@ -884,7 +989,105 @@ code {
   margin-top: 1.25rem;
 }
 
-/* ── 状态块 ───────────────────────────────────────────────────────────── */
+/* ── 登录页（2026-10-23 视觉校验重做） ──────────────────────────────────── */
+
+.login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  /* 未登录时没有外壳，用一个极淡的品牌底把卡片托起来 */
+  background: hsl(var(--background));
+}
+
+.login__card {
+  width: 100%;
+  max-width: 30rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--panel-radius);
+  box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.04), 0 8px 24px -12px hsl(var(--foreground) / 0.12);
+  padding: 1.75rem;
+}
+
+.login__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.login__mark {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius);
+  background: hsl(var(--brand));
+}
+
+.login__product {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.login__tagline {
+  margin: 0.3rem 0 0;
+  font-size: var(--text-sm);
+  color: hsl(var(--muted-foreground));
+  line-height: 1.55;
+}
+
+.login__divider {
+  height: 1px;
+  background: hsl(var(--border));
+  margin: 1.25rem 0;
+}
+
+.login__action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.login__lead {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.login__lead--error {
+  color: hsl(var(--bad));
+}
+
+.login__sso {
+  align-self: flex-start;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+}
+
+.login__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: hsl(var(--muted-foreground));
+  line-height: 1.6;
+}
+
+.login__status {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: hsl(var(--muted-foreground));
+}
+
+.login__footer {
+  margin-top: 1.5rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
 
 .state {
   margin: 0.75rem 0;
@@ -928,15 +1131,19 @@ code {
 /* ── 分类规范页（沿用原布局，换 token 并消除 1280px 溢出 W-006） ──────── */
 
 .taxonomy-page {
-  padding: 1rem 1.25rem 3rem;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 3rem;
   box-sizing: border-box;
-  max-width: 100%;
   overflow-x: hidden;
 }
 
 .taxonomy-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  /* ★ 2026-10-23 视觉校验：原来 minmax(15rem, 1fr) 在 1440px 下把 6 张卡
+     挤成一行（每张约 200px），正文每行只剩 3–5 个字，完全不可读。
+     七轴卡片是长段说明文字，最小可读宽度定在 22rem。 */
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }

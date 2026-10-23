@@ -53,10 +53,24 @@ export const BARE_PROPS = new Set([
   ...SPACING_PROPS,
 ]);
 
-/** 把 token 引用整段抠掉：`hsl(var(--x))` / `rgb(var(--x))` / `var(--x)`。 */
+/**
+ * 把 token 引用整段抠掉：`hsl(var(--x))` / `hsl(var(--x) / 0.4)` / `var(--x)`。
+ *
+ * ★ 2026-10-23 补 alpha 形态：第一版正则只认 `hsl(var(--x))`，
+ *   **带 alpha 的 `hsl(var(--foreground) / 0.04)` 抠不掉**，于是：
+ *     - 通道值来自 tokens.css（是真 token 引用），
+ *     - 但 `rest` 里还剩 `hsl(`，被第 73 行判成裸值。
+ *   这与 01cb34b 修掉的假阳性是**同一个形状**（认不出 token 引用 → 误报），
+ *   只不过长在 alpha 语法上。实测由登录页 box-shadow 撞出来。
+ *
+ *   ★ 仍然不放过真裸值：`hsl(210 40% 50% / 0.4)` 里没有 `var(--x)`，抠不掉 → 仍判裸。
+ */
 export function stripTokenRefs(v) {
   return String(v)
-    .replace(/\b(?:rgba?|hsla?)\(\s*var\(\s*--[a-z0-9-]+\s*\)\s*\)/gi, " ")
+    .replace(
+      /\b(?:rgba?|hsla?)\(\s*var\(\s*--[a-z0-9-]+\s*\)\s*(?:\/\s*[\d.]+%?\s*)?\)/gi,
+      " ",
+    )
     .replace(/var\(\s*--[a-z0-9-]+\s*\)/gi, " ");
 }
 

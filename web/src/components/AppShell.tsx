@@ -107,8 +107,14 @@ export default function AppShell() {
         </nav>
         <div className="shell__right">
           {current && current.product_lines.length > 0 && (
-            <span className="shell__scope-pill font-data" title="授权产品线范围">
-              品线：{current.product_lines.join(" / ")}
+            <span
+              className="shell__scope-pill font-data"
+              title={`授权产品线范围：${current.product_lines.join(" / ")}`}
+            >
+              {/* ★ 2026-10-23 视觉校验：原来把四条品线全名平铺（pump / wearable /
+                  skincare / feeding），在 1440px 下把顶栏挤成两行，
+                  逼得导航词中折行。收成计数 + 悬停看全量。 */}
+              品线 {current.product_lines.length}
             </span>
           )}
           <Button

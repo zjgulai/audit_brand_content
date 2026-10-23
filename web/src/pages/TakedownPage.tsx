@@ -512,8 +512,12 @@ export default function TakedownPage() {
       {tasks === null ? (
         <p className="hint">加载下线任务中…</p>
       ) : tasks.length === 0 ? (
-        <div className="state">
-          <p className="hint">当前租户没有待执行的下线任务。</p>
+        <div className="empty">
+          <p className="empty__title">当前租户没有待执行的下线任务</p>
+          <p>
+            下线任务由签发撤回（revoke）或自动失效（invalidated）后自动生成，
+            无需手工建单。此处为空表示没有已发布内容待下线。
+          </p>
         </div>
       ) : (
         <ul className="handoff-list" data-takedown-list="">

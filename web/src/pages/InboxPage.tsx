@@ -177,8 +177,11 @@ export default function InboxPage() {
       {cases === null ? (
         <p className="hint">加载案件中…</p>
       ) : pendingSelfCases.length === 0 ? (
-        <div className="state">
-          <p className="hint">当前没有处于「待自决」状态的案件。</p>
+        <div className="empty">
+          <p className="empty__title">当前没有处于「待自决」状态的案件</p>
+          <p>
+            「待自决」是机器判不了、需要业务方自己确认的那一类，不等同于通过或已放行。
+          </p>
         </div>
       ) : (
         <div className="cases-table-wrap">
