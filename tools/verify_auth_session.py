@@ -4,6 +4,9 @@
 
 覆盖：
   C0 cookie 只含 opaque id，服务端可解析 principal
+     ★ 2026-10-24 #131 补票：C0g/C0h 断言 cookie 本体不含身份主键/tenant/
+       rbac 角色名（长哨兵逐字判）；--controls 喂「数据编进 cookie」的
+       坏实现形状必须红、真 create_session 不许误报
   C1 idle 30m / absolute 8h；活动只续 idle，不续 absolute
   C2 撤销立即失效
   C3 step-up TTL 5m、single-use、绑定 principal+case+action+nonce
@@ -21,6 +24,7 @@
 """
 
 import os
+import secrets
 import shutil
 import sys
 import tempfile
@@ -37,6 +41,22 @@ try:
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入 base.auth_session: %s" % exc)
     sys.exit(2)
+
+
+def _c0_leak_needles():
+    """C0g/C0h 的**逐字判据针**：cookie 本体里不许出现的字面量。
+
+    ★ 长度门槛是判据口径（见 main() 里 C0g 段的注释）：
+      2 字符（'t1'/'it'）在 43 字符 base64url 上子串碰撞 ≈1e-2，不能当判据；
+      12 字符 ≈1e-13、5 字符角色名合计 ≈3e-8，逐字判才可用。
+      短名不进检查集不是遗漏 —— 是不让判据自己带一个 ~1% 的假红。
+    """
+    try:
+        from base.rbac import ROLES as _ROLES
+    except Exception:  # noqa: BLE001
+        _ROLES = ()
+    return ("ou_leak-probe", "tenant-leak-probe") + tuple(
+        r for r in _ROLES if len(r) >= 5)
 
 
 def main():
@@ -69,6 +89,9 @@ def main():
         # C0 opaque cookie + server-side principal
         store = SessionStore(db)
         cookie = store.create_session("ou_alice", tenant="t1", now=1000)
+        report(all(n not in cookie for n in _c0_leak_needles()),
+               "C0 cookie 不含任何身份/tenant/role 逐字片段",
+               "cookie=%r" % cookie)
         report(is_opaque_cookie(cookie), "C0 cookie 只含 opaque id", "cookie=%r" % cookie)
         # ★ 2026-10-23 修一处**约 1% 的假红**（原写法见下）。
         #
@@ -98,6 +121,38 @@ def main():
         sess = store.get_session(cookie, now=1001)
         report(sess and sess.get("principal") == "ou_alice",
                "C0 服务端解析 principal", "got=%r" % (sess,))
+
+        # C0g/C0h ★ 2026-10-24 #131 补票：cookie 内容只有随机 session id。
+        #
+        #   #131 实测：把 create_session 的 sid 改成
+        #   `secrets.token_urlsafe(32) + '-' + tenant` 后整链 rc=0 ——
+        #   C0 既有检查只查 'ou_alice' 子串（身份主键）、tenant 只做服务端回读
+        #   行为判（改坏后回读照样命中）、R3 只否掉含 '／' 的畸形 cookie。
+        #   cookie 里编进 tenant 没有任何一处会红。
+        #
+        #   判据形状（C0g/C0h 是真实 create_session 产物的**逐字检查**）：
+        #   用一个**长哨兵** tenant/principal 建第二个会话，断言两者都不在
+        #   cookie 里。哨兵必须长（≥12 字符）：'t1' 这种 2 字符字面量在 43 字符
+        #   base64url 上的子串碰撞 ≈1.0e-2（本文件上文实测过一次），不能用作判据；
+        #   12+ 字符把碰撞压到 ≈1e-13，逐字判才是可用的机器判据。
+        #   rbac 角色名只查 ≥5 字符的（submitter/signer/coordinator/machine，
+        #   合计碰撞 ≤3e-8）：'dp3'/'it' 短字面量同样碰不起 —— 短名不在
+        #   检查集这件事是**判据口径**，不是遗漏。
+        try:
+            from base.rbac import ROLES as _ROLES
+        except Exception:  # noqa: BLE001 — rbac 不在时只查身份与 tenant
+            _ROLES = ()
+        _ROLE_NEEDLES = tuple(r for r in _ROLES if len(r) >= 5)
+        leak_cookie = store.create_session(
+            "ou_leak-probe", tenant="tenant-leak-probe", now=1002)
+        report("ou_leak-probe" not in leak_cookie
+               and "tenant-leak-probe" not in leak_cookie,
+               "C0g cookie 不含身份主键与 tenant（长哨兵逐字判）",
+               "cookie=%r" % leak_cookie)
+        _leaked = [r for r in _ROLE_NEEDLES if r in leak_cookie]
+        report(not _leaked,
+               "C0h cookie 不含任何 rbac 角色/权限标识（≥5 字符角色名）",
+               "leaked=%r" % (_leaked,))
 
         # C1 idle 30m / absolute 8h
         c = store.create_session("ou_bob", tenant="t1", now=2000)
@@ -392,8 +447,78 @@ def main():
     return 1
 
 
+# ═══════════════════ --controls：#131 离线反向对照 ═══════════════════
+#
+# 判定体是真实的 create_session()。#131 实测的变异是 sid 变成
+# `secrets.token_urlsafe(32) + '-' + tenant` —— 这里在 mock 层复刻同一种
+# 「数据进 cookie」的坏实现，逐个喂给 C0g/C0h 用的同一根判据针：
+#   ① tenant 编进 cookie   → 'tenant-leak-probe' 针必须红
+#   ② 身份主键编进 cookie  → 'ou_leak-probe' 针必须红
+#   ③ 角色名编进 cookie    → 'coordinator' 针必须红
+# 好样本（真 create_session）三个方向都**不许误报**。
+# 任何一条不成立 → 退 1。
+
+def controls() -> int:
+    fails = []
+    n_cases = [0]
+
+    def ok(name, cond, detail=""):
+        n_cases[0] += 1
+        cond = bool(cond)
+        if not cond:
+            fails.append(name)
+        print("  %s %s %s" % ("✅" if cond else "❌", name, detail))
+
+    print("=" * 78)
+    print("auth_session · 离线反向对照（--controls · #131 cookie 泄漏面）")
+    print("=" * 78)
+
+    needles = _c0_leak_needles()
+
+    # 坏实现形状：把不同字段编进 cookie 本体（与 #131 的变异同形）
+    bad_impls = (
+        ("tenant 编进 cookie", "tenant-leak-probe"),
+        ("身份主键编进 cookie", "ou_leak-probe"),
+        ("角色名编进 cookie", "coordinator"),
+    )
+    for name, payload in bad_impls:
+        hit = [n for n in needles if n in payload]
+        ok("坏实现（%s）→ C0g/C0h 的针必须红（命中 %r）"
+           % (name, hit), len(hit) == 1, "payload=%r" % payload)
+
+    # 好样本：真实 create_session 的产物不许被针误伤
+    tmpdir = tempfile.mkdtemp(prefix="auth-session-controls-")
+    try:
+        store = SessionStore(os.path.join(tmpdir, "c.db"))
+        try:
+            good = store.create_session(
+                "ou_leak-probe", tenant="tenant-leak-probe", now=1000)
+            leaked = [n for n in needles if n in good]
+            ok("好实现（真 create_session，principal/tenant 都用哨兵值）"
+               "→ 逐字针不许误报", not leaked, "leaked=%r" % (leaked,))
+            ok("好实现 → 服务端回读仍是哨兵 principal/tenant"
+               "（哨兵进了服务端库、没进 cookie）",
+               (lambda s: s is not None
+                and s.get("principal") == "ou_leak-probe"
+                and s.get("tenant") == "tenant-leak-probe")(
+                   store.get_session(good, now=1001)), "")
+        finally:
+            store.close()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    print("-" * 78)
+    if fails:
+        print("❌ %d 项失败：%s" % (len(fails), fails))
+        return 1
+    print("✅ %d 项全过（该红、该绿都有）" % n_cases[0])
+    return 0
+
+
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv[1:]:
+            sys.exit(controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         print("UNTESTED: 验收器自身异常: %s" % exc)

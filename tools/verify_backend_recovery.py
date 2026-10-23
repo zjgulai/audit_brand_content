@@ -4,11 +4,20 @@
 
 主体：base/backend_recovery.py、base/business_event_store.py、
 base/projection_store.py、base/projector.py。
+
+★ C15（2026-10-24，#135 补票）：编排/运维配置中**不存在** session 库的备份任务
+  （存在即红）。#135 实测：往 docker-compose.yml 的 services 加一个
+  backup-session 服务、把 /backup/session.db 复制成 session-backup.db，
+  本验证器只读 base/backend_recovery 的 excludes/哨兵，从不读编排配置 →
+  整链 rc=0。C15 直接读仓库的 docker-compose.yml，按「session 库 × 拷贝/备份
+  动词」的组合形状判（不点名键名 —— 键名会漏掉别的写法，形状不会），
+  --controls 喂夹带 backup-session 服务的坏 compose 必须红、真 compose 不许误报。
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -24,6 +33,59 @@ try:
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入恢复模块: %s" % exc)
     sys.exit(2)
+
+
+# ── C15：session 库备份任务扫描（编排/运维配置）──────────────────────────
+#
+# ★ 判据按**形状**不按键名：某个具体的字面量（'session.db'）出现与否，
+#   挡不住改一个名字的备份任务 —— 会漏的那条判据等于没有（§2.4 的教训）。
+#   形状 = 「session 库特征」与「拷贝/备份/上传动词」在**同一个配置单元**
+#   （compose 服务块 / cron 行 / systemd unit / launchd plist）里同时出现。
+#   白名单注释里提到这些词不算（注释不算代码 —— 与 C5/J1a 同一条读法）。
+
+SESSION_FILE_SHAPE = re.compile(
+    r"session[\w.-]*\.(?:db|sqlite3?|sqlite-*|bak)"
+    r"|sessions?\b.*(backup|bak|copy|dump)"
+    r"|(?:backup|bak|copy|dump).*sessions?\b", re.I)
+
+SESSION_DIR_SHAPE = re.compile(r"session[s]?(?![_-]?audit)", re.I)
+
+COPY_VERB_SHAPE = re.compile(
+    r"\b(?:cp|copy|rsync|tar|dump|sqlite3\b[^|\n;]*\"?\.(?:backup|dump)"
+    r"|backup|upload|sync|s3\s+cp|gsutil\s+cp|aws\s+s3)\b", re.I)
+
+LINE_COMMENT_SHAPE = re.compile(r"^\s*(?:#|//)")
+
+OPS_CONFIG_CANDIDATES = (
+    "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml",
+    "deploy/crontab", "crontab", "deploy/backup.sh",
+)
+
+
+def scan_session_backup_tasks(text):
+    """返回配置文本里「session 库 × 拷贝动词」的命中清单（用于报告与对照）。"""
+    hits = []
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not line.strip() or LINE_COMMENT_SHAPE.match(line):
+            continue
+        if SESSION_DIR_SHAPE.search(line) and COPY_VERB_SHAPE.search(line):
+            hits.append(line.strip())
+    return hits
+
+
+def scan_ops_configs(root):
+    """扫仓库根的编排/运维配置文件（compose / crontab / deploy 脚本）。"""
+    findings = []
+    for name in OPS_CONFIG_CANDIDATES:
+        path = Path(root) / name
+        if not path.is_file():
+            continue
+        hits = scan_session_backup_tasks(
+            path.read_text(encoding="utf-8", errors="replace"))
+        if hits:
+            findings.append((name, hits))
+    return findings
 
 
 def main():
@@ -199,6 +261,16 @@ def main():
             denied = exc.code == "audit_snapshot_incomplete"
         report(denied and not partial_backup.exists(),
                "C14 审计半行快照拒绝，不生成伪完整备份")
+
+        # C15 ★ 编排/运维配置里不许有 session 库的备份任务（#135 补票）。
+        #   判据原文（验收表行 135 ①）：「编排/运维配置中不存在 session 库的
+        #   备份任务（存在即红）」。#135 实测：compose 里加一个把 session.db
+        #   拷成 session-backup.db 的服务后整链全绿 —— 三个 verifier 0 处读
+        #   编排配置。这里逐个配置单元查「session 库特征 × 拷贝动词」组合。
+        ops_findings = scan_ops_configs(ROOT)
+        report(not ops_findings,
+               "C15 编排/运维配置中不存在 session 库的备份任务",
+               repr(ops_findings))
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
@@ -210,8 +282,105 @@ def main():
     return 1
 
 
+# ═══════════════════ --controls：#135 离线反向对照 ═══════════════════
+#
+# 判定体是 scan_session_backup_tasks()/scan_ops_configs()。#135 实测的变异是
+# 往 compose services 加 backup-session 服务（cp session.db → session-backup.db）。
+# 这里喂同形状的坏样本与各种「提到 session 但不是备份任务」的好样本：
+#   坏样本（逐个必须红）：compose 服务块 / crontab 行 / 显式 session.db 字面量
+#   好样本（不许误报）：真 compose、注释、auth/step-up 审计备份、主检查的
+#                      excludes 判定体自身
+# 任何一条不成立 → 退 1。
+
+_BAD_COMPOSE = """\
+name: bad
+services:
+  api:
+    image: app:local
+  backup-session:
+    image: busybox:stable
+    command: ["sh","-c","cp /backup/session.db /backup/session-backup.db"]
+    volumes:
+      - /srv/data/db:/backup
+"""
+
+_BAD_CRONTAB = """\
+# hourly backup
+0 * * * * root /usr/bin/rsync -a /srv/data/db/session.db /srv/backups/
+"""
+
+_GOOD_COMPOSE = """\
+name: good
+services:
+  api:
+    image: app:local
+    volumes:
+      - /srv/data/db:/data/db
+    stop_grace_period: 30s
+"""
+
+
+def controls() -> int:
+    fails = []
+    n_cases = [0]
+
+    def ok(name, cond, detail=""):
+        n_cases[0] += 1
+        cond = bool(cond)
+        if not cond:
+            fails.append(name)
+        print("  %s %s %s" % ("✅" if cond else "❌", name, detail))
+
+    print("=" * 78)
+    print("backend_recovery · 离线反向对照（--controls · #135 编排备份任务）")
+    print("=" * 78)
+
+    # ── 坏样本：每种运维形状都必须红 ──
+    hits_bad_compose = scan_session_backup_tasks(_BAD_COMPOSE)
+    ok("坏样本（compose 加 backup-session 服务）→ 必须命中", bool(hits_bad_compose),
+       repr(hits_bad_compose))
+    ok("坏样本命中的是 backup-session 那一行（不是 api 块）",
+       bool(hits_bad_compose) and all("session" in h.lower() for h in hits_bad_compose),
+       repr(hits_bad_compose))
+    hits_bad_cron = scan_session_backup_tasks(_BAD_CRONTAB)
+    ok("坏样本（crontab 行 rsync session.db）→ 必须命中", bool(hits_bad_cron),
+       repr(hits_bad_cron))
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "docker-compose.yml").write_text(_BAD_COMPOSE, encoding="utf-8")
+        found = scan_ops_configs(d)
+        ok("坏样本（落成真 docker-compose.yml）→ scan_ops_configs 必须报出",
+           len(found) == 1 and found[0][0] == "docker-compose.yml", repr(found))
+
+    # ── 好样本：不许误报 ──
+    hits_good = scan_session_backup_tasks(_GOOD_COMPOSE)
+    ok("好样本（真 compose，无备份任务）→ 不许命中", not hits_good, repr(hits_good))
+    ok("好样本（注释里提到 session 备份）→ 不许命中（注释不算代码）",
+       not scan_session_backup_tasks(
+           "# rsync session.db daily  ← 只是注释\n   # cp session.db /bak\n"))
+    ok("好样本（auth/step-up 审计的备份挂载）→ 不许命中（审计不是 session 库）",
+       not scan_session_backup_tasks(
+           '- /srv/data/logs/auth-audit.jsonl:/logs/auth-audit.jsonl:ro\n'
+           '  cp auth-audit.jsonl /backup/\n'))
+    ok("好样本（业务库/projection 备份任务）→ 不许命中（只管 session 库）",
+       not scan_session_backup_tasks(
+           "0 * * * * root /usr/bin/rsync -a /srv/data/db/projection.db /srv/backups/\n"))
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "docker-compose.yml").write_text(_GOOD_COMPOSE, encoding="utf-8")
+        ok("好样本（真 compose 落盘）→ scan_ops_configs 不许报",
+           scan_ops_configs(d) == [], "")
+
+    print("-" * 78)
+    if fails:
+        print("❌ %d 项失败：%s" % (len(fails), fails))
+        return 1
+    print("✅ %d 项全过（该红、该绿都有）" % n_cases[0])
+    return 0
+
+
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv[1:]:
+            sys.exit(controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         print("UNTESTED: 验收器自身异常: %s" % exc)

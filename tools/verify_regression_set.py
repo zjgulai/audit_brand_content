@@ -29,17 +29,36 @@
             而同文件 `empty_families` 只有 3 族 —— 此前没有任何断言能抓到）
   GS-FP   每条样本的指纹可复算且与记录值相等
   GS-CHANGE  `changelog` 每条都有 `operator` / `at` / `reason` 三项且非空
+  GS-CHG-PIN **改样本必须留变更痕迹**：GS-FP / GS-CHANGE 各自只查自己那侧
+          （改 text 且同步指纹 → GS-FP 绿；changelog 是历史列表 → 不看样本），
+          两个方向合起来 0 断言（2026-10-23 变异探针实测 survived）。
+          本条两半：①样本数组实算指纹必须等于 `FROZEN_SET_FINGERPRINT`
+          （写进本文件的冻结读数，与 acceptance-ratchet.json 地板同模式）；
+          ②changelog 记账纪律（初始条目之外不许缺 `after_fingerprint`；
+          最新条目若带值必须等于当前实算）。改样本而三者（changelog 条目 /
+          冻结读数 / 样本自身指纹）缺一 → 红。
+  GS-RULES-FP **规则表与引擎清单对账**：`rules-v1.json` 的 sha256/bytes 必须与
+          `skeleton/engine-manifest.json` 记录值相等 —— 直接改规则而不跑
+          `engine_manifest.py --write` 的变异，门函数（纯函数）与 CI 断言
+          （只看工作流文本）都无感（2026-10-23 变异探针实测 survived）。
+          manifest 是本仓唯一的规则版本留痕，judge.py 的 rule_version 从它派生。
+  GS-CI-ENFORCE **改规则必须先跑回归集（CI/分支保护通道，配置层）**：
+          `.github/workflows/acceptance.yml` 必须同时 (a) 在 `pull_request` 上触发、
+          (b) 跑执行器（`tools/verify_acceptance_run.py`）、(c) 用棘轮收口
+          （`tools/verify_acceptance_ratchet.py` —— failed=0 的硬门）。
+          只断言「门函数对」而不断言「门真的在 PR 通道上跑」，
+          与「常量定义了没人用」同形（AGENTS.md §2.4）。
   GS-GATE **规则文件变更的合并门**：`merge_allowed(changed_paths, receipt)` 纯函数 ——
           改规则库文件而无「跑过回归集且通过、指纹一致」的回执 → 拒；
           非规则文件变更 → 放行（反向对照，证明门不是一律拒绝）
 
 ## **本文件不证明什么**（结论行必须照抄）
 
-* **不证明远端分支保护真的拦住了合并。** 实测（2026-10-22）：本仓**没有任何 CI 配置**
-  （`.github/workflows` / `.gitlab-ci.yml` / `Jenkinsfile` / `.pre-commit` 全无），
-  远端 main 也**没有分支保护**（匿名 API `protected=false`；带凭据的详情读不到，401）。
-  所以行 85 第 ⑤ 条在**配置层今天不成立** —— GS-GATE 验的是**判定函数本身对不对**，
-  不是「远端真的挡住了」。两者差别与「声明 vs 行为」同形（AGENTS.md §2.4.1）。
+* **CI 在跑 ≠ 远端真的挡住了合并。** GS-CI-ENFORCE 断言的是**本仓内的 CI 配置**
+  （`.github/workflows/acceptance.yml`，2026-10-23 已入库）把执行器挂在了
+  `pull_request` 通道上；「远端 main 的分支保护真的把这个 check 设成了必需」
+  本机读不到（匿名 API `protected=false`；带凭据的详情 401，2026-10-22 实测）。
+  配置层与远端强制层是两层，本文件只断言配置层。
 * **不证明样本语义正确。** 83 条样本是人工编写的通用广告语
   （`provenance: public_synthetic`），它们的 `expected` 是**建集人的判断**，
   没有经过法务或产品签署。本文件只证明**结构性质**（规模/覆盖/指纹/变更记录），
@@ -86,6 +105,30 @@ RULE_FILES = (
     "research/governance/skeleton/product-lines-v1.json",
 )
 
+# GS-CI-ENFORCE：CI/分支保护通道的**本仓执行点**（2026-10-23 入库，T-145）。
+# 行 85 第 ⑤ 条要的是「改规则但不跑回归集的 PR 合并被挡」——
+# 那件事的配置层落在这个工作流文件里：PR 通道 + 执行器 + 棘轮硬门。
+# ★ **必须逐字点名**，不许只数条目 —— 条目计数那种判据在重排/改名时恒真。
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "acceptance.yml"
+CI_PR_CHANNEL = "pull_request:"
+CI_EXECUTOR_MARKER = "tools/verify_acceptance_run.py"
+CI_RATCHET_MARKER = "tools/verify_acceptance_ratchet.py"
+
+# GS-RULES-FP：规则表与其版本留痕（engine_manifest.py 的产物）。
+RULES_FILE = ROOT / "research" / "governance" / "skeleton" / "rules-v1.json"
+ENGINE_MANIFEST = ROOT / "research" / "governance" / "skeleton" / "engine-manifest.json"
+
+# GS-CHG-PIN：**冻结读数**（2026-10-24 用 `set_fingerprint()` 实算，83 条样本）。
+# 复现：python3 -c "import json,sys; sys.path.insert(0,'tools');
+#           from verify_regression_set import set_fingerprint;
+#           r=json.load(open('research/governance/regression-set-v1.json'));
+#           print(set_fingerprint(r['samples']))"
+# ★ 与 `tools/acceptance-ratchet.json` 的 passed_floor 同一个模式：
+#   今天的读数钉下来；动它 = 一次有记录的决定（changelog 新条目 + 本值同步更新，
+#   同一提交）。改样本而三者缺一，GS-CHG-PIN 红。
+FROZEN_SET_FINGERPRINT = (
+    "538389f39bc4406dcf56f0a88430af8d3d97438a4c7b78270915c66cd665df2a")
+
 
 def sample_fingerprint(text: str) -> str:
     """指纹口径：`sha256(json({"text": ...}, sort_keys, ensure_ascii=False))`。
@@ -97,6 +140,19 @@ def sample_fingerprint(text: str) -> str:
     return hashlib.sha256(
         json.dumps({"text": text}, ensure_ascii=False, sort_keys=True).encode("utf-8")
     ).hexdigest()
+
+
+def set_fingerprint(samples) -> str:
+    """冻结集整体指纹：`sha256(json(样本数组, sort_keys, ensure_ascii=False))`。
+
+    口径：**全量逐字节等价**（整份样本对象列表，按 JSON 归一化）。
+    任何字段变化 —— text、指纹、族、expected —— 都会改变这个值；
+    而「重排数组顺序」不改变它（`sort_keys` 归一化的是键，不重排序数组 ——
+    所以数组顺序本身也算内容的一部分）。这条口径存在的理由见 GS-CHG-PIN。
+    """
+    return hashlib.sha256(
+        json.dumps(list(samples or []), ensure_ascii=False, sort_keys=True)
+        .encode("utf-8")).hexdigest()
 
 
 # ── 纯判定函数（可被 --controls 单独喂样本）─────────────────────────────
@@ -275,6 +331,129 @@ def merge_allowed(changed_paths, receipt):
     return True, "规则变更带了通过的回执"
 
 
+def check_change_pin(samples, changelog):
+    """GS-CHG-PIN：改样本必须留下变更痕迹（2026-10-23 补，见本文件头部）。
+
+    抓的是哪种：改了一条样本的 text、把 `fingerprint` 同步重算
+    （GS-FP 因此全绿），且 changelog 是历史列表没人回头看样本
+    （GS-CHANGE 因此全绿）→ 在两条旧断言上都无感。
+
+    判据两半：
+
+      ① **冻结指纹**：`samples` 的实算整体指纹必须等于 FROZEN_SET_FINGERPRINT ——
+        写进本文件的**冻结读数**（与 `tools/acceptance-ratchet.json` 的地板同一个模式：
+        今天的读数钉下来，动它必须是一次有记录的决定）。
+        「冻结回归集」的「冻结」二字落点就在这里：没有这一条，冻结只是文件名。
+        ★ 合法变更的程序：改样本 → changelog 加一条（operator/at/reason/after_fingerprint）
+          → 重算 → **同一提交**里更新 FROZEN_SET_FINGERPRINT。少任何一步，本条红。
+      ② **记账纪律**：`after_fingerprint` 为空只许出现在 changelog 的**第一条**
+        （初始建集时还没有「上一版」可对账）；此后每条都必须带；且**最新一条**若带了，
+        必须等于当前实算指纹（记了账就得记对）。历史条目的值不复算 ——
+        历史样本状态已不在盘上，硬算就是编造。
+
+    ★ ②单独不够：变异「改样本 + 不加 changelog 条目」在 ② 上无感
+      （changelog 原样不动）—— 抓它的只能是 ①。两半缺一不可。
+    """
+    problems = []
+    current = set_fingerprint(samples)
+    if current != FROZEN_SET_FINGERPRINT:
+        problems.append(
+            "冻结集指纹对不上：冻结读数 %s… 实算 %s… —— 回归集已不是上次冻结的那一份。"
+            "若是合法变更：changelog 补条目（operator/at/reason/after_fingerprint）"
+            "并同一提交更新 verify_regression_set.py 的 FROZEN_SET_FINGERPRINT"
+            % (FROZEN_SET_FINGERPRINT[:12], current[:12]))
+    if not changelog:
+        problems.append("changelog 为空 —— 样本从哪来、谁建的，无从对账")
+    else:
+        for i, e in enumerate(changelog):
+            if not isinstance(e, dict):
+                continue
+            if e.get("after_fingerprint") is None and i > 0:
+                problems.append(
+                    "changelog[%d] 缺 after_fingerprint —— 初始建集条目（第 1 条）之外"
+                    "不许空：变更之后「改成了哪一版」必须指得出" % i)
+        last = changelog[-1]
+        if isinstance(last, dict) and last.get("after_fingerprint") is not None \
+                and last["after_fingerprint"] != current:
+            problems.append(
+                "changelog 最新条目 after_fingerprint=%s… ≠ 当前实算冻结集指纹 %s… —— "
+                "账记了，但记的不是现在这一版"
+                % (str(last["after_fingerprint"])[:12], current[:12]))
+    return problems
+
+
+def check_rules_fp(rules_bytes=None, manifest=None):
+    """GS-RULES-FP：规则表与引擎清单对账 —— 「改规则必须留痕」的盘上执行点。
+
+    抓的是哪种：直接编辑 `rules-v1.json` 而不跑 `engine_manifest.py --write`
+    —— 门函数 `merge_allowed` 是纯函数（无感）、CI 断言只看工作流文本（无感）、
+    GS-FP 只管回归集样本（无感）。从本条起：**规则表的字节与 manifest 记录的
+    sha256/bytes 不一致 → 红**。
+
+    manifest 是本仓**唯一**的规则版本留痕（`engine_manifest.py` 的存在理由），
+    `judge.py` 的 `versions()` 从它派生 rule_version —— manifest 一过期，
+    所有判定回执都答不了「这是哪版规则算的」。合法变更程序：改规则 →
+    `engine_manifest.py --write` → 本条转绿。
+
+    `rules_bytes` / `manifest` 可注入（`--controls` 反向对照用，不写真文件，§2.4.4）。
+    """
+    problems = []
+    if rules_bytes is None:
+        if not RULES_FILE.exists():
+            return ["未测前提：规则表文件不存在 %s" % RULES_FILE]
+        rules_bytes = RULES_FILE.read_bytes()
+    if manifest is None:
+        if not ENGINE_MANIFEST.exists():
+            return ["没有引擎清单 %s —— 规则表没有任何版本留痕，"
+                    "「改规则必须留痕」无从谈起" % ENGINE_MANIFEST.relative_to(ROOT)]
+        try:
+            manifest = json.loads(ENGINE_MANIFEST.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            return ["引擎清单解析失败：%s —— 未测" % exc]
+    art = (manifest.get("artifacts") or {}).get("rules") or {}
+    rec_sha, rec_bytes = art.get("sha256"), art.get("bytes")
+    if not rec_sha:
+        return ["引擎清单里没有 rules 制度的 sha256 —— 规则表不在版本留痕内"]
+    cur_sha = hashlib.sha256(rules_bytes).hexdigest()
+    if cur_sha != rec_sha or len(rules_bytes) != rec_bytes:
+        problems.append(
+            "规则表与引擎清单对不上：manifest 记录 sha256=%s… bytes=%s，"
+            "盘上实算 sha256=%s… bytes=%d —— 改了规则没重算 manifest"
+            "（合法程序：python3 engine_manifest.py --write）"
+            % (str(rec_sha)[:12], rec_bytes, cur_sha[:12], len(rules_bytes)))
+    return problems
+
+
+def check_ci_enforce(text=None):
+    """GS-CI-ENFORCE：改规则必须先跑回归集 —— CI 通道的配置层断言（2026-10-23 补）。
+
+    抓的是哪种：把 `.github/workflows/acceptance.yml` 的 `pull_request` 触发删掉、
+    或把执行器/棘轮两步换掉 —— 门函数 `merge_allowed` 是纯函数，照旧全绿；
+    从本条起这三种删法各自当场红。行 85 第 ⑤ 条「改规则但不跑回归集的 PR
+    合并被挡住」的**配置层执行点**就是这三个标记。
+
+    ★ 逐字点名，不数条目：条目计数那种判据在标记重排/改名时恒真（§2.4）。
+    `text` 可注入 —— `--controls` 的反向对照喂打掉的配置文本，
+    **不写真文件**（§2.4.4：自证不许有副作用）。
+    """
+    problems = []
+    if text is None:
+        if not CI_WORKFLOW.exists():
+            return ["没有 CI 工作流文件 %s —— 改规则而不跑回归集的 PR 在配置层无人拦"
+                    % CI_WORKFLOW.relative_to(ROOT)]
+        text = CI_WORKFLOW.read_text(encoding="utf-8")
+    if CI_PR_CHANNEL not in text:
+        problems.append("CI 工作流没有 %s 触发 —— 改规则的 PR 不会跑回归集（只有 push/dispatch 时等于没门）"
+                        % CI_PR_CHANNEL.rstrip(":"))
+    if CI_EXECUTOR_MARKER not in text:
+        problems.append("CI 工作流没有跑执行器（%s）—— 「改规则必须先跑验收」没有执行点"
+                        % CI_EXECUTOR_MARKER)
+    if CI_RATCHET_MARKER not in text:
+        problems.append("CI 工作流没有棘轮门（%s）—— 回归集倒退不会挡住合并（failed=0 那条硬判据没人执行）"
+                        % CI_RATCHET_MARKER)
+    return problems
+
+
 # ── 主检查 ────────────────────────────────────────────────────────────
 def main() -> int:
     results = []
@@ -333,6 +512,21 @@ def main() -> int:
     check("GS-CHANGE", not chg, "changelog 每条都有 operator / at / reason"
           if not chg else str(chg[:2]))
 
+    pin = check_change_pin(samples, reg.get("changelog") or [])
+    check("GS-CHG-PIN", not pin,
+          "冻结集指纹 = FROZEN_SET_FINGERPRINT；changelog 记账纪律成立"
+          if not pin else str(pin[:2]))
+
+    rfp = check_rules_fp()
+    check("GS-RULES-FP", not rfp,
+          "规则表字节与 engine-manifest.json 的 sha256/bytes 一致（改规则必须重算 manifest）"
+          if not rfp else str(rfp[:2]))
+
+    ci = check_ci_enforce()
+    check("GS-CI-ENFORCE", not ci,
+          "CI 工作流把执行器与棘轮挂在 pull_request 通道上（配置层）"
+          if not ci else str(ci[:2]))
+
     # GS-GATE：证明门不是一律拒绝，也不是一律放行
     #   ★ 2026-10-22 修一处我自己的错：`merge_allowed` 返回 (allowed, why)，
     #     第一版把 `allowed` 直接当成「被拒绝了」用（变量名写成 deny_rule），
@@ -363,9 +557,10 @@ def main() -> int:
     if failed:
         print("  ❌ 退 1（有红）")
         return 1
-    print("  ✅ 全过 —— 只证明：集合规模/陷阱覆盖/族覆盖/指纹/变更记录/合并门判定函数成立。")
-    print("     ★ **不证明**远端分支保护真的拦住了合并 —— 本仓没有任何 CI，")
-    print("       远端 main 也没有分支保护（2026-10-22 实测 protected=false）。")
+    print("  ✅ 全过 —— 只证明：集合规模/陷阱覆盖/族覆盖/指纹/变更记录/"
+          "变更对账（冻结指纹）/规则表-清单对账/CI 配置层/合并门判定函数成立。")
+    print("     ★ CI 在跑 ≠ 远端真的挡住了合并：分支保护的本机读数 401，")
+    print("       「必需检查」那半无法从这台机器证明（2026-10-22 实测 protected=false）。")
     print("     ★ **不证明**样本语义正确（83 条为人工编写的通用广告语，未经法务签署）。")
     return 0
 
@@ -405,6 +600,36 @@ def run_controls() -> int:
         return samples[:n]
 
     d = lambda o: copy.deepcopy(o)  # noqa: E731
+    s0 = d(samples[0])
+
+    def after_change():
+        """好样本②的形状：走完合法变更程序之后（冻结读数已同步更新）。"""
+        new_text = s0["text"] + " v2"
+        new_fp = hashlib.sha256(json.dumps(
+            {"text": new_text}, ensure_ascii=False,
+            sort_keys=True).encode("utf-8")).hexdigest()
+        new_samples = [dict(s0, text=new_text,
+                            fingerprint={"algorithm": "sha256",
+                                         "value": new_fp})] + d(samples)[1:]
+        new_pin = set_fingerprint(new_samples)
+        saved = FROZEN_SET_FINGERPRINT
+        globals()["FROZEN_SET_FINGERPRINT"] = new_pin
+        try:
+            return check_change_pin(new_samples, changelog + [dict(
+                changelog[-1], at="2026-10-24T00:00:00Z",
+                after_fingerprint=new_pin)])
+        finally:
+            globals()["FROZEN_SET_FINGERPRINT"] = saved
+
+    # GS-CI-ENFORCE 反向用例的最小合法配置。★ 放在 cases **之外** ——
+    # 写在列表字面量里时，赋值行本身让整个列表在它前面就断成两截
+    # （SyntaxError）；就算侥幸不断，紧跟其后的元组也会被吃成
+    # 无害表达式语句，用例静默消失。同形错法见 GS-GATE 的注释。
+    ci_ok = ("on:\n  pull_request:\n    branches: [main]\n"
+             "jobs:\n  acceptance:\n    steps:\n"
+             "      - run: .venv/bin/python " + CI_EXECUTOR_MARKER + "\n"
+             "      - run: cat acceptance-run.txt | "
+             ".venv/bin/python " + CI_RATCHET_MARKER + "\n")
 
     cases = [
         ("好样本：真实回归集规模", False, lambda: check_size(samples)),
@@ -460,6 +685,63 @@ def run_controls() -> int:
         ("坏样本：changelog 缺 reason",
          True, lambda: check_changelog([{"operator": "x", "at": "2026-10-22"}])),
         ("坏样本：changelog 为空", True, lambda: check_changelog([])),
+
+        # GS-CHG-PIN 的成对反向对照。坏样本只喂 deepcopy —— 决不写真源（§2.4.4）。
+        # 坏样本的形状就是审计里 survived 的那个变异：改 text、把样本自身
+        # fingerprint 同步重算（GS-FP 全绿），冻结读数与 changelog 都不动。
+        # 好样本②「合法变更后的形状」也一并喂（`after_change`，cases 之外）：
+        # 走完程序（changelog 补条目 + 冻结读数同步更新）必须转绿 ——
+        # 只有红没有绿的判据会误伤合法变更。
+        ("好样本：真实冻结集（= FROZEN_SET_FINGERPRINT）",
+         False, lambda: check_change_pin(samples, changelog)),
+        ("好样本：合法变更后的形状（读数已同步，见函数体）",
+         False, after_change),
+        ("坏样本：改 text 且指纹同步、冻结读数没跟",
+         True, lambda: check_change_pin(
+             [dict(s0, text=s0["text"] + " v2",
+                   fingerprint={"algorithm": "sha256",
+                                "value": "b" * 64})] + d(samples)[1:],
+             changelog)),
+        ("坏样本：非首条 changelog 缺 after_fingerprint",
+         True, lambda: check_change_pin(samples, changelog + [
+             {"operator": "x", "at": "2026-10-24", "reason": "改 GS-001"}])),
+        ("坏样本：最新条目 after_fingerprint ≠ 当前实算",
+         True, lambda: check_change_pin(
+             samples, changelog + [dict(changelog[-1],
+                                        after_fingerprint="a" * 64,
+                                        at="2026-10-24")])),
+
+        # GS-RULES-FP 的成对反向对照。全部走注入（不写 rules-v1.json / manifest，§2.4.4）。
+        ("好样本：真实规则表 × 真实 manifest（字节一致）",
+         False, lambda: check_rules_fp()),
+        ("坏样本：规则表改一个字节、manifest 没重算",
+         True, lambda: check_rules_fp(
+             rules_bytes=RULES_FILE.read_bytes() + b" ",
+             manifest=json.loads(ENGINE_MANIFEST.read_text(encoding="utf-8")))),
+        ("坏样本：manifest 记录值指向别的版本",
+         True, lambda: check_rules_fp(
+             rules_bytes=RULES_FILE.read_bytes(),
+             manifest={"artifacts": {"rules": {
+                 "sha256": "a" * 64, "bytes": RULES_FILE.stat().st_size}}})),
+        ("坏样本：manifest 里没有 rules 制度",
+         True, lambda: check_rules_fp(
+             rules_bytes=RULES_FILE.read_bytes(), manifest={"artifacts": {}})),
+
+        # GS-CI-ENFORCE 的成对反向对照。配置文本读进内存再打掉，
+        # 决不写 CI_WORKFLOW（§2.4.4：自证不许有副作用）。
+        # 反向用例自备最小合法配置（`ci_ok`，cases 之外）：它们要证的是
+        # 「判据对这种形状会红」，真文件在不在盘上都不影响这一证明。
+        ("好样本：CI 配置三标记齐全", False, lambda: check_ci_enforce(ci_ok)),
+        ("坏样本：CI 没有 pull_request 触发",
+         True, lambda: check_ci_enforce(ci_ok.replace(CI_PR_CHANNEL, "push:"))),
+        ("坏样本：CI 不跑执行器",
+         True, lambda: check_ci_enforce(
+             ci_ok.replace(".venv/bin/python " + CI_EXECUTOR_MARKER, "echo skipped"))),
+        ("坏样本：CI 不跑棘轮",
+         True, lambda: check_ci_enforce(
+             ci_ok.replace(".venv/bin/python " + CI_RATCHET_MARKER, "echo skipped"))),
+        ("坏样本：CI 配置为空（等价于文件缺失）",
+         True, lambda: check_ci_enforce("")),
 
         # ★ 2026-10-22 修三处我自己的错：`check_*` 的约定是「返回问题列表，空 = 绿」。
         #   第一版我把 `[]` 当成「红」写在这三个 lambda 里，而 `[]` 是**假值** ——

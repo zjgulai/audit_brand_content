@@ -4,6 +4,9 @@
 
 覆盖：
   C0  claim 原子独占：并发两人只有一个成功，另一个明确 conflict；重复 claim 拒绝
+  C0b 非领取人写已领取案件（autosave/heartbeat/adopt）必须 not_assignee 拒绝，
+      且被拒后案件状态/版本不变（#134 变异：_require_claim 去掉 assignee
+      校验曾实测全绿 —— 本文件此前没有「别人来写已领取案件」的用例）
   C1  lease：30 分钟空闲自动释放；释放前 draft 仍在；心跳延长；版本冲突明确
   C2  draft：全字段快照 + snapshot_seq/snapshot_at/content_hash/author；
       autosave 不产 formal；只有 explicit submit 才产 formal
@@ -16,6 +19,7 @@
   R3  autosave 产生 formal finding → 红
   R4  adopt 无 derived_from → 红
   R5  原 draft 被修改 → 红
+  R6  非领取人写已领取案件不被拒 / 写入生效 → 红（--controls 反向对照）
 
 退出码：0 全过 / 1 有红 / 2 未测（导入失败或验收器自身异常）。
 """
@@ -84,6 +88,49 @@ def main():
     except LedgerConflict as exc:
         dup = exc.code
     report(dup is not None, "C0 重复 claim 被拒绝", repr(dup))
+
+    # C0b/R6 非领取人对已领取案件的一切写操作必须被拒（#134）。
+    # 判据③「成功后该案件对其他人的可操作性变为不可用」：变异去掉
+    # _require_claim 的 assignee 校验后，bob 的 autosave/heartbeat 全绿 ——
+    # 这里逐个写入口各喂一条非领取人样本，并断言被拒后状态/版本都没动。
+    ledger = ReviewsLedger(lease_seconds=1800)
+    c = claim(ledger, "case-6", "alice", now=0)
+    d = ledger.autosave("case-6", "alice", c["version"],
+                        form={"summary": "alice 的草稿"}, notes="n",
+                        evidence_selections=[], references=[], now=5)
+    baseline_case = ledger.get_case("case-6")
+    baseline_drafts = ledger.list_drafts("case-6")
+    intrusions = []
+    for op, call in (
+        ("autosave", lambda: ledger.autosave(
+            "case-6", "bob", ledger.get_case("case-6")["version"],
+            form={"summary": "bob 的草稿"}, notes="x",
+            evidence_selections=[], references=[], now=6)),
+        ("heartbeat", lambda: ledger.heartbeat(
+            "case-6", "bob", ledger.get_case("case-6")["version"], now=7)),
+        ("adopt", lambda: ledger.adopt(
+            "case-6", "bob", ledger.get_case("case-6")["version"],
+            source_draft_id=d["draft"]["draft_id"], now=8)),
+        ("submit", lambda: ledger.submit(
+            "case-6", "bob", ledger.get_case("case-6")["version"],
+            conclusion={"status": "confirmed", "reason": "越权结案"}, now=9)),
+    ):
+        try:
+            call()
+            intrusions.append((op, None))
+        except LedgerConflict as exc:
+            intrusions.append((op, exc.code))
+        except Exception as exc:  # noqa: BLE001
+            intrusions.append((op, type(exc).__name__))
+    after_case = ledger.get_case("case-6")
+    report(all(code == "not_assignee" for _, code in intrusions)
+           and len(intrusions) == 4,
+           "C0b/R6 非领取人 autosave/heartbeat/adopt/submit 全部 not_assignee 拒绝",
+           repr(intrusions))
+    report(after_case == baseline_case
+           and len(ledger.list_drafts("case-6")) == len(baseline_drafts)
+           and ledger.formal_events() == [],
+           "C0b/R6 被拒的越权写不改变案件状态/草稿/正式记录", repr(after_case))
 
     # C1 lease：心跳延长 / 到期释放且 draft 仍在
     ledger = ReviewsLedger(lease_seconds=1800)
@@ -252,8 +299,86 @@ def main():
     return 1
 
 
+# ═══════════════════ --controls：离线反向对照 ═══════════════════
+#
+# C0b 的坏样本 = #134 的变异本身：把 _require_claim 的 assignee 校验整个
+# 短路（status 恒判 claimed、assignee 恒判相等），喂同一个「非领取人写
+# 已领取案件」的形状 → 主判定的 C0b 两条必须红；
+# 好样本 = 真 _require_claim → C0b 两条不许误报。该红、该绿都有。
+
+def _controls_one_case(ledger_cls):
+    ledger = ledger_cls(lease_seconds=1800)
+    c = ledger.claim("case-x", "alice", now=0)
+    ledger.autosave("case-x", "alice", c["version"], form={"summary": "v"},
+                    notes="n", evidence_selections=[], references=[], now=5)
+    before = ledger.get_case("case-x")
+    rejected = None
+    try:
+        # bob 拿的是**当前**版本 —— 越权者本来就看得见版本号，
+        # 缺口只在 assignee 校验（#134 的变异只关掉那一个闸）。
+        ledger.autosave("case-x", "bob", ledger.get_case("case-x")["version"],
+                        form={"summary": "bob"}, notes="x",
+                        evidence_selections=[], references=[], now=6)
+    except LedgerConflict as exc:
+        rejected = exc.code
+    except Exception as exc:  # noqa: BLE001
+        rejected = type(exc).__name__
+    return rejected, before, ledger.get_case("case-x")
+
+
+def controls() -> int:
+    import unittest.mock as mock
+
+    from base import reviews_ledger as rl
+
+    results = []
+
+    def ok(name, cond, detail=""):
+        results.append((name, bool(cond)))
+        print("%s %s %s" % ("✅" if cond else "❌", name, detail))
+
+    def bad_require_claim(_self, case, actor, version):
+        # assignee 校验短路：只留版本校验（#134 变异的形状 —— 非
+        # assignee 也能通过）。
+        if version != case["version"]:
+            raise LedgerConflict(
+                "version_conflict",
+                "期望版本 %r，实际 %r" % (version, case["version"]))
+
+    print("=" * 72)
+    print("verify_reviews_ledger · 离线反向对照（--controls）")
+    print("=" * 72)
+
+    # 1 ★ 坏实现：assignee 校验短路（#134 的变异形状）
+    with mock.patch.object(rl.ReviewsLedger, "_require_claim", bad_require_claim):
+        rejected_bad, before_bad, after_bad = _controls_one_case(rl.ReviewsLedger)
+    ok("坏实现（_require_claim 不校验 assignee）→ bob 越权 autosave 不被拒 "
+       "→ C0b 第一条必须红", rejected_bad is None)
+    ok("坏实现 → 越权写让案件版本前进（状态被改）→ C0b 第二条必须红",
+       after_bad != before_bad and after_bad["version"] == before_bad["version"] + 1,
+       "%r -> %r" % (before_bad["version"], after_bad["version"]))
+
+    # 2 ★ 好实现（真 _require_claim）→ 两条 C0b 断言都必须绿（不误伤）
+    rejected_good, before_good, after_good = _controls_one_case(rl.ReviewsLedger)
+    ok("好实现 → 非领取人 autosave 被 not_assignee 拒绝（不误伤）",
+       rejected_good == "not_assignee")
+    ok("好实现 → 被拒后案件状态/版本一个字段都没动（不误伤）",
+       after_good == before_good,
+       "version %r -> %r" % (before_good["version"], after_good["version"]))
+
+    print("-" * 72)
+    bad = [n for n, p in results if not p]
+    if bad:
+        print("❌ %d/%d 项失败：%s" % (len(bad), len(results), bad))
+        return 1
+    print("✅ %d/%d 项全过（该红、该绿都有）" % (len(results), len(results)))
+    return 0
+
+
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv:
+            sys.exit(controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         import traceback

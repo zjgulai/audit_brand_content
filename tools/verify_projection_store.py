@@ -4,11 +4,19 @@
 
 主体：base/business_event_store.py、base/projection_store.py、base/projector.py、
 base/review_command_service.py。
+
+  C6f 幽灵记录不许被当成真相 —— 不止 rebuild（C6b）：
+      该案的**增量 apply** 也必须清掉只存在于投影库、权威文件里没有的行
+      （整案替换；#107 曾实测 projection_store 侧没有自有执行点）。
+  C6g 幽灵在场 + 水位 hash 与权威不符 → status 必须 corrupt，
+      不许报 fresh 把幽灵当成真相（#107 survived 那条变异）。
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 
@@ -64,7 +72,24 @@ def main():
 
         report(projection.status(authority.head())["status"] == "lagging",
                "C0 未投影时 status=lagging")
-        projector.catch_up()
+        try:
+            projector.catch_up()
+        except sqlite3.IntegrityError as exc:
+            # 整案替换（DELETE 后重插）被去掉时，同一案件的第二个 draft
+            # 会撞 UNIQUE。这不是「断言抓住」，是坏实现的崩溃 —— 但它
+            # 崩的正是本验证器要断言的行为（幽灵/重复行不许进投影），
+            # 折算成一条 FAIL 而不是退 2 蒙混。
+            report(False, "C1a 整案替换在途：重复 draft 不许撞 UNIQUE（"
+                          "apply_batch 必须先 DELETE 再 INSERT）", repr(exc))
+            projector = None
+        else:
+            report(True, "C1a 整案替换在途：重复 draft 不许撞 UNIQUE", "")
+        if projector is None:
+            # C1a 已红：整案替换被去掉，后续断言在一个坏投影上没有意义，
+            # 直接以有红收场（不许退 2 蒙混）。
+            print("----------------------------------------")
+            print("❌ %d passed, %d failed" % (passed, failed), file=sys.stderr)
+            return 1
         st = projection.status(authority.head())
         case = projection.get_case("case-1")
         report(st["status"] == "fresh" and st["lag_commits"] == 0
@@ -119,6 +144,78 @@ def main():
         report(prefix_denied and prefix.watermark()["applied_seq"] == 1,
                "C6e 异历史前缀拒绝后续批次洗白")
         prefix.close()
+
+        # C6f 幽灵记录不许被当成真相（#107）：C6b 证明的是 rebuild 清幽灵，
+        # 这里补 projection_store 自己的执行点 —— 对**同一个案件**正常重放
+        # 增量批次（catch_up / apply_batch，不 rebuild）也必须清掉
+        # 只存在于投影库、权威文件里没有的行。
+        # （夹具用独立的 mini 权威恰好两个批次（claim → save_draft）：
+        #   两批都带 draft 的主链会先在坏实现上撞 UNIQUE 崩溃 —— 那是
+        #   untested，不是断言拦住。）
+        gh_root = os.path.join(root, "authority-ghost")
+        gh_lease = WriterLease(os.path.join(gh_root, "writer.lock")).acquire()
+        extra_roots.append(gh_root)
+        gh_authority = BusinessEventStore(gh_root, lease=gh_lease,
+                                          clock=lambda: 1010)
+        gh_authority.execute(aggregate_id="case-ghost", command="claim",
+                             actor=actor(), expected_version=0, payload={},
+                             idempotency_key="gh1", now=1010)
+        gh_authority.execute(aggregate_id="case-ghost", command="save_draft",
+                             actor=actor(), expected_version=1,
+                             payload={"form": {"v": 1}, "notes": "inc",
+                                      "evidence_selections": [], "references": []},
+                             idempotency_key="gh2", now=1011)
+        ghost_batches = gh_authority.batches()
+        ghost_db = os.path.join(root, "projection-ghost.db")
+        ghost = ProjectionStore(ghost_db, clock=lambda: 1013)
+        ghost.apply_batch(ghost_batches[0])
+        ghost._conn.execute(
+            "INSERT INTO drafts(draft_id,case_id,snapshot_seq,author,content_json) "
+            "VALUES('ghost-incremental','case-ghost',999,'x','{}')")
+        ghost._conn.commit()
+        report(ghost.get_draft("ghost-incremental") is not None,
+               "C6f-0 构造幽灵记录（未 rebuild）")
+        Projector(gh_authority, ghost).catch_up()
+        ghost_after = ghost.get_draft("ghost-incremental")
+        ghost_case = ghost.get_case("case-ghost")
+        report(ghost_after is None,
+               "C6f-1 该案增量 apply 清掉 projection-only 幽灵 draft",
+               repr(ghost_after))
+        report(ghost_case == gh_authority.state("case-ghost")
+               and len(ghost.list_drafts("case-ghost")) == 1,
+               "C6f-2 幽灵清除后该案查询结果与权威 state 逐字段一致",
+               repr(ghost_case))
+        # 幽灵不进 applied_commands：权威没有这个 command_id，可正常重放。
+        report(ghost.watermark()["applied_seq"] == 2
+               and ghost.status(gh_authority.head())["status"] == "fresh",
+               "C6f-3 清幽灵的增量重放照常追平 fresh", repr(ghost.watermark()))
+        ghost.close()
+        gh_lease.release()
+
+        # C6g 幽灵在场时系统必须「识别为异常」，不许报 fresh 当成真相（#107）。
+        # 投影库里多出权威没有的记录、而水位 hash 已对不上权威 head ——
+        # 此时 status 报 fresh 就等于把幽灵当成真相。#107 曾实测：把 status()
+        # 里 manifest hash 不一致的 corrupt 判定关掉，唯一红项是 C6d（挂错
+        # 断言），本判据自身没有执行点 —— C6g 用幽灵夹具补上它。
+        stale_db = os.path.join(root, "projection-stale.db")
+        stale = ProjectionStore(stale_db, clock=lambda: 1003)
+        for b in authority.batches():
+            stale.apply_batch(b)
+        stale._conn.execute(
+            "INSERT INTO drafts(draft_id,case_id,snapshot_seq,author,content_json) "
+            "VALUES('ghost-stale','case-1',999,'x','{}')")
+        stale._conn.execute(
+            "UPDATE projection_meta SET manifest_sha256=? WHERE singleton=1",
+            ("e" * 64,))
+        stale._conn.commit()
+        report(stale.get_draft("ghost-stale") is not None,
+               "C6g-0 构造幽灵 + 水位 hash 不符的投影")
+        stale_status = stale.status(authority.head())
+        report(stale_status["status"] == "corrupt"
+               and stale_status["last_error_code"] == "projection_manifest_mismatch",
+               "C6g 幽灵在场+水位不符 → corrupt，不许 fresh 当成真相",
+               repr(stale_status))
+        stale.close()
 
         # C7 删除投影文件后，从权威全量重建
         projection.close()
@@ -343,8 +440,119 @@ def main():
     return 1
 
 
+# ═══════════════════ --controls：离线反向对照 ═══════════════════
+#
+# C6f 的坏样本 = #107 的变异本身：去掉 apply_batch 的整案替换
+# （`DELETE FROM drafts WHERE case_id=?` 那一行），同一增量重放后幽灵仍在
+# → 主判定的 C6f-1 必须红；好实现 → C6f 不许误报。该红、该绿都有。
+
+def controls() -> int:
+    import unittest.mock as mock
+
+    import base.projection_store as ps
+
+    results = []
+
+    def ok(name, cond, detail=""):
+        results.append((name, bool(cond)))
+        print("%s %s %s" % ("✅" if cond else "❌", name, detail))
+
+    print("=" * 72)
+    print("verify_projection_store · 离线反向对照（--controls）")
+    print("=" * 72)
+
+    root = tempfile.mkdtemp(prefix="vps-controls-")
+    roots = [root]
+    try:
+        auth_root = os.path.join(root, "authority")
+        lease = WriterLease(os.path.join(auth_root, "writer.lock")).acquire()
+        authority = BusinessEventStore(auth_root, lease=lease, clock=lambda: 1000)
+        authority.execute(aggregate_id="case-g", command="claim", actor=actor(),
+                          expected_version=0, payload={}, idempotency_key="g1",
+                          now=1000)
+        authority.execute(aggregate_id="case-g", command="save_draft",
+                          actor=actor(), expected_version=1,
+                          payload={"form": {"x": 1}, "notes": "draft",
+                                   "evidence_selections": [], "references": []},
+                          idempotency_key="g2", now=1001)
+        batches = authority.batches()
+
+        def build(store_cls):
+            db = os.path.join(root, "p-%d.db" % len(results))
+            store = store_cls(db, clock=lambda: 1003)
+            store.apply_batch(batches[0])
+            store._conn.execute(
+                "INSERT INTO drafts(draft_id,case_id,snapshot_seq,author,"
+                "content_json) VALUES('ghost','case-g',999,'x','{}')")
+            store._conn.commit()
+            from base.projector import Projector
+            Projector(authority, store).catch_up()
+            ghost = store.get_draft("ghost")
+            store.close()
+            return ghost
+
+        # 1 ★ 坏实现：整案替换（DELETE FROM drafts）被跳过 —— #107 变异形状。
+        real_apply = ps.ProjectionStore.apply_batch
+
+        def apply_no_delete(self, b):
+            # 复制真 apply_batch 的其余逻辑，只去掉 drafts 的 DELETE：
+            # 变异后幽灵 draft 在正常重放下应当存活。
+            from base.projection_store import _json
+            if not isinstance(b, dict):
+                raise ProjectionError("batch_type", "batch 必须是对象")
+            events = b.get("events") or []
+            state = events[0]["state"]
+            case_id = b.get("aggregate_id")
+            with self._lock:
+                self._conn.execute("BEGIN IMMEDIATE")
+                self._conn.execute(
+                    "INSERT INTO review_cases(case_id,version,status,assignee,"
+                    "state_json) VALUES(?,?,?,?,?) ON CONFLICT(case_id) DO UPDATE "
+                    "SET version=excluded.version,status=excluded.status,"
+                    "assignee=excluded.assignee,state_json=excluded.state_json",
+                    (case_id, int(state["version"]), state["status"],
+                     state.get("assignee"), _json(state)))
+                # ★ 变异点：`DELETE FROM drafts WHERE case_id=?` 不执行。
+                for draft in state.get("drafts") or []:
+                    self._conn.execute(
+                        "INSERT INTO drafts(draft_id,case_id,snapshot_seq,author,"
+                        "content_json) VALUES(?,?,?,?,?)",
+                        (draft["draft_id"], case_id, int(draft["snapshot_seq"]),
+                         draft.get("author"), _json(draft)))
+                self._conn.execute(
+                    "UPDATE projection_meta SET applied_seq=?,manifest_sha256=?,"
+                    "last_error_code=NULL WHERE singleton=1",
+                    (b.get("authority_seq"), b.get("manifest_sha256")))
+                self._conn.execute("COMMIT")
+                return {"replayed": False, "applied_seq": b.get("authority_seq")}
+
+        with mock.patch.object(ps.ProjectionStore, "apply_batch", apply_no_delete):
+            ghost_bad = build(ps.ProjectionStore)
+        ok("坏实现（apply 不做整案替换）→ 增量重放后幽灵仍在 → C6f-1 必须红",
+           ghost_bad is not None, repr(ghost_bad))
+
+        # 2 ★ 好实现（真 apply_batch）→ C6f-1 必须绿（不误伤）
+        ghost_good = build(ps.ProjectionStore)
+        ok("好实现 → 该案增量 apply 清掉 projection-only 幽灵（不误伤）",
+           ghost_good is None)
+        lease.release()
+    finally:
+        for r in roots:
+            shutil.rmtree(r, ignore_errors=True)
+
+    print("-" * 72)
+    bad_items = [n for n, p in results if not p]
+    if bad_items:
+        print("❌ %d/%d 项失败：%s" % (len(bad_items), len(results), bad_items))
+        return 1
+    print("✅ %d/%d 项全过（该红、该绿都有）" % (len(results), len(results)))
+    return 0
+
+
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv:
+            sys.exit(controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         print("UNTESTED: 验收器自身异常: %s" % exc)

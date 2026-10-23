@@ -30,6 +30,13 @@
   RC-SINGLE  反向对照：**只给 after 单点**的报告必须红（这是行 87 的原话）
   RC-NOOP    反向对照：变更没改变任何样本 → 红
              （分不清「变更没生效」与「语料碰不到」，只看单点数值时两者同形）
+  RC-MANIFEST **「改规则」在真仓里必须留版本痕**：`skeleton/rules-v1.json` 的
+             sha256/bytes 必须与 `skeleton/engine-manifest.json` 记录值相等
+             （直接改规则而不跑 `engine_manifest.py --write` → 红）。
+             2026-10-23 变异探针实测：改一条规则、manifest 不动，本验证器 6 项全过 ——
+             tempdir 副本上的流程再严，管不到真仓那份规则表。
+             ★ 本文件「重跑 manifest 否则版本号会撒谎」的要求，此前只落在
+               tempdir 副本上；这一条把它落回真仓。
 
 ## 变更怎么注入（不是「假造一个变更流程」）
 
@@ -45,9 +52,11 @@
 
 ## **本文件不证明什么**（结论行必须照抄）
 
-* **不证明「测试分支」这件事存在。** 本仓没有 CI、没有变更 API，
-  「在测试分支做变更」在本架构下**没有对象** —— 我用 tempdir 副本模拟的是
-  **引擎对规则变更的响应**，不是**分支工作流本身**。
+* **不证明「测试分支」这件事存在。** CI 的**配置层**已入库
+  （`.github/workflows/acceptance.yml`，2026-10-23：PR 通道跑执行器 + 棘轮硬门），
+  但「远端真的挡住了合并」本机读不到（无分支保护读数）——
+  本文件用 tempdir 副本模拟的是**引擎对规则变更的响应**，
+  工作流层与远端强制层各有自己的票。
 * **不证明合并被挡住。** 那是第 1 层（`GS-GATE`）与第 2 层（触发者）的事，
   两者各有自己的票与本文件分开报。
 * **不证明报告的渲染层。** 本文件产出的是**结构化读数**；把它渲染成人读报告的
@@ -66,6 +75,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import shutil
 import subprocess
@@ -76,6 +86,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SKEL = ROOT / "research" / "governance" / "skeleton"
 REGRESSION = ROOT / "research" / "governance" / "regression-set-v1.json"
+ENGINE_MANIFEST = SKEL / "engine-manifest.json"
+RULES_FILE = SKEL / "rules-v1.json"
 
 # 三类变更各自要触发的规则。挑的是**回归集里确实会命中**的规则，
 # 否则「变更没生效」与「语料碰不到」在读数上同形（行 87 原话点名的那个坑）。
@@ -193,6 +205,50 @@ def diff_readings(before: list, after: list):
     return changed, sorted(set(b) - set(a)), sorted(set(a) - set(b))
 
 
+def check_manifest_fresh(rules_bytes=None, manifest=None):
+    """RC-MANIFEST：真仓的规则表必须与引擎清单对上账（2026-10-24 补）。
+
+    抓的是哪种：在**真仓**里直接编辑 `rules-v1.json` 而不跑
+    `engine_manifest.py --write`。审计里 survived 的正是这个变异
+    （`research/governance/skeleton/rules-v1.json` 被改一条规则后，
+    本验证器 6 项全过退 0 —— 因为三种变更都只发生在 tempdir 副本里，
+    副本上 manifest 重算了，真仓那份没人看）。
+
+    manifest 是判定回执里 rule_version 的唯一来源（`judge.py::versions()`）——
+    它一过期，所有已出回执都答不了「这是哪版规则算的」，行 87 的
+    「变更前后对比」就没有可信的版本锚点。
+
+    ★ 合法程序：改规则 → `python3 engine_manifest.py --write` → 本条转绿。
+      所以这条变异不算「不许改规则」，是「改了必须重算版本号」。
+    `rules_bytes` / `manifest` 可注入（--controls 反向对照用，不写真文件，§2.4.4）。
+    """
+    problems = []
+    if rules_bytes is None:
+        if not RULES_FILE.exists():
+            return ["未测前提：规则表不存在 %s" % RULES_FILE]
+        rules_bytes = RULES_FILE.read_bytes()
+    if manifest is None:
+        if not ENGINE_MANIFEST.exists():
+            return ["没有引擎清单 %s —— 规则表没有版本留痕，"
+                    "「变更前后」无从对版本" % ENGINE_MANIFEST.relative_to(ROOT)]
+        try:
+            manifest = json.loads(ENGINE_MANIFEST.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            return ["引擎清单解析失败：%s —— 未测" % exc]
+    art = (manifest.get("artifacts") or {}).get("rules") or {}
+    rec_sha, rec_bytes = art.get("sha256"), art.get("bytes")
+    if not rec_sha:
+        return ["引擎清单里没有 rules 制品的 sha256 —— 规则表不在版本留痕内"]
+    cur_sha = hashlib.sha256(rules_bytes).hexdigest()
+    if cur_sha != rec_sha or len(rules_bytes) != rec_bytes:
+        problems.append(
+            "真仓规则表与引擎清单对不上：manifest 记录 sha256=%s… bytes=%s，"
+            "盘上实算 sha256=%s… bytes=%d —— 改了规则没重算 manifest"
+            "（合法程序：python3 research/governance/skeleton/engine_manifest.py --write）"
+            % (str(rec_sha)[:12], rec_bytes, cur_sha[:12], len(rules_bytes)))
+    return problems
+
+
 # ── 纯判定函数（可被 --controls 单独喂样本）─────────────────────────────
 def check_report_shape(report):
     """RC-SHAPE：报告必须同时含每条样本的 before 与 after，不能只有 after。"""
@@ -248,6 +304,13 @@ def main() -> int:
     if not (50 <= len(samples) <= 100):
         print("  ❌ 回归集条数 %d 不在 50–100 —— 本票要求跑冻结集" % len(samples))
         return 1
+
+    # RC-MANIFEST：真仓的「改规则留痕」对账。放在跑引擎**之前**：
+    # 真仓规则表与 manifest 对不上时，本票后面一切 before/after 的版本语义都悬空。
+    mfp = check_manifest_fresh()
+    check("RC-MANIFEST", not mfp,
+          "真仓规则表与 engine-manifest.json 一致（改过规则必重算 manifest）"
+          if not mfp else str(mfp[:2]))
 
     # 基线：未改动的 skeleton
     base_td = Path(tempfile.mkdtemp(prefix="rc-base-"))
@@ -327,9 +390,10 @@ def main() -> int:
         print("  ❌ 退 1（有红）")
         return 1
     print("  ✅ 全过 —— 只证明：三种规则变更各跑一次、每次都有 before/after 两份读数、")
-    print("     样本 ID 集恒等、且每种变更都至少改变了一条样本。")
-    print("     ★ **不证明**「在测试分支做变更」这件事存在 —— 本仓无 CI、无变更 API，")
-    print("       我用 tempdir 副本模拟的是**引擎对规则变更的响应**，不是分支工作流。")
+    print("     样本 ID 集恒等、每种变更都至少改变了一条样本、真仓规则表与版本留痕对账成立。")
+    print("     ★ 「在测试分支做变更」的工作流层已由 `.github/workflows/acceptance.yml`")
+    print("       承接（PR 通道跑执行器 + 棘轮）；本文件仍只模拟**引擎对规则变更的响应**，")
+    print("       不证明远端真的挡住了合并。")
     print("     ★ **不证明**合并被挡住（那是 GS-GATE 与触发者的两层，各有自己的票）。")
     return 0
 
@@ -371,6 +435,23 @@ def run_controls() -> int:
          True, lambda: check_changed({"changed_ids": []})),
         ("坏样本：changed_ids 缺失",
          True, lambda: check_changed({})),
+
+        # RC-MANIFEST 的成对反向对照。全部走注入（不写 rules-v1.json /
+        # engine-manifest.json，§2.4.4：自证不许有副作用）。
+        ("好样本：真实规则表 × 真实 manifest（字节一致）",
+         False, lambda: check_manifest_fresh()),
+        ("坏样本：规则表改一个字节、manifest 没重算",
+         True, lambda: check_manifest_fresh(
+             rules_bytes=RULES_FILE.read_bytes() + b" ",
+             manifest=json.loads(ENGINE_MANIFEST.read_text(encoding="utf-8")))),
+        ("坏样本：manifest 记录值指向别的版本",
+         True, lambda: check_manifest_fresh(
+             rules_bytes=RULES_FILE.read_bytes(),
+             manifest={"artifacts": {"rules": {
+                 "sha256": "a" * 64, "bytes": RULES_FILE.stat().st_size}}})),
+        ("坏样本：manifest 里没有 rules 制品",
+         True, lambda: check_manifest_fresh(
+             rules_bytes=RULES_FILE.read_bytes(), manifest={"artifacts": {}})),
     ]
 
     print("=" * 72)
