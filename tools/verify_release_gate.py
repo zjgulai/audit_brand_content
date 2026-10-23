@@ -146,6 +146,46 @@ def main():
       gate3.state("case-3")["status"] == "revoked"
       and gate3.state("case-3")["release_status"] == "已撤回", str(gate3.state("case-3")))
 
+    # ── A7 撤回权不随签发权自动获得（行 91）─────────────────────────
+    #   ★ 夹具必须**分开能力**：`signer()` 默认同时给 release.sign + release.revoke，
+    #     用它做撤回测试会把这个缺陷整个盖住（2026-10-23 审计指出）。
+    def _signed_for(prefix, cid, sign_principal):
+        g, ss = new_gate(prefix)
+        cc = case(case_id=cid)
+        g.sign(cc, sign_principal,
+               token(ss, sign_principal, cc, nonce="s-" + cid),
+               "s-" + cid, reason="test", now=1001)
+        return g, ss, cc
+
+    p_sign_only = signer("u3", capabilities=["release.sign"])
+    g7, s7, c7 = _signed_for("a7", "case-7", p_sign_only)
+    tk7 = token(s7, p_sign_only, c7, action="revoke", nonce="rv7")
+    try:
+        g7.revoke(c7, p_sign_only, tk7, "rv7", reason="x")
+        T("A7a 只有签发权 → 撤回被拒", False, "未拒 —— 撤回权随签发权自动获得了")
+    except SoDViolation:
+        T("A7a 只有签发权 → 撤回被拒", True, "")
+
+    p_revoke_only = signer("u4", capabilities=["release.revoke"])
+    g8, s8, c8 = _signed_for("a8", "case-8", p_sign_only)
+    tk8 = token(s8, p_revoke_only, c8, action="revoke", nonce="rv8")
+    try:
+        g8.revoke(c8, p_revoke_only, tk8, "rv8", reason="内容修改", now=1002)
+        T("A7b 只有撤回权 → 撤回放行（反向对照：不是一律拒绝）",
+          g8.state("case-8")["status"] == "revoked", str(g8.state("case-8")))
+    except Exception as e:  # noqa: BLE001
+        T("A7b 只有撤回权 → 撤回放行（反向对照：不是一律拒绝）", False,
+          "%s: %s" % (type(e).__name__, e))
+
+    p_none = signer("u5", capabilities=[])
+    g9, s9, c9 = _signed_for("a9", "case-9", p_sign_only)
+    tk9 = token(s9, p_none, c9, action="revoke", nonce="rv9")
+    try:
+        g9.revoke(c9, p_none, tk9, "rv9", reason="x")
+        T("A7c 两个能力都无 → 撤回被拒", False, "未拒")
+    except SoDViolation:
+        T("A7c 两个能力都无 → 撤回被拒", True, "")
+
     # ── B 签发绑定全字段 ────────────────────────────────────────────
     T("B1 签名包含全部绑定字段", set(SIGNATURE_FIELDS) <= set(sig), str(sorted(set(SIGNATURE_FIELDS) - set(sig))))
     T("B2 validate_signature 对真签名零错误", validate_signature(sig) == [], str(validate_signature(sig)))

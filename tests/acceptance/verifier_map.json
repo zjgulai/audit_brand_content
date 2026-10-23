@@ -205,6 +205,12 @@
       "fixture": "{root}/tools/verify_finding_store.py",
       "command": "{venv} {root}/tools/verify_finding_store.py"
     },
+    "42": {
+      "test_id": "acceptance-42",
+      "criteria": "SEC-1.1.1-4",
+      "fixture": "{root}/tools/verify_p_code_not_severity.py",
+      "command": "{venv} {root}/tools/verify_p_code_not_severity.py && {venv} {root}/tools/verify_p_code_not_severity.py --controls"
+    },
     "49": {
       "test_id": "acceptance-49",
       "criteria": "SEC-4.1-1",

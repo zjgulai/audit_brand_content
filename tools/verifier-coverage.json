@@ -859,6 +859,24 @@
         "research/governance/regression-set-v1.json",
         "research/governance/skeleton/rules-v1.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_p_code_not_severity.py",
+      "asserts": "行 42：扫报告模板 / 群消息模板 / 指标定义 / 验收表，出现「P0 高危」「P0 严重」「最高危 P0」即红；反向对照证明 P0 层 / DP0 / 正则层不被误报；验收表第 42 行本身写出的坏样本按行排除。5 项反向对照",
+      "subjects": [
+        "tools/audit/report_render.mjs",
+        "tools/reply-cards/contract.md",
+        "base/metrics_read_model.py",
+        "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_combination_escalation.py",
+      "asserts": "行 29：组合规则共现升级（分析引擎 score.py 的 _apply_escalation）——共现 → escalated / severity 升到 to_severity / disposition 改写；单要素不升；去掉 escalation 字段不升（证明升级来自规则数据）。**生产引擎 rule_judge 无 escalation 实现**，故 #29 不映射",
+      "subjects": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/skeleton/score.py"
+      ]
     }
   ]
 }

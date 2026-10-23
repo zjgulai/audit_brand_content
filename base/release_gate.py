@@ -303,7 +303,12 @@ class ReleaseGate(object):
                 raise SoDViolation("缺少 release.sign")
         if action == "revoke":
             caps = principal.get("capabilities") or []
-            if "release.revoke" not in caps and "release.sign" not in caps:
+            # ★ 2026-10-23 行 91：撤回权**不随**签发权自动获得。
+            #   原写法 `revoke not in caps and sign not in caps` 等于「有签发权就能撤回」——
+            #   实测：只有 release.sign 的账号发起撤回会被放行。
+            #   修法是**只认 release.revoke**；把 `and` 直接换成 `or` 会变成
+            #   「两个能力都必须有」，比行 91 的要求更严，也不对。
+            if "release.revoke" not in caps:
                 raise SoDViolation("缺少 release.revoke")
         if principal.get("tenant") != case.get("tenant"):
             raise SoDViolation("跨租户")
