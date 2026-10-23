@@ -23,6 +23,19 @@ verify_control_points.py —— 控制点主表与路由表的契约验收（L6-
   python3 tools/verify_control_points.py --json     # 机器可读
   python3 tools/verify_control_points.py --selftest # 反向对照（项数以运行输出为准）
 
+## 变异探针补票（2026-10-24；rows #70 / #71 / #74 / #76 / #78 各 1 条 survived）
+
+| 行 | survived 的变异 | 当时为什么抓不住 | 现在的执行点 |
+|---|---|---|---|
+| #70 | 打死自证里的 H-5 | 负样本 ⑫ 的红由 EF-1 顺带满足（F1 只有一个码，改走 F2 后变未声明空族） | ⑫ 重造：空族声明同步改，**红必须归 H-5 本人**（EF-1 不红） |
+| #70 | （同族）真实数据侧静默改写 | H-3/H-4/H-5/C74-4 只看最后一条 | **H-5a**：历史 version 两两不同（撞车=旧条目被改写） |
+| #71 | H01 的 control_name 改成别的语义 | B-7 需要 history 有 name_by_code，盘上两条 entry 都没有 | **B-8**：control_name 与挂载规则的 `topic_label` 语义锚对拍（独立来源）；B-7 落盘快照后自动接管 |
+| #74 | 历史 v2 条目 version 改成 v3（撞车） | 同上「只看最后一条」 | **H-5a**（同一执行点）；自证另跑真实数据侧 H/C74 全绿钉 |
+| #76 | judge_entry 按首字母推族 / rule_judge 接受数组 parent_rule | C76-5/6 被 `_is_real_table` 门控，自证夹具永远轮不到 | 自证 ⑰b-2：**显式跑真实主表侧的 C76-5c/6a**，生产代码改坏当场红 |
+| #78 | `master_count` 分母写死 58 | 行 78 的命令只有 verify_engine_contract（0 处分母断言）；自证的 CD 组只用构造夹具 | 自证 ⑰b-2：**真实主表喂进 CD 探针**（正确口径不报警 + 58 当总数必报警）——配上含 `--selftest` 的命令即可打中；分母纯函数的行为级断言仍在 base 侧 |
+
+自证新增 12 项（80/80 以运行输出为准），全部自带反向对照（坏样本红 / 好样本绿各一条）。
+
 ## 行 76 逐条对账（2026-10-23 T-76；**结论：四条全部有执行点，已映射**）
 
 验收表行 76（`PMO/audit/验收表-v3-覆盖全部判据-20261017.md:203`）要四件事：
@@ -698,6 +711,31 @@ def check_history(cp, history):
                       ("族归属与最后一条历史一致" if hist_fam == cur_fam else
                        "族归属与最后一条历史不一致（改族未升版本/未留痕即红）："
                        "历史 %r / 当前 %r" % (hist_fam, cur_fam))))
+
+    # ── H-5a：历史里的 version 必须互不相同 ──────────────────────────────
+    # ★ 2026-10-24 补（变异探针 #74 的口子）：H-3/H-4/H-5/C74-4 只看【最后一条】，
+    #   历史里更早的条目被改写成任何值（包括与后一条撞车）都无人看见 ——
+    #   那正是判据「无历史记录的静默改写」的反面：**有记录，但记录被改写**。
+    #   真实事故形状：把 v2 那条的 version 抹成 v3，再往尾部补一条 v4 快照 ——
+    #   于是「v2 时刻的族/码快照」从盘上消失，SEC-5-3 的「旧值仍可查」名存实亡，
+    #   而当时全部检查（H-2/H-3/H-4/H-5/C74-4、--selftest 68/68）都是绿的。
+    #   判据用「快照身份（version）两两不同」而不是逐字节比较：
+    #   逐字节会把「当时没留 name_by_code、后来补齐了」这种合法的补录也打死；
+    #   version 是版本号，任何一次真实变更都产生新值，它重了 = 有人改写了历史。
+    seen_v: dict = {}
+    dup_v = []
+    for i, e in enumerate(entries):
+        v = e.get("version") if isinstance(e, dict) else None
+        if _blank(v):
+            dup_v.append("#%d 缺 version" % i)
+        elif v in seen_v:
+            dup_v.append("#%d 与 #%d 的 version 都是 %r" % (i, seen_v[v], v))
+        else:
+            seen_v[v] = i
+    out.append(_check(
+        "H-5a", not dup_v,
+        "历史快照的 version 必须两两不同（重了 = 有旧条目被静默改写，"
+        "该版本时刻的快照已不可信）：%s" % (dup_v[:4] or "无")))
     return out
 
 
@@ -999,6 +1037,38 @@ def check_first_batch(cp, rules, history, whitelist):
         ("历史 name_by_code 与当前 control_name 一致" if has_name_snapshot
          else "历史无 name_by_code 快照；只对拍码集合，不冒充语义对拍")
         + (f" · 冲突 {name_conflict[:4]}" if name_conflict else "")))
+
+    # ── B-8：首批码的 control_name 必须有独立语义锚 ────────────────────────
+    # ★ 2026-10-24 补（变异探针 #71 的口子）：「从未被重新分配给不同语义的控制点」
+    #   这条此前唯一的执行点是 B-7，而 B-7 需要 history 里存了 name_by_code ——
+    #   盘上两条 entry 都没有 → 把 H01 的 control_name 改成任何值，
+    #   --row 71 一处红都不出（实测 survived）。B-7 写明「不冒充语义对拍」是对的，
+    #   但该子句不能因此 0 执行点。
+    #
+    #   锚不在 history 里（那里没有），在**另一份被独立治理的数据**里：
+    #   挂到该码的规则的 `topic_label`（rules-v1.json）。两份来源治理者不同、
+    #   变更路径不同 —— 把表里的名字改成别的语义，锚对不上就红。
+    #   局限（明说，不冒充）：锚只能证明「名字没被改成不同语义」；
+    #   「表和规则**同时**改成同一个新语义」两个来源一起动，这条抓不住 ——
+    #   那需要 history 真正落 name_by_code 快照（B-7 的判据已备好，落盘即自动生效）。
+    #   U02 的规则是 enabled=false，topic_label 仍是登记语义，照样作锚。
+    anchor_miss = []
+    for code in sorted(expected & set(codes)):
+        labels = {r.get("topic_label") for r in by_parent.get(code, [])
+                  if isinstance(r, dict)}
+        labels = {x for x in labels if isinstance(x, str) and x.strip()}
+        name_now = next(r.get("control_name") for r in rows
+                        if r.get("control_code") == code)
+        if labels and name_now not in labels:
+            anchor_miss.append("%s: name=%r 锚 %r" % (code, name_now, sorted(labels)[:2]))
+        elif not labels:
+            # 规则没挂 label → 这个码没有锚，显式说「无锚」而不是当它通过
+            anchor_miss.append("%s: 无 topic_label 锚（rules 未登记语义）" % code)
+    out.append(_check(
+        "B-8", not anchor_miss,
+        "首批码 control_name 必须与挂载规则的 topic_label 语义锚一致"
+        "（独立来源：rules-v1.json；历史落 name_by_code 后由 B-7 接管）：%s"
+        % (anchor_miss[:4] or "20 码全部有锚且一致")))
     return out
 
 
@@ -1400,9 +1470,25 @@ def selftest(verbose: bool = False) -> int:
     expect("历史/规则好样本", cp, rt, True, hist, rules)
 
     # ⑫ 改族但版本/历史没跟 → H-5 红
+    #   ★ 2026-10-24（变异探针 #70）：这个 fixture 的 F1 只有一个码，改走 F2 后
+    #     F1 变成「实际空但没声明」，EF-1 也会红 —— 打死 H-5 本身照样全绿，
+    #     「只改 family」这条子判据的自证覆盖是假的。
+    #   修法：负样本必须点名它自己的检查 id —— H-5 红、EF-1 不红，
+    #     于是这个样本真的在验 H-5，而不是蹭另一条断言的红色。
+    #     （EF-1 不红：把空族声明同步成 {F1, F3}，改族后的空集恰好被声明覆盖。）
     cp, rt = _deep(cp0), _deep(rt0)
     cp["control_points"][0]["family"] = "F2"
-    expect("改族未升版本", cp, rt, False, hist, rules)
+    cp["empty_families"] = [{"family": f, "state": "无控制点", "reason": "test"}
+                            for f in ("F1", "F3")]
+    _r12 = evaluate(_deep(cp), _deep(rt), _deep(hist), _deep(rules))
+    _ids12 = {c["id"] for c in _r12["reds"]}
+    results.append(("★ 改族未升版本 → H-5 红（且 EF-1 不红：红色属于 H-5 本人）",
+                    "H-5" in _ids12 and "EF-1" not in _ids12,
+                    f"红项={sorted(_ids12)}"))
+    results.append(("★ 好样本对照：同一夹具不改族 → H-5 不红（上面那条不是恒红）",
+                    "H-5" not in {c["id"] for c in evaluate(_deep(cp0), _deep(rt0),
+                                                            _deep(hist), _deep(rules))["reds"]},
+                    ""))
 
     # ⑬ 新增码缺规则/依据/版本 + 版本未递增 → C74 红
     cp, rt = _deep(cp0), _deep(rt0)
@@ -1543,6 +1629,131 @@ def selftest(verbose: bool = False) -> int:
         bool(_cdp({}, {})),
         str(_cdp({}, {}))))
 
+    # ════════ ⑰b-2：自证必须连带验到「真实主表」上的检查（2026-10-24）════════
+    #
+    # ★ 为什么要有这一段（变异探针 #74 / #76 / #78 共同的口子）：
+    #   行 74 / 76 / 78 的验收命令都是「主判定 && --selftest」。主判定读**真实
+    #   治理数据**（research/governance/*.json），自证用**内存夹具** —— 夹具不是
+    #   真实主表，`_is_real_table` 门控的检查（C76-5/6）在自证里一次都不跑；
+    #   于是把真实数据/生产代码改坏，`--selftest` 那 68 项照样全绿，
+    #   而「主判定 && 自证」里主判定红了会退 1 —— **但没有一个红项能归到
+    #   自证名下**，主判定与自证各自「证的是别的东西」这个事实无人看见。
+    #   治法：自证里**显式跑一遍真实数据侧的检查并把读数钉在这里** ——
+    #   真实数据坏了 / 生产代码的执行点坏了，这一组当场红，`--selftest` 那
+    #   半个命令自己就能抓住，不再依赖主判定的退出码被 `&&` 短路。
+    def _real_side(expected_ids, not_ids=(), absent_ids=()):
+        """跑真实主表侧检查，断言其红项恰好点名 expected_ids（可为空=要求全绿）。
+        返回 (名字, 是否通过, 明细)。读不出真实数据 → 显式 untested，不算通过。"""
+        try:
+            _tcp, _e1 = load(TABLE)
+            _thist, _e2 = load(HISTORY)
+            _trules, _e3 = load(RULES)
+        except Exception as exc:  # noqa: BLE001
+            return ("真实数据读不出（%s）" % type(exc).__name__, False,
+                    "untested：真实侧检查没法跑")
+        if _tcp is None or _thist is None or _trules is None:
+            return ("真实数据侧", False,
+                    "untested：治理 JSON 读不出（%s），不假装检查过"
+                    % "；".join(e for e in (_e1, _e2, _e3) if e))
+        _checks = (check_history(_tcp, _thist)
+                   + check_new_codes(_tcp, _thist, _trules))
+        if _is_real_table(_tcp):
+            _checks += check_family_attribution(_tcp)
+            _checks += check_single_mounting(_tcp)
+        ids = {c["id"] for c in _checks if not c["ok"]}
+        got_expected = all(x in ids for x in expected_ids)
+        got_clean = all(x not in ids for x in not_ids)
+        absent_ok = all(x not in {c["id"] for c in _checks} for x in absent_ids)
+        return ("真实数据侧", got_expected and got_clean and absent_ok,
+                "红项=%s（期望红 %s / 必须不红 %s）"
+                % (sorted(ids), sorted(expected_ids), sorted(not_ids)))
+
+    # ⑰b-2·A（#74 / #70 数据侧）：真实主表与真实历史必须对得上（全绿）；
+    #   且 C74-4 只允许由真实的版本递增关系担保 —— 历史里出现重复 version
+    #   会先被 H-5a 抓住（那是它的检查），C74-4 保持只管「新增码要递增」。
+    results.append(_real_side((), not_ids=("H-1", "H-2", "H-2b", "H-3", "H-4",
+                                           "H-5", "H-5a", "C74-1", "C74-2",
+                                           "C74-3", "C74-4")))
+    # ⑰b-2·B（#78 数据侧）：分母口径 —— 真实主表算出的 total 必须喂进探针、
+    #   正确口径不报警、58 当总数**必须**报警（CD-4/CD-5 的真实数据版）。
+    try:
+        from base.control_points import (master_count as _mc_real,
+                                         control_point_denominator_problems
+                                         as _cdp_real)
+    except Exception as exc:  # noqa: BLE001
+        _mc_real = _cdp_real = None
+        results.append(("真实数据侧", False,
+                        "untested：base.control_points 导入失败（%s: %s）—— "
+                        "CD 探针没法跑" % (type(exc).__name__, exc)))
+    try:
+        _tcp2, _e_cd = load(TABLE)
+        if _tcp2 is None:
+            results.append(("真实数据侧", False,
+                            "untested：主表读不出（%s），CD 探针没法跑" % _e_cd))
+        elif _cdp_real is None:
+            pass  # 上面已经记过 untested
+        else:
+            _m2 = _mc_real(_tcp2)
+            _g2 = _cdp_real({"control_points_total": _m2["total"],
+                             "control_points_active": _m2["active"]}, _tcp2)
+            _b2 = _cdp_real({"control_points_total": 58}, _tcp2)
+            results.append(("真实数据侧：口径=真实主表 → 不报警；58 当总数 → 必报警",
+                            not _g2 and bool(_b2),
+                            "good=%s bad58=%s（主表 total=%s）"
+                            % (_g2 or "无", _b2 or "无", _m2["total"])))
+    except Exception as exc:  # noqa: BLE001
+        results.append(("真实数据侧", False,
+                        "untested：CD 探针没法跑（%s: %s）"
+                        % (type(exc).__name__, exc)))
+    # ⑰b-2·C（#76 生产代码侧）：C76-5/6 只在真实主表上跑、自证夹具永远轮不到 ——
+    #   把「这次自证真的跑到了它们」本身落成断言：真实表在盘上时它们必须在场；
+    #   **且各自的红绿由真实生产代码决定** —— 生产代码变了（judge_entry 改按
+    #   首字母推族 / rule_judge 接受数组 parent_rule），这里当场红。
+    try:
+        _tcp3, _e76 = load(TABLE)
+    except Exception:
+        _tcp3, _e76 = None, "读抛异常"
+    if _tcp3 is None:
+        results.append(("真实数据侧", False,
+                        "untested：主表读不出（%s），C76-5/6 在场性没法断言" % _e76))
+    elif not _is_real_table(_tcp3):
+        results.append(("真实数据侧", False,
+                        "untested：盘上主表不像真实表（5 条反例码缺失）—— "
+                        "C76-5/6 没跑，不假装覆盖过"))
+    else:
+        _c76 = check_family_attribution(_tcp3) + check_single_mounting(_tcp3)
+        _ids76 = [c["id"] for c in _c76]
+        results.append(("真实数据侧：C76-5/6 必须真实在场（自证不是只证夹具）",
+                        {"C76-5a", "C76-5b", "C76-5c", "C76-6a", "C76-6b", "C76-6c"}
+                        <= set(_ids76),
+                        "在场 %r" % _ids76))
+        results.append(("真实数据侧：C76-5c 探针（按 family 字段，不按首字母）→ 必须绿",
+                        all(c["ok"] for c in _c76 if c["id"] == "C76-5c"),
+                        "；".join(c["detail"] for c in _c76 if c["id"] == "C76-5c")[:160]))
+        results.append(("真实数据侧：C76-6a 挂载点拒绝数组 parent_rule → 必须绿",
+                        all(c["ok"] for c in _c76 if c["id"] == "C76-6a"),
+                        "；".join(c["detail"] for c in _c76 if c["id"] == "C76-6a")[:160]))
+    # ⑰b-2·D（#70 数据侧 · 正向留痕）：H-5a 的坏样本 ——
+    #   两条历史 version 撞车 = 「有记录但被静默改写」，必须由 H-5a 单独红。
+    _tcp4, _e4a = load(TABLE)
+    _thist4, _e4b = load(HISTORY)
+    if _tcp4 is None or _thist4 is None:
+        results.append(("真实数据侧", False,
+                        "untested：读不出（%s），H-5a 坏样本没法构造"
+                        % "；".join(e for e in (_e4a, _e4b) if e)))
+    else:
+        _h4 = _deep(_thist4)
+        # ★ 撞【第 0 条】的 version（改写成第 1 条的值），最后一条不动 ——
+        #   这样 H-3（最后一条 vs 主表）不该红，红必须全部归 H-5a 本人。
+        _h4["entries"][0]["version"] = _h4["entries"][1].get("version")
+        _ids4 = {c["id"] for c in check_history(_tcp4, _h4) if not c["ok"]}
+        results.append(("★ 历史版本撞车 → H-5a 红（其余 H 段不背锅）",
+                        "H-5a" in _ids4 and "H-3" not in _ids4,
+                        "红项=%s" % sorted(_ids4)))
+        results.append(("★ 反向对照：历史原样 → H-5a 不红（不是恒红）",
+                        "H-5a" not in {c["id"] for c in check_history(_tcp4, _thist4)
+                                       if not c["ok"]}, ""))
+
     # ⑰ 跨族拆分有显式批准 → 不误报（反向对照：不是恒红）
     cp, rt = _deep(cp0), _deep(rt0)
     cp["control_points"][0]["families"] = ["F1", "F2"]
@@ -1625,10 +1836,14 @@ def selftest(verbose: bool = False) -> int:
     }
     batch_rules = {
         "rules": [
-            {"parent_rule": code, "external_ref": [{"entry_id": "E"}]}
+            # ★ 2026-10-24（#71 补票）：夹具规则带 topic_label 语义锚，
+            #   与 control_name（name-<code>）一致 —— B-8 的好样本侧
+            #   必须在这套夹具上能绿，坏样本才谈得上「把锚打歪会红」。
+            {"parent_rule": code, "external_ref": [{"entry_id": "E"}],
+             "topic_label": "name-" + code}
             for code in FIRST_BATCH_CODES if code != "U02"
         ] + [
-            {"parent_rule": "U02", "enabled": False},
+            {"parent_rule": "U02", "enabled": False, "topic_label": "name-U02"},
             {"parent_rule": "安全词", "topic_only": True},
         ]
     }
@@ -1805,6 +2020,43 @@ def selftest(verbose: bool = False) -> int:
     results.append(("行71 历史语义变化 → B-7 红",
                     "B-7" in red_ids(check_first_batch(batch_cp, batch_rules,
                                                        bad_name, batch_wl)), ""))
+    # ── B-8 · 语义锚（2026-10-24，变异探针 #71 的口子）──────────────────
+    #   batch 夹具里规则带 topic_label 且与 control_name 一致 → 好样本必须绿；
+    #   把 H01 的 control_name 改成不同语义（不动规则）→ B-8 必须红；
+    #   反向对照：历史**同时**改成同一个名字（两来源一起动）→ 不归 B-8 管，
+    #   它必须闭嘴（锚对得上），那一条留给 B-7 / 落 name_by_code 后的将来。
+    results.append(("行71 B-8 好样本：名字与规则 topic_label 一致 → 绿",
+                    "B-8" not in red_ids(check_first_batch(batch_cp, batch_rules,
+                                                           batch_hist, batch_wl)), ""))
+    # ★ 历史夹具用【无 name_by_code】那一版（真实仓现状）：B-7 走「只对拍码集合」
+    #   分支不红，于是「表侧改语义」的红色只能属于 B-8 本人 —— 不背锅才有意义。
+    _b8_hist_noanchor = _deep(batch_hist)
+    _b8_hist_noanchor["entries"][0].pop("name_by_code", None)
+    _b8_bad = _deep(batch_cp)
+    _b8_bad["control_points"][0]["control_name"] = "完全不同的语义"
+    _r8 = red_ids(check_first_batch(_b8_bad, batch_rules, _b8_hist_noanchor, batch_wl))
+    results.append(("★ 行71 表侧改语义（规则不动）→ B-8 红（且 B-7 不背锅）",
+                    "B-8" in _r8 and "B-7" not in _r8, f"红项={sorted(_r8)}"))
+    _b8_both = _deep(batch_cp)
+    _b8_both["control_points"][0]["control_name"] = "完全不同的语义"
+    _b8_both_hist = _deep(_b8_hist_noanchor)
+    _b8_both_rules = _deep(batch_rules)
+    for _r8r in _b8_both_rules["rules"]:
+        if _r8r.get("parent_rule") == "H01":
+            _r8r["topic_label"] = "完全不同的语义"
+    results.append(("行71 反向对照：表与规则一起改 → B-8 不误报（锚仍一致；"
+                    "两个来源同时动归 B-7/落盘快照管）",
+                    "B-8" not in red_ids(check_first_batch(_b8_both, _b8_both_rules,
+                                                           _b8_both_hist, batch_wl)), ""))
+    _b8_noanchor = _deep(batch_cp)
+    _b8_noanchor["control_points"][0]["control_name"] = "另一个名字"
+    _b8_rules_noanchor = _deep(batch_rules)
+    for _r in _b8_rules_noanchor["rules"]:
+        if _r.get("parent_rule") == FIRST_BATCH_CODES[0]:
+            _r.pop("topic_label", None)
+    results.append(("★ 行71 规则无 topic_label → 该码无锚，B-8 显式红（不冒充通过）",
+                    "B-8" in red_ids(check_first_batch(_b8_noanchor, _b8_rules_noanchor,
+                                                       batch_hist, batch_wl)), ""))
 
     # ══════════════════ C71-RP：规则指向的控制点必须存在 ══════════════════
     #

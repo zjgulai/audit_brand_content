@@ -14,12 +14,20 @@
   E **分母口径**：未覆盖分子只算 UNASSESSED，不含 CLEAN-CANDIDATE、
     ERROR、fetch_error；推翻率分母含申诉胜与败。
   F **目标线**：target 为 None/待基线，不得写死数值。
-  G **反向对照**：n=0 出百分比、BLOCK 未复核完出比率、CLEAN-CANDIDATE 计入
-    未覆盖分子、写死目标线 —— 必须红（变异由外部执行）。
+  G **确定性**：同一数据两次结果一致。
+  H **边界与分子口径（#81/#83/#84 补票）**：
+    · #81/#84 —— MIN_N 边界成对样本：分母 29 → `样本不足` 且无比率，
+      分母 30 → ok 且给比率（只喂 n=10 查不出 29/30 边界）；
+    · #83 —— MIN_N_UNCOVERED 边界：未覆盖分母=1 必须给比率，不许「样本不足」；
+    · #84 —— 推翻率分子只计人工与机器**结论不同**的条数（标准集金标 46/48；
+      分子口径改成 == 曾全绿，46→2 无人拦）。
+  X **反向对照（--controls）**：上面每条判据各配变异形状（必须判假）与
+    正常形状（必须判真）—— 判据自己没红过不算验证过它。
 
 ## 退出码
 
-  0 全过 · 1 有红 · 2 未测（导入失败之外的不可测条件）
+  0 全过 · 1 有红 · 2 未测（导入失败之外的不可测条件）；
+  `--controls` 跑离线反向对照（同一退出码口径）。
 """
 from __future__ import annotations
 
@@ -37,6 +45,17 @@ except Exception as e:  # noqa: BLE001
     sys.exit(1)
 
 SEVEN = ["numerator", "denominator", "window", "sampling_layer", "min_n", "status", "target"]
+
+
+def sample_insufficient(m):
+    """#81/#84 判据的「样本不足」形状：status、分子分母 n 与无比率，一次说清。"""
+    return (m.get("status") == "样本不足" and m.get("ratio") is None
+            and m.get("n") == m.get("denominator"))
+
+
+def gives_ratio(m):
+    """边界另一侧：ok 且真的给出比率数值。"""
+    return (m.get("status") == "ok" and isinstance(m.get("ratio"), float))
 
 
 def case(**over):
@@ -169,6 +188,12 @@ def main():
       ov.get("denominator") == 48 and ov.get("status") == "ok", str(ov))
     T("A9 推翻率分母含申诉胜与败",
       (ov.get("appeal_won") or 0) > 0 and (ov.get("appeal_lost") or 0) > 0, str(ov))
+    # ★ #84 补票：分子只计人工与机器**结论不同**的条数。上面 48 条合格样本里
+    #   恰有 2 条结论相同（gold_0/gold_1：机器 PASS、人工 PASS 的那种组合没有 ——
+    #   实为 gold 每条 机器=state vs 人工 BLOCK/PASS，下式金标由构造保证 46）。
+    #   分子口径从 != 改成 == 曾让分子 46→2 仍全绿（A8 只断言分母与 status）。
+    T("A8b 推翻率分子只计结论不同（金标 46/48）",
+      ov.get("numerator") == 46, "numerator=%r（应为 46）" % (ov.get("numerator"),))
 
     # ── B 未测不是 0 ────────────────────────────────────────────────
     for cid, load in (("B1 数据源抛异常", loader(raises=True)),
@@ -201,6 +226,40 @@ def main():
     T("C3 n=0 → 不出百分比（未覆盖分母 0）",
       empty["metrics"]["uncovered_ratio"]["status"] != "ok"
       and empty["metrics"]["uncovered_ratio"]["ratio"] is None, str(empty["metrics"]["uncovered_ratio"]))
+
+    # ── C4/C5 ★ #81/#83/#84 补票：MIN_N 29/30 与 MIN_N_UNCOVERED 1/2 边界 ──────
+    # 只用 n=10 查不出 29/30 边界：MIN_N 30→29 曾全绿，n=29 直接出比率（违判据）。
+    b29 = [case(case_id="b%d" % i, state="REVIEW", machine_max_sev="L4",
+                human_max_sev="L4", machine_conclusion="REVIEW",
+                human_conclusion="BLOCK") for i in range(29)]
+    ob29 = MetricsReadModel(loader(cases=b29, cov=coverage())).compute("2026-10")
+    T("C4a #81 召回分母 29 < 30 → 样本不足且无比率",
+      sample_insufficient(ob29["metrics"]["recall_l4_l5"]),
+      str(ob29["metrics"]["recall_l4_l5"]))
+    T("C4b #84 推翻率分母 29 < 30 → 样本不足且无比率",
+      sample_insufficient(ob29["metrics"]["human_overturn_rate"]),
+      str(ob29["metrics"]["human_overturn_rate"]))
+    b30 = [case(case_id="b%d" % i, state="REVIEW", machine_max_sev="L4",
+                human_max_sev="L4", machine_conclusion="REVIEW",
+                human_conclusion="BLOCK") for i in range(30)]
+    ob30 = MetricsReadModel(loader(cases=b30, cov=coverage())).compute("2026-10")
+    T("C4c #81 召回分母 30 → ok 且给比率",
+      gives_ratio(ob30["metrics"]["recall_l4_l5"]),
+      str(ob30["metrics"]["recall_l4_l5"]))
+    T("C4d #84 推翻率分母 30 → ok 且给比率",
+      gives_ratio(ob30["metrics"]["human_overturn_rate"]),
+      str(ob30["metrics"]["human_overturn_rate"]))
+    # #83：MIN_N_UNCOVERED=1 → 分母 1 必须给比率；把它改成 2 曾让 den=1 变「样本不足」。
+    one = [case(case_id="only", state="未审查", machine_conclusion="未审查")]
+    o1 = MetricsReadModel(loader(cases=one, cov=coverage())).compute("2026-10")
+    T("C5a #83 未覆盖分母 1 → 给比率而不是样本不足",
+      gives_ratio(o1["metrics"]["uncovered_ratio"]),
+      str(o1["metrics"]["uncovered_ratio"]))
+    zero = MetricsReadModel(loader(cases=[], cov=coverage())).compute("2026-10")
+    T("C5b #83 未覆盖分母 0 → 未测/不可计算形状",
+      zero["metrics"]["uncovered_ratio"]["status"] in ("样本不足", "未测")
+      and zero["metrics"]["uncovered_ratio"]["ratio"] is None,
+      str(zero["metrics"]["uncovered_ratio"]))
 
     # ── D 抽样层 / BLOCK 全量复核 ──────────────────────────────────
     cov_missing = coverage(sampled_layers=["PASS", "待自决", "REVIEW"])
@@ -253,11 +312,94 @@ def main():
     ob = MetricsReadModel(loader()).compute("2026-10")
     T("G1 同一数据两次结果一致", oa == ob, "")
 
+    if "--controls" in sys.argv:
+        rc_controls = controls(sample_insufficient, gives_ratio)
+        if fails:
+            # 主检查红了就别让 --controls 报全绿 —— 退出码只看最红的那一侧。
+            print("\n⚠ 主检查另有 %d 项红（--controls 不掩盖）：" % len(fails))
+            for f in fails:
+                print("  ❌ " + f)
+            return 1
+        return rc_controls
+
     for f in fails:
         print("  ❌ " + f)
     verdict = "❌" if fails else "✅"
     print("\n%s verify_metrics_read_model %d 项检查 · %d 项红" % (verdict, checks, len(fails)))
     return 1 if fails else 0
+
+
+def controls(sample_insufficient, gives_ratio):
+    """X 段 · --controls 离线反向对照：每条新判据都有「该红」与「该绿」两侧。
+
+    「坏形状」直接模拟生产变异后的输出（与 mutprobe 的 old/new 同形）：
+      · MIN_N 30→29       → n=29 被判 ok 且给比率
+      · MIN_N_UNCOVERED 1→2 → den=1 被判「样本不足」
+      · 分子口径 !=→==    → 标准集分子 46→2
+    判据对这些坏形状必须判假、对正常输出必须判真 —— 缺一侧就没被验证过。
+    """
+    # 真形状：n=29 边界（真实跑出）
+    b29 = [case(case_id="b%d" % i, state="REVIEW", machine_max_sev="L4",
+                human_max_sev="L4", machine_conclusion="REVIEW",
+                human_conclusion="BLOCK") for i in range(29)]
+    o29 = MetricsReadModel(loader(cases=b29, cov=coverage())).compute("2026-10")
+    # 坏形状：MIN_N 30→29 之后 n=29 的样子（ok + 比率）
+    mutated_n29 = {"status": "ok", "ratio": 1.0, "n": 29, "denominator": 29}
+
+    # 真形状：den=1（真实跑出）
+    one = [case(case_id="only", state="未审查", machine_conclusion="未审查")]
+    o1 = MetricsReadModel(loader(cases=one, cov=coverage())).compute("2026-10")
+    # 坏形状：MIN_N_UNCOVERED 1→2 之后 den=1 的样子（样本不足 + 无比率）
+    mutated_den1 = {"status": "样本不足", "ratio": None, "n": 1, "denominator": 1}
+
+    # #84 分子：同一份标准集，真口径 vs 变异口径各自数出的分子
+    eligible = [c for c in dataset()
+                if c.get("machine_conclusion") is not None
+                and c.get("human_conclusion") is not None]
+    num_true = sum(1 for c in eligible if c["machine_conclusion"] != c["human_conclusion"])
+    num_mutated = sum(1 for c in eligible if c["machine_conclusion"] == c["human_conclusion"])
+
+    cases = [
+        # ── 该绿（真形状过真判据）────────────────────────────────
+        ("[C4] 真形状：n=29 → 判据判「样本不足」",
+         lambda: sample_insufficient(o29["metrics"]["recall_l4_l5"])
+         and sample_insufficient(o29["metrics"]["human_overturn_rate"])),
+        ("[C4] 真形状：n=30 → 判据判 ok 且给比率",
+         lambda: gives_ratio({"status": "ok", "ratio": 1.0, "n": 30, "denominator": 30})),
+        ("[C5] 真形状：den=1 → 判据判给比率",
+         lambda: gives_ratio(o1["metrics"]["uncovered_ratio"])),
+        ("[C5] 真形状：den=0 → 判据判不出比率",
+         lambda: not gives_ratio({"status": "样本不足", "ratio": None, "n": 0, "denominator": 0})),
+        ("[A8b] 真口径在标准集上数出的分子 == 金标 46",
+         lambda: num_true == 46),
+        # ── 该红（变异形状必须被真判据抓住）──────────────────────
+        ("[C4] 坏形状（MIN_N→29：n=29 判 ok 给比率）→ 被抓住",
+         lambda: not sample_insufficient(mutated_n29)),
+        ("[C5] 坏形状（den=1 判样本不足）被「样本不足」判据看清 → C5a 主检查必然红",
+         lambda: sample_insufficient(mutated_den1)),
+        ("[C5] 坏形状（MIN_N_UNCOVERED→2：den=1 判样本不足）→ 被抓住",
+         lambda: not gives_ratio(mutated_den1)),
+        ("[A8b] 坏口径（==）数出的分子 ≠ 46 → 被金标抓住",
+         lambda: num_mutated != 46),
+    ]
+    fail = 0
+    print("=" * 78)
+    print("X 段 · metrics_read_model 判据反向对照（该红该绿都有）")
+    print("=" * 78)
+    for i, (name, fn) in enumerate(cases, 1):
+        try:
+            ok, err = bool(fn()), ""
+        except Exception as e:  # noqa: BLE001
+            ok, err = False, "（%s: %s）" % (type(e).__name__, e)
+        if not ok:
+            fail += 1
+        print("  %s [%d/%d] %s%s" % ("✅" if ok else "❌", i, len(cases), name, err))
+    print("-" * 78)
+    if fail:
+        print("❌ %d 项中 %d 项失败" % (len(cases), fail))
+        return 1
+    print("✅ %d 项全过（判据的红绿两侧都活着）" % len(cases))
+    return 0
 
 
 if __name__ == "__main__":

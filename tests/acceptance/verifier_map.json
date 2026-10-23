@@ -1,6 +1,12 @@
 {
   "generated_for": "acceptance-v3",
   "rows": {
+    "4": {
+      "test_id": "acceptance-4",
+      "criteria": "甲 / SEC-3.2-1",
+      "fixture": "{root}/tools/verify_normalizer.py",
+      "command": "{venv} {root}/tools/verify_normalizer.py"
+    },
     "5": {
       "test_id": "acceptance-5",
       "criteria": "L1-1",
@@ -42,6 +48,12 @@
       "criteria": "SEC-1.1.1-1 / SEC-1.1.1-2 / SEC-1.1.1-3 / SEC-3.3.4-2 / SEC-3.3.4-3 / L2-4",
       "fixture": "{root}/tools/verify_decision_table.py",
       "command": "{venv} {root}/tools/verify_decision_table.py"
+    },
+    "21": {
+      "test_id": "acceptance-21",
+      "criteria": "SEC-3.3.4-5 / SEC-3.3.4.4-1 / SEC-3.3.4.4-2 / SEC-3.3.4.4-3 / LOC-1 / LOC-2 / LOC-3 / LOC-4 / SEC-3.3.4.4-4 / L1-3",
+      "fixture": "{root}/tools/verify_normalizer.py",
+      "command": "{venv} {root}/tools/verify_normalizer.py"
     },
     "24": {
       "test_id": "acceptance-24",
@@ -97,6 +109,18 @@
       "fixture": "{root}/tools/verify_coverage_composer.py",
       "command": "{venv} {root}/tools/verify_coverage_composer.py"
     },
+    "36": {
+      "test_id": "acceptance-36",
+      "criteria": "STOP-1 / STOP-2 / STOP-3 / STOP-4 / STOP-5 / STOP-6 / STOP-7 / STOP-9",
+      "fixture": "{root}/tools/verify_stop_conditions.py",
+      "command": "{venv} {root}/tools/verify_stop_conditions.py && {venv} {root}/tools/verify_stop_conditions.py --controls"
+    },
+    "37": {
+      "test_id": "acceptance-37",
+      "criteria": "V1 / V2 / V4 / V5",
+      "fixture": "{root}/tools/verify_report_render.mjs",
+      "command": "node {root}/tools/verify_report_render.mjs"
+    },
     "38": {
       "test_id": "acceptance-38",
       "criteria": "SEC-1.2.2-1 / SEC-1.2.2-2 / SEC-1.2.2-3 / SEC-1.2.2-4",
@@ -121,17 +145,59 @@
       "fixture": "{root}/tools/verify_p_code_not_severity.py",
       "command": "{venv} {root}/tools/verify_p_code_not_severity.py && {venv} {root}/tools/verify_p_code_not_severity.py --controls"
     },
+    "45": {
+      "test_id": "acceptance-45",
+      "criteria": "EQ-1",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py"
+    },
+    "46": {
+      "test_id": "acceptance-46",
+      "criteria": "L2-1a",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py"
+    },
+    "47": {
+      "test_id": "acceptance-47",
+      "criteria": "PO-4 / I1 / I2 / I3 / I4 / I5 / I6 / I7",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py"
+    },
+    "51": {
+      "test_id": "acceptance-51",
+      "criteria": "丙 / L3-2 / SEC-8-4 / STOP-6",
+      "fixture": "{root}/tools/verify_case_watch.py",
+      "command": "{venv} {root}/tools/verify_case_watch.py"
+    },
+    "54": {
+      "test_id": "acceptance-54",
+      "criteria": "SEC-0-1 / SEC-4.3-1",
+      "fixture": "{root}/tools/smoke_end_to_end.py",
+      "command": "{venv} {root}/tools/smoke_end_to_end.py"
+    },
     "56": {
       "test_id": "acceptance-56",
       "criteria": "R1 / R2 / R3 / L4-2 / SEC-8-19",
       "fixture": "{root}/tools/verify_report_store.py",
       "command": "{venv} {root}/tools/verify_report_store.py"
     },
+    "57": {
+      "test_id": "acceptance-57",
+      "criteria": "SEC-4.3.1-1 / SEC-4.3.1-2 / SEC-4.3.1-3",
+      "fixture": "{root}/tools/verify_report_render.mjs",
+      "command": "node {root}/tools/verify_report_render.mjs"
+    },
     "58": {
       "test_id": "acceptance-58",
       "criteria": "SEC-4.3.1-4 / SEC-4.3.3-1 / SEC-4.3.3-2 / SEC-4.3.3-3 / SEC-4.3.3-4 / SEC-4.3.3-5 / SEC-4.3.3-6 / F1 / F2 / SEC-8-16 / L4-7",
       "fixture": "{root}/tools/verify_report_render.mjs",
       "command": "node {root}/tools/verify_report_render.mjs"
+    },
+    "59": {
+      "test_id": "acceptance-59",
+      "criteria": "SEC-4.3.1-5",
+      "fixture": "{root}/tools/verify_report_consistency.py",
+      "command": "{venv} {root}/tools/verify_report_consistency.py"
     },
     "60": {
       "test_id": "acceptance-60",
@@ -157,6 +223,24 @@
       "fixture": "{root}/tools/verify_report_render.mjs",
       "command": "node {root}/tools/verify_report_render.mjs"
     },
+    "69": {
+      "test_id": "acceptance-69",
+      "criteria": "SEC-5-1 / SEC-5-1b",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py --row 69"
+    },
+    "70": {
+      "test_id": "acceptance-70",
+      "criteria": "SEC-5-2 / SEC-5-3 / SEC-5-4",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py --selftest && {venv} {root}/tools/verify_orchestrator.py"
+    },
+    "71": {
+      "test_id": "acceptance-71",
+      "criteria": "SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py --row 71"
+    },
     "72": {
       "test_id": "acceptance-72",
       "criteria": "SEC-5-8 / SEC-5-10b / DER-2 / DER-2b",
@@ -168,6 +252,32 @@
       "criteria": "SEC-5-10 / L2-3",
       "fixture": "{root}/tools/verify_coverage_reason_ir.py",
       "command": "{venv} {root}/tools/verify_pass_reachability.py && {venv} {root}/tools/verify_coverage_reason_ir.py"
+    },
+    "74": {
+      "test_id": "acceptance-74",
+      "criteria": "SEC-5-9",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
+    },
+    "76": {
+      "test_id": "acceptance-76",
+      "criteria": "SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27",
+      "fixture": "{root}/tools/verify_control_points.py",
+      "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
+    },
+    "77": {
+      "test_id": "acceptance-77",
+      "criteria": "SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32",
+      "fixture": "{root}/tools/verify_decision_table.py",
+      "command": "{venv} {root}/tools/verify_decision_table.py && {venv} {root}/tools/verify_orchestrator.py"
+    },
+    "78": {
+      "test_id": "acceptance-78",
+      "criteria": "SEC-5-33",
+      "fixture": "{root}/tools/verify_engine_contract.py",
+      "command": "{venv} {root}/tools/verify_engine_contract.py",
+      "timeout": 60,
+      "cpu_seconds": 45
     },
     "80": {
       "test_id": "acceptance-80",
@@ -198,6 +308,22 @@
       "criteria": "SEC-6-R4-1 / SEC-6-R4-2 / SEC-6-R4-3 / SEC-6-R4-4 / SEC-6-R4-5 / SEC-6-R4-6 / SEC-6-R4-7",
       "fixture": "{root}/tools/verify_metrics_read_model.py",
       "command": "{venv} {root}/tools/verify_metrics_read_model.py"
+    },
+    "85": {
+      "test_id": "acceptance-85",
+      "criteria": "SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4",
+      "fixture": "{root}/tools/verify_regression_set.py",
+      "command": "{venv} {root}/tools/verify_regression_set.py",
+      "timeout": 60,
+      "cpu_seconds": 45
+    },
+    "87": {
+      "test_id": "acceptance-87",
+      "criteria": "戊 / SEC-6-GS-5 / SEC-8-6",
+      "fixture": "{root}/tools/verify_rule_change_regression.py",
+      "command": "{venv} {root}/tools/verify_rule_change_regression.py",
+      "timeout": 120,
+      "cpu_seconds": 90
     },
     "88": {
       "test_id": "acceptance-88",
@@ -247,11 +373,101 @@
       "fixture": "{root}/tools/verify_release_gate.py",
       "command": "{venv} {root}/tools/verify_release_gate.py"
     },
+    "100": {
+      "test_id": "acceptance-100",
+      "criteria": "RL-12",
+      "fixture": "{root}/tools/verify_write_api.py",
+      "command": "{venv} {root}/tools/verify_write_api.py"
+    },
     "102": {
       "test_id": "acceptance-102",
       "criteria": "RL-14",
       "fixture": "{root}/tools/verify_release_gate.py",
       "command": "{venv} {root}/tools/verify_release_gate.py"
+    },
+    "103": {
+      "test_id": "acceptance-103",
+      "criteria": "RL-15",
+      "fixture": "{root}/tools/verify_review_api.py",
+      "command": "{venv} {root}/tools/verify_review_api.py && {venv} {root}/tools/verify_authority_change.py"
+    },
+    "104": {
+      "test_id": "acceptance-104",
+      "criteria": "TS-1",
+      "fixture": "{root}/tools/verify_production_app.py",
+      "command": "{venv} {root}/tools/verify_write_api.py && {venv} {root}/tools/verify_review_api.py && {venv} {root}/tools/verify_web_auth.py && {venv} {root}/tools/verify_production_app.py",
+      "timeout": 60,
+      "cpu_seconds": 45
+    },
+    "105": {
+      "test_id": "acceptance-105",
+      "criteria": "TS-2",
+      "fixture": "{root}/tools/verify_pycompat.py",
+      "command": "{venv} {root}/tools/verify_pycompat.py",
+      "timeout": 900,
+      "cpu_seconds": 600
+    },
+    "106": {
+      "test_id": "acceptance-106",
+      "criteria": "TS-3",
+      "fixture": "{root}/tools/verify_dependency_lock.py",
+      "command": "{venv} {root}/tools/verify_dependency_lock.py",
+      "timeout": 60,
+      "cpu_seconds": 45
+    },
+    "107": {
+      "test_id": "acceptance-107",
+      "criteria": "TS-4",
+      "fixture": "{root}/tools/verify_projection_store.py",
+      "command": "{venv} {root}/tools/verify_atomic_commit.py && {venv} {root}/tools/verify_business_event_store.py && {venv} {root}/tools/verify_projection_store.py && {venv} {root}/tools/verify_backend_recovery.py",
+      "timeout": 60,
+      "cpu_seconds": 45
+    },
+    "108": {
+      "test_id": "acceptance-108",
+      "criteria": "TS-5",
+      "fixture": "{root}/web/scripts/check_frontend_gates.mjs",
+      "command": "node {root}/web/scripts/check_frontend_gates.mjs --row 108 && node {root}/web/scripts/check_frontend_gates.mjs --controls",
+      "timeout": 15,
+      "cpu_seconds": 10
+    },
+    "112": {
+      "test_id": "acceptance-112",
+      "criteria": "TS-9",
+      "fixture": "{root}/web/scripts/check_a11y_dual_gate.mjs",
+      "command": "node {root}/web/scripts/check_a11y_dual_gate.mjs && node {root}/web/scripts/check_a11y_dual_gate.mjs --controls",
+      "timeout": 30,
+      "cpu_seconds": 20
+    },
+    "113": {
+      "test_id": "acceptance-113",
+      "criteria": "TS-12",
+      "fixture": "{root}/web/scripts/check_browser_scope.mjs",
+      "command": "node {root}/web/scripts/check_browser_scope.mjs --controls",
+      "timeout": 15,
+      "cpu_seconds": 10
+    },
+    "116": {
+      "test_id": "acceptance-116",
+      "criteria": "TS-14",
+      "fixture": "{root}/web/scripts/a11y_check.mjs",
+      "command": "node {root}/web/scripts/a11y_check.mjs --standalone",
+      "timeout": 30,
+      "cpu_seconds": 20
+    },
+    "117": {
+      "test_id": "acceptance-117",
+      "criteria": "TS-15",
+      "fixture": "{root}/tools/verify_ts15_deploy.py",
+      "command": "{venv} {root}/tools/verify_ts15_deploy.py",
+      "timeout": 60,
+      "cpu_seconds": 45
+    },
+    "119": {
+      "test_id": "acceptance-119",
+      "criteria": "TS-17",
+      "fixture": "{root}/tools/verify_cpu_first.py",
+      "command": "{venv} {root}/tools/verify_cpu_first.py"
     },
     "122": {
       "test_id": "acceptance-122",
@@ -270,6 +486,20 @@
       "criteria": "TS-23",
       "fixture": "{root}/tools/verify_release_gate.py",
       "command": "{venv} {root}/tools/verify_release_gate.py"
+    },
+    "127": {
+      "test_id": "acceptance-127",
+      "criteria": "TS-24",
+      "fixture": "{root}/tools/verify_release_gate.py",
+      "command": "{venv} {root}/tools/verify_release_gate.py"
+    },
+    "129": {
+      "test_id": "acceptance-129",
+      "criteria": "TS-26",
+      "fixture": "{root}/web/scripts/check_no_metrics_dashboard.mjs",
+      "command": "node {root}/web/scripts/check_no_metrics_dashboard.mjs --controls",
+      "timeout": 15,
+      "cpu_seconds": 10
     },
     "130": {
       "test_id": "acceptance-130",
@@ -314,224 +544,6 @@
       "command": "{venv} {root}/tools/verify_auth_session.py && {venv} {root}/tools/verify_backend_recovery.py && {venv} {root}/tools/verify_production_app.py",
       "timeout": 60,
       "cpu_seconds": 45
-    },
-    "36": {
-      "test_id": "acceptance-36",
-      "criteria": "STOP-1 / STOP-2 / STOP-3 / STOP-4 / STOP-5 / STOP-6 / STOP-7 / STOP-9",
-      "fixture": "{root}/tools/verify_stop_conditions.py",
-      "command": "{venv} {root}/tools/verify_stop_conditions.py && {venv} {root}/tools/verify_stop_conditions.py --controls"
-    },
-    "37": {
-      "test_id": "acceptance-37",
-      "criteria": "V1 / V2 / V4 / V5",
-      "fixture": "{root}/tools/verify_report_render.mjs",
-      "command": "node {root}/tools/verify_report_render.mjs"
-    },
-    "47": {
-      "test_id": "acceptance-47",
-      "criteria": "PO-4 / I1 / I2 / I3 / I4 / I5 / I6 / I7",
-      "fixture": "{root}/tools/verify_decision_table.py",
-      "command": "{venv} {root}/tools/verify_decision_table.py"
-    },
-    "57": {
-      "test_id": "acceptance-57",
-      "criteria": "SEC-4.3.1-1 / SEC-4.3.1-2 / SEC-4.3.1-3",
-      "fixture": "{root}/tools/verify_report_render.mjs",
-      "command": "node {root}/tools/verify_report_render.mjs"
-    },
-    "100": {
-      "test_id": "acceptance-100",
-      "criteria": "RL-12",
-      "fixture": "{root}/tools/verify_write_api.py",
-      "command": "{venv} {root}/tools/verify_write_api.py"
-    },
-    "107": {
-      "test_id": "acceptance-107",
-      "criteria": "TS-4",
-      "fixture": "{root}/tools/verify_projection_store.py",
-      "command": "{venv} {root}/tools/verify_atomic_commit.py && {venv} {root}/tools/verify_business_event_store.py && {venv} {root}/tools/verify_projection_store.py && {venv} {root}/tools/verify_backend_recovery.py",
-      "timeout": 60,
-      "cpu_seconds": 45
-    },
-    "54": {
-      "test_id": "acceptance-54",
-      "criteria": "SEC-0-1 / SEC-4.3-1",
-      "fixture": "{root}/tools/smoke_end_to_end.py",
-      "command": "{venv} {root}/tools/smoke_end_to_end.py"
-    },
-    "51": {
-      "test_id": "acceptance-51",
-      "criteria": "丙 / L3-2 / SEC-8-4 / STOP-6",
-      "fixture": "{root}/tools/verify_case_watch.py",
-      "command": "{venv} {root}/tools/verify_case_watch.py"
-    },
-    "59": {
-      "test_id": "acceptance-59",
-      "criteria": "SEC-4.3.1-5",
-      "fixture": "{root}/tools/verify_report_consistency.py",
-      "command": "{venv} {root}/tools/verify_report_consistency.py"
-    },
-    "71": {
-      "test_id": "acceptance-71",
-      "criteria": "SEC-5-5 / SEC-5-6 / SEC-5-7 / SEC-5-21 / SEC-5-23 / SEC-5-24",
-      "fixture": "{root}/tools/verify_control_points.py",
-      "command": "{venv} {root}/tools/verify_control_points.py --row 71"
-    },
-    "78": {
-      "test_id": "acceptance-78",
-      "criteria": "SEC-5-33",
-      "fixture": "{root}/tools/verify_engine_contract.py",
-      "command": "{venv} {root}/tools/verify_engine_contract.py",
-      "timeout": 60,
-      "cpu_seconds": 45
-    },
-    "21": {
-      "test_id": "acceptance-21",
-      "criteria": "SEC-3.3.4-5 / SEC-3.3.4.4-1 / SEC-3.3.4.4-2 / SEC-3.3.4.4-3 / LOC-1 / LOC-2 / LOC-3 / LOC-4 / SEC-3.3.4.4-4 / L1-3",
-      "fixture": "{root}/tools/verify_normalizer.py",
-      "command": "{venv} {root}/tools/verify_normalizer.py"
-    },
-    "45": {
-      "test_id": "acceptance-45",
-      "criteria": "EQ-1",
-      "fixture": "{root}/tools/verify_decision_table.py",
-      "command": "{venv} {root}/tools/verify_decision_table.py"
-    },
-    "46": {
-      "test_id": "acceptance-46",
-      "criteria": "L2-1a",
-      "fixture": "{root}/tools/verify_decision_table.py",
-      "command": "{venv} {root}/tools/verify_decision_table.py"
-    },
-    "74": {
-      "test_id": "acceptance-74",
-      "criteria": "SEC-5-9",
-      "fixture": "{root}/tools/verify_control_points.py",
-      "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
-    },
-    "76": {
-      "test_id": "acceptance-76",
-      "criteria": "SEC-5-22 / SEC-5-25 / SEC-5-26 / SEC-5-27",
-      "fixture": "{root}/tools/verify_control_points.py",
-      "command": "{venv} {root}/tools/verify_control_points.py && {venv} {root}/tools/verify_control_points.py --selftest"
-    },
-    "77": {
-      "test_id": "acceptance-77",
-      "criteria": "SEC-5-28 / SEC-5-29 / SEC-5-30 / SEC-5-31 / SEC-5-32",
-      "fixture": "{root}/tools/verify_decision_table.py",
-      "command": "{venv} {root}/tools/verify_decision_table.py && {venv} {root}/tools/verify_orchestrator.py"
-    },
-    "70": {
-      "test_id": "acceptance-70",
-      "criteria": "SEC-5-2 / SEC-5-3 / SEC-5-4",
-      "fixture": "{root}/tools/verify_control_points.py",
-      "command": "{venv} {root}/tools/verify_control_points.py --selftest && {venv} {root}/tools/verify_orchestrator.py"
-    },
-    "103": {
-      "test_id": "acceptance-103",
-      "criteria": "RL-15",
-      "fixture": "{root}/tools/verify_review_api.py",
-      "command": "{venv} {root}/tools/verify_review_api.py && {venv} {root}/tools/verify_authority_change.py"
-    },
-    "104": {
-      "test_id": "acceptance-104",
-      "criteria": "TS-1",
-      "fixture": "{root}/tools/verify_production_app.py",
-      "command": "{venv} {root}/tools/verify_write_api.py && {venv} {root}/tools/verify_review_api.py && {venv} {root}/tools/verify_web_auth.py && {venv} {root}/tools/verify_production_app.py",
-      "timeout": 60,
-      "cpu_seconds": 45
-    },
-    "69": {
-      "test_id": "acceptance-69",
-      "criteria": "SEC-5-1 / SEC-5-1b",
-      "fixture": "{root}/tools/verify_control_points.py",
-      "command": "{venv} {root}/tools/verify_control_points.py --row 69"
-    },
-    "119": {
-      "test_id": "acceptance-119",
-      "criteria": "TS-17",
-      "fixture": "{root}/tools/verify_cpu_first.py",
-      "command": "{venv} {root}/tools/verify_cpu_first.py"
-    },
-    "106": {
-      "test_id": "acceptance-106",
-      "criteria": "TS-3",
-      "fixture": "{root}/tools/verify_dependency_lock.py",
-      "command": "{venv} {root}/tools/verify_dependency_lock.py",
-      "timeout": 60,
-      "cpu_seconds": 45
-    },
-    "117": {
-      "test_id": "acceptance-117",
-      "criteria": "TS-15",
-      "fixture": "{root}/tools/verify_ts15_deploy.py",
-      "command": "{venv} {root}/tools/verify_ts15_deploy.py",
-      "timeout": 60,
-      "cpu_seconds": 45
-    },
-    "85": {
-      "test_id": "acceptance-85",
-      "criteria": "SEC-6-GS-1 / SEC-6-GS-2 / SEC-6-GS-3 / SEC-6-GS-6 / SEC-6-GS-7 / L5-4",
-      "fixture": "{root}/tools/verify_regression_set.py",
-      "command": "{venv} {root}/tools/verify_regression_set.py",
-      "timeout": 60,
-      "cpu_seconds": 45
-    },
-    "116": {
-      "test_id": "acceptance-116",
-      "criteria": "TS-14",
-      "fixture": "{root}/web/scripts/a11y_check.mjs",
-      "command": "node {root}/web/scripts/a11y_check.mjs --standalone",
-      "timeout": 30,
-      "cpu_seconds": 20
-    },
-    "113": {
-      "test_id": "acceptance-113",
-      "criteria": "TS-12",
-      "fixture": "{root}/web/scripts/check_browser_scope.mjs",
-      "command": "node {root}/web/scripts/check_browser_scope.mjs --controls",
-      "timeout": 15,
-      "cpu_seconds": 10
-    },
-    "129": {
-      "test_id": "acceptance-129",
-      "criteria": "TS-26",
-      "fixture": "{root}/web/scripts/check_no_metrics_dashboard.mjs",
-      "command": "node {root}/web/scripts/check_no_metrics_dashboard.mjs --controls",
-      "timeout": 15,
-      "cpu_seconds": 10
-    },
-    "87": {
-      "test_id": "acceptance-87",
-      "criteria": "戊 / SEC-6-GS-5 / SEC-8-6",
-      "fixture": "{root}/tools/verify_rule_change_regression.py",
-      "command": "{venv} {root}/tools/verify_rule_change_regression.py",
-      "timeout": 120,
-      "cpu_seconds": 90
-    },
-    "108": {
-      "test_id": "acceptance-108",
-      "criteria": "TS-5",
-      "fixture": "{root}/web/scripts/check_frontend_gates.mjs",
-      "command": "node {root}/web/scripts/check_frontend_gates.mjs --row 108 && node {root}/web/scripts/check_frontend_gates.mjs --controls",
-      "timeout": 15,
-      "cpu_seconds": 10
-    },
-    "105": {
-      "test_id": "acceptance-105",
-      "criteria": "TS-2",
-      "fixture": "{root}/tools/verify_pycompat.py",
-      "command": "{venv} {root}/tools/verify_pycompat.py",
-      "timeout": 900,
-      "cpu_seconds": 600
-    },
-    "112": {
-      "test_id": "acceptance-112",
-      "criteria": "TS-9",
-      "fixture": "{root}/web/scripts/check_a11y_dual_gate.mjs",
-      "command": "node {root}/web/scripts/check_a11y_dual_gate.mjs && node {root}/web/scripts/check_a11y_dual_gate.mjs --controls",
-      "timeout": 30,
-      "cpu_seconds": 20
     }
   }
 }

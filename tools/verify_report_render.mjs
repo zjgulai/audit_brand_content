@@ -10,7 +10,6 @@ try {
   console.error(`UNTESTED: 无法导入 tools/audit/report_render.mjs: ${e.message}`);
   process.exit(2);
 }
-
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 
@@ -128,6 +127,136 @@ function irFingerprint(ir) {
   return createHash("sha256")
     .update(JSON.stringify(canonicalJson(ir)), "utf8")
     .digest("hex");
+}
+
+// ═══════════ 变异补票（2026-10-23）═══════════
+//
+// 来源：PMO/audit/变异探针审计-剩余5组43行-20261023.md 第四节 —— 本验收器名下
+// 有 9 条 survived：#37×3、#57×1、#58×1、#60×2、#61×1、#67×1。
+// 规矩（AGENTS.md §2.4.1「没红过的断言不算验证过它」）：
+//   · 每条新断言的判断逻辑拆成下面这些纯函数；
+//   · `--controls` 用**同一把尺**喂坏样本（必须翻红）与好样本（不许误报）；
+//   · 判断只写一份，主流程与对照共用 —— 不许两份实现各自漂移。
+
+const V1_ENUM = ["yes", "no", "partial"]; // Playbook V1 的三种覆盖取值（C9 夹具同源）
+const EXPECTED_URL = "https://example.test/reports/ir-1.md"; // baseSnapshot 的 report_url
+// 判据点名的空泛话术是「请人工看一下」：
+const EMPTY_REVIEW_REASONS = ["请人工看一下", "需要人工看一下"];
+// ★ 词表刻意不含生产现有兜底「需要人看」（report_render.mjs 渲染空 review_reason 时
+//   仍会输出它）—— 判据点名的是「请人工看一下」这个形状；把「需要人看」一并收进来
+//   会让基线常红，而那要等生产把兜底改成具体原因类别才能修，不在本行范围内
+//   （生产侧缺口已登记在 rows note，不是被静默吸收）。
+
+/** #37 V2：三个数必须带单位出现在视频行里（60s / 2s；抽帧数不带 s）。 */
+function hasUnits(md) {
+  return Boolean(md_videoNum(md, "duration")) && Boolean(md_videoNum(md, "interval"));
+}
+
+/** #37b V1 值枚举：返回不在 yes/no/partial 里的键（空数组 = 全部在枚举内）。 */
+function V1_KEYS_OUTSIDE(covers) {
+  return Object.keys(covers || {}).filter((k) => !V1_ENUM.includes(covers[k]));
+}
+
+/** 从视频行抠出 duration/interval 数值；抠不到返回 null（由调用方判红）。 */
+function md_videoNum(md, which) {
+  const line = (md || "").split("\n").find((l) => l.includes("总时长"));
+  if (!line) return null;
+  const m = which === "duration"
+    ? line.match(/总时长：(\d+(?:\.\d+)?)s/)
+    : line.match(/抽帧间隔：(\d+(?:\.\d+)?)s/);
+  return m ? m[1] : null;
+}
+
+/** #37 V4 文案掩蔽修复：V1 缺键错误必须逐键点名（`V1 视频 covers 缺项：<键>`）。 */
+function v1MissingKeys(errors) {
+  const names = [];
+  for (const e of errors || []) {
+    const m = String(e).match(/V1 视频 covers 缺项：(.+)$/);
+    if (m) names.push(...m[1].split("、"));
+  }
+  return names;
+}
+
+/** #60a BLOCK：消息里那条命中必须与 IR 里最高严重度的 confirmed 逐字一致。 */
+function blockWorstMatches(snapshot, text) {
+  const confirmed = (snapshot.ir.findings || []).filter((f) => f.status === "confirmed");
+  const pool = confirmed.length ? confirmed : (snapshot.ir.findings || []);
+  const worst = pool.slice().sort(
+    (a, b) => (SEV_RANK[b.severity] || 0) - (SEV_RANK[a.severity] || 0),
+  )[0];
+  if (!worst) return false;
+  return String(text || "").includes(worst.severity)
+    && String(text || "").includes(worst.control_code)
+    && String(text || "").includes(worst.quote);
+}
+
+const SEV_RANK = { L0: 0, L1: 1, L2: 2, L3: 3, L4: 4, L5: 5 };
+
+/** #60b/#67 判红尺：给定文本，返回命中的禁则（空数组 = 通过）。 */
+function textViolations(text) {
+  const s = String(text || "");
+  const out = [];
+  if (EMPTY_REVIEW_REASONS.some((w) => s.includes(w))) {
+    out.push("空泛话术：请人工看一下");
+  }
+  for (const w of V4_FORBIDDEN) {
+    if (s.includes(w)) out.push(`未审文案冒充已审：${w}`);
+  }
+  return out;
+}
+
+// 判据 #67 点名的表述族（「等表述」按同一语义收）：B65 的四个词 + PASS 标签。
+const V4_FORBIDDEN = ["已审", "已通过", "没问题", "无需处理", "审批完成", "【PASS】"];
+
+/** #61：按 。 切句，取【标签】与「 · 报告：」之间的句子数。 */
+function sentenceCount(text) {
+  const m = String(text || "").match(/^【([^】]+)】([\s\S]*?) · 报告：/);
+  if (!m) return -1;
+  const body = m[2];
+  const parts = body.split("。").filter((p) => p.trim().length > 0);
+  return parts.length;
+}
+
+/**
+ * #61 主判据（判据原文）：
+ *   ① 「按约定的句子边界切分，恰有 1 个句子」—— 。 是句界；
+ *   ② 「消息由模板从结构化字段生成」—— 五档各有一句**模板句**，
+ *      结构化字段替换进固定骨架；模板之外的内容（自由文本尾巴）就是第二句。
+ * 实测：往 text 里塞「 另请尽快处理。」的变异在 。 口径下合并成了一句（survived），
+ * 但它**破坏了模板骨架** —— 骨架对拍后必红。这就是判据 ② 的执行点。
+ */
+function messageTemplateShape(text, state, expectedTail) {
+  const head = `【${state}】`;
+  if (!String(text || "").startsWith(head)) return false;
+  const tail = ` · 报告：${EXPECTED_URL}`;
+  if (!String(text).endsWith(tail)) return false;
+  return String(text).slice(head.length, text.length - tail.length) === expectedTail;
+}
+
+/** #58：md 命中块的每条 finding_id 必须指得回 IR。 */
+function findingIdsResolvable(md, ir) {
+  const sec = section(md, "## 命中的问题");
+  if (sec === null) return false;
+  const known = new Set((ir.findings || []).map((f) => f.finding_id));
+  const listed = [...sec.matchAll(/^- ([^·]+?) · 控制点：/gm)].map((m) => m[1].trim());
+  return listed.length > 0 && listed.every((id) => known.has(id));
+}
+
+/** 按标题切出区块内容；没有该标题返回 null（与 block() 的 "" 区分开）。 */
+function section(md, title) {
+  const i = (md || "").indexOf(title);
+  if (i < 0) return null;
+  const rest = md.slice(i + title.length);
+  const j = rest.search(/^## /m);
+  return j < 0 ? rest : rest.slice(0, j);
+}
+
+/** #57：md 结论块的状态必须与 IR.decision.state 逐字一致。 */
+function mdStateMatchesIr(md, state) {
+  const sec = section(md, "## 结论");
+  if (sec === null) return false;
+  const m = sec.match(/^- 状态：(.+)$/m);
+  return Boolean(m) && m[1].trim() === String(state);
 }
 
 try {
@@ -259,6 +388,16 @@ try {
   report(!reportScope.some((h) => h.id === "padding"),
          "C6 padding 不适用于报告正文", JSON.stringify(reportScope));
 
+  // ── 变异补票 #63：2 层 hedge 堆叠必须**不**触发（负样本）──
+  // 判据原文：「再构造 2 层 hedge 堆叠样本断言不触发」。没有这条负样本时，
+  // 阈值 3→2 的变异无人发现（实测 survived）。两层=不触发、三层=阻断，两边都得站住。
+  report(R.lintText("可能 或许 需要人看。", "message").every((h) => h.id !== "hedgeStack"),
+         "C6/#63 2 层 hedge 不触发（负样本）",
+         JSON.stringify(R.lintText("可能 或许 需要人看。", "message")));
+  report(R.lintText("可能 或许 大概 需要人看。", "message")
+           .some((h) => h.id === "hedgeStack" && h.level === "block"),
+         "C6/#63 3 层 hedge 仍阻断（正向不松动）", "");
+
   // C7 阻断级必须拦
   const blocking = [
     ["chatbotResidue", (s) => { s.ir.decision.basis = "好问题"; }, "report"],
@@ -321,6 +460,197 @@ try {
          && (m9claim.errors || []).some((e) => String(e).includes("V4")),
          "R5 消息说「视频已审」但无五项 → 红", JSON.stringify(m9claim.errors));
 
+  // ── 变异补票 #37a：V1 五键逐键负样本，错误必须**逐键点名**该键 ──
+  // 背景：V4 文案含子串 V1，`includes("V1")` 会被顺带满足 —— 那是掩蔽不是独立验证。
+  // 修法：断言错误文本恰为 `V1 视频 covers 缺项：<键>`，且五个键各构造一次。
+  {
+    let allNamed = true;
+    const detail = {};
+    for (const key of R.V1_KEYS) {
+      const s = baseSnapshot();
+      s.video = clone(video);
+      delete s.video.covers[key];
+      const r = R.renderReport(s);
+      const named = v1MissingKeys(r.errors);
+      detail[key] = named;
+      if (!(r.ok === false && named.includes(key))) allNamed = false;
+    }
+    report(allNamed, "#37a V1 逐键负样本：错误必须点名缺失键",
+           JSON.stringify(detail));
+    // 旧 R5 那条子串匹配继续保留，但它不再独自承担 V1 这一支
+  }
+
+  // ── 变异补票 #37b：覆盖声明必须如实回显输入的 covers ──
+  // 注：生产 validateSnapshot 目前**只查键存在、不查值域**（report_render.mjs 的 V1
+  //   循环里没有取值检查）——「值属于约定枚举」这一半需要生产实现才能直接断言，
+  //   未实现（AGENTS.md §2.4：不许写恒真断言充数，缺已在 note 登记）。
+  //   这里断言可观察的另一半：md 里的 `<键>=<值>` 必须等于输入 snapshot.video.covers
+  //   的值 —— 值被硬编码（全部写成 yes）时此处必红。
+  {
+    const s = baseSnapshot(); // fixture：音轨=no、完整画面语义=partial（枚举内取值）
+    s.video = clone(video);
+    const r = R.renderReport(s);
+    const line = (r.markdown || "").split("\n").find((l) => l.includes("视频已审")) || "";
+    const echoed = R.V1_KEYS.every((k) => line.includes(`${k}=${s.video.covers[k]}`));
+    report(r.ok === true && echoed,
+           "#37b 视频覆盖值如实回显输入（音轨=no、完整画面语义=partial）",
+           line || "(无视频行)");
+    const outside = V1_KEYS_OUTSIDE(s.video.covers);
+    report(outside.length === 0,
+           "#37b fixture 取值在枚举内（yes/no/partial）", JSON.stringify(outside));
+  }
+
+  // ── 变异补票 #37c：三个数都存在且**单位明确**（60s / 2s）──
+  report(r9.ok === true && hasUnits(r9.markdown) && r9.markdown.includes("抽帧数：30"),
+         "#37c 视频 V2 三数带单位（总时长 60s / 间隔 2s）",
+         (r9.markdown || "").split("\n").find((l) => l.includes("总时长")) || "");
+  {
+    const s = baseSnapshot();
+    s.video = clone(video);
+    s.video.duration_seconds = 60;
+    s.video.interval_seconds = 2;
+    const r = R.renderReport(s);
+    report(r.ok === true && md_videoNum(r.markdown, "duration") === "60"
+           && md_videoNum(r.markdown, "interval") === "2",
+           "#37c 视频行数值可解析且来自 60/2", "");
+  }
+
+  // ── 变异补票 #57：md 状态必须与 IR.decision.state 对拍（BLOCK fixture）──
+  {
+    const s = baseSnapshot(); // decision.state = "BLOCK"
+    const r = R.renderReport(s);
+    report(r.ok === true && mdStateMatchesIr(r.markdown, "BLOCK"),
+           "#57 md 结论块状态 == IR.decision.state（BLOCK）", "");
+    const s2 = withIr({ decision: { ...baseSnapshot().ir.decision, state: "待自决" } });
+    const r2 = R.renderReport(s2);
+    report(r2.ok === true && mdStateMatchesIr(r2.markdown, "待自决"),
+           "#57 md 结论块状态 == IR.decision.state（待自决）", "");
+  }
+
+  // ── 变异补票 #58：命中块逐条 finding_id 必须指得回 IR ──
+  {
+    const s = baseSnapshot();
+    s.ir.findings.push({
+      finding_id: "f-2", control_code: "H02", status: "candidate", severity: "L2",
+      produced_by: "rule", derived_from: null, authority_state: "ok",
+      detected_by: "P1", location: { type: "image", bbox: [0.5, 0.5, 0.6, 0.6] },
+      quote: "第二处", evidence_id: "E-1",
+    });
+    const r = R.renderReport(s);
+    report(r.ok === true && findingIdsResolvable(r.markdown, s.ir),
+           "#58 命中块 finding_id 全部指回 IR（f-1,f-2）", "");
+  }
+
+  // ── 变异补票 #60b：REVIEW 原因为空的坏样本 → 消息不许落进空泛话术 ──
+  // 判据原文点名的空泛话术就是「请人工看一下」；兜底改成它时这条必须红。
+  {
+    const s = baseSnapshot();
+    s.ir.decision.state = "REVIEW";
+    s.ir.decision.review_reason = ""; // 原因为空（判据点名的反向对照样本）
+    const m = R.renderMessage(s);
+    const v = textViolations(m.text || "");
+    report(m.ok === true && v.length === 0,
+           "#60b REVIEW 空原因 → 消息不含空泛话术（请人工看一下）",
+           JSON.stringify({ text: m.text, violations: v }));
+  }
+
+  // ── 变异补票 #60a：BLOCK 取最高严重度（双 finding fixture）──
+  {
+    const s = baseSnapshot();
+    s.ir.findings.push({
+      finding_id: "f-5", control_code: "H05", status: "confirmed", severity: "L5",
+      produced_by: "rule", derived_from: null, authority_state: "ok",
+      detected_by: "P2", location: { type: "image", bbox: [0.7, 0.7, 0.8, 0.8] },
+      quote: "五级命中", evidence_id: "E-1",
+    });
+    const m = R.renderMessage(s);
+    report(m.ok === true && blockWorstMatches(s, m.text),
+           "#60a BLOCK 消息取最高严重度 finding（L5/H05/五级命中）",
+           JSON.stringify(m.text));
+    const sAlt = baseSnapshot();
+    sAlt.ir.findings[0].severity = "L1";
+    sAlt.ir.findings[0].control_code = "H99";
+    sAlt.ir.findings[0].quote = "一级命中";
+    sAlt.ir.findings.push({
+      finding_id: "f-5", control_code: "H05", status: "confirmed", severity: "L5",
+      produced_by: "rule", derived_from: null, authority_state: "ok",
+      detected_by: "P2", location: { type: "image", bbox: [0.7, 0.7, 0.8, 0.8] },
+      quote: "五级命中", evidence_id: "E-1",
+    });
+    const mAlt = R.renderMessage(sAlt);
+    report(mAlt.ok === true && mAlt.text.includes("L5") && mAlt.text.includes("H05")
+           && mAlt.text.includes("五级命中") && !mAlt.text.includes("L1")
+           && !mAlt.text.includes("H99") && !mAlt.text.includes("一级命中"),
+           "#60a 双 finding 取 L5 不取 L1（反向：消息不含低级那条）",
+           JSON.stringify(mAlt.text));
+  }
+
+  // ── 变异补票 #61：BLOCK/REVIEW 消息恰一句（。切句）──
+  {
+    const sB = baseSnapshot();
+    const mB = R.renderMessage(sB);
+    report(sentenceCount(mB.text) === 1, "#61 BLOCK 消息【标签】与链接间恰 1 句",
+           `sentenceCount=${sentenceCount(mB.text)} text=${mB.text}`);
+    const sR = baseSnapshot();
+    sR.ir.decision.state = "REVIEW";
+    sR.ir.decision.review_reason = "需要法务判断";
+    const mR = R.renderMessage(sR);
+    report(sentenceCount(mR.text) === 1, "#61 REVIEW 消息恰 1 句",
+           `sentenceCount=${sentenceCount(mR.text)}`);
+    // 坏样本：2 句 review_reason → 消息文本含 2 句，尺子必须数得出来
+    report(sentenceCount("【REVIEW】原因一。原因二。 · 报告：https://x") === 2,
+           "#61 坏样本 2 句 → 尺子数出 2（检测器自身非恒真）", "");
+    // 换行折叠契约：review_reason 带换行进来，消息必须把换行折掉（不破句界也不破单行）
+    {
+      const sN = baseSnapshot();
+      sN.ir.decision.state = "REVIEW";
+      sN.ir.decision.review_reason = "需要法务判断\n另请核实时间线";
+      const mN = R.renderMessage(sN);
+      report(mN.ok === true && !mN.text.includes("\n") && sentenceCount(mN.text) === 1,
+             "#61b 多行 review_reason → 消息仍单行（换行被折叠）",
+             JSON.stringify(mN.text));
+    }
+    // 模板骨架对拍（判据②的执行点）：五档各等于「【标签】+ 固定骨架字段句 +
+    // ` · 报告：` + URL」。骨架外多出的尾巴（哪怕不带 。）→ 对拍不等 → 红。
+    {
+      const withState = (state) => withIr({
+        decision: { ...baseSnapshot().ir.decision, state },
+      });
+      const five = [
+        ["BLOCK", baseSnapshot(), "L4 · H01 · “未坐安全座椅” · 位置：bbox=[0.1,0.2,0.4,0.6]"],
+        ["REVIEW", withState("REVIEW"), "需要法务判断"],
+        ["未审查", withState("未审查"), "视频音轨：无能力"],
+        ["待自决", withState("待自决"), "是否修改文案"],
+        ["PASS", withIr({
+          decision: { ...baseSnapshot().ir.decision, state: "PASS", obligations: [] },
+          coverage: { ...baseSnapshot().ir.coverage, coverage_state: "full" },
+        }), "覆盖：图片"],
+      ];
+      for (const [state, s, body] of five) {
+        const m = R.renderMessage(s);
+        const shape = messageTemplateShape(m.text, state, body)
+          ? true
+          : `≠模板：${JSON.stringify(m.text)}`;
+        report(m.ok === true && shape === true,
+               `#61c ${state} 消息 = 模板骨架逐字对拍`, String(shape));
+      }
+    }
+  }
+
+  // ── 变异补票 #60b/#67：未审/REVIEW 文案过禁词尺（好样本不许误报）──
+  {
+    const mB0 = R.renderMessage(baseSnapshot());
+    const mU0 = (() => {
+      const s = baseSnapshot();
+      s.ir.decision.state = "未审查";
+      return R.renderMessage(s);
+    })();
+    report(mB0.ok === true && textViolations(mB0.text).length === 0
+           && mU0.ok === true && textViolations(mU0.text).length === 0,
+           "#60b/#67 好 BLOCK/未审查 消息过禁词尺（不许误报）",
+           JSON.stringify({ b: textViolations(mB0.text), u: textViolations(mU0.text) }));
+  }
+
   // L1-6：PASS + coverage != full 属非法输入，报告与消息都必须拒绝
   const sL16 = baseSnapshot();
   sL16.ir.decision.state = "PASS";
@@ -354,6 +684,42 @@ try {
          && !(m11.text || "").includes("[[card:"),
          "C11 群消息带报告链接且无卡片原字符", JSON.stringify(m11.text));
 
+  // ── 变异补票 #67：未审文案不许冒充已审（词表断言，报告 + 消息两侧）──
+  {
+    const u = baseSnapshot().unassessed[0];
+    const snapshots = [];
+    // 未审查消息：part/reason 原文直进正文
+    {
+      const s = baseSnapshot();
+      s.ir.decision.state = "未审查";
+      snapshots.push(R.renderMessage(s));
+    }
+    // 报告「未审说明」区块文本（parse_status=failed 与 coverage missing 两个来源）
+    {
+      const s = baseSnapshot();
+      s.unassessed = [
+        u,
+        { part: "解析失败的内容", reason: "parse_status=failed", owner: "media_pipeline" },
+        { part: "覆盖缺口的内容", reason: "coverage missing", owner: "media_pipeline" },
+      ];
+      snapshots.push(R.renderReport(s));
+    }
+    // BLOCK 报告全文也在词表检查范围内（判据说的是「未审样本中」的生成文案）
+    {
+      const s = baseSnapshot();
+      snapshots.push(R.renderReport(s));
+    }
+    const bad = [];
+    for (const out of snapshots) {
+      const txt = out.text != null ? out.text : (out.markdown || "");
+      if (!out.ok) bad.push({ notOk: true, errors: out.errors });
+      else for (const v of textViolations(txt)) bad.push({ v, sample: txt.slice(0, 60) });
+    }
+    report(bad.length === 0,
+           "#67 未审文案词表断言（已审/已通过/没问题/…）零命中",
+           JSON.stringify(bad));
+  }
+
   // C12/C13 ★ C-78 ①：渲染的键必须是 control_code，不是分类条目
   //
   //   ★ 这两条看的是**渲染出来的文本**，不是源码里有没有这个词。
@@ -373,6 +739,9 @@ try {
          md_sub.slice(0, 160));
 
   console.log("----------------------------------------");
+  const ranControls = process.argv.includes("--controls");
+  const controlsOk = ranControls ? checkControls(report) : null;
+  console.log(`controls_ok: ${controlsOk === null ? "未测（加 --controls 跑反向对照）" : controlsOk}`);
   if (failed === 0) {
     console.log(`✅ ${passed}/${passed + failed} 全过`);
     process.exit(0);
@@ -382,4 +751,130 @@ try {
 } catch (e) {
   console.error(`UNTESTED: 验收器自身异常: ${e && e.stack ? e.stack : e}`);
   process.exit(2);
+}
+
+/* ═══════════ --controls：新断言的反向对照 ═══════════
+ *
+ * AGENTS.md §2.4.1：没红过的断言不算验证过它。上面主流程的新断言每条都要在这里
+ * 喂一次**坏样本**（尺子必须翻红）+ 一次**好样本**（不许误报）。坏样本直接喂给
+ * 上面的纯函数（主流程用的同一把尺），能红 = 尺子真的在判；好样本必须绿。
+ *
+ * 判定：0 全过 / 1 有对照不红（新断言是恒真的） / 2 未测。
+ */
+
+import process from "node:process";
+
+function checkControls(reportFn) {
+  let cp = 0;
+  let cf = 0;
+
+  // 统一口径：fn 返回 pass（= 输入表现符合要求，断言会放行）。
+  // badMustRed=true 的行：pass 必须是 false（尺子把它判红）才算对照成立。
+  function probe(name, badMustRed, fn) {
+    let pass;
+    try {
+      pass = fn() === true;
+    } catch (e) {
+      reportFn(false, `CTRL ${name}`, `自身异常: ${e && e.message}`);
+      cf++;
+      return;
+    }
+    const okNow = badMustRed ? !pass : pass;
+    reportFn(okNow, `CTRL ${badMustRed ? "坏样本必须红" : "好样本不许红"}：${name}`,
+             `pass=${pass}`);
+    if (okNow) cp++;
+    else cf++;
+  }
+
+  // #37a 尺（v1MissingKeys）：掩蔽形状 —— V4 文案错误不含逐键点名 → 必须判红
+  probe("V1 缺键错误未逐键点名（V4 掩蔽形状）", true, () => {
+    const named = v1MissingKeys(["V4「视频已审」必须带 V1 五项，缺：音轨"]);
+    return named.includes("音轨");
+  });
+  probe("V1 缺键错误逐键点名（正向）", false, () => {
+    const named = v1MissingKeys(["V1 视频 covers 缺项：音轨"]);
+    return named.includes("音轨") && named.length === 1;
+  });
+
+  // #37b V1 值枚举（坏样本直接喂枚举判定，与 #37b 同一把尺）
+  probe("V1 值域外（covers.字幕=不一定）→ 枚举判定红", true, () => {
+    const covers = { 字幕: "不一定", 内嵌文字: "yes", 关键帧: "yes", 音轨: "no", 完整画面语义: "partial" };
+    return V1_KEYS_OUTSIDE(covers).length === 0;
+  });
+  probe("V1 值在枚举内 → 枚举判定绿（不许误报）", false, () => {
+    const covers = { 字幕: "yes", 内嵌文字: "no", 关键帧: "partial", 音轨: "yes", 完整画面语义: "no" };
+    return V1_KEYS_OUTSIDE(covers).length === 0;
+  });
+
+  // #37c 单位尺
+  probe("视频行单位被删（总时长：60 无 s）→ 尺红", true, () =>
+    hasUnits("- 抽帧数：30；总时长：60；抽帧间隔：2s"));
+  probe("视频行带单位（60s/2s）→ 尺绿", false, () =>
+    hasUnits("- 抽帧数：30；总时长：60s；抽帧间隔：2s"));
+
+  // #57 状态对拍尺
+  probe("md 状态与 IR 不一致（硬编码 PASS 假绿形状）→ 尺红", true, () =>
+    mdStateMatchesIr("## 结论\n- 状态：PASS\n- 放行状态：待放行", "BLOCK"));
+  probe("md 状态与 IR 一致 → 尺绿", false, () =>
+    mdStateMatchesIr("## 结论\n- 状态：BLOCK\n- 放行状态：待放行", "BLOCK"));
+
+  // #58 finding_id 反查尺
+  probe("命中行缺 finding_id（指不回 IR）→ 尺红", true, () =>
+    findingIdsResolvable(
+      "## 命中的问题\n- 控制点：H01 · 严重度：L4 · 确认状态：confirmed\n",
+      { findings: [{ finding_id: "f-1" }] },
+    ));
+  probe("命中行 finding_id 指回 IR → 尺绿", false, () =>
+    findingIdsResolvable(
+      "## 命中的问题\n- f-1 · 控制点：H01 · 严重度：L4\n",
+      { findings: [{ finding_id: "f-1" }] },
+    ));
+
+  // #60a 最高严重度尺
+  probe("BLOCK 消息取低严重度那条（丢 L5 取 L4）→ 尺红", true, () => {
+    const snap = {
+      ir: { findings: [
+        { finding_id: "f-1", control_code: "H01", status: "confirmed", severity: "L4", quote: "四" },
+        { finding_id: "f-2", control_code: "H02", status: "confirmed", severity: "L5", quote: "五" },
+      ] },
+    };
+    return blockWorstMatches(snap, "【BLOCK】L4 · H01 · “四” · 报告：https://x");
+  });
+  probe("BLOCK 消息取最高严重度那条 → 尺绿", false, () => {
+    const snap = {
+      ir: { findings: [
+        { finding_id: "f-1", control_code: "H01", status: "confirmed", severity: "L4", quote: "四" },
+        { finding_id: "f-2", control_code: "H02", status: "confirmed", severity: "L5", quote: "五" },
+      ] },
+    };
+    return blockWorstMatches(snap, "【BLOCK】L5 · H02 · “五” · 报告：https://x");
+  });
+
+  // #60b 空泛话术尺
+  probe("REVIEW 原因是空泛话术「请人工看一下」→ 尺红", true, () =>
+    textViolations("【REVIEW】请人工看一下 · 报告：https://x").length === 0);
+  probe("REVIEW 原因具体（需要法务判断）→ 尺绿", false, () =>
+    textViolations("【REVIEW】需要法务判断 · 报告：https://x").length === 0);
+
+  // #61 句数尺
+  probe("消息正文两句（2 句坏样本）→ 尺红", true, () =>
+    sentenceCount("【REVIEW】原因一。原因二。 · 报告：https://x") === 1);
+  probe("消息正文一句 → 尺绿", false, () =>
+    sentenceCount("【BLOCK】L4 · H01。 · 报告：https://x") === 1);
+
+  // #67 冒充已审词表尺
+  for (const word of V4_FORBIDDEN) {
+    probe(`未审文案含「${word}」→ 词表尺红`, true, () =>
+      textViolations(`未审说明：视频音轨（无能力）${word}`).length === 0);
+  }
+  probe("未审文案干净（无冒充表述）→ 词表尺绿", false, () =>
+    textViolations("未审说明：视频音轨（无能力）责任人：media_pipeline").length === 0);
+
+  console.log("----------------------------------------");
+  if (cf === 0) {
+    console.log(`✅ controls ${cp}/${cp + cf} 全过`);
+    return true;
+  }
+  console.error(`❌ controls ${cp} passed, ${cf} failed`);
+  return false;
 }

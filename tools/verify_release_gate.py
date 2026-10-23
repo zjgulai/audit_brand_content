@@ -9,18 +9,34 @@
   B **签发绑定全字段**：case_version / IR id+version / raw+text / rule+kb 快照
     （version+hash）/ used_authority_refs / conflict_table_version / 六类媒体指纹 +
     root hash / signature_version；缺一或签名被改 → 红。
+  B8–B10（2026-10-23 变异复查 #126/#127 补）：签发绑定**逐字段与 case 对拍**
+    （kb_snapshot 被绑成 rule_snapshot、keyframe 被绑成 frame 必红）；
+    生产 SIGNATURE_FIELDS 与验收器**自己的**清单恒等（清单收窄必红 ——
+    B1 用生产常量自证，清单收窄在 B1 不可见）；四类媒体指纹各一枚独立
+    （两类同值 = 压成一枚，失效源不可定位，必红）。
   C **SoD**：提交人、最终复核人不可签；跨租户/品线/无 release.sign → 拒。
   D **step-up**：必须消费；重复使用、错误 action/nonce、过期 → 拒（接 auth_session）。
   E **失效五类**：content / rule_snapshot / kb_snapshot / used ref versions /
     conflict_table_version；**未使用的 ref 变化不触发**（SB-8）。
-  F **重审 job**：invalidated 必须自动建 job；queued 合并 change_set；running 时新建
-    successor；同 change_set 幂等；完成后回 pending_release。
+  F **重审 job**：invalidated 必须自动建 job；queued 合并 change_set（**两次变化
+    都必须在 change_set 里**，丢一次即红 —— 2026-10-23 变异复查 #102 补）；
+    running 时新建 successor；同 change_set 幂等；完成后回 pending_release。
   G **机器不可写放行**：任何 patch 带 release_status → 拒。
   H **签名不可变**：旧签名被改 → validate 红；重新签发 = 新记录 + derived_from。
 
 ## 退出码
 
   0 全过 · 1 有红 · 2 未测（导入失败之外的不可测条件）
+
+## --controls（反向对照）
+
+  好样本 → 0 · 坏样本 → 各自非零。反向对照清单：
+    C-1 判定器对真签名必须闭嘴（反向：喂好样本不许红 —— 不许修成哑巴）
+    C-2 B8 kb 绑定拍 case 必须拦「绑成 rule_snapshot」（坏样本：偏判后的签名）
+    C-3 B8 绑定拍 case 必须拦「field 收窄」（坏样本：SIGNATURE_FIELDS 删 kb_snapshot_hash）
+    C-4 B8 媒体指纹必须拦「压成一枚」（坏样本：keyframe == frame）
+    C-5 F1a 合并必须拦「丢第一次变化」（坏样本：_merge 只留最后一次）
+    C-6 B9 必须拦「验收器清单缩窄」（坏样本：本表清单删 ocr_output_hash）
 """
 from __future__ import annotations
 
@@ -38,12 +54,90 @@ sys.path.insert(0, ROOT)
 try:
     from auth_session import SessionStore
     from release_gate import (
-        ReleaseGate, SIGNATURE_FIELDS, SignatureError, StepUpError,
-        SoDViolation, InvalidTransition, MachineWriteDenied, media_root,
-        validate_signature)
+        ReleaseGate, SIGNATURE_FIELDS, SIGNATURE_VERSION, SignatureError,
+        StepUpError, SoDViolation, InvalidTransition, MachineWriteDenied,
+        media_root, validate_signature)
 except Exception as e:  # noqa: BLE001
     print("❌ 导入 base/release_gate.py / auth_session 失败：%s" % e)
     sys.exit(1)
+
+
+# ── 验收器自己的清单（B9 反向对照的判据，不 import 生产的）──────────────
+#   与 release_gate.SIGNATURE_FIELDS 的 27 个签发绑定字段恒等；生产侧收窄
+#   （如 #126 删 kb_snapshot_hash、#127 删 ocr_output_hash）在 B9 必红。
+#   ★ 这份清单自己被 --controls C-6 看着：它自己缩窄时 --controls 必须红。
+EXPECTED_SIGNATURE_FIELDS = {
+    "signature_id", "signature_version", "case_id", "case_version",
+    "ir_id", "ir_version", "raw_sha256", "text_sha256",
+    "rule_snapshot_version", "rule_snapshot_hash",
+    "kb_snapshot_version", "kb_snapshot_hash",
+    "used_authority_refs", "conflict_table_version",
+    "frame_manifest_hash", "keyframe_set_hash", "ocr_output_hash",
+    "asr_output_hash", "model_config_hash", "sampling_config_hash",
+    "media_fingerprints_root_hash", "signer_id", "signed_at",
+    "step_up_ref", "decision", "reason", "signature_hash",
+}
+
+# 签发绑定必须与 case 逐字段对拍的条目（B8）：签名字段 → case 字段 → label。
+# kb 绑成 rule（#126 变异一）、keyframe 绑成 frame（#127 变异一）都在这里拦。
+_BIND_TO_CASE = (
+    ("case_version", "case_version"),
+    ("ir_id", "ir_id"), ("ir_version", "ir_version"),
+    ("raw_sha256", "raw_sha256"), ("text_sha256", "text_sha256"),
+    ("rule_snapshot_version", ("rule_snapshot", "version")),
+    ("rule_snapshot_hash", ("rule_snapshot", "hash")),
+    ("kb_snapshot_version", ("kb_snapshot", "version")),
+    ("kb_snapshot_hash", ("kb_snapshot", "hash")),
+    ("conflict_table_version", "conflict_table_version"),
+    ("frame_manifest_hash", "frame_manifest_hash"),
+    ("keyframe_set_hash", "keyframe_set_hash"),
+    ("ocr_output_hash", "ocr_output_hash"),
+    ("asr_output_hash", "asr_output_hash"),
+    ("model_config_hash", "model_config_hash"),
+    ("sampling_config_hash", "sampling_config_hash"),
+)
+
+
+def _sig_binding_mismatch(sig, case):
+    """B8 判定器：签名里的绑定值必须与 case 的原值逐字段相等。
+
+    返回不相等的字段清单（空 = 通过）。独立于生产的 _binding()/SIGNATURE_FIELDS，
+    只对拍值本身 —— 生产把 kb 绑成 rule、keyframe 绑成 frame 时，值不相等即红。
+    """
+    out = []
+    for sig_field, case_field in _BIND_TO_CASE:
+        if isinstance(case_field, tuple):
+            snap = case.get(case_field[0])
+            case_val = snap.get(case_field[1]) if isinstance(snap, dict) else None
+        else:
+            case_val = case.get(case_field)
+        if sig.get(sig_field) != case_val:
+            out.append("%s=%r != case.%s=%r" % (sig_field, sig.get(sig_field),
+                                                case_field, case_val))
+    case_refs = sorted("%s:%s" % (r.get("ref_id"), r.get("version"))
+                       for r in (case.get("used_authority_refs") or []))
+    sig_refs = sorted("%s:%s" % (r.get("ref_id"), r.get("version"))
+                      for r in (sig.get("used_authority_refs") or []))
+    if sig_refs != case_refs:
+        out.append("used_authority_refs=%r != case=%r" % (sig_refs, case_refs))
+    return out
+
+
+# 四类逐项媒体指纹（TS-24）：各一枚独立指纹，不是一枚总指纹。
+_FOUR_MEDIA = ("frame_manifest_hash", "keyframe_set_hash",
+               "ocr_output_hash", "asr_output_hash")
+
+
+def _collapsed_media(sig):
+    """B10 判定器：四类指纹里出现「两类同值」= 压成一枚 → 失效源不可定位。
+
+    返回同值对（空 = 通过）。把 keyframe_set_hash 绑成 frame_manifest_hash
+    （#127 变异一）在这里红。
+    """
+    seen = {}
+    for f in _FOUR_MEDIA:
+        seen.setdefault(str(sig.get(f)), []).append(f)
+    return [v for v in seen.values() if len(v) > 1]
 
 
 def sha(s):
@@ -188,6 +282,12 @@ def main():
 
     # ── B 签发绑定全字段 ────────────────────────────────────────────
     T("B1 签名包含全部绑定字段", set(SIGNATURE_FIELDS) <= set(sig), str(sorted(set(SIGNATURE_FIELDS) - set(sig))))
+    # B9（#126/#127 变异二补）：生产 SIGNATURE_FIELDS 与验收器**自己的**清单恒等。
+    #   B1 用生产常量自证 —— 生产把字段删掉（kb_snapshot_hash / ocr_output_hash）
+    #   B1 反而变绿；只有拿验收器自己的清单做下界才能看见收窄。
+    T("B9 生产字段清单 ⊇ 验收器自己的清单（收窄必红）",
+      EXPECTED_SIGNATURE_FIELDS <= set(SIGNATURE_FIELDS),
+      "生产侧缺：" + str(sorted(EXPECTED_SIGNATURE_FIELDS - set(SIGNATURE_FIELDS))))
     T("B2 validate_signature 对真签名零错误", validate_signature(sig) == [], str(validate_signature(sig)))
     T("B2b 签名只存不可逆 step-up ref，不存 bearer token",
       sig["step_up_ref"].startswith("stepup:") and sig["step_up_ref"] != tk
@@ -213,6 +313,24 @@ def main():
         T("B7 case 缺 rule_snapshot → 签发拒", False, "未拒")
     except SignatureError:
         T("B7 case 缺 rule_snapshot → 签发拒", True, "")
+
+    # ── B8/B10 逐字段对拍（#126/#127 变异一补）────────────────────────
+    #   B3/B4 只验「改一个字段签名哈希不符」，从不与 **case 的原值**对拍：
+    #   生产把 kb_snapshot 绑成 rule_snapshot（_binding:155 的 kv,kh 换成 rv,rh）、
+    #   把 keyframe_set_hash 绑成 frame_manifest_hash 时，签名仍内部自洽、B1–B7 全绿。
+    #   B8 对拍值本身，B10 拦「四类指纹压成一枚」。
+    gB8, sessB8 = new_gate("b8")
+    sigB8 = gB8.sign(case(case_id="case-b8"), s,
+                     token(sessB8, s, case(case_id="case-b8"), nonce="b8"),
+                     "b8", reason="test", now=1001)
+    cB8 = case(case_id="case-b8")
+    T("B8 签发绑定与 case 逐字段相等（kb 不得绑成 rule、keyframe 不得绑成 frame）",
+      _sig_binding_mismatch(sigB8, cB8) == [],
+      "; ".join(_sig_binding_mismatch(sigB8, cB8)))
+    T("B10 四类媒体指纹各一枚独立（不得压成一枚总指纹）",
+      _collapsed_media(sigB8) == [], str(_collapsed_media(sigB8)))
+    T("B10b 四类指纹确实互不相同（fixture 自检，防同值 fixture 恒真）",
+      len({cB8[f] for f in _FOUR_MEDIA}) == len(_FOUR_MEDIA), str(cB8))
 
     # ── C SoD ───────────────────────────────────────────────────────
     def must_deny(cid, fn, exc=Exception):
@@ -306,14 +424,27 @@ def main():
 
     # ── F 重审 job ──────────────────────────────────────────────────
     g10, s10, c10 = signed_case("f10")
+    # ★ 两次变化走**不同字段**（raw / conflict_table）：change_set 按 field 归并，
+    #   同字段连续变化按语义本就折叠成一条（只留最新值）；只有不同字段才谈得上
+    #   「合并丢一条」—— 这也是 #102 那个变异（_merge 只留一次变化）可观察的前提。
     cur1 = case(case_id=c10["case_id"], raw_sha256="9" * 64)
     r1 = g10.invalidate(c10["case_id"], cur1, now=1002)
     job1 = r1["job"]
-    cur2 = case(case_id=c10["case_id"], raw_sha256="8" * 64)
+    cur2 = case(case_id=c10["case_id"], conflict_table_version="ct-2")
     r2 = g10.invalidate(c10["case_id"], cur2, now=1003)
     T("F1 queued 期间连续变化 → 同一 job、change_set 合并",
       r2.get("job_created") is False and r2["job"]["job_id"] == job1["job_id"]
       and len(r2["job"]["change_set"]) >= 1, str(r2))
+    # F1a（#102 变异补）：RL-14「缺一条即红」—— 合并只留一次变化（无论留头还是
+    #   留尾）时，F1 的 >=1 依旧全绿。合并后的 change_set 必须**两次变化都在**：
+    #   第一次（raw 1→9…）与第二次（conflict ct-1→ct-2）各一条，缺一即红。
+    cs = r2["job"]["change_set"]
+    T("F1a 合并保留两次变化的完整内容（RL-14 缺一条即红）",
+      any(x.get("field") == "raw_sha256" and x.get("new_version") == "9" * 64
+          for x in cs)
+      and any(x.get("field") == "conflict_table_version"
+              and x.get("new_version") == "ct-2" for x in cs),
+      "change_set=%s" % json.dumps(cs, ensure_ascii=False))
     g10.start_job(c10["case_id"], now=1004)
     cur3 = case(case_id=c10["case_id"], kb_snapshot={"version": "kb-3", "hash": "7" * 64})
     r3 = g10.invalidate(c10["case_id"], cur3, now=1005)
@@ -366,5 +497,84 @@ def main():
     return 1 if fails else 0
 
 
+def _controlled(cid, sig, case_dict, mut):
+    """--controls 共用判定器：B8/B9/B10 三个判定器 + F1a 的合并判据，
+    喂一份样本返回红项清单（空 = 该组全过）。好样本必须全空（C-1），
+    五类坏样本必须各自非空（C-2…C-6）。"""
+    bad = []
+    if _sig_binding_mismatch(sig, case_dict):
+        bad.append(cid + "-B8")
+    if not (EXPECTED_SIGNATURE_FIELDS <= set(mut["fields"])):
+        bad.append(cid + "-B9")
+    if _collapsed_media(sig):
+        bad.append(cid + "-B10")
+    return bad
+
+
+def run_controls():
+    """--controls：好样本必须闭嘴，五类坏样本必须各自红（§2.4.1：没红过的断言不算验证过它）。"""
+    results = []
+
+    def ok(name, cond, detail=""):
+        results.append((name, bool(cond), detail))
+
+    tmp = tempfile.mkdtemp(prefix="rg_ctl_")
+    s = signer()
+    # C-1 好样本：真实签发，判定器必须全空（不许把验证器修成哑巴）
+    sessions = SessionStore(os.path.join(tmp, "ctl.db"))
+    g = ReleaseGate(sessions=sessions)
+    c_good = case(case_id="ctl-good")
+    sig_good = g.sign(c_good, s, sessions.issue_step_up(
+        s["id"], c_good["case_id"], "sign", "n1", now=1000),
+        "n1", reason="test", now=1001)
+    mut_good = {"fields": set(SIGNATURE_FIELDS)}
+    bad = _controlled("good", sig_good, c_good, mut_good)
+    ok("C-1 好样本 → 判定器全部闭嘴", bad == [], str(bad))
+
+    # C-2 坏样本（#126 变异一）：kb_snapshot 被绑成 rule_snapshot
+    sig_kb = dict(sig_good)
+    sig_kb["kb_snapshot_version"] = sig_good["rule_snapshot_version"]
+    sig_kb["kb_snapshot_hash"] = sig_good["rule_snapshot_hash"]
+    bad = _controlled("c2", sig_kb, case(case_id="ctl-good"), mut_good)
+    ok("C-2 kb 绑成 rule_snapshot → B8 红", "c2-B8" in bad, str(bad))
+
+    # C-3 坏样本（#126 变异二）：SIGNATURE_FIELDS 删 kb_snapshot_hash
+    mut_narrow = {"fields": set(SIGNATURE_FIELDS) - {"kb_snapshot_hash"}}
+    bad = _controlled("c3", sig_good, case(case_id="ctl-good"), mut_narrow)
+    ok("C-3 字段清单收窄（删 kb_snapshot_hash）→ B9 红", "c3-B9" in bad, str(bad))
+
+    # C-4 坏样本（#127 变异一）：keyframe_set_hash 绑成 frame_manifest_hash（压成一枚）
+    sig_col = dict(sig_good)
+    sig_col["keyframe_set_hash"] = sig_good["frame_manifest_hash"]
+    bad = _controlled("c4", sig_col, case(case_id="ctl-good"), mut_good)
+    ok("C-4 keyframe 压成 frame 一枚 → B8+B10 红",
+       "c4-B8" in bad and "c4-B10" in bad, str(bad))
+
+    # C-5 坏样本（#102）：合并丢第一次变化 → F1a 判据红（两条异字段变化，留尾丢头）
+    cs_full = [{"field": "raw_sha256", "new_version": "9" * 64},
+               {"field": "conflict_table_version", "new_version": "ct-2"}]
+    cs_dropped = cs_full[1:]           # _merge 只留最后一次的形状
+    def _f1a(cs):
+        return (any(x.get("field") == "raw_sha256"
+                    and x.get("new_version") == "9" * 64 for x in cs)
+                and any(x.get("field") == "conflict_table_version"
+                        and x.get("new_version") == "ct-2" for x in cs))
+    ok("C-5 完整合并 → F1a 闭嘴；丢第一次 → 红",
+       _f1a(cs_full) and not _f1a(cs_dropped), str(cs_dropped))
+
+    # C-6 反向对照（对着验收器自己的清单）：这份清单自己缩窄时 B9 必须红
+    mut_self = {"fields": EXPECTED_SIGNATURE_FIELDS - {"ocr_output_hash"}}
+    bad = _controlled("c6", sig_good, case(case_id="ctl-good"), mut_self)
+    ok("C-6 验收器清单自己缩窄 → B9 红", "c6-B9" in bad, str(bad))
+
+    passed = sum(1 for _, p, _ in results if p)
+    for name, p, detail in results:
+        print("  %s %s  %s" % ("✓" if p else "✗", name, detail))
+    print("\n%s verify_release_gate --controls %d/%d" %
+          ("✅" if passed == len(results) else "✗", passed, len(results)))
+    shutil.rmtree(tmp, ignore_errors=True)
+    return 0 if passed == len(results) else 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run_controls() if "--controls" in sys.argv[1:] else main())

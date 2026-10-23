@@ -10,11 +10,23 @@
   C **L4-2 重建**：`rebuild(ir, renderer)` 必须得到同一 report_id / 同一内容；
     删掉文件后仍可重建，并可恢复。
   D **R1**：渲染文本必须含 `source_ir_version` 与 `source_ir_fingerprint`；
-    缺一或指纹不符 → 拒发布。
+    缺一或指纹不符 → 拒发布。**版本值必须与 IR 逐字一致**（D9）——
+    只查「有这一行」挡不住把逐字比较弱化成存在性的变异（#56 实测 survived）。
   E **ACL 回读**：无权限 → `{ok:false,url:null}`，不得返回 URL。
   F **完整性**：旧报告被改 / 索引重复 → 读与校验必须红。
   G **静态链接**：URL 不含 /api/ 或 render；构造器拒绝渲染服务 base。
+    render 子句有**独立样本**（G3d）：`/reports/` 内的 render 命名也必须拒 ——
+    G3b 的 render 样本挂在 base 的 `/render/` 段上，先被前缀拒绝，
+    该子句被删掉时 G3b 照旧绿（#56 实测 survived）。
+  C59 **md ↔ IR 对拍**：遗漏 / 多出两个方向各自独立成立（C59b–C59e）——
+    单 finding 夹具里「f1 换成 fX」同时触发两个方向，删掉任何一支都看不见
+    （#59 实测两条 survived）。
   H **反向对照**：删掉任一守卫（变异由外部执行）→ 上述断言必须红。
+
+## --controls（离线反向对照）
+
+  坏实现形状（#56/#59 实测 survived 的变异）用子类 / mock 模拟，
+  判定体对坏样本必须红、对好样本不许误伤 —— 没红过的断言不算验证过它。
 
 ## 退出码
 
@@ -28,12 +40,13 @@ import os
 import shutil
 import sys
 import tempfile
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "base"))
 
 try:
-    from report_store import ReportStore
+    from report_store import ReportStore, rendered_report_mismatches
 except Exception as e:  # noqa: BLE001
     print("❌ 导入 base/report_store.py 失败：%s" % e)
     sys.exit(1)
@@ -92,6 +105,39 @@ def render_ratio(x):
             "- 状态：%s\n\n本周审核通过率为 98%%。\n"
             % (x.get("source_ir_version") or x["ir_version"], fp(x),
                x.get("decision", {}).get("state", "PASS")))
+
+
+def render_wrong_version(x):
+    """★ D9 的坏样本形状：版本行**存在**，但值与 IR 不一致。
+    把逐字比较弱化成「行存在」的变异（#56 实测 survived）必须被它打红。"""
+    return ("# 报告\n\nsource_ir_version: wrong-version\nsource_ir_fingerprint: %s\n"
+            "- 状态：%s\n\n正文 %s\n"
+            % (fp(x), x.get("decision", {}).get("state", "PASS"), x.get("body", "")))
+
+
+def ir2(version=1):
+    """两个 finding 的 IR —— C59 方向分离用（单 finding 夹具下
+    「删掉一个 id」会走 unparsable 早退，两个方向永远同时触发）。"""
+    x = ir(version, "C59")
+    x["ir_id"] = "ir_c59split"
+    x["findings"] = [
+        {"finding_id": "f1", "control_code": "H01"},
+        {"finding_id": "f2", "control_code": "H02"},
+    ]
+    return x
+
+
+_C59_CODES = {"f1": "H01", "f2": "H02", "fX": "H99"}
+
+
+def render2(x, ids=("f1", "f2")):
+    """渲染 ir2 的文本：一行 finding 一个 id，可增删（fX=IR 里不存在的 id）。"""
+    lines = "".join("- %s · 控制点：%s\n" % (fid, _C59_CODES.get(fid, "H00"))
+                    for fid in ids)
+    return ("# 报告\n\nsource_ir_version: %s\nsource_ir_fingerprint: %s\n"
+            "- 状态：%s\n\n%s\n正文\n"
+            % (x.get("source_ir_version") or x["ir_version"], fp(x),
+               x.get("decision", {}).get("state", "PASS"), lines))
 
 
 def main():
@@ -234,6 +280,31 @@ def main():
       r_bad_idx.get("ok") is False and r_bad_idx.get("url") is None
       and r_bad_idx.get("detail") == "index_corrupt", str(r_bad_idx))
 
+    # ── D9–D12 ★ 版本/指纹值必须与 IR 逐字一致（#56 实测 survived）──
+    #   旧版只喂「整行缺失」（D1/D2）；把逐字比较弱化成「行存在」的变异，
+    #   版本值写错它也全绿。所以这里喂「行在、值错」。
+    v_store = ReportStore(os.path.join(TMP, "version_check"), base_url)
+    badv = v_store.publish(ir(50, "WRONGVER"), render_wrong_version, ACL)
+    T("D9 版本行存在但值与 IR 不符 → 拒发布",
+      badv.get("ok") is False and badv.get("url") is None
+      and str(badv.get("detail", "")).startswith("r1:"), str(badv))
+    goodv = v_store.publish(ir(50, "GOODVER"), render, ACL)
+    T("D10 ★ 同一 IR、版本值逐字一致 → 正常发布（反向对照：不是把 R1 收太紧）",
+      goodv.get("ok") is True and goodv.get("url"), str(goodv))
+    rb_v = v_store.rebuild(ir(50, "GOODVER"), render, expected_report_id=goodv.get("report_id"))
+    T("D11 ★ rebuild 报告的 source_ir_version 必须与 IR 逐字一致（非空）",
+      rb_v.get("ok") is True
+      and (ir(50, "GOODVER").get("source_ir_version") or "") in rb_v.get("text", ""),
+      str(rb_v)[:200])
+    # 指纹与版本同时为空值边界：空串版本 = IR 侧非法（_ir_identity 已拒），此处钉
+    # 「报告侧的版本行不能拿空/None 混过去」
+    empty_v = v_store.publish(
+        {"ir_id": "ir_ev", "ir_version": 51, "source_ir_version": "cu-51",
+         "body": "EV", "findings": [], "decision": {"state": "PASS"}},
+        lambda x: render(x).replace("source_ir_version: cu-51", "source_ir_version: "), ACL)
+    T("D12 ★ 版本行渲染成空值 → 拒发布（不许拿空版本混过存在性检查）",
+      empty_v.get("ok") is False and empty_v.get("url") is None, str(empty_v))
+
     # ── E ACL 回读（独立干净 store，避免继承 F 段的重复索引） ──────
     acl_store = ReportStore(os.path.join(TMP, "acl_clean"), base_url)
     acl_pub = acl_store.publish(ir(40, "ACLCLEAN"), render, ACL)
@@ -313,11 +384,78 @@ def main():
       r_bad_url.get("ok") is False and r_bad_url.get("url") is None
       and r_bad_url.get("detail") == "bad_url", str(r_bad_url))
 
+    # G3d ★ render 子句的**独立**样本（#56 实测 survived）：
+    #   G3b 唯一的 render 样本挂在 base 的 /render/ 段上，先被 startswith 前缀
+    #   拒掉 —— 删掉末尾那句 `"render" not in low` 它照样绿，该子句从没被
+    #   独立断言过。所以样本必须**先过前缀、后落在 render 子句上**。
+    render_in_reports = base_url + "/reports/render.md"
+    T("G3d ★ /reports/ 路径段内的 render 命名 → 拒（render 子句独立成立）",
+      acl_store._valid_url(render_in_reports, base_url) is False,
+      "%s -> %r" % (render_in_reports,
+                    acl_store._valid_url(render_in_reports, base_url)))
+    T("G3d2 ★ 合法静态 URL（不含 render/api 字样）→ 照常放行（不误伤）",
+      acl_store._valid_url(acl_pub["url"], base_url) is True,
+      repr(acl_pub["url"]))
+    # G3d3 行为级：把 index 里的 url 篡改成 /reports/render.md，read 必须拒。
+    idx_rows[0]["url"] = render_in_reports
+    with open(bad_idx_path, "w", encoding="utf-8") as f:
+        for row in idx_rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    r_g3d = bad_url_store.read(bp.get("report_id"), P_SUB_OWN)
+    T("G3d3 ★ index 里塞进 /reports/render.md → read 拒（bad_url）",
+      r_g3d.get("ok") is False and r_g3d.get("url") is None
+      and r_g3d.get("detail") == "bad_url", str(r_g3d))
+    T("G3e ★ D10 的发布文件 read 回来的 url 仍是合法静态地址（正向不误伤）",
+      v_store.read(goodv.get("report_id"), P_SUB_OWN).get("url") == goodv.get("url"),
+      str(v_store.read(goodv.get("report_id"), P_SUB_OWN))[:200])
+
     # ── H 反向对照（变异由外部执行；这里守住输入坏样本） ───────────
     T("H1 输入带 renderer 但内容不符 → 重建必须拒",
       store.rebuild(ir(1, "A"), lambda x: render(x) + "DIFF", expected_report_id=rid).get("ok") is False, "")
     T("H2 未授权 principal 永远拿不到 url（干净 store）",
       all(acl_store.read(acl_rid, p).get("url") is None for _, p in denied), "")
+
+    # ── C59 ★ md ↔ IR 对拍的「遗漏」与「多出」两个方向各自独立成立 ──
+    #   （#59 实测两条 survived）
+    #   旧夹具只有 1 个 finding：把 f1 换成 fX 会**同时**触发 missing 与
+    #   unexpected，「删掉一个 id」又走 unparsable 早退 —— 两个方向谁都
+    #   没有被单独断言过。这里用 2-finding 夹具把两个方向拆开，
+    #   并断言错误码**逐字**出现（不是笼统的 errs != []）。
+    ir_2 = ir2()
+    m_ok = rendered_report_mismatches(ir_2, render2(ir_2))
+    T("C59a ★ 2-finding 正样本 → 零不一致（夹具自身先对拍干净）",
+      m_ok == [], str(m_ok))
+    m_missing = rendered_report_mismatches(ir_2, render2(ir_2, ids=("f1",)))
+    T("C59b ★ 遗漏方向独立成立：IR 有 f2、文本没有 → missing 逐字报出",
+      any(e == "missing_or_wrong_finding:f2:H02" for e in m_missing)
+      and not any(e.startswith("unexpected_finding") for e in m_missing),
+      str(m_missing))
+    m_extra = rendered_report_mismatches(ir_2, render2(ir_2, ids=("f1", "f2", "fX")))
+    T("C59c ★ 多出方向独立成立：文本多 fX、IR 没有 → unexpected 逐字报出",
+      any(e == "unexpected_finding:fX" for e in m_extra)
+      and not any(e.startswith("missing_or_wrong_finding") for e in m_extra),
+      str(m_extra))
+    m_swap = rendered_report_mismatches(ir_2, render2(ir_2, ids=("f1", "fX")))
+    T("C59d ★ 同样本必须**同时**报出两个方向（缺一支的变异立刻红）",
+      any(e.startswith("missing_or_wrong_finding:f2") for e in m_swap)
+      and any(e == "unexpected_finding:fX" for e in m_swap),
+      str(m_swap))
+    pub2 = ReportStore(os.path.join(TMP, "c59_pub"), base_url)
+    r_missing = pub2.publish(ir_2, lambda x: render2(x, ids=("f1",)), ACL)
+    r_extra = pub2.publish(ir_2, lambda x: render2(x, ids=("f1", "f2", "fX")), ACL)
+    T("C59e 遗漏文本 → publish 物理阻断（ir_render_mismatch:missing…）",
+      r_missing.get("ok") is False and r_missing.get("url") is None
+      and "missing_or_wrong_finding:f2" in str(r_missing.get("detail", "")), str(r_missing))
+    T("C59f 多出文本 → publish 物理阻断（ir_render_mismatch:unexpected…）",
+      r_extra.get("ok") is False and r_extra.get("url") is None
+      and "unexpected_finding:fX" in str(r_extra.get("detail", "")), str(r_extra))
+    T("C59g 两个方向的坏文本都没有落盘",
+      not any(f.endswith(".md") for f in os.listdir(os.path.join(pub2.root, "reports"))),
+      str(os.listdir(os.path.join(pub2.root, "reports"))))
+    good2 = ReportStore(os.path.join(TMP, "c59_good"), base_url).publish(
+        ir_2, render2, ACL)
+    T("C59h ★ 2-finding 一致文本 → 正常发布（方向断言没把渲染收死）",
+      good2.get("ok") is True and good2.get("url"), str(good2))
 
     shutil.rmtree(TMP, ignore_errors=True)
     for f in fails:
@@ -327,5 +465,117 @@ def main():
     return 1 if fails else 0
 
 
+# ═══════════════ --controls：离线反向对照 ═══════════════
+#
+# 每个形状都是 #56/#59 实测 survived 的变异本身：弱化成存在性检查、
+# 删掉 render 子句、丢掉对拍的 missing / unexpected 支。
+# 好样本不许误伤，坏样本必须红；任何一条不成立 → 退 1。
+
+def controls():
+    fails = []
+    n_cases = [0]
+
+    def ok(name, cond, detail=""):
+        n_cases[0] += 1
+        if not cond:
+            fails.append(name)
+        print("  %s %s %s" % ("✅" if cond else "❌", name, detail))
+
+    print("=" * 78)
+    print("verify_report_store · 离线反向对照（--controls）")
+    print("=" * 78)
+
+    # ── 1 ★ 坏：版本行存在但值错 → D9 样本必须红（#56 弱化成存在性就绿）──
+    x1 = ir(1, "A")
+    bad_v = render_wrong_version(x1)
+    weak = ("source_ir_version:" in bad_v)          # 弱化成「行存在」的判定
+    real = ReportStore._check_r1(object(), bad_v,
+                                 x1.get("source_ir_version"), fp(x1))
+    ok("坏实现（版本行只查存在）放过值错的文本 = 弱化洞真实存在",
+       weak is True and real is not None, "weak=%r real=%r" % (weak, real))
+
+    # ── 2 ★ 好：真判定体对「版本行在、值对」放行（不误伤）──
+    ok("真判定体：版本值逐字一致 → 放行",
+       ReportStore._check_r1(object(), render(x1),
+                             x1.get("source_ir_version"), fp(x1)) is None, "")
+
+    # ── 3 ★ 真 R1：版本值写错必须红（正向）──
+    ok("真判定体：版本值写错 → 红（不是只有缺失才红）",
+       real is not None, str(real))
+
+    # ── 4 ★ 坏：_valid_url 删掉 render 子句 → G3d 样本必须红 ──
+    base_url = "https://static.example.com"
+    def weak_valid_url(url, sb):
+        return (isinstance(url, str) and url.startswith(sb + "/reports/")
+                and url.endswith(".md") and "/api/" not in url.lower())
+    hole = weak_valid_url(base_url + "/reports/render.md", base_url)
+    real_v = ReportStore._valid_url(base_url + "/reports/render.md", base_url)
+    ok("坏实现（_valid_url 删 render 子句）放过 render 命名 = 洞真实存在",
+       hole is True and real_v is False, "hole=%r real=%r" % (hole, real_v))
+
+    # ── 5 ★ 好：真 _valid_url 对 render 命名拒、对合法静态放行 ──
+    ok("真判定体：/reports/render.md → 拒",
+       real_v is False, "")
+    good_url = base_url + "/reports/rp" + "0" * 16 + ".md"
+    ok("真判定体：合法静态 URL → 放行（不误伤）",
+       ReportStore._valid_url(good_url, base_url) is True, good_url)
+
+    # ── 6 ★ 坏：对拍函数丢掉 missing 支 → 遗漏样本必须红 ──
+    ir_x = ir2()
+    full_m = rendered_report_mismatches(ir_x, render2(ir_x, ids=("f1",)))
+    def missing_dropped(i, t):
+        return [e for e in rendered_report_mismatches(i, t)
+                if not e.startswith("missing_or_wrong_finding")]
+    m = missing_dropped(ir_x, render2(ir_x, ids=("f1",)))
+    ok("坏实现（对拍丢 missing 支）放过遗漏样本 = 这支真的在拦（反向证明）",
+       full_m != [] and m == [], "full=%r dropped=%r" % (full_m, m))
+
+    # ── 7 ★ 坏：对拍函数丢掉 unexpected 支 → 多出样本必须红 ──
+    full_e = rendered_report_mismatches(ir_x, render2(ir_x, ids=("f1", "f2", "fX")))
+    def unexpected_dropped(i, t):
+        return [e for e in rendered_report_mismatches(i, t)
+                if not e.startswith("unexpected_finding")]
+    e7 = unexpected_dropped(ir_x, render2(ir_x, ids=("f1", "f2", "fX")))
+    ok("坏实现（对拍丢 unexpected 支）放过多出样本 = 这支真的在拦（反向证明）",
+       full_e != [] and e7 == [], "full=%r dropped=%r" % (full_e, e7))
+
+    # ── 8 ★ 方向分离：遗漏与多出的错误码各自逐字出现 ──
+    m_only = rendered_report_mismatches(ir_x, render2(ir_x, ids=("f1",)))
+    e_only = rendered_report_mismatches(ir_x, render2(ir_x, ids=("f1", "f2", "fX")))
+    ok("遗漏方向：missing_or_wrong_finding:f2 逐字报出、无 unexpected",
+       any(e == "missing_or_wrong_finding:f2:H02" for e in m_only)
+       and not any(e.startswith("unexpected") for e in m_only), str(m_only))
+    ok("多出方向：unexpected_finding:fX 逐字报出、无 missing",
+       any(e == "unexpected_finding:fX" for e in e_only)
+       and not any(e.startswith("missing_or_wrong") for e in e_only), str(e_only))
+
+    # ── 9 ★ publish 阻断两个方向（行为级，独立 store）──
+    import tempfile as _tf
+    tmpd = _tf.mkdtemp(prefix="vrs-controls-")
+    try:
+        st = ReportStore(os.path.join(tmpd, "d"), base_url)
+        rm = st.publish(ir_x, lambda t: render2(t, ids=("f1",)), ACL)
+        re_ = st.publish(ir_x, lambda t: render2(t, ids=("f1", "f2", "fX")), ACL)
+        ok("publish：遗漏文本 → 阻断（ok:false, url:null）",
+           rm.get("ok") is False and rm.get("url") is None, str(rm))
+        ok("publish：多出文本 → 阻断（ok:false, url:null）",
+           re_.get("ok") is False and re_.get("url") is None, str(re_))
+        st2 = ReportStore(os.path.join(tmpd, "g"), base_url)
+        rg = st2.publish(ir_x, render2, ACL)
+        ok("publish：一致文本 → 正常发布（不误伤）",
+           rg.get("ok") is True and rg.get("url"), str(rg))
+    finally:
+        shutil.rmtree(tmpd, ignore_errors=True)
+
+    print("-" * 78)
+    if fails:
+        print("❌ %d 项失败：%s" % (len(fails), fails))
+        return 1
+    print("✅ %d 项全过（该红、该绿都有）" % n_cases[0])
+    return 0
+
+
 if __name__ == "__main__":
+    if "--controls" in sys.argv:
+        sys.exit(controls())
     sys.exit(main())

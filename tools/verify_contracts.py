@@ -411,6 +411,37 @@ def samples() -> dict:
 
 # ═══════════════════════════ 行为断言（schema 表达不了的）═══════════════════════════
 
+def skill_channel_problems(receipt: dict, declared: dict) -> list:
+    """B-10 判据的纯函数面：receipt 的 skill_id/version/hash 必须等于
+    调用方声明的 skill 身份。回执写假值 / 常量 fallback / unknown 顶账，
+    通道一断这里就必须非空 —— --controls 用它喂坏样本。"""
+    problems = []
+    if not isinstance(receipt, dict):
+        return ["receipt 必须是 dict，收到 %s" % type(receipt).__name__]
+    for k in ("skill_id", "skill_version", "skill_hash"):
+        want = declared.get(k)
+        got = receipt.get(k)
+        if got != want:
+            problems.append("receipt.%s=%r != 调用方声明的 %r" % (k, got, want))
+    return problems
+
+
+def receipt_id_pair_problems(id1, id2) -> list:
+    """B-11 判据的纯函数面：两次运行的 receipt_id 必须各自存在、互不相同、
+    形如哈希（不许是常量）。--controls 用它喂「两次同 id」的坏样本。"""
+    problems = []
+    for label, rid in (("第一次", id1), ("第二次", id2)):
+        if not isinstance(rid, str) or not rid:
+            problems.append("%s的 receipt_id 为空或不是字符串：%r" % (label, rid))
+            continue
+        if len(rid) < 8:
+            problems.append("%s的 receipt_id 形如常量（长度 %d）：%r"
+                            % (label, len(rid), rid))
+    if isinstance(id1, str) and id1 and id1 == id2:
+        problems.append("两次运行 receipt_id 相同：%r（id 没有跟着运行开始时刻走）" % id1)
+    return problems
+
+
 def check_behavior(schemas: dict) -> list:
     """
     这几条约束在本校验器的关键字支持范围内**表达不了**，所以由本函数做行为断言。
@@ -636,13 +667,128 @@ def check_behavior(schemas: dict) -> list:
        "真实 judge_entry 图片 receipt 喂 schema：%s" %
        ("通过" if not receipt_errors else receipt_errors[:3]))
 
+    # ── B-10 receipt.skill_hash 必须等于**实际加载的 skill**（验收行 15 子判据）──
+    #
+    # ★ 2026-10-24 变异复查 #15a 抓到的假绿：schema 只要求 skill_hash 是
+    #   非空 string，B-9 喂的 receipt 用的是**生产回执自己的值** ——
+    #   把生产 receipt 的 skill_hash 换成假值后 80 项仍全过（自比恒真）。
+    #   修法：receipt 的 skill_hash 必须与**调用方声明**的 skill 身份对拍 ——
+    #   judge_unit(skill_id=…, skill_hash=…) 的回执必须原样带出这两个值；
+    #   同时 skill_id / skill_version 也一并按「请求 → 回执」的通道核一遍
+    #   （同一行判据的「skill_version 等于实际加载的 skill」半边）。
+    b10_bad = []
+    try:
+        from base import contract as _cc
+        from base.judge_entry import judge_unit as _judge
+        _sk_args = dict(skill_id="contract-check-skill", skill_version="9.9",
+                        skill_hash="contract-check-hash-777")
+        _u = _cc.from_text("skill_hash 通道对拍样本", uri="inline:b10")
+        _u["parse_status"] = "ok"
+        _r = _judge(_u, clock=lambda: 1000, **_sk_args)["receipt"]
+        b10_bad = skill_channel_problems(_r, _sk_args)
+    except Exception as exc:  # noqa: BLE001
+        b10_bad = ["%s: %s" % (type(exc).__name__, exc)]
+    ok("B-10", not b10_bad,
+       "receipt.skill_id/version/hash 必须原样带出调用方声明的 skill 身份：%s"
+       % ("通过" if not b10_bad else b10_bad[:2]))
+
+    # ── B-11 同一输入连跑两次 receipt_id 必须不同（验收行 15 末句）──
+    #
+    # ★ 2026-10-24 变异复查 #15b 抓到的假绿：receipt_id 固定成常量后 80 项
+    #   仍全过 —— 脚本只跑一次 judge，从不比较两次执行的 receipt_id。
+    #   ★ 判据的机制面：receipt_id 由「运行开始时刻」参与派生 ——
+    #   两次运行必有不同的 started，所以必有不同的 id。
+    #   实测修正：用**恒定时钟**（clock=lambda: 1000）两次 id 相同是幂等，
+    #   不是缺陷 —— 真代码下同刻同 id。所以这里注入**递增时钟**：
+    #   两次运行的 started 必然不同 → id 必须不同。常量变异（#15b）
+    #   会把「id 跟着运行走」砍断，这里当场红。
+    b11_bad = []
+    try:
+        from base import contract as _cc2
+        from base.judge_entry import judge_unit as _judge2
+        _u2 = _cc2.from_text("receipt_id 唯一性样本", uri="inline:b11")
+        _u2["parse_status"] = "ok"
+        _ticks = iter(range(1, 10_000))
+        _r1 = _judge2(_u2, clock=lambda: next(_ticks))["receipt"]
+        _r2b = _judge2(_u2, clock=lambda: next(_ticks))["receipt"]
+        b11_bad = receipt_id_pair_problems(_r1.get("receipt_id"),
+                                           _r2b.get("receipt_id"))
+    except Exception as exc:  # noqa: BLE001
+        b11_bad = ["%s: %s" % (type(exc).__name__, exc)]
+    ok("B-11", not b11_bad,
+       "两次运行的 receipt_id 必须不同（started 参与派生；恒时钟同 id 是幂等不算红）：%s"
+       % ("通过" if not b11_bad else b11_bad[:2]))
+
     return out
+
+def run_controls() -> int:
+    """--controls：B-10 / B-11 新断言的反向对照。坏样本必须红、好样本必须绿
+    （§2.4.1：没红过的断言不算验证过它 —— 判据自己要先被喂红一次）。"""
+    good_declared = {"skill_id": "s", "skill_version": "1", "skill_hash": "abc"}
+
+    def ok_receipt():
+        # 与 samples().good_receipt 同构的最小 receipt
+        return {
+            "receipt_id": "rc-" + "a" * 16,
+            "skill_id": good_declared["skill_id"],
+            "skill_version": good_declared["skill_version"],
+            "skill_hash": good_declared["skill_hash"],
+        }
+
+    checks = []
+
+    def check(cid, cond, detail=""):
+        checks.append((cid, bool(cond), detail))
+
+    # B-10 面：声明与回执一致 → 绿；写假值 / 顶 unknown → 红
+    check("C-B10a 通道一致必须绿（不误报）",
+          not skill_channel_problems(ok_receipt(), good_declared))
+    fake = ok_receipt()
+    fake["skill_hash"] = "fake-skill-hash"          # #15a 的变异形状
+    check("C-B10b receipt.skill_hash 写假值必须红",
+          bool(skill_channel_problems(fake, good_declared)))
+    unknowned = ok_receipt()
+    unknowned["skill_id"] = "unknown"               # 生产 fallback 的顶账形状
+    check("C-B10c skill_id 顶 unknown 必须红",
+          bool(skill_channel_problems(unknowned, good_declared)))
+    missing = ok_receipt()
+    del missing["skill_version"]
+    check("C-B10d skill_version 缺失必须红",
+          bool(skill_channel_problems(missing, good_declared)))
+
+    # B-11 面：两次不同且形如哈希 → 绿；常量 / 撞 id → 红
+    check("C-B11a 两次不同 id 必须绿（不误报）",
+          not receipt_id_pair_problems("rc-1a2b3c4d5e6f7a8b",
+                                       "rc-9f8e7d6c5b4a3210"))
+    check("C-B11b 两次同 id 必须红",                # #15b 的变异形状
+          bool(receipt_id_pair_problems("rc-fixed-constant", "rc-fixed-constant")))
+    check("C-B11b2 常量 id（长度不足）必须红",
+          bool(receipt_id_pair_problems("rc-1", "rc-2")))
+    check("C-B11c 空 id 必须红",
+          bool(receipt_id_pair_problems(None, "rc-9f8e7d6c5b4a3210")))
+
+    reds = [c for c in checks if not c[1]]
+    print("=" * 60)
+    print("--controls · verify_contracts 新断言反向对照")
+    print("=" * 60)
+    for cid, okc, detail in checks:
+        print("  %s %-40s %s" % ("✓" if okc else "✗", cid, detail))
+    if reds:
+        print("❌ %d/%d 红" % (len(reds), len(checks)), file=sys.stderr)
+        return 1
+    print("✅ %d/%d 全过（坏样本红、好样本不误报）" % (len(checks), len(checks)))
+    return 0
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--verbose", action="store_true")
+    ap.add_argument("--controls", action="store_true",
+                    help="新断言（B-10/B-11）的反向对照：坏样本必须红")
     args = ap.parse_args()
+    if args.controls:
+        return run_controls()
 
     # 读 schema
     loaded, read_errors = {}, []

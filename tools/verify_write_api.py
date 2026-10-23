@@ -113,6 +113,111 @@ def release_case(case_id):
     }
 
 
+# ── --controls（RL-12④ / #100 的反向对照）────────────────────────────────
+# 断言函数抽出来给 --controls 复用：好样本（真 AppealStore）绿；
+# 坏样本（pause 偷改 reason / open 改写 reason 的桩）必须红。
+# 没红过的断言不算验证过它（AGENTS.md §2.4.1）。
+RL12_PAUSE_FIELDS = {"state", "pause_reason", "paused_at"}
+
+
+def assert_pause_field_discipline(report, store, appeal_id, expected_reason):
+    """对一次 pause 做逐字段比对：PAUSE_FIELDS 之外一个字段都不许变，
+    且 pause_reason 必须逐字等于传入值。"""
+    before = store.get(appeal_id)
+    paused_rows = store.pause(before["case_id"], now=time.time())
+    after = store.get(appeal_id)
+    untouched = sorted(
+        k for k in set(before) | set(after)
+        if k not in RL12_PAUSE_FIELDS and before.get(k) != after.get(k))
+    report(not untouched and set(before) <= set(after),
+           "C2/RL-12④ pause 不改写 pause 三字段之外的任何字段",
+           "changed=%r" % (untouched,))
+    prow = next((x for x in paused_rows
+                 if x["appeal_id"] == appeal_id), {})
+    report(prow.get("state") == "paused_version_invalidated"
+           and prow.get("pause_reason") == expected_reason
+           and isinstance(prow.get("paused_at"), str)
+           and prow.get("paused_at", "").endswith("Z"),
+           "C2/RL-12① pause_reason 必须是调用方传入的那个值",
+           "pause_reason=%r expected=%r"
+           % (prow.get("pause_reason"), expected_reason))
+
+
+def run_controls():
+    """坏样本必须红；好样本必须绿。返回 0 / 1。"""
+    ok_all = True
+    print("verify_write_api · --controls（RL-12④ 申诉字段纪律反向对照）")
+
+    def mk_report(tag):
+        def report(ok, name, detail=""):
+            nonlocal ok_all
+            print("  %s [%s] %s%s"
+                  % ("✅" if ok else "❌", tag, name,
+                     "" if ok else "：%s" % detail))
+            if not ok:
+                ok_all = False
+        return report
+
+    # 好样本：真 AppealStore —— 两条断言都必须绿
+    good = AppealStore()
+    item = good.open("case-g", "u_a", "误判")
+    assert_pause_field_discipline(mk_report("好样本"), good,
+                                  item["appeal_id"], "version_invalidated")
+
+    # 坏样本 1（#100 原样变异）：pause 把 reason 写成自选常量
+    class BadPauseStore(AppealStore):
+        def pause(self, case_id, reason="version_invalidated", now=None):
+            rows = super().pause(case_id, reason=reason, now=now)
+            for it in self._items.values():
+                if it["case_id"] == case_id:
+                    it["reason"] = "重审通过，原因待补"   # ← 变异：静默改写
+            return rows
+
+    bad1 = BadPauseStore()
+    item = bad1.open("case-b1", "u_a", "误判")
+    aid = item["appeal_id"]
+    before_fails = [False]
+
+    def report1(ok, name, detail=""):
+        if "RL-12④" in name and not ok:
+            before_fails[0] = True
+
+    assert_pause_field_discipline(report1, bad1, aid, "version_invalidated")
+    print("  %s 坏样本 1：pause 静默改写 reason → RL-12④ 红"
+          % ("✅" if before_fails[0] else "❌"))
+    ok_all = ok_all and before_fails[0]
+
+    # 坏样本 2：pause_reason 被写成别的值（①的值断言红）
+    bad2 = AppealStore()
+    item = bad2.open("case-b2", "u_a", "误判")
+
+    def bad2_pause(self, case_id, reason="version_invalidated", now=None):
+        return AppealStore.pause(self, case_id, reason="已自动关闭", now=now)
+
+    bad2.pause = bad2_pause.__get__(bad2, AppealStore)
+    try:
+        fails2 = []
+
+        def report2(ok, name, detail=""):
+            if "RL-12①" in name and not ok:
+                fails2.append(name)
+
+        assert_pause_field_discipline(report2, bad2, item["appeal_id"],
+                                      "version_invalidated")
+    finally:
+        pass
+    print("  %s 坏样本 2：pause_reason 换值 → RL-12① 红"
+          % ("✅" if fails2 else "❌"))
+    ok_all = ok_all and bool(fails2)
+
+    print()
+    if ok_all:
+        print("✅ --controls 全过：好样本绿；坏样本各自红")
+        return 0
+    print("❌ --controls 有对照不符")
+    return 1
+
+
 def candidate(fid):
     return {
         "finding_id": fid, "control_code": "H01", "detected_by": "P1",
@@ -264,12 +369,41 @@ def main():
     st, _ = call(app, "POST", "/api/v1/appeals/%s/migrate" % ap["appeal_id"],
                  coord, "K-mig-wrong", {})
     report(st == 403, "R3 非原申诉人 migrate → 403", str(st))
-    appeals.pause("case-1", now=time.time())
+
+    # RL-12 ④（#100 逐字段比对）：pause 前后快照全部字段，pause 只允许写
+    # pause 相关的三个字段（state/pause_reason/paused_at），其余逐字段不变。
+    # ★ 变异法实测：pause 静默改写 reason 字段时 61/61 全绿 —— 之前没有任何
+    #   断言回读 reason/appellant/opened_at，这条把它变成红的。
+    #   断言本体在模块级 assert_pause_field_discipline（--controls 复用同一份，
+    #   不许出现「主判据一套、对照另一套」的漂移）。
+    assert_pause_field_discipline(report, appeals, ap["appeal_id"],
+                                  "version_invalidated")
+
     st, migrated = call(app, "POST",
                         "/api/v1/appeals/%s/migrate" % ap["appeal_id"],
                         sub, "K-mig-ok", {})
     report(st == 200 and migrated["state"] == "migrated",
            "C2 原申诉人 migrate → migrated", "%s %r" % (st, migrated))
+    mig_before = appeals.get(ap["appeal_id"])
+    # migrate 返回的是改写后的快照（migrated["migrated_at"] 已写入），
+    # 回读时它已经迁移完成 —— 「改写前」的状态只能取调用返回值本身。
+    mig_after = migrated
+    MIGRATE_FIELDS = {"state", "migrated_at"}
+    untouched = sorted(
+        k for k in set(mig_before) | set(mig_after)
+        if k not in MIGRATE_FIELDS
+        and mig_before.get(k) != mig_after.get(k))
+    report(not untouched,
+           "C2/RL-12④ migrate 同样只写 state/migrated_at（逐字段比对）",
+           "changed=%r" % (untouched,))
+    MIGRATE_FIELDS = {"state", "migrated_at"}
+    untouched = sorted(
+        k for k in set(mig_before) | set(mig_after)
+        if k not in MIGRATE_FIELDS
+        and mig_before.get(k) != mig_after.get(k))
+    report(not untouched,
+           "C2/RL-12④ migrate 同样只写 state/migrated_at（逐字段比对）",
+           "changed=%r" % (untouched,))
 
     st, ap2 = call(app, "POST", "/api/v1/appeals", sub, "K-appeal-2",
                    {"case_id": "case-1", "reason": "再申诉"})
@@ -278,6 +412,16 @@ def main():
     report(any(x["appeal_id"] == ap2["appeal_id"] and x["state"] == "stale"
                for x in stale),
            "C2 paused 超 30 天 → stale（不关闭）", repr(stale))
+    # ④ 在 stale 这一步同样成立：stale 后 reason/appellant 仍是申诉时原值
+    # （RL-12 的「记录完整保留」半边；stale 只许写 state/stale_at）
+    stale_row = next((x for x in stale
+                      if x["appeal_id"] == ap2["appeal_id"]), {})
+    report(stale_row.get("pause_reason") == "version_invalidated"
+           and stale_row.get("reason") == "再申诉"
+           and stale_row.get("appellant") == "u_sub",
+           "C2/RL-12④ stale 后 reason/appellant 仍是申诉时原值",
+           repr({k: stale_row.get(k)
+                 for k in ("reason", "appellant", "pause_reason", "stale_at")}))
 
     st, ap3 = call(app, "POST", "/api/v1/appeals", sub, "K-appeal-3",
                    {"case_id": "case-1", "reason": "待撤"})
@@ -544,7 +688,11 @@ def main():
 
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv[1:]:
+            sys.exit(run_controls())
         sys.exit(main())
+    except SystemExit:
+        raise
     except Exception as exc:  # noqa: BLE001
         import traceback
         tb = traceback.extract_tb(exc.__traceback__)

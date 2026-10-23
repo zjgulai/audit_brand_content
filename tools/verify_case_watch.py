@@ -13,6 +13,16 @@ verify_case_watch.py —— 转出后超时升级（C-51 / L3-2 / STOP-6）
   6. 通知：走 NotificationOutbox 唯一出口；解析不出接收人 → 未测而不是静默
   7. 反向对照：删掉守卫必须红
 
+★ K 段（#51 实测 survived 的两条补票）：
+
+  K1 **「目标是项目统筹」钉在写进台账/通知的 role 上**，不是常量：
+     6h 只断言 DEFAULT_ESCALATION_ROLE == '项目统筹'，把默认 role 改成
+     '法务' 它照样绿 —— 这里断言**默认路径**（不传 escalation_role、案件
+     也不带 escalation 字段）实际写进台账事件与通知 payload 的 role。
+  K2 **「事件可按案件号查询」必须用含两个案件的台账验**：单案件台账上
+     by_case() 返回全部 = 过滤结果，恒真 —— 这里断言 c-2 的台账里
+     **查不到** c-1 的事件，反之亦然。
+
 退出码：0 全过 / 1 有红 / 2 未测（import 失败）
 """
 from __future__ import annotations
@@ -315,6 +325,66 @@ def main() -> int:
         ok("6h 默认升级角色 = 项目统筹",
            W.DEFAULT_ESCALATION_ROLE == "项目统筹", "")
 
+    # ══════════ 6K ★ #51 补票：写进台账/通知的 role 与按案件过滤 ══════════
+    with tempfile.TemporaryDirectory() as d:
+        # K1 ★ 「目标是项目统筹」必须钉在**默认路径实际写进台账的 role** 上：
+        #   不传 escalation_role、案件不带 escalation 字段 —— 真实落到
+        #   台账事件与通知 payload 里的 role 都必须是「项目统筹」。
+        #   （#51 实测：默认改成「法务」后 51/51 全绿 —— 6h 只看常量。）
+        led_k1 = W.EscalationLedger(Path(d) / "k1.json")
+        box_k1 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "k1d.json"))
+        r_k1 = W.scan([c], "2026-10-21T09:00:00+08:00",
+                      ledger=led_k1, outbox=box_k1,
+                      escalation_recipients=["u_coord"])
+        ev_k1 = led_k1.by_case("c-1")
+        ntf_k1 = box_k1.records[0] if box_k1.records else {}
+        # 通知 payload 里的 role：new_notification 的 payload=… 在
+        # scan() 里以 escalation_role=… 传入，落在 n["payload"]
+        payload_k1 = (ntf_k1.get("payload") or {}) if isinstance(ntf_k1, dict) else {}
+        ok("K1a ★ 默认路径写进台账的 escalation_role = 项目统筹（不是常量自证）",
+           len(ev_k1) == 1 and ev_k1[0].get("escalation_role") == "项目统筹",
+           str(ev_k1))
+        ok("K1b ★ 默认路径写进通知的 escalation_role = 项目统筹",
+           payload_k1.get("escalation_role") == "项目统筹", str(payload_k1))
+        ok("K1c ★ 扫描结果 due 里的 escalation_role 同样是项目统筹",
+           (_first(r_k1, "due", "escalation_role") == "项目统筹"),
+           str(_first(r_k1, "due", "escalation_role")))
+        # K1 反向对照：给案件自带 escalation=法务 → 逐字不同（字段真的在被读）
+        led_k1b = W.EscalationLedger(Path(d) / "k1b.json")
+        box_k1b = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "k1bd.json"))
+        W.scan([case(cid="c-esc", escalation="法务")], "2026-10-21T09:00:00+08:00",
+               ledger=led_k1b, outbox=box_k1b, escalation_recipients=["u_legal"])
+        ev_k1b = led_k1b.by_case("c-esc")
+        ok("K1d ★ 案件自带 escalation 字段会覆盖默认（role 字段真的被写）",
+           len(ev_k1b) == 1 and ev_k1b[0].get("escalation_role") == "法务",
+           str(ev_k1b))
+
+        # K2 ★ 「事件可按案件号查询」用**含两个案件**的台账验（#51：
+        #   单案件台账上 by_case 返回全部 = 过滤结果，恒真）。
+        led_k2 = W.EscalationLedger(Path(d) / "k2.json")
+        box_k2 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "k2d.json"))
+        W.scan([c, case("c-2")], "2026-10-21T09:00:00+08:00",
+               ledger=led_k2, outbox=box_k2,
+               escalation_recipients=["u_coord"])
+        by1 = led_k2.by_case("c-1")
+        by2 = led_k2.by_case("c-2")
+        ok("K2a ★ 两个案件各自到期 → 各自一条台账事件",
+           len(by1) == 1 and len(by2) == 1,
+           "c-1=%d c-2=%d total=%d" % (len(by1), len(by2), len(led_k2.events)))
+        ok("K2b ★ by_case(c-1) 查不到 c-2 的事件（过滤真过滤）",
+           all(e.get("case_id") == "c-1" for e in by1), str(by1))
+        ok("K2c ★ by_case(c-2) 查不到 c-1 的事件",
+           all(e.get("case_id") == "c-2" for e in by2), str(by2))
+        ok("K2d ★ 合集 = 全部事件（分项之和 = 总数）",
+           len(by1) + len(by2) == len(led_k2.events) and len(led_k2.events) == 2,
+           "total=%d" % len(led_k2.events))
+        # K2 落盘侧：重建后按案件号仍各查各的
+        led_k2b = W.EscalationLedger(Path(d) / "k2.json")
+        ok("K2e ★ 落盘重读后按案件查询仍过滤（不是只内存里对）",
+           len(led_k2b.by_case("c-1")) == 1 and len(led_k2b.by_case("c-2")) == 1
+           and all(e.get("case_id") == "c-1" for e in led_k2b.by_case("c-1")),
+           "c-1=%d c-2=%d" % (len(led_k2b.by_case("c-1")), len(led_k2b.by_case("c-2"))))
+
     # ══════════ 7. 反按对照（删守卫必须红）══════════
     with tempfile.TemporaryDirectory() as d:
         # R1 ★ 去重键换成扫描时刻 → 两次扫描产生两条通知
@@ -401,8 +471,115 @@ def main() -> int:
     return 1
 
 
+# ═══════════════════ --controls：离线反向对照 ═══════════════════
+#
+# 判定体是 scan()/by_case()，直接喂「#51 实测 survived 的坏实现形状」：
+#   ① role 写死「法务」（默认值被改）  → K1a/K1b/K1c 必须红
+#   ② by_case 不按 case_id 过滤        → K2b/K2c/K2d 必须红
+# 好样本不许误伤。任何一条不成立 → 退 1。
+
+def controls() -> int:
+    from unittest import mock
+
+    fails = []
+    n_cases = [0]
+
+    def ok(name, cond, detail=""):
+        n_cases[0] += 1
+        if not cond:
+            fails.append(name)
+        print("  %s %s %s" % ("✅" if cond else "❌", name, detail))
+
+    print("=" * 78)
+    print("case_watch · 离线反向对照（--controls）")
+    print("=" * 78)
+
+    with tempfile.TemporaryDirectory() as d:
+        # ── 1 ★ 坏实现：默认 role 变「法务」（#51 的变异本身）──
+        #   mock scan 里的 role 兜底：`case.get("escalation") or escalation_role`
+        #   的 escalation_role 侧被换成常量「法务」。
+        real_scan = W.scan
+
+        def bad_role_scan(cases, now, **kw):
+            if "escalation_role" not in kw:
+                kw["escalation_role"] = "法务"
+            return real_scan(cases, now, **kw)
+
+        led = W.EscalationLedger(Path(d) / "c1.json")
+        box = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "c1d.json"))
+        with mock.patch.object(W, "scan", bad_role_scan):
+            r = W.scan([case()], "2026-10-21T09:00:00+08:00",
+                       ledger=led, outbox=box,
+                       escalation_recipients=["u_coord"])
+        # ↑ 注意：patch 的是 W.scan 本名，而模块内调用走的是本名 —— 但坏实现
+        #   在 scan 内部并不生效（role 兜底在函数体里）。这里 mock 的是「调用方
+        #   不传 escalation_role」这个入口形状，坏默认值由 kw 注入 —— 等价于
+        #   把 DEFAULT_ESCALATION_ROLE 换成「法务」。
+        ev = led.by_case("c-1")
+        ntf = box.records[0] if box.records else {}
+        payload = (ntf.get("payload") or {}) if isinstance(ntf, dict) else {}
+        ok("坏实现（默认 role=法务）→ K1a 形状的断言必须红（台账 role != 项目统筹）",
+           len(ev) == 1 and ev[0].get("escalation_role") == "法务", str(ev))
+        ok("坏实现（默认 role=法务）→ K1b 形状的断言必须红（通知 payload 也错）",
+           payload.get("escalation_role") == "法务", str(payload))
+        ok("好实现（真 scan）→ 默认路径台账 role = 项目统筹（不误伤）",
+           _default_path_role_ok(), "")
+
+        # ── 2 ★ 坏实现：by_case 不过滤（#51 的变异本身）──
+        with mock.patch.object(W.EscalationLedger, "by_case",
+                               lambda self, case_id: list(self.events)):
+            led2 = W.EscalationLedger(Path(d) / "c2.json")
+            box2 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "c2d.json"))
+            real_scan([case(), case("c-2")], "2026-10-21T09:00:00+08:00",
+                      ledger=led2, outbox=box2,
+                      escalation_recipients=["u_coord"])
+            by1 = led2.by_case("c-1")
+            by2 = led2.by_case("c-2")
+        ok("坏实现（by_case 恒回全部）→ K2b 形状的断言必须红（c-1 的台账里混进 c-2）",
+           len(by1) == 2 and any(e.get("case_id") == "c-2" for e in by1), str(by1))
+        ok("坏实现（by_case 恒回全部）→ K2d 形状的断言必须红（之和 != 分项）",
+           len(by1) + len(by2) != len(led2.events), "by1=%d by2=%d total=%d"
+           % (len(by1), len(by2), len(led2.events)))
+        led3 = W.EscalationLedger(Path(d) / "c3.json")
+        box3 = N.NotificationOutbox(dedup=N.DedupLedger(Path(d) / "c3d.json"))
+        real_scan([case(), case("c-2")], "2026-10-21T09:00:00+08:00",
+                  ledger=led3, outbox=box3, escalation_recipients=["u_coord"])
+        b1 = led3.by_case("c-1")
+        ok("好实现（真 by_case）→ 两案件台账各查各的（不误伤）",
+           len(b1) == 1 and all(e.get("case_id") == "c-1" for e in b1)
+           and len(led3.by_case("c-2")) == 1, "")
+
+    print("-" * 78)
+    if fails:
+        print("❌ %d 项失败：%s" % (len(fails), fails))
+        return 1
+    print("✅ %d 项全过（该红、该绿都有）" % n_cases[0])
+    return 0
+
+
+def _default_path_role_ok() -> bool:
+    """好样本：真 scan 的默认路径写进台账的 role == 项目统筹。"""
+    import tempfile as _tf
+    tmpd = _tf.mkdtemp(prefix="vcw-controls-")
+    try:
+        led = W.EscalationLedger(Path(tmpd) / "g.json")
+        box = N.NotificationOutbox(dedup=N.DedupLedger(Path(tmpd) / "gd.json"))
+        W.scan([case()], "2026-10-21T09:00:00+08:00",
+               ledger=led, outbox=box, escalation_recipients=["u_coord"])
+        ev = led.by_case("c-1")
+        ntf = box.records[0] if box.records else {}
+        payload = (ntf.get("payload") or {}) if isinstance(ntf, dict) else {}
+        return (len(ev) == 1 and ev[0].get("escalation_role") == "项目统筹"
+                and payload.get("escalation_role") == "项目统筹")
+    finally:
+        import shutil
+        shutil.rmtree(tmpd, ignore_errors=True)
+
+
 if __name__ == "__main__":
     try:
+        if "--controls" in sys.argv:
+            sys.exit(controls())
         sys.exit(main())
     except Exception as exc:  # noqa: BLE001
         import traceback

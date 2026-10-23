@@ -4,6 +4,8 @@
 
 覆盖：
   C0  ContentUnit 12 个 required 字段 + 双指纹；parse_status/failure_kind 域
+  C0b schema fingerprint.required 必须声明双指纹、raw_sha256 pattern 为 64 位十六进制
+  C0c 缺 raw_sha256 / 缺 text_sha256 的 unit 由 schema 拒绝（验收行 4 第二支）
   C1  free_text ok：复用 contract builder、unit_id/content_key 不重算
   C2  ad_record / image：同样复用 contract builder
   C3  partial：可进判定，但 can_pass=False（永不 PASS）
@@ -11,20 +13,30 @@
   C5  covers / does_not_cover 必填且无默认值（缺失/空 covers 必拒）
   C6  parse_status / failure_kind / reason 合法性
   C7  text_sha256 == sha256(text)，text_chars == len(text)
+  C7b 双指纹独立复算：raw 用原件字节、text 用正文、unit_id 按声明公式
+      （验收行 4「用原件字节重算 raw_sha256」+ 行 5「独立复算」——
+       参照是本文件自带的 hashlib，**不**复用 base.contract 的实现，
+       否则生产公式删掉 raw 位时自比恒真：2026-10-23 实测 #5 的 survived 形状）
   C8  同输入两次 unit_id 相同；新进程 + 全新 pycache 仍相同
   C9  只产 ContentUnit，不产 ReviewIR（findings/decision/coverage_state/ir_id 必拒）
   R1  删掉 covers 默认补齐 → 红（C5 缺失参数用例）
   R2  failed 产出正文 → 红（C4）
   R3  text_sha256 与 sha256(text) 脱钩 → 红（C7）
   R4  同输入两次 unit_id 不同 → 红（C8）
+  R4b 跨进程**直接**比对 text_sha256 / raw_sha256（验收行 10：
+      不借 unit_id 的道 —— #10 实测 unit_id 退化成 cu0000… 时这个代理被击穿）
+
+--controls：N1–N6 新断言的反向对照（坏样本必须红；§2.4.1 没红过的断言不算验证过）。
 
 退出码：0 全过 / 1 有红 / 2 未测（导入失败或验收器自身异常）。
 """
 
 import base64
 import copy
+import hashlib
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -89,8 +101,108 @@ def thumb_problems(ref: str) -> list:
     return ["frame_thumb 不是可解码的 PNG/JPEG/WebP"]
 
 
-def free_raw(text="FDA approved wearable breast pump", uri="inline:test"):
-    return {"kind": "free_text", "text": text, "uri": uri}
+def ind_sha_text(t: str) -> str:
+    """独立参照实现：本文件自带的 sha256，不复用 base.contract 的函数。
+
+    ★ 为什么必须独立：#5 实测的 survived 形状是「把 raw_sha256 从 _unit_id
+      公式里删掉仍全绿」—— 生产 validate() 的 H7 用同一个 _unit_id 复算，
+      自比恒真。参照必须长在验收器这边。
+    """
+    return hashlib.sha256(t.encode("utf-8")).hexdigest()
+
+
+def raw_sha_problem(unit: dict, raw_bytes) -> list:
+    """验收行 4 第一支：用**原件字节**重算 raw_sha256，与字段相等。"""
+    fp = unit.get("fingerprint") or {}
+    if not isinstance(raw_bytes, (bytes, bytearray)):
+        return ["无原件字节可复算 raw_sha256（该样本没声明 raw）"]
+    want = hashlib.sha256(bytes(raw_bytes)).hexdigest()
+    if fp.get("raw_sha256") != want:
+        return ["raw_sha256=%r != 原件字节重算 %r"
+                % (fp.get("raw_sha256"), want)]
+    return []
+
+
+def text_sha_problem(unit: dict) -> list:
+    """验收行 4 第二支的 text 半边：用解析出的正文重算 text_sha256。"""
+    fp = unit.get("fingerprint") or {}
+    want = hashlib.sha256((unit.get("text") or "").encode("utf-8")).hexdigest()
+    if fp.get("text_sha256") != want:
+        return ["text_sha256=%r != 正文重算 %r"
+                % (fp.get("text_sha256"), want)]
+    return []
+
+
+def unit_id_formula_problem(unit: dict) -> list:
+    """验收行 5「按声明的复算算法独立重算」：cu + sha256('cu-v1|kind|raw|text')[:16]。
+
+    ★ 判据原文要求 raw_sha256 **参与**公式 —— 同正文不同原件必须拿到不同的
+      unit_id。这里用独立 hashlib 复算，生产公式删掉 raw 位（#5 的变异）时
+      本函数与生产值对不上，必须红。
+    """
+    fp = unit.get("fingerprint") or {}
+    kind = (unit.get("source") or {}).get("kind")
+    want = "cu" + ind_sha_text(
+        "cu-v1|%s|%s|%s" % (kind, fp.get("raw_sha256"), fp.get("text_sha256"))
+    )[:16]
+    if unit.get("unit_id") != want:
+        return ["unit_id=%r != 独立复算 cu-v1|kind|raw|text → %r"
+                % (unit.get("unit_id"), want)]
+    return []
+
+
+def fp_schema_errors(fp, fp_schema: dict) -> list:
+    """验收行 4 第三支：缺 raw_sha256 / 缺 text_sha256 由 **schema** 拒绝。
+
+    判据读自 base/content-unit-v1.schema.json 的 fingerprint.required 与
+    逐字段 pattern —— 验收器只查顶层 required（:157-164）时
+    fingerprint.required 被删掉是不可见的（#4 第二支的 survived 形状）。
+    """
+    if not isinstance(fp, dict):
+        return ["fingerprint 必须是 dict，收到 %s" % type(fp).__name__]
+    errs = []
+    for req in fp_schema.get("required") or []:
+        if req not in fp:
+            errs.append("缺必填指纹字段 %r" % req)
+    props = fp_schema.get("properties") or {}
+    for k, v in fp.items():
+        sub = props.get(k) or {}
+        pat = sub.get("pattern")
+        if isinstance(pat, str) and isinstance(v, str) and not re.match(pat, v):
+            errs.append("fingerprint.%s=%r 不匹配 schema pattern %r" % (k, v, pat))
+    return errs
+
+
+def fp_required_ok(fp_schema: dict) -> bool:
+    """C0b 的判据：schema 的 fingerprint 子声明必须点名双指纹 + text_chars，
+    且 raw_sha256 带 64 位十六进制 pattern。schema 被收窄（required 清空 /
+    pattern 删掉）时必须判 False —— 那正是 #4 第二支的变异面。"""
+    req = set(fp_schema.get("required") or [])
+    if req != {"raw_sha256", "text_sha256", "text_chars"}:
+        return False
+    pat = (fp_schema.get("properties") or {}).get("raw_sha256", {}).get("pattern")
+    return pat == "^[0-9a-f]{64}$"
+
+
+def fp_pair_problem(a: dict, b: dict) -> list:
+    """验收行 10：两次运行（含跨进程）的指纹**直接**逐项比对。
+
+    ★ 不借 unit_id 的道 —— #10 实测 sha256_text(...)[:16] 全零填充时
+      unit_id 退化成 cu0000000000000000，R4 的代理反而通过。
+    """
+    problems = []
+    for k in ("raw_sha256", "text_sha256", "unit_id"):
+        if a.get(k) != b.get(k):
+            problems.append("两次运行 %s 不一致：%r vs %r" % (k, a.get(k), b.get(k)))
+    return problems
+
+
+def free_raw(text="FDA approved wearable breast pump", uri="inline:test",
+             raw_bytes=None):
+    raw = {"kind": "free_text", "text": text, "uri": uri}
+    if raw_bytes is not None:
+        raw["raw_bytes"] = raw_bytes
+    return raw
 
 
 def landing_raw(label="html"):
@@ -131,7 +243,104 @@ def failed_modal_raws():
     }
 
 
+def run_controls() -> int:
+    """--controls：N1–N6 新断言的反向对照。喂坏样本，断言必须红（§2.4.1：
+    没红过的断言不算验证过它 —— 一条恒真的断言比没有更糟）。"""
+    schema = json.loads(open(
+        os.path.join(REPO_ROOT, "base", "content-unit-v1.schema.json"),
+        encoding="utf-8").read())
+    fp_schema = (schema.get("properties") or {}).get("fingerprint") or {}
+
+    u = N.normalize(free_raw("controls base unit"), covers=["正文"],
+                    does_not_cover=[])
+
+    checks = []
+
+    def check(cid, cond, detail=""):
+        checks.append((cid, bool(cond), detail))
+
+    # N1 raw_sha_problem：指纹抄错 → 必须红
+    tampered = copy.deepcopy(u)
+    tampered["fingerprint"]["raw_sha256"] = hashlib.sha256(b"other").hexdigest()
+    check("N1 raw_sha_problem 对抄错的 raw_sha256 必须红",
+          bool(raw_sha_problem(tampered, b"controls-base-raw")))
+    check("N1b raw_sha_problem 对合法 unit 必须绿（不误报）",
+          not raw_sha_problem(u, "controls base unit".encode("utf-8")))
+
+    # N2 unit_id_formula_problem：unit_id 被手改成错值 → 必须红
+    wrong_id = copy.deepcopy(u)
+    wrong_id["unit_id"] = "cu" + "0" * 16
+    check("N2 unit_id_formula_problem 对手改 id 必须红",
+          bool(unit_id_formula_problem(wrong_id)))
+    # ★ N2c（#5 的 survived 形状）：生产公式删掉 raw 位 → 独立复算必须红。
+    #   判据：同一 unit 的 (kind, raw, text) 用独立 hashlib 复算的值
+    #   与生产 unit_id 不等时红 —— 造一个 raw 位被删后**仍相等**的反例是不可能的
+    #   （raw 变则 want 变），这里用「raw 抄错但 unit_id 不变」的假绿样本：
+    fake = copy.deepcopy(u)
+    fake["fingerprint"]["raw_sha256"] = hashlib.sha256(b"another-raw").hexdigest()
+    # unit_id 没跟着 raw 变（这正是 #5 变异造成的形状）→ 必须红
+    check("N2c raw 改了而 unit_id 没变 → 独立复算必须红",
+          bool(unit_id_formula_problem(fake)))
+
+    # N3 text_sha_problem：正文指纹脱钩 → 必须红
+    decoupled = copy.deepcopy(u)
+    decoupled["fingerprint"]["text_sha256"] = hashlib.sha256(b"other text").hexdigest()
+    check("N3 text_sha_problem 对脱钩指纹必须红", bool(text_sha_problem(decoupled)))
+
+    # N4 fp_schema_errors：缺 raw_sha256 / pattern 不符 → 必须红；合法 → 绿
+    cut = copy.deepcopy(u)
+    del cut["fingerprint"]["raw_sha256"]
+    check("N4 缺 raw_sha256 的指纹必须被 schema 判据拒绝",
+          bool(fp_schema_errors(cut["fingerprint"], fp_schema)))
+    # ★ N4b（#4 第二支的反向对照）：schema 的 fingerprint.required 被清空 →
+    #   C0b 判据必须红。判据若写成恒真（比如「required 存在就行」），
+    #   这一喂必绿，controls 当场暴露。
+    gutted = {"type": "object", "properties": fp_schema.get("properties")}
+    check("N4b fingerprint.required 被清空 → C0b 判据必须红",
+          not fp_required_ok(gutted))
+    # ★ N4b2：pattern 被删 → C0b 判据必须红（同一条判据的另一半）。
+    nopat = {"required": fp_schema.get("required"),
+             "properties": {k: v for k, v in (fp_schema.get("properties") or {}).items()
+                            if k != "raw_sha256"}}
+    check("N4b2 raw_sha256 pattern 被删 → C0b 判据必须红",
+          not fp_required_ok(nopat))
+    check("N4b3 真 schema 必须过 C0b 判据（不误报）", fp_required_ok(fp_schema))
+    check("N4c 合法指纹不被误拒", not fp_schema_errors(u["fingerprint"], fp_schema))
+
+    # N5 fp_pair_problem：两次结果不一致 → 必须红；一致 → 绿
+    check("N5 两次指纹不一致必须红",
+          bool(fp_pair_problem({"text_sha256": "a", "raw_sha256": "a", "unit_id": "u1"},
+                               {"text_sha256": "b", "raw_sha256": "a", "unit_id": "u1"})))
+    check("N5b 两次指纹一致必须绿（不误报）",
+          not fp_pair_problem({"text_sha256": "a", "raw_sha256": "a", "unit_id": "u1"},
+                              {"text_sha256": "a", "raw_sha256": "a", "unit_id": "u1"}))
+
+    # N6 schema 判据的负样本走真实 schema 值：pattern 被放宽 → 判据必须跟着失明
+    # （判据取自 schema 而不是硬编码 —— schema 被改坏时这里的「放宽即失明」要能被看见）。
+    loose = copy.deepcopy(fp_schema)
+    loose["properties"] = {**(loose.get("properties") or {})}
+    loose["properties"]["raw_sha256"] = {"type": "string"}
+    check("N6 pattern 放宽后 pattern 不符样本不再被拦（判据确实取自 schema）",
+          not fp_schema_errors(mangled := copy.deepcopy(u)["fingerprint"], loose))
+    # —— N6 是「判据来源」的存在性对照：判据硬编码时 loose 改动不影响结果；
+    #    判据取自 schema 时，放宽 = 失明。两者都可观察，不存在恒真。
+
+    reds = [c for c in checks if not c[1]]
+    print("=" * 60)
+    print("--controls · verify_normalizer 新断言反向对照")
+    print("=" * 60)
+    for cid, ok, detail in checks:
+        print("  %s %-52s %s" % ("✓" if ok else "✗", cid, detail))
+    if reds:
+        print("❌ %d/%d 红" % (len(reds), len(checks)), file=sys.stderr)
+        return 1
+    print("✅ %d/%d 全过（坏样本红、好样本不误报）" % (len(checks), len(checks)))
+    return 0
+
+
 def main():
+    if "--controls" in sys.argv:
+        return run_controls()
     passed = 0
     failed = 0
     thumb_dir = tempfile.mkdtemp(prefix="normalizer-thumb-")
@@ -167,6 +376,15 @@ def main():
            and len(N.FAILURE_KINDS) == len(EXPECTED_FAILURE_KINDS),
            "C0 parse_status / failure_kind 取值域（独立字面量对拍）",
            "%r %r" % (N.PARSE_STATUSES, N.FAILURE_KINDS))
+
+    # C0b schema 的 fingerprint 子声明（验收行 4 第三支的判据来源）。
+    # ★ 只查顶层 required（原 :157-164）时 fingerprint.required 被删掉是不可见的
+    #   —— #4 第二支 survived 的形状：fingerprint.required 从未被消费。
+    fp_schema = (schema.get("properties") or {}).get("fingerprint") or {}
+    fp_req = set(fp_schema.get("required") or [])
+    report(fp_required_ok(fp_schema),
+           "C0b schema fingerprint.required 声明双指纹 + text_chars（pattern 64hex）",
+           "required=%r" % (fp_req,))
 
     # C1 free_text ok
     raw = free_raw()
@@ -647,6 +865,58 @@ def main():
             bad.append((s.get("unit_id"), "raw_sha256"))
     report(not bad, "R3 text_sha256 == sha256(text) 且双指纹齐全", repr(bad[:3]))
 
+    # C7b 双指纹 + unit_id **独立复算**（验收行 4 第一支 / 行 5）。
+    # 参照是本文件自带的 hashlib，不复用 base.contract 的实现 ——
+    # 生产 _unit_id 删掉 raw 位（#5 变异）时这里必须红，自比恒真不算数。
+    # ★ 样本带原件字节：raw_sha256 答「看的是哪份原件」，必须有原件可对
+    #   （#4 第一支 survived：验证器只查 64 位字符串，从不按原件字节重算）。
+    recalc_samples = [
+        # u 来自 C1 的 free_raw() 默认正文；raw_bytes 缺省时 raw_sha256=text UTF-8
+        ("free_text(默认原件=text UTF-8)", u,
+         "FDA approved wearable breast pump".encode("utf-8")),
+        ("ad_record(整行 JSON)", u_ad,
+         json.dumps({"Primary Text": "A", "Headline": "B", "外部广告ID": "ad-1"},
+                    ensure_ascii=False, sort_keys=True,
+                    separators=(",", ":")).encode("utf-8")),
+        ("image(raw)", u_img, b"image-bytes"),
+    ]
+    recalc_bad = []
+    for label, s, rbytes in recalc_samples:
+        for prob in raw_sha_problem(s, rbytes):
+            recalc_bad.append("%s: %s" % (label, prob))
+        for prob in text_sha_problem(s):
+            recalc_bad.append("%s: %s" % (label, prob))
+        for prob in unit_id_formula_problem(s):
+            recalc_bad.append("%s: %s" % (label, prob))
+    # 同正文、不同原件 → unit_id 必须不同（raw 位真实参与公式的行为面）。
+    probe_a = norm(free_raw("同正文不同原件 probe", uri="inline:probe-a"))
+    probe_b = norm(free_raw("同正文不同原件 probe", uri="inline:probe-b",
+                            raw_bytes=b"different-raw-bytes-for-probe-b"))
+    if probe_a["unit_id"] == probe_b["unit_id"]:
+        recalc_bad.append("同正文不同原件 probe: unit_id 撞了（raw 位没参与公式）")
+    if probe_a["fingerprint"]["raw_sha256"] == probe_b["fingerprint"]["raw_sha256"]:
+        recalc_bad.append("同正文不同原件 probe: raw_sha256 撞了（不该发生）")
+    report(not recalc_bad,
+           "C7b 双指纹+unit_id 独立复算（raw 用原件字节；公式吃 raw 位）",
+           repr(recalc_bad[:3]))
+
+    # C0c 缺指纹字段 / 指纹写坏 → schema 判据必须拒绝（验收行 4 第三支）。
+    missing_fp_bad = []
+    for miss in ("raw_sha256", "text_sha256"):
+        cut = copy.deepcopy(u)
+        del cut["fingerprint"][miss]
+        if not fp_schema_errors(cut["fingerprint"], fp_schema):
+            missing_fp_bad.append("缺 %s 的指纹未被 schema 判据拒绝" % miss)
+    mangled = copy.deepcopy(u)
+    mangled["fingerprint"]["raw_sha256"] = "zz" * 32
+    if not fp_schema_errors(mangled["fingerprint"], fp_schema):
+        missing_fp_bad.append("raw_sha256 不匹配 pattern 未被 schema 判据拒绝")
+    if fp_schema_errors(u["fingerprint"], fp_schema):
+        missing_fp_bad.append("合法指纹被 schema 判据误拒")
+    report(not missing_fp_bad,
+           "C0c 缺 raw_sha256/text_sha256 或 pattern 不符 → schema 判据拒绝",
+           repr(missing_fp_bad))
+
     # C8 确定性：同输入两次 + 新进程/新 pycache
     raw2 = free_raw("same input, deterministic")
     a = norm(raw2)
@@ -658,17 +928,44 @@ def main():
         env = os.environ.copy()
         env["PYTHONPYCACHEPREFIX"] = cache
         code = (
-            "import sys\n"
+            "import sys, json\n"
             "sys.path.insert(0, %r)\n"
             "from base.normalizer import normalize\n"
             "u = normalize(%r, covers=%r, does_not_cover=%r)\n"
-            "print(u['unit_id'])\n" % (REPO_ROOT, raw2, ["正文"], []))
+            "print(json.dumps({'unit_id': u['unit_id'],\n"
+            "                  'fingerprint': u['fingerprint']}))\n"
+            % (REPO_ROOT, raw2, ["正文"], []))
         proc = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT,
                               env=env, capture_output=True, text=True)
-        report(proc.returncode == 0
-               and (proc.stdout or "").strip() == a["unit_id"],
+        remote = {}
+        try:
+            remote = json.loads((proc.stdout or "").strip() or "{}")
+        except ValueError:
+            pass
+        report(proc.returncode == 0 and remote.get("unit_id") == a["unit_id"],
                "R4 新进程 + 全新 pycache 后 unit_id 仍相同",
-               "rc=%s out=%r err=%r" % (proc.returncode, proc.stdout, proc.stderr[-200:]))
+               "rc=%s out=%r err=%r" % (proc.returncode, proc.stdout[:200],
+                                        proc.stderr[-200:]))
+        # R4b（验收行 10）：跨进程**直接**比对 text_sha256 / raw_sha256，
+        # 不借 unit_id 的道 —— #10 实测 unit_id 退化成 cu0000… 时该代理被击穿。
+        cross_bad = []
+        if proc.returncode != 0 or not remote:
+            cross_bad.append("新进程没跑起来或输出不是 JSON：%r" % (proc.stdout or "")[:120])
+        else:
+            cross_bad += fp_pair_problem(
+                {"raw_sha256": a["fingerprint"].get("raw_sha256"),
+                 "text_sha256": a["fingerprint"].get("text_sha256"),
+                 "unit_id": a["unit_id"]},
+                {"raw_sha256": remote.get("fingerprint", {}).get("raw_sha256"),
+                 "text_sha256": remote.get("fingerprint", {}).get("text_sha256"),
+                 "unit_id": remote.get("unit_id")})
+            # 行为面：text_sha256 不得退化成「固定串」——
+            # 恒等函数两次运行相等是假绿，不同正文必须拿到不同指纹。
+            if a["fingerprint"]["text_sha256"] == u_part["fingerprint"]["text_sha256"]:
+                cross_bad.append("不同正文的 text_sha256 相同 —— 指纹退化了")
+        report(not cross_bad,
+               "R4b 跨进程直接比对 text_sha256/raw_sha256（不借 unit_id）",
+               repr(cross_bad[:3]))
     finally:
         shutil.rmtree(cache, ignore_errors=True)
 
