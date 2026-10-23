@@ -229,6 +229,12 @@
       "fixture": "{root}/tools/verify_report_render.mjs",
       "command": "node {root}/tools/verify_report_render.mjs"
     },
+    "66": {
+      "test_id": "acceptance-66",
+      "criteria": "L4-1 / SEC-8-8",
+      "fixture": "{root}/tools/verify_report_render.mjs",
+      "command": "node {root}/tools/verify_report_render.mjs"
+    },
     "67": {
       "test_id": "acceptance-67",
       "criteria": "丁 / SEC-8-5",

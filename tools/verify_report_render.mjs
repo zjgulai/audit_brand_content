@@ -478,6 +478,61 @@ try {
            JSON.stringify({ text: mNoL4.text }));
   }
 
+  // ── C4d（验收表 #66 后半 · L4-1 SEC-8-8）多条同质 finding 不刷屏 ───────
+  //
+  // 验收表 #66 原文第二句：「**再构造多条同质 finding，断言群消息仍按 M1
+  // 只有一句、不逐条刷屏。**」
+  //
+  // ★ 2026-10-24 05 指出：这一句与 #60 的覆盖**不重叠** ——
+  //   #60 判据原文是「对五个标签**各构造一条**消息」，单条口径；
+  //   #66 后半是多条口径。`#60a` 只覆盖了 #66 的前半（取最严重那条）。
+  //   此前 `verify_report_render.mjs` 里**没有任何「多条同质 finding」的样本**，
+  //   这一句从未有执行点。
+  //
+  // 关掉它的最小条件（05 给的口径）：3 条同质 confirmed finding，
+  // 断言 `【BLOCK】` 在消息里只出现一次、命中行只有一条。
+  {
+    const homo = baseSnapshot();
+    homo.ir.decision.state = "BLOCK";
+    homo.ir.decision.obligations = [];
+    // 三条同质：同控制点、同严重度、同原文 —— 「同质」是指它们不构成区分度，
+    // 若实现按数组长度循环输出，就会重复三遍同样的句子。
+    const base = baseSnapshot().ir.findings[0];
+    homo.ir.findings = [0, 1, 2].map((i) => ({
+      ...base,
+      finding_id: `f-homo-${i}`,
+    }));
+    const mHomo = R.renderMessage(homo);
+    const tHomo = mHomo.text || "";
+    const labelCount = (tHomo.match(/【BLOCK】/g) || []).length;
+    // 「命中行」= 消息里出现控制点的次数。三者同质，正确实现只该出现一次。
+    const hitCount = (tHomo.match(/H01/g) || []).length;
+    report(
+      mHomo.ok === true
+        && labelCount === 1
+        && hitCount === 1
+        && !tHomo.includes("\n"),
+      "C4d★ 3 条同质 finding → 群消息仍只有一句（【BLOCK】1 次、命中 1 条，不逐条刷屏）",
+      JSON.stringify({ ok: mHomo.ok, labelCount, hitCount, text: tHomo }),
+    );
+
+    // 反向对照：单条 finding 时同样是 1 次 —— 若判据写成「恰好 3 条就输出 3 次」
+    // 或「条数必须 > 1 才通过」，这条会露出它其实没在数。
+    const one = baseSnapshot();
+    one.ir.decision.state = "BLOCK";
+    one.ir.decision.obligations = [];
+    one.ir.findings = [{ ...base }];
+    const mOne = R.renderMessage(one);
+    const tOne = mOne.text || "";
+    report(
+      mOne.ok === true
+        && (tOne.match(/【BLOCK】/g) || []).length === 1
+        && (tOne.match(/H01/g) || []).length === 1,
+      "C4d★ 反向对照：1 条 finding 也是 1 次（证明不是按条数循环输出）",
+      JSON.stringify({ text: tOne }),
+    );
+  }
+
   // C5 未知桶计数
   report(r0.markdown.includes("未知桶计数"),
          "C5 空未知桶也写「未知桶计数」", "");

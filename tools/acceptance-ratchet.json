@@ -2,20 +2,20 @@
  "schema_version": 1,
  "policy": "T-145 · 验收棘轮地板",
  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
- "passed_floor": 86,
+ "passed_floor": 87,
  "recorded_at": "2026-10-24",
  "recorded_reading": {
-  "passed": 86,
+  "passed": 87,
   "failed": 0,
-  "untested": 50,
+  "untested": 49,
   "untested_split": {
-   "machine": 43,
+   "machine": 42,
    "manual": 7,
    "unverifiable": 0,
    "unknown": 0
   },
   "untested_origin": {
-   "unmapped": 49,
+   "unmapped": 48,
    "executed_rc2": 1
   }
  },
@@ -79,13 +79,19 @@
    "to": "86",
    "at": "2026-10-24",
    "why": "本轮补断言后转 passed 4 条：#9（#9 四类 failure_kind 计数，生产侧补齐 empty/parse_error/unsupported 三键）、#62（renderMessage 读 obligations 与 candidate 并渲染并行义务短标记）、#117（单写者约束，跨进程验）、#47 ④（LABELS 词表）。#66 **未转** —— 见下。"
+  },
+  {
+   "from": "86",
+   "to": "87",
+   "at": "2026-10-24",
+   "why": "#66 转 passed：补 `C4d` 覆盖其判据后半「多条同质 finding 不逐条刷屏」（前半早由 #60a 覆盖）。变异「按条数循环输出」→ killed。原判定「改前已覆盖」不成立 —— 那是只看前半。"
   }
  ],
  "notes": [
   {
    "at": "2026-10-24",
-   "about": "#66 的原始判断被证伪",
-   "text": "T-240 审计里我报「#66 把 worstFinding 改成 findings[0] 照样全绿」。实测：在**改前**的 HEAD 状态下做这个变异，`#60a`（双 finding 取 L5 不取 L1）会红 → 该变异本来就是 killed。#66 与 #60 覆盖同一行为，属重复记账，不是缺口。因此 #66 维持未映射，不补断言。这条要在审计报告里更正。"
+   "about": "#66 的覆盖状态（经 05 复核后更正）",
+   "text": "#66 判据有两句：① 「1 个 confirmed L4/L5 + 2 个 L1/L2，不许被数量盖掉」；② 「多条同质 finding 仍只有一句、不逐条刷屏」。前半由 `#60a` 覆盖（`worstFinding → findings[0]` 变异在改前即 killed，实测确认）。后半此前在 `verify_report_render.mjs` 里 **0 处执行点** —— `#60` 判据原文是「五个标签各构造一条消息」，单条口径，与后半的多条口径不重叠。已补 `C4d`（3 条同质 finding：`【BLOCK】` 恰好 1 次、命中 1 条）+ 反向对照（1 条也是 1 次，证明不是按条数循环）。变异「按 finding 数量循环输出」→ killed。**#66 因此转 passed。**"
   }
  ]
 }
