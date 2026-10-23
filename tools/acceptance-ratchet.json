@@ -2,26 +2,35 @@
   "schema_version": 1,
   "policy": "T-145 · 验收棘轮地板",
   "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 121,
+  "passed_floor": 116,
   "recorded_at": "2026-10-23",
   "recorded_reading": {
-    "passed": 121,
+    "passed": 116,
     "failed": 0,
-    "untested": 15,
+    "untested": 20,
     "untested_split": {
-      "machine": 8,
+      "machine": 13,
       "manual": 7,
       "unverifiable": 0,
       "unknown": 0
     },
     "untested_origin": {
-      "unmapped": 14,
+      "unmapped": 19,
       "executed_rc2": 1
     }
   },
   "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
   "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
-  "lower_history": [],
+  "lower_history": [
+    {
+      "from": "121",
+      "to": "116",
+      "at": "2026-10-23",
+      "reason": "读数审计发现 5 行是假绿，已回退映射：#9（指标没算 empty/parse_error/unsupported）、#29（决策表脚本不加载组合规则）、#42（无「P 当严重度」扫描器）、#62（群消息渲染不读 obligations/candidate）、#66（验证器全程只有 1 条 finding）。",
+      "why_not_a_regression": "这不是「功能退步」，是「原先那 5 条 passed 本来就不成立」。回退让读数变诚实，而不是让能力变弱。",
+      "how_to_restore": "按 PMO/audit 下三份审计报告的缺口清单逐条补断言，补一条涨一格。"
+    }
+  ],
   "raise_history": [
     {
       "from": "116",
