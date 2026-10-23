@@ -835,6 +835,14 @@
         "tools/verify_depad.py",
         "tools/verify_kb.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_media_model_lock.py",
+      "asserts": "行 120/121 的**机器半边**：Playbook TS-18/TS-19 仍标「候选」且写着「过门后才锁版本」（出现「已选定/已锁定」即红）；阶段3-准备评估.md 的候选矩阵仍在；**配置里一旦锁定 OCR/ASR 版本，四项（OCR）/五项（ASR）读数必须齐备**，缺一项即红。今天仓内 0 份锁定配置 → 门不适用（打印为事实行，不冒充「门验过了」）。7 项反向对照。**人工实测那一半没有对象**，#120/#121 不映射",
+      "subjects": [
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+        "PMO/implement/阶段3-准备评估.md"
+      ]
     }
   ]
 }
