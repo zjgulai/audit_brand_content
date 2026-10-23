@@ -1,12 +1,6 @@
 {
   "generated_for": "acceptance-v3",
   "rows": {
-    "4": {
-      "test_id": "acceptance-4",
-      "criteria": "甲 / SEC-3.2-1",
-      "fixture": "{root}/tools/verify_normalizer.py",
-      "command": "{venv} {root}/tools/verify_normalizer.py"
-    },
     "5": {
       "test_id": "acceptance-5",
       "criteria": "L1-1",
@@ -274,12 +268,6 @@
     "126": {
       "test_id": "acceptance-126",
       "criteria": "TS-23",
-      "fixture": "{root}/tools/verify_release_gate.py",
-      "command": "{venv} {root}/tools/verify_release_gate.py"
-    },
-    "127": {
-      "test_id": "acceptance-127",
-      "criteria": "TS-24",
       "fixture": "{root}/tools/verify_release_gate.py",
       "command": "{venv} {root}/tools/verify_release_gate.py"
     },

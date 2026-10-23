@@ -2,20 +2,20 @@
  "schema_version": 1,
  "policy": "T-145 · 验收棘轮地板",
  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
- "passed_floor": 84,
+ "passed_floor": 82,
  "recorded_at": "2026-10-23",
  "recorded_reading": {
-  "passed": 84,
+  "passed": 82,
   "failed": 0,
-  "untested": 52,
+  "untested": 54,
   "untested_split": {
-   "machine": 45,
+   "machine": 47,
    "manual": 7,
    "unverifiable": 0,
    "unknown": 0
   },
   "untested_origin": {
-   "unmapped": 51,
+   "unmapped": 53,
    "executed_rc2": 1
   }
  },
@@ -45,6 +45,14 @@
    "reason": "剩余 10 个 fan-out 组（33 行）的覆盖率审计完成：真覆盖仅 #97，30 行 partial、2 行 uncovered（#20/#22）。委托方裁定「全部回退 untested」。另一条独立复核证据：定向变异证明这些验证器对判据本身不敏感 —— 删掉 send_gateway 的裸「通过」分支后仍 34/34 绿；把 auth_session 的 STEP_UP_SECONDS 5 分钟改成 90 秒、ABSOLUTE_SECONDS 8 小时改成 2 小时，仍 40/40 绿；finding_store 接受悬空 derived_from、自指 derived_from 与 control_code=123。",
    "why_not_a_regression": "不是功能退步，是这 30 条 passed 从来就不成立 —— 验证器只验了判据的一部分子条款，而 fan-out 把同一次绿同时记到了整组每一行上。",
    "how_to_restore": "逐行补断言后转回。#97 已用两次定向变异证明真会红（摘必填字段校验 → 3b 三条红；只删『无取证即拒』→ 3c 红），保留 passed。"
+  },
+  {
+   "from": "84",
+   "to": "82",
+   "at": "2026-10-23",
+   "reason": "变异探针审计（wf_f7d730ec-950，43 行 / 104 个变异）判出两行全假绿：#4（把 raw_sha256 从 _unit_id 公式删掉、或构造缺 raw_sha256 的 IR，103/103 仍全绿——原件重算与 schema 拒绝两支都没有执行点）、#127（逐项改动 frame/keyframe/ocr/asr/model/sampling 六类指纹，invalidate 全部返回 False，只有 media_fingerprints 集合 root 会失效——四类媒体指纹逐项失效既没实现也没人验）。",
+   "why_not_a_regression": "同理，这两条的 passed 从来就不成立。",
+   "how_to_restore": "#4 补『用原件字节重算 raw_sha256 与字段相等』+『缺 raw_sha256 由 schema 拒绝』两支；#127 先在生产侧实现逐项指纹失效，再补六类改动各一次的断言。"
   }
  ],
  "raise_history": [
