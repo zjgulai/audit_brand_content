@@ -2,20 +2,20 @@
  "schema_version": 1,
  "policy": "T-145 · 验收棘轮地板",
  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
- "passed_floor": 87,
+ "passed_floor": 117,
  "recorded_at": "2026-10-24",
  "recorded_reading": {
-  "passed": 87,
+  "passed": 117,
   "failed": 0,
-  "untested": 49,
+  "untested": 19,
   "untested_split": {
-   "machine": 42,
+   "machine": 12,
    "manual": 7,
    "unverifiable": 0,
    "unknown": 0
   },
   "untested_origin": {
-   "unmapped": 48,
+   "unmapped": 18,
    "executed_rc2": 1
   }
  },
@@ -85,6 +85,12 @@
    "to": "87",
    "at": "2026-10-24",
    "why": "#66 转 passed：补 `C4d` 覆盖其判据后半「多条同质 finding 不逐条刷屏」（前半早由 #60a 覆盖）。变异「按条数循环输出」→ killed。原判定「改前已覆盖」不成立 —— 那是只看前半。"
+  },
+  {
+   "from": "87",
+   "to": "117",
+   "at": "2026-10-24",
+   "reason": "第三波补断言（e81bde1 + ce0784a）：第二批回退的 30 行先探针再补断言，30 条探针变异全部复测 killed 后加回映射。mapped 88 → 118。"
   }
  ],
  "notes": [
