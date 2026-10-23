@@ -15,6 +15,28 @@
   E **静态扫描**：源码里 `release_status` 只允许常量「待放行」；不存在
     标签→发布状态/已放行的直连映射。
   F **反向对照**：输入带「已放行」也必须被覆盖回「待放行」；ERROR 输入拒路由。
+  A8（#49）**五层「谁接谁结」与规定值逐层恒等**：DP0 投放侧、DP1 文案提交人、
+    DP2 机器（工具预审）、DP3 内容审核员、DP4 法务 —— 接与结同层同角色，
+    规定值写在验证器里（不从生产 ROLE 常量读，否则常量改了断言跟着绿）。
+  C4（#50）**主表 × routing 表全连接**：control-points-v1.json 的全部
+    control_code 在 routing 表里各恰有一行 —— 丢一行、一对多都红。
+    （P1 只对「表里有的行」自洽，routing 删行时它跟着少查一条且全绿。）
+  E4/E5（#53）**静态扫描扩到全部 release_status 生产点**：base/ + api/ 全量
+    AST 扫描 —— 常量值只允许五档结局（待放行/已放行/已拒绝/已撤回/已失效），
+    人工门结局只许出现在 release_gate.py；标签直连映射任何文件都不许有。
+  H（#68）**人工签发的记录必须含正确的签发人**：真实走一遍 release_gate.sign，
+    记录 signer_id 与授权 principal.id 对拍（换 principal 记录必须跟着换）；
+    机器 patch 写 release_status/status → 拒；人工签发后放行状态才变。
+    （B 类断言只看「字段在场」，signer_id 写成常量 "system" 时全仓必须有一处红。）
+
+## --controls（反向对照）
+
+  好样本必须闭嘴、坏样本必须各自红（§2.4.1：没红过的断言不算验证过它）：
+    C-1/C-2/C-3   五层角色判定器：真实路由闭嘴；DP4 finalizer=项目统筹红；DP3 owner=法务红
+    C-4/C-5/C-6   全连接判定器：真实表闭嘴；routing 丢 H09 红；H01 两行（一对多）红
+    C-7/C-8/C-9/C-10  release_status 扫描器：真实源码闭嘴；decision_table 写「放行」红；
+                  release_gate 之外写「已放行」红；标签直连映射红
+    C-11/C-12/C-13  签发人身份判定器：真实签发闭嘴；signer_id=system 红；signer_id=别人红
 
 ## 退出码
 
@@ -36,11 +58,207 @@ sys.path.insert(0, os.path.join(ROOT, "base"))
 
 try:
     from disposition_router import DispositionRouter
+    from auth_session import SessionStore
+    from release_gate import ReleaseGate, MachineWriteDenied
 except Exception as e:  # noqa: BLE001
-    print("❌ 导入 base/disposition_router.py 失败：%s" % e)
+    print("❌ 导入 base/disposition_router.py / release_gate.py 失败：%s" % e)
     sys.exit(1)
 
 FIVE = ["BLOCK", "REVIEW", "未审查", "待自决", "PASS"]
+
+# ── #49：五层「谁接/谁结」的规定值（判据原文，不从生产 ROLE 常量读）────────
+SPEC_ROLES = {
+    "DP0": ("投放侧", "投放侧"),
+    "DP1": ("文案提交人", "文案提交人"),
+    "DP2": ("机器（工具预审）", "机器（工具预审）"),
+    "DP3": ("内容审核员", "内容审核员"),
+    "DP4": ("法务", "法务"),
+}
+
+
+def _role_mismatches(routed):
+    """A8 判定器：routed = {layer: route() 输出}。五层 owner/finalizer 必须与
+    判据规定的「谁接/谁结」逐层恒等；返回不匹配清单（空 = 通过）。"""
+    bad = []
+    for layer, want in SPEC_ROLES.items():
+        r = routed.get(layer)
+        got = (r.get("owner"), r.get("finalizer")) if isinstance(r, dict) else (None, None)
+        if got != want:
+            bad.append("%s: owner=%r/finalizer=%r, 规定 %r/%r"
+                       % ((layer,) + got + want))
+    return bad
+
+
+# ── #50：主表 × routing 表全连接 ─────────────────────────────────────────
+def _collect_codes(node, out=None):
+    """递归收集主表里全部 control_code（主表结构变化时不漏）。"""
+    if out is None:
+        out = []
+    if isinstance(node, dict):
+        v = node.get("control_code")
+        if isinstance(v, str) and v:
+            out.append(v)
+        for x in node.values():
+            _collect_codes(x, out)
+    elif isinstance(node, list):
+        for x in node:
+            _collect_codes(x, out)
+    return out
+
+
+def _load_cp_codes():
+    """主表 control_code 清单；读不出返回 (None, 原因) —— 未测，不许当绿。"""
+    p = os.path.join(ROOT, "research", "governance", "control-points-v1.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:  # noqa: BLE001
+        return None, "control-points-v1.json 读不出（%s）" % e
+    return _collect_codes(data), ""
+
+
+def _routing_gaps(cp_codes, route_rows):
+    """C4 判定器：主表 × routing 表全连接。
+    missing = 主表有、routing 没有（#50 变异形状：routing 丢行）；
+    dup = 一对多（同一 control_code 两行）。"""
+    seen = []
+    dup = set()
+    for row in route_rows or []:
+        code = row.get("control_code") if isinstance(row, dict) else None
+        if not (isinstance(code, str) and code):
+            continue
+        if code in seen:
+            dup.add(code)
+        else:
+            seen.append(code)
+    missing = [c for c in cp_codes if c not in seen]
+    return {"missing": missing, "dup": sorted(dup), "routed": len(seen)}
+
+
+# ── #53 / #68：release_status 生产点全量扫描 ────────────────────────────
+RELEASE_OUTCOMES = ("待放行", "已放行", "已拒绝", "已撤回", "已失效")
+HUMAN_GATE_FILE = os.path.join("base", "release_gate.py")
+RELEASE_PRODUCERS = ("base/disposition_router.py", "base/decision_table.py",
+                     "base/judge_entry.py", "base/media.py",
+                     "base/release_gate.py", "base/case_watch.py",
+                     "api/review_api.py", "api/write_api.py")
+
+
+def _const_write_sites(tree):
+    """release_status 常量写入点：dict 字面量 / 下标赋值 / 关键字实参。"""
+    sites = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict):
+            for k, v in zip(node.keys, node.values):
+                if isinstance(k, ast.Constant) and k.value == "release_status" \
+                        and isinstance(v, ast.Constant):
+                    sites.append(v.value)
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Subscript) and isinstance(t.slice, ast.Constant) \
+                        and t.slice.value == "release_status" \
+                        and isinstance(node.value, ast.Constant):
+                    sites.append(node.value.value)
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg == "release_status" and isinstance(kw.value, ast.Constant):
+                    sites.append(kw.value.value)
+    return sites
+
+
+def _scan_release_writes(sources):
+    """E4 判定器：多文件 release_status 常量扫描（#53 / #68）。
+    sources = {相对路径: 源码文本} → 违规清单（空 = 通过）。
+      ① 常量值只允许五档结局；
+      ② 人工门结局（非「待放行」）只许出现在 release_gate.py。
+    ★ 结局清单来自判据原文，不从被扫文件读 —— 常量改了断言不会跟着绿。"""
+    bad = []
+    for rel in sorted(sources):
+        try:
+            tree = ast.parse(sources[rel])
+        except SyntaxError as e:
+            bad.append("%s: 语法解析失败 %s" % (rel, e))
+            continue
+        for v in _const_write_sites(tree):
+            if v is None:
+                continue        # ERROR 骨架里的占位 None
+            if v not in RELEASE_OUTCOMES:
+                bad.append("%s: release_status 常量 %r 不在五档结局内" % (rel, v))
+            elif v != "待放行" and rel != HUMAN_GATE_FILE:
+                bad.append("%s: 人工门结局 %r 出现在 release_gate.py 之外" % (rel, v))
+    return bad
+
+
+def _label_maps(sources):
+    """E5 判定器：任何生产文件不得出现 五档标签 → 释放状态 的直连映射。"""
+    bad = []
+    for rel in sorted(sources):
+        try:
+            tree = ast.parse(sources[rel])
+        except SyntaxError:
+            continue            # 语法错由 E4 报
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Dict):
+                for k, v in zip(node.keys, node.values):
+                    if isinstance(k, ast.Constant) and k.value in FIVE \
+                            and isinstance(v, ast.Constant) \
+                            and isinstance(v.value, str) and not v.value.startswith("DP"):
+                        bad.append("%s: %r → %r 直连映射" % (rel, k.value, v.value))
+    return bad
+
+
+def _load_producer_sources():
+    """base/*.py + api/*.py 全量读入（相对路径 → 源码文本）。"""
+    srcs = {}
+    for d in ("base", "api"):
+        dp = os.path.join(ROOT, d)
+        if not os.path.isdir(dp):
+            continue
+        for fn in sorted(os.listdir(dp)):
+            if fn.endswith(".py"):
+                rel = "%s/%s" % (d, fn)
+                with open(os.path.join(dp, fn), encoding="utf-8") as f:
+                    srcs[rel] = f.read()
+    return srcs
+
+
+# ── #68：签发身份样本（真实走一遍 release_gate.sign）────────────────────
+SIGN_CASE = {
+    "case_id": "case-h", "case_version": 1,
+    "ir_id": "ir-1", "ir_version": "review-ir-v1",
+    "raw_sha256": "1" * 64, "text_sha256": "2" * 64,
+    "rule_snapshot": {"version": "rs-1", "hash": "3" * 64},
+    "kb_snapshot": {"version": "kb-1", "hash": "4" * 64},
+    "used_authority_refs": [{"ref_id": "E1", "version": "v1"}],
+    "conflict_table_version": "ct-1",
+    "media_fingerprints": [],
+    "frame_manifest_hash": "f" * 64, "keyframe_set_hash": "e" * 64,
+    "ocr_output_hash": "d" * 64, "asr_output_hash": "c" * 64,
+    "model_config_hash": "b" * 64, "sampling_config_hash": "a" * 64,
+    "submitter_id": "u1", "final_reviewer_id": "u2",
+    "tenant": "t1", "product_line": "p1",
+}
+
+
+def _sign_case(tmpdir, principal_id="u3", case_id="case-h", now=1000):
+    """真实签发一件案子，返回 (sig, principal, gate)。"""
+    sessions = SessionStore(os.path.join(tmpdir, "sess_%s.db" % case_id))
+    gate = ReleaseGate(sessions=sessions)
+    principal = {"id": principal_id, "tenant": "t1", "product_line": "p1",
+                 "capabilities": ["release.sign"]}
+    case = dict(SIGN_CASE)
+    case["case_id"] = case_id
+    token = sessions.issue_step_up(principal_id, case_id, "sign", "n1", now=now)
+    sig = gate.sign(case, principal, token, "n1", reason="ctl", now=now + 1)
+    return sig, principal, gate
+
+
+def _signer_mismatch(sig, principal):
+    """H1 判定器：签发记录的 signer_id 必须等于**本次授权** principal 的 id。"""
+    pid = principal.get("id") if isinstance(principal, dict) else None
+    if isinstance(pid, str) and pid and sig.get("signer_id") == pid:
+        return []
+    return ["signer_id=%r != 授权 principal.id=%r" % (sig.get("signer_id"), pid)]
 
 
 def dec(state="BLOCK", layer="DP2", obligations=None, **over):
@@ -82,6 +300,7 @@ def expected_due(now, due_text):
 
 def main():
     fails = []
+    untested = []
     checks = 0
 
     def T(cid, ok, detail=""):
@@ -121,6 +340,20 @@ def main():
           isinstance(r.get("appeal_channel"), str) and RECEIPT in r["appeal_channel"], str(r.get("appeal_channel")))
         T("%s：due_at 是 ISO-Z" % cid,
           isinstance(r.get("due_at"), str) and r["due_at"].endswith("Z") and "T" in r["due_at"], str(r.get("due_at")))
+
+    # ── A8 五层「谁接/谁结」与规定值恒等（#49）────────────────────────
+    #   A3 只断言 finalizer 非空 —— DP4 finalizer 从「法务」改成「项目统筹」时
+    #   105 项全绿（#49 变异实测）。这里拿判据原文的规定值逐层对拍。
+    routed = {}
+    for layer in ("DP0", "DP1", "DP2", "DP3", "DP4"):
+        routed[layer] = router.route(decision_for_layer(layer), RECEIPT,
+                                     now="2026-10-19T02:00:00Z")
+    role_bad = _role_mismatches(routed)
+    T("A8 五层 owner/finalizer 与规定值逐层恒等（DP4=法务、DP3=内容审核员…）",
+      role_bad == [], "; ".join(role_bad))
+    T("A8b 每次路由只产出唯一一个处置层（无多层并存/无层可落）",
+      all(r.get("layer") in ("DP0", "DP1", "DP2", "DP3", "DP4") for r in routed.values()),
+      str({k: r.get("layer") for k, r in routed.items()}))
 
     # ── B 不重算 state/layer、不重生成 obligations ──────────────────
     obs = ["pending_candidate", "partial_coverage", "evidence_gap", "自定义义务"]
@@ -196,6 +429,25 @@ def main():
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
+    # ── C4 主表 × routing 表全连接（#50）────────────────────────────
+    #   P1 只对「routing 表里有的行」自洽：routing 删掉 H09 那行时它少查一条
+    #   且全绿（#50 变异实测）。全连接以主表 control-points-v1.json 为基准。
+    cp_codes, cp_err = _load_cp_codes()
+    if cp_codes is None:
+        print("  ⚠ C4 未测：%s" % cp_err)
+        untested.append("C4 " + cp_err)
+    else:
+        gaps = _routing_gaps(cp_codes, rows)
+        T("C4 主表全部 %d 个 control_code 在 routing 表各有恰一行（缺/重都红）"
+          % len(cp_codes),
+          gaps["missing"] == [] and gaps["dup"] == [],
+          "missing=%s dup=%s routed=%d" % (gaps["missing"], gaps["dup"], gaps["routed"]))
+        T("C4b routing 表无未登记的孤儿行",
+          all(isinstance(row.get("control_code"), str)
+              and row.get("control_code") in set(cp_codes) for row in rows),
+          str([row.get("control_code") for row in rows
+               if row.get("control_code") not in set(cp_codes)]))
+
     # ── D 一致性守卫 ────────────────────────────────────────────────
     def must_raise(cid, fn):
         try:
@@ -246,6 +498,20 @@ def main():
     T("E3 源码不出现「已放行」/published 释放路径字面量",
       ("已放行" not in src) and ("published" not in src.lower()), "")
 
+    # ── E4/E5 静态扫描扩到全部 release_status 生产点（#53 / #68）────
+    #   旧扫描只读 disposition_router.py 一个文件：decision_table.py:337
+    #   写「放行」时 105 项全绿（#53 变异实测）。
+    srcs = _load_producer_sources()
+    if not srcs:
+        print("  ⚠ E4/E5 未测：base/ api/ 读不出源码")
+        untested.append("E4/E5 base/ api/ 读不出源码")
+    else:
+        e4 = _scan_release_writes(srcs)
+        T("E4 release_status 常量写入点全量扫描（base/ + api/ 共 %d 个文件）只许五档结局，人工门结局只在 release_gate.py"
+          % len(srcs), e4 == [], "; ".join(e4))
+        e5 = _label_maps(srcs)
+        T("E5 任何生产文件不得有 五档标签→释放状态 直连映射", e5 == [], "; ".join(e5))
+
     # ── F 反向对照：输入说已放行也必须被覆盖 ────────────────────────
     r_f = router.route(dec("BLOCK", "DP2", release_status="已放行"), RECEIPT)
     T("F1 输入 release_status=已放行 → 输出仍是待放行",
@@ -266,12 +532,160 @@ def main():
       router.route(dec("BLOCK", "DP2"), RECEIPT, now="2026-10-19T02:00:00Z")["due_at"]
       == r_g1["due_at"], "")
 
+    # ── H 人工签发才改变放行状态、签发记录含正确的签发人（#68）──────
+    #   旧验证器 0 处提到 签发/signer：signer_id 写成常量 "system" 时
+    #   verify_release_gate 62 项也全绿（#68 变异实测）—— 它只断言字段在场
+    #   与 SoD 权限，从不把记录与授权 principal 身份对拍。
+    tmpdir_h = tempfile.mkdtemp(prefix="disposition_sign_")
+    try:
+        sig_h, principal_h, gate_h = _sign_case(tmpdir_h)
+        mism = _signer_mismatch(sig_h, principal_h)
+        T("H1 签发记录 signer_id 必须等于本次授权 principal 的 id", mism == [],
+          "; ".join(mism))
+        T("H2 签发记录含签发时间与 step-up ref（记录可追溯到人）",
+          isinstance(sig_h.get("signed_at"), str) and sig_h["signed_at"]
+          and isinstance(sig_h.get("step_up_ref"), str) and sig_h["step_up_ref"],
+          "signed_at=%r step_up_ref=%r" % (sig_h.get("signed_at"), sig_h.get("step_up_ref")))
+        st_h = gate_h.state("case-h")
+        T("H3 人工签发后放行状态才改变（sign → 已放行）",
+          st_h["status"] == "signed" and st_h["release_status"] == "已放行", str(st_h))
+        # 反向对照（进程内）：换一个授权人签发，记录必须跟着换 —— 防「死常量」断言。
+        sig_b, principal_b, _ = _sign_case(tmpdir_h, principal_id="u9",
+                                           case_id="case-h2", now=2000)
+        T("H4 换授权人签发 → signer_id 跟着换（不是写死的常量）",
+          sig_b["signer_id"] == "u9" and sig_b["signer_id"] != sig_h["signer_id"],
+          "%r vs %r" % (sig_b["signer_id"], sig_h["signer_id"]))
+        # 机器 patch 写 release_status/status → 拒（#68：机器标签不可写放行）。
+        try:
+            gate_h.apply_machine_patch("case-h", {"release_status": "已放行"})
+            T("H5 机器 patch 写 release_status → 拒", False, "未拒")
+        except MachineWriteDenied:
+            T("H5 机器 patch 写 release_status → 拒", True, "")
+        try:
+            gate_h.apply_machine_patch("case-h", {"status": "signed"})
+            T("H6 机器 patch 写 status → 拒", False, "未拒")
+        except MachineWriteDenied:
+            T("H6 机器 patch 写 status → 拒", True, "")
+    finally:
+        shutil.rmtree(tmpdir_h, ignore_errors=True)
+
     for f in fails:
         print("  ❌ " + f)
-    verdict = "❌" if fails else "✅"
-    print("\n%s verify_disposition_router %d 项检查 · %d 项红" % (verdict, checks, len(fails)))
-    return 1 if fails else 0
+    for u in untested:
+        print("  ⚠ 未测：" + u)
+    verdict = "❌" if fails else ("⚠" if untested else "✅")
+    print("\n%s verify_disposition_router %d 项检查 · %d 项红 · %d 项未测"
+          % (verdict, checks, len(fails), len(untested)))
+    if fails:
+        return 1
+    if untested:
+        return 2
+    return 0
+
+
+def run_controls():
+    """--controls：好样本必须闭嘴，坏样本必须各自红（§2.4.1）。
+
+    每组判定器都是「拿真实产物跑一遍」的好样本 + 判据原文里的坏样本形状，
+    全部进程内构造，不改任何盘上文件。
+    """
+    results = []
+
+    def ok(name, cond, detail=""):
+        results.append((name, bool(cond), detail))
+
+    tmpdir = tempfile.mkdtemp(prefix="disposition_ctl_")
+    try:
+        router = DispositionRouter()
+
+        # ── A8 五层角色判定器 ──────────────────────────────────────
+        routed = {layer: router.route(decision_for_layer(layer), "rcpt_ctl",
+                                      now="2026-10-19T02:00:00Z")
+                  for layer in ("DP0", "DP1", "DP2", "DP3", "DP4")}
+        ok("C-1 好样本（真实五层路由）→ 角色判定器闭嘴",
+           _role_mismatches(routed) == [], str(_role_mismatches(routed)))
+        # C-2 = #49 变异形状：DP4 finalizer 掉包成「项目统筹」
+        bad_dp4 = dict(routed)
+        bad_dp4["DP4"] = dict(routed["DP4"], finalizer="项目统筹")
+        ok("C-2 DP4 finalizer=项目统筹 → 红", _role_mismatches(bad_dp4) != [],
+           str(_role_mismatches(bad_dp4)))
+        # C-3 反向：换一层（DP3 owner=法务）也必须红 —— 不许只认 DP4 一个形状
+        bad_dp3 = dict(routed)
+        bad_dp3["DP3"] = dict(routed["DP3"], owner="法务")
+        ok("C-3 DP3 owner=法务（掉包另一层）→ 红",
+           _role_mismatches(bad_dp3) != [], str(_role_mismatches(bad_dp3)))
+
+        # ── C4 全连接判定器 ────────────────────────────────────────
+        routing = json.load(open(router.path, encoding="utf-8"))
+        rows = routing.get("routes") or []
+        cp_codes, cp_err = _load_cp_codes()
+        if cp_codes is None:
+            ok("C-4…C-6 全连接未测：%s" % cp_err, False)
+        else:
+            ok("C-4 好样本（真实 routing 表）→ 全连接判定器闭嘴",
+               _routing_gaps(cp_codes, rows) == {"missing": [], "dup": [], "routed": len(cp_codes)},
+               str(_routing_gaps(cp_codes, rows)))
+            # C-5 = #50 变异形状：routing 表丢一行 H09
+            rows_missing = [r for r in rows if r.get("control_code") != "H09"]
+            ok("C-5 routing 表丢 H09 → 红",
+               _routing_gaps(cp_codes, rows_missing)["missing"] == ["H09"],
+               str(_routing_gaps(cp_codes, rows_missing)))
+            # C-6 反向：一对多（H01 两行）也必须红
+            rows_dup = list(rows) + [dict(rows[0])]
+            ok("C-6 H01 出现两行（一对多）→ 红",
+               _routing_gaps(cp_codes, rows_dup)["dup"] == ["H01"],
+               str(_routing_gaps(cp_codes, rows_dup)))
+
+        # ── E4/E5 release_status 扫描器 ────────────────────────────
+        srcs = _load_producer_sources()
+        ok("C-7 好样本（真实 base/ + api/ 源码）→ 扫描器闭嘴",
+           srcs and _scan_release_writes(srcs) == [] and _label_maps(srcs) == [],
+           "%s / %s" % (_scan_release_writes(srcs), _label_maps(srcs)))
+        # C-8 = #53 变异形状：decision_table.py 写「放行」
+        src_bad = dict(srcs)
+        src_bad["base/decision_table.py"] = srcs["base/decision_table.py"].replace(
+            '"release_status": "待放行",', '"release_status": "放行",', 1)
+        ok("C-8 decision_table.py 写「放行」→ 红",
+           _scan_release_writes(src_bad) != [], str(_scan_release_writes(src_bad)))
+        # C-9 反向：release_gate.py 之外写人工门结局也必须红
+        #   （case_watch.py 里混进一个 release_status="已放行" 的字面量写入点）
+        src_bad2 = dict(srcs)
+        src_bad2["base/case_watch.py"] = srcs["base/case_watch.py"] + \
+            '\n\n_WATCH_BAD = {"release_status": "已放行"}\n'
+        ok("C-9 release_gate.py 之外写「已放行」→ 红",
+           any("case_watch" in x for x in _scan_release_writes(src_bad2)),
+           str(_scan_release_writes(src_bad2)))
+        # C-10 = E5 形状：标签直连映射
+        src_bad3 = dict(srcs)
+        src_bad3["api/review_api.py"] = srcs["api/review_api.py"] + \
+            '\n\n_LABEL_MAP = {"PASS": "已放行"}\n'
+        ok("C-10 PASS→已放行 直连映射 → 红",
+           _label_maps(src_bad3) != [], str(_label_maps(src_bad3)))
+
+        # ── H1 签发身份判定器 ──────────────────────────────────────
+        sig_h, principal_h, _ = _sign_case(tmpdir, case_id="ctl-good")
+        ok("C-11 好样本（真实签发）→ 身份判定器闭嘴",
+           _signer_mismatch(sig_h, principal_h) == [], str(_signer_mismatch(sig_h, principal_h)))
+        # C-12 = #68 变异形状：signer_id 写成常量 "system"
+        sig_sys = dict(sig_h, signer_id="system")
+        ok("C-12 signer_id=system（不是授权人）→ 红",
+           _signer_mismatch(sig_sys, principal_h) != [],
+           str(_signer_mismatch(sig_sys, principal_h)))
+        # C-13 反向：换成另一个真实用户也必须红（不许只认 "system" 一个串）
+        sig_other = dict(sig_h, signer_id="u77")
+        ok("C-13 signer_id=u77（不是授权人）→ 红",
+           _signer_mismatch(sig_other, principal_h) != [],
+           str(_signer_mismatch(sig_other, principal_h)))
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    passed = sum(1 for _, p, _ in results if p)
+    for name, p, detail in results:
+        print("  %s %s  %s" % ("✓" if p else "✗", name, detail))
+    print("\n%s verify_disposition_router --controls %d/%d"
+          % ("✅" if passed == len(results) else "✗", passed, len(results)))
+    return 0 if passed == len(results) else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run_controls() if "--controls" in sys.argv[1:] else main())

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import re
 import sys
+import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,7 +37,184 @@ ENVELOPE = ROOT / "tools" / "reply-cards" / "envelope.mjs"
 WS_DAEMON = ROOT / "tools" / "ws_daemon.mjs"
 
 
-def main() -> int:
+# ═══════════════════════════════════════════════════════════════════════
+# JS 噪声剥离（5c-b 用）：抹掉**注释**，字符串/模板串**逐字保留**，其余原样。
+# 为什么不许用「裸文本存在性」：
+#   §2.4 那条（「名字出现过 ≠ 拦得住」）+ 2026-10-24 实测 —— 变异 64-0b 把降级目标
+#   改成 `sent = { ok: true, mode: \`card-failed→${rc.mode}\`, ... }`（发不出去的
+#   原样结果），裸文本检查 `card-failed→` 依然命中，34/34 依旧全绿。
+# 为什么字符串/模板串逐字保留而不是抹成空格：5c-b 的判据之一正是**模板串里的
+#   mode 来源**（`${rt.mode}` 合法 / `${rc.mode}` 是 64-0b 的骗法），抹掉内容判据就没了。
+#   字符串/模板串要消费（而不是当普通字符放过）的原因：里面的 `//`（URL）不许被当成注释。
+# 已知盲区明说（§2.1.1：会误报的检查器比没有更糟，会漏报的也要明着留）：
+#   ① 字符串/模板串/正则字面量的**内容**对 5c-b3 的标记检查可见 —— 把降级标记藏进
+#     字符串常量能骗过 5c-b3（但骗不过 5c-b1/5c-b2 的调用结构检查）；
+#   ② 不处理正则字面量（有意的：启始判定是启发式，误判会把真代码抹掉）；
+#     正则体内不可能出现未转义的 `/`，所以不会误触发注释分支。
+def _strip_js_noise(src: str) -> str:
+    out: list[str] = []
+    i, n = 0, len(src)
+    while i < n:
+        c = src[i]
+        nxt = src[i + 1] if i + 1 < n else ""
+        if c == "/" and nxt == "/":                      # 行注释
+            while i < n and src[i] != "\n":
+                out.append("\n" if src[i] == "\n" else " ")
+                i += 1
+            continue
+        if c == "/" and nxt == "*":                      # 块注释（保换行）
+            i += 2
+            while i < n and not (src[i] == "*" and i + 1 < n and src[i + 1] == "/"):
+                out.append("\n" if src[i] == "\n" else " ")
+                i += 1
+            out.append("  ")
+            i += 2
+            continue
+        if c in ("'", '"', "`"):                         # 字符串 / 模板串：逐字保留
+            q = c
+            out.append(q)
+            i += 1
+            while i < n:
+                if src[i] == "\\" and i + 1 < n:
+                    out.append(src[i:i + 2])
+                    i += 2
+                    continue
+                out.append(src[i])
+                if src[i] == q:
+                    i += 1
+                    break
+                i += 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _branch_spans(src: str):
+    """从已剥噪声的源码里找出 replyTo 的降级链，返回 (行列表, 起点0基, 终点0基含)。
+
+    branch_spans = [(名字, 起行0基, 止行0基含)]；找不到链 → None。
+    """
+    lines = src.splitlines()
+    start = next((i for i, ln in enumerate(lines)
+                  if re.match(r"^async function replyTo\s*\(", ln)), None)
+    if start is None:
+        return None, None, None
+    depth, end = 0, None
+    for i in range(start, len(lines)):
+        depth += lines[i].count("{") - lines[i].count("}")
+        if i > start and depth == 0:
+            end = i
+            break
+    if end is None:
+        return None, None, None
+    blk = lines[start:end + 1]
+    chain_re = re.compile(r"\}\s*else\s*\{")
+    chain = next((k for k, ln in enumerate(blk) if chain_re.search(ln)), None)
+    if chain is None:
+        return None, None, None
+    branch_re = re.compile(r"^  if\s*\(")
+    marks = [(k, "else" if chain_re.search(ln) else "if")
+             for k, ln in enumerate(blk) if chain_re.search(ln) or branch_re.match(ln)]
+    spans = []
+    for idx, (k, name) in enumerate(marks):
+        stop = (marks[idx + 1][0] - 1) if idx + 1 < len(marks) else len(blk) - 1
+        spans.append((f"{name}@{k}", k, stop))
+    return spans, start, end
+
+
+def _branch_text(spans, start, end, lines):
+    return [(name, "\n".join(lines[start + a:start + b + 1])) for name, a, b in spans]
+
+
+def _fallback_checks(raw_src: str):
+    """5c-b 三条判据（输入 = **未剥离**的 daemon 源码文本）。
+
+    判据读法（★ 一处都不能松，三处都各有变异骗过它）：
+      · 定位 replyTo 体内 `if (card) { ... } else { ... }` 的**两个 span**；
+      · card span：必须调用 feishu.replyCard；
+      · fallback span = **card span 的下一个 span**（`} else {` 起的那支）——
+        ① 必须有 `= await feishu.replyMarkdown(`（一次调用 = 一条真到群的消息；
+          `sent = rc` 没有调用 → 变异 64-0 在这里红）；
+        ② 该 span 里必须出现 `sent =`，且补发结果被收进 sent（出口留痕唯一）；
+        ③ 降级标记 `card-failed→` 必须落在**这个 span**（replyTo 体内），且 mode
+          取自补发那次（`${rt.mode}` / `${r.mode}` / 'text-fallback'）——
+          `${rc.mode}` 是变异 64-0b 的骗法（它在台账里把补发记成卡片）；
+          标记出现在别的 span 或注释性文本里都不算（后者见 --controls 坏样本 3）。
+
+    返回 (ok, fails, detail)；fails 是红项键列表，空 = 全过。
+    main 与 --controls 共用同一份判据 —— 对照喂的坏样本必须让**这同一份**判据红。
+    """
+    wd_src = _strip_js_noise(raw_src)
+    wd_lines = wd_src.splitlines()
+    spans, b0, _b1 = _branch_spans(wd_src)
+    if spans is None:
+        return False, ["chain"], "replyTo 函数体或 `} else {` 降级链扫描不到 —— 判据落空"
+    call_re = re.compile(r"\bfeishu\.(replyCard|replyMarkdown|sendMarkdown)\s*\(")
+
+    def _txt(i):
+        nm, a, b = spans[i]
+        return nm, "\n".join(wd_lines[b0 + a:b0 + b + 1])
+
+    card_i = next((i for i in range(len(spans))
+                   if "replyCard" in call_re.findall(_txt(i)[1])), None)
+    if card_i is None:
+        return False, ["card"], "card 分支（调用 replyCard 的那支）扫描不到"
+    fb_i = card_i + 1
+    if fb_i >= len(spans):
+        return False, ["no_replyMarkdown"], "card 分支之后没有 else 支 —— 没有补发"
+    fb_nm, fb_tx = _txt(fb_i)
+    fb_calls = call_re.findall(fb_tx)
+    fb_span_all = "\n".join(wd_lines[b0 + spans[fb_i][1]:])  # fallback span 起到函数尾
+
+    # 降级标记：补发那次的 mode（rt/r）或封闭集合 text-fallback；
+    # rc/card 那几次的 mode **不算** —— 那是变异 64-0b 的骗法
+    guard_re = re.compile(
+        r"card-failed\s*→\s*(?:\$\{\s*(?:rt|r)\s*\.\s*mode\s*\}|['\"]text-fallback['\"])")
+    raw_re = re.compile(r"card-failed\s*→\s*\$\{\s*(?:rc|card)\s*\.\s*mode\s*\}")
+
+    c5a = fb_calls == ["replyMarkdown"]
+    c5b = (c5a and re.search(r"=\s*await\s+feishu\.replyMarkdown\s*\(", fb_tx)
+           and re.search(r"\bsent\s*=", fb_tx))
+    mark_m = guard_re.search(fb_span_all)
+    raw_m = raw_re.search(fb_span_all)
+    c5c = mark_m is not None and raw_m is None
+    fails = []
+    if not c5a:
+        fails.append("no_replyMarkdown")
+    if not c5b:
+        fails.append("sent_missing")
+    if not c5c:
+        # raw_rc_mode 优先：骗法（`${rc.mode}`）在场时红在这一项，
+        # 好让 --controls 能证明判据「看见了」那个骗法，而不是碰巧红
+        fails.append("raw_rc_mode" if raw_m is not None else "mark")
+    detail = (f"card分支={spans[card_i][0]} 补发分支={fb_nm}（calls={fb_calls or '无'}）；"
+              f"标记{'在(' + mark_m.group(0) + ')' if mark_m else '缺'}；"
+              f"rc.mode 骗法{'在' if raw_m else '无'}")
+    return (not fails), fails, detail
+
+
+# --controls 的坏样本：直接复用探针阶段两份真实变异（内存字符串，不碰盘上文件）
+_BAD_64_0 = (
+    "      const rt = await feishu.replyMarkdown(messageId, chatId, text);\n"
+    "      sent = rt.ok ? { ...rt, mode: `card-failed→${rt.mode}`, error: rc.error } : rt;",
+    "      sent = rc;")
+_BAD_64_0B = (
+    "      const rt = await feishu.replyMarkdown(messageId, chatId, text);\n"
+    "      sent = rt.ok ? { ...rt, mode: `card-failed→${rt.mode}`, error: rc.error } : rt;",
+    "      sent = { ok: true, mode: `card-failed→${rc.mode}`, error: rc.error };")
+_BARE = "本次审批通过，请你查收。"
+_BAD_TEXT = "本次审批已通过，无需处理。"
+
+
+def _bare_hit(hits):
+    """7d 的判定核心：hits 里有没有 裸「通过」@4:6 这一条。main 与 --controls 共用。"""
+    return next((h for h in (hits or [])
+                 if h.get("word") == "通过" and h.get("start") == 4
+                 and h.get("end") == 6), None)
+
+
+def _main() -> int:
     results = []
 
     def ok(name, cond, detail):
@@ -202,6 +380,35 @@ def main() -> int:
     else:
         results.append(("5c ws_daemon.mjs 不存在 → 跳过", True, "文件不在"))
 
+    # 5c-b：卡片被拒 → **真的补发一条纯文本**（行为级，不只查文本存在）。
+    # ★ 2026-10-24 实测：变异 64-0（`sent = rc;` —— 卡片失败后把**发不出去的原样
+    #   结果**当发送结果）之后 34/34 仍全绿，`verify_cards.mjs` 的 L1 也只查
+    #   `card-failed→` 这串字在不在 —— 「最终仍有一条纯文本到达群里」在发送链上
+    #   0 断言。变异 64-0b 更阴：保留 `card-failed→` 字样（骗过 L1），但 mode 记的
+    #   是 `rc.mode`（卡片那次，不是补发那次）。判据见 `_fallback_checks` 的 docstring
+    #   （main 与 --controls 共用同一份，对照喂的坏样本红在**同一份**判据上）。
+    if WS_DAEMON.exists():
+        f_ok, f_fails, f_detail = _fallback_checks(
+            WS_DAEMON.read_text(encoding="utf-8"))
+        fails = set(f_fails)
+        structural = {"chain", "card"}          # 链都扫不到 → 三条全红，不许静默绿
+        subs = [
+            ("5c-b1 卡片被拒 → 有一次**新的** replyMarkdown 调用（真补发）",
+             "no_replyMarkdown"),
+            ("5c-b2 补发结果必须落进 sent（出口留痕唯一）", "sent_missing"),
+            ("5c-b3 sent.mode 带降级标记、且 mode 取自补发那次（不许 `${rc.mode}`）",
+             None),   # mark / raw_rc_mode 任一在即红
+        ]
+        for name, key in subs:
+            bad = bool(fails & structural)
+            if key:
+                bad = bad or key in fails
+            else:
+                bad = bad or ("mark" in fails) or ("raw_rc_mode" in fails)
+            ok(name, not bad, f_detail)
+    else:
+        results.append(("5c-b ws_daemon.mjs 不存在 → 跳过", True, "文件不在"))
+
     # ═══════ 6. 外发最小化（G-6）：唯一出口 decide_mode ═══════
     pos = "联系 13800138000，身份证 11010519491231002X，路径 /Users/lute/secret.txt"
     out = decide_mode(pos)
@@ -268,6 +475,62 @@ def main() -> int:
                  and neg_out.get("redactions") == [])
     results.append(("7c 正常文案含「通过率」→ 不误拦", report_ok, repr(neg_out)))
 
+    # 7d：**裸「通过」**必须拦（L3-4 四词之一）。
+    # ★ 2026-10-24 实测：把 FORBIDDEN_RECEIPT_WORDS 的 `通过(?!率)` 分支删掉后
+    #   34/34 仍全绿 —— 7a 只含「已通过/无需处理」、7b 只有「审批完成」、7c 只证
+    #   「通过率」不误拦，四词清单里这一词实际未被验（变异 65-0 survived）。
+    bare = _BARE
+    bare_out = decide_mode(bare)
+    bare_hits = ((bare_out.get("error") or {}).get("hits") or [])
+    bare_hit = _bare_hit(bare_hits)
+    bare_ok = (bare_out.get("blocked") is True and bare_out.get("text") is None
+               and bare_out.get("payload") is None
+               and (bare_out.get("error") or {}).get("code") == "receipt_forbidden_word"
+               and bare_hit is not None)
+    results.append(("7d 裸「通过」（不带率）→ 阻断", bare_ok,
+                    "hits=" + repr(bare_hits) + " —— 裸「通过」分支没拦，65-0 缺口未闭"
+                    if not bare_ok else
+                    f"blocked=True，命中={[h.get('word') for h in bare_hits]}"))
+
+    # 7e：反向对照 —— 裸「通过」分支被换成「永不匹配」的 (?!) 之后，7d 必须变红。
+    # 机制：把正则换成变异 65-0 的形状（`通过(?!率)|` → `(?!)|`，其余三支原样保留）
+    # 后在**函数对象克隆**上重扫原句 —— 不改盘上 base/（探针只读）；克隆共享
+    # _forbidden_hits 的字节码，函数内的递归调用仍落在同一对象里，行为等同真变异。
+    # 断言三件事：① 坏表下「通过@4:6」这条命中**消失**（7d 的红真的来自那个分支，
+    # 不是常量巧合）；② 坏表下其余分支照旧命中（对照自己活着 —— 全空说明探针坏了）；
+    # ③ 真表下「通过@4:6」仍在（没有误伤、双向都对）。
+    try:
+        import base.send_gateway as _sg
+        _clone = types.ModuleType("_fg_probe")
+        _clone.__dict__.update(_sg.__dict__)
+        _clone.FORBIDDEN_RECEIPT_WORDS = re.compile(
+            r"(?:已通过(?!率)|(?!)|无需处理|审批完成)")
+        _scan = types.FunctionType(_sg._forbidden_hits.__code__, _clone.__dict__,
+                                   "_forbidden_hits", _sg._forbidden_hits.__defaults__)
+
+        def _has(hits, word, s, e):
+            return any(h.get("word") == word and h.get("start") == s
+                       and h.get("end") == e for h in hits)
+
+        _probe_bare = _scan(bare, "text", [])        # 坏表 × 裸「通过」句
+        _probe_7a = _scan(bad_text, "text", [])      # 坏表 × 7a 原句（其余分支须活着）
+        _live_bare = _sg._forbidden_hits(bare, "text", [])   # 真表 × 裸「通过」句
+        ctrl_ok = (not _has(_probe_bare, "通过", 4, 6)
+                   and _has(_probe_7a, "已通过", 4, 7)
+                   and _has(_probe_7a, "无需处理", 8, 12)
+                   and _has(_live_bare, "通过", 4, 6))
+        results.append(("7e 反向对照：裸「通过」分支换成 (?!) → 7d 的命中必须消失；"
+                        "其余分支与真表照旧", ctrl_ok,
+                        f"坏表×裸通过句 hits={[h.get('word') for h in _probe_bare]}"
+                        f"（不许有 通过）；坏表×7a句 hits="
+                        f"{[h.get('word') for h in _probe_7a]}（必须有 已通过/无需处理）；"
+                        f"真表×裸通过句 hits={[h.get('word') for h in _live_bare]}"
+                        f"（必须有 通过）"))
+    except Exception as e:  # noqa: BLE001
+        results.append(("7e 反向对照：裸「通过」分支换成 (?!) → 7d 的命中必须消失；"
+                        "其余分支与真表照旧",
+                        False, f"对照自身跑不起来：{type(e).__name__}: {e}"))
+
     # ── 汇总 ──
     passed = sum(1 for _, p, _ in results if p)
     total = len(results)
@@ -284,5 +547,111 @@ def main() -> int:
     return 1
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# --controls：坏样本必须红、好样本必须绿（反向对照；探针只读，不碰盘上生产文件）
+def run_controls() -> int:
+    print("verify_send_gateway · --controls（5c-b 与 7d 的反证）")
+    bad_flags, good_flags = [], []
+
+    # ── 坏样本 1：变异 64-0（sent = rc；补发没了）→ 5c-b1/b2 必须红 ──
+    if not WS_DAEMON.exists():
+        print("⚠ 未测：ws_daemon.mjs 不存在，--controls 对拍不了", file=sys.stderr)
+        return 2
+    wd = WS_DAEMON.read_text(encoding="utf-8")
+    bad0 = wd.replace(*_BAD_64_0)
+    if bad0 == wd:
+        bad_flags.append("64-0 未应用上（old 片段找不到）")
+    else:
+        f_ok, f_fails, _d = _fallback_checks(bad0)
+        if f_ok or not ({"no_replyMarkdown", "sent_missing"} & set(f_fails)):
+            bad_flags.append(f"64-0（sent=rc）没让 5c-b 红：fails={f_fails}")
+
+    # ── 坏样本 2：变异 64-0b（保留 card-failed→ 字样、mode 用 rc.mode）→ 必须红 ──
+    #   骗法只改了标记的 mode 来源，补发调用还在；判据必须在 raw_rc_mode 这一项上红
+    #   （若红在 no_replyMarkdown，说明判据根本没看见那个骗法 —— 检查照样算红，但没验到点）
+    bad0b = wd.replace(*_BAD_64_0B)
+    if bad0b == wd:
+        bad_flags.append("64-0b 未应用上（old 片段找不到）")
+    else:
+        f_ok, f_fails, _d = _fallback_checks(bad0b)
+        if f_ok or "raw_rc_mode" not in f_fails:
+            bad_flags.append(f"64-0b（`${{rc.mode}}` 骗法）没让 5c-b3 红：fails={f_fails}")
+
+    # ── 坏样本 3：**只**把标记藏进注释、发的那路改成 text-fallback 常量 ──
+    #   replyCard 失败后仍有一次真的 replyMarkdown 调用（b1/b2 该绿），
+    #   但 span 里没有任何活的 `card-failed→` —— b3 必须红。
+    #   这一针专门证「注释不算代码」：裸文本检查（verify_cards L1 那种）会被注释骗绿。
+    commented = wd.replace(
+        "      const rt = await feishu.replyMarkdown(messageId, chatId, text);\n"
+        "      sent = rt.ok ? { ...rt, mode: `card-failed→${rt.mode}`, error: rc.error } : rt;",
+        "      const rt = await feishu.replyMarkdown(messageId, chatId, text);\n"
+        "      // mode: `card-failed→${rt.mode}` —— 这行是注释\n"
+        "      sent = rt.ok ? { ...rt, mode: `text-fallback`, error: rc.error } : rt;")
+    if commented == wd:
+        bad_flags.append("注释藏标记样本未应用上")
+    else:
+        f_ok, f_fails, _d = _fallback_checks(commented)
+        if f_ok or "mark" not in f_fails:
+            bad_flags.append(f"注释里的标记不该算数（必须红在 mark）：fails={f_fails}")
+
+    # ── 坏样本 4：禁词表裸「通过」分支 → 7d 判定核心必须说「没拦住」 ──
+    #   （真变异由 mutprobe 对盘上 base/ 做；这里是同一判定的只读对照：
+    #    把「拦截成功」的好样本换成 (?!) 坏表的预期结果，判定核心必须认得出）
+    import base.send_gateway as _sg2
+    _probe = _scan_with_regex(r"(?:已通过(?!率)|(?!)|无需处理|审批完成)")
+    if _probe is None:
+        bad_flags.append("7d 坏表探针跑不起来")
+    elif _bare_hit(_probe(_BARE, "text", [])) is not None:
+        bad_flags.append("坏表（(?!)）下裸「通过」仍被算成命中 —— 判定核心是假的")
+
+    # ── 好样本 1：真 daemon → 三条 5c-b 全绿 ──
+    f_ok, f_fails, _d = _fallback_checks(wd)
+    if not f_ok:
+        good_flags.append(f"未变异 daemon 被判红：fails={f_fails}")
+
+    # ── 好样本 2：真禁词表 → 裸「通过」@4:6 命中 ──
+    _live = _sg2._forbidden_hits(_BARE, "text", [])
+    if _bare_hit(_live) is None:
+        good_flags.append(f"真表连裸「通过」都没命中：{_live}")
+
+    # ── 好样本 3：7c 的「通过率」句 → 裸「通过」判定不许误命中 ──
+    _neg = _sg2._forbidden_hits("本周审核通过率为 98%。", "text", [])
+    if any(h.get("word") == "通过" for h in _neg):
+        good_flags.append(f"「通过率」被裸「通过」误命中：{_neg}")
+
+    print()
+    if bad_flags or good_flags:
+        for f in bad_flags:
+            print(f"  ✗ 坏样本没红：{f}")
+        for f in good_flags:
+            print(f"  ✗ 好样本误红：{f}")
+        print(f"❌ --controls 有对照不符（坏未红 {len(bad_flags)} / 好误红 {len(good_flags)}）")
+        return 1
+    print("  ✓ 坏样本红：64-0（sent=rc）→ 5c-b1/b2；64-0b（rc.mode）与注释藏标记 → 5c-b3；"
+          "(?!) 坏表 → 7d 判定核心")
+    print("  ✓ 好样本绿：真 daemon 三条全过；真表命中裸「通过」；「通过率」不误命中")
+    print("✅ --controls 全过：好样本绿；坏样本各自红")
+    return 0
+
+
+def _scan_with_regex(pattern: str):
+    """拿一个正则造一个 _forbidden_hits 形状的扫描函数（不改盘上模块）。"""
+    import base.send_gateway as _sg
+    try:
+        _clone = types.ModuleType("_fg_ctrl")
+        _clone.__dict__.update(_sg.__dict__)
+        _clone.FORBIDDEN_RECEIPT_WORDS = re.compile(pattern)
+        return types.FunctionType(_sg._forbidden_hits.__code__, _clone.__dict__,
+                                  "_forbidden_hits", _sg._forbidden_hits.__defaults__)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def main(argv=None) -> int:
+    if argv is not None and "--controls" in argv:
+        return run_controls()
+    return _main()
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

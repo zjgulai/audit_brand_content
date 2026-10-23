@@ -18,6 +18,17 @@
   C9 两个独立 SQLite 连接并发消费同一 token，恰一成功
   R2 去掉 absolute → 8h 后仍有效（测试注入）
   R3 cookie 塞 tenant → 必须红
+  TS-11（行 114）量的锚：idle 29 分钟有效 / 31 分钟失效；absolute 7h59m 有效 /
+       8h01m 失效且全程持续活动。★ 2026-10-24 探针实测：把 IDLE_SECONDS 改成
+       45*60、ABSOLUTE_SECONDS 改成 4*60*60，验证器 43/43 全绿 —— 既有 C1 的
+       检查点全部随实现常量走（now = t0 + IDLE_SECONDS + 1），量本身无锚。
+       修法：判据体（probe_idle_boundary / probe_absolute_boundary）用判据原文的
+       字面量（29/31 分钟、7h59m/8h01m），不读 base.auth_session 的任何常量。
+  TS-13（行 115）量的锚：token 4 分钟内可用（a）/ 6 分钟后拒绝（c）。
+       ★ 同一轮探针实测：STEP_UP_SECONDS 改成 90、issue 的 TTL 改成 now+60
+         都 survived。修法同上（probe_ttl_boundary，字面量 4/6 分钟）。
+       single-use（b）由 C3/C9 守（探针实测 AND used=0 变异被 C3+C9b 抓住）；
+       跨案/跨动作（d/e）由 C4 守。这里只锚有效期**长短**。
 
 退出码：0 全过 / 1 有红 / 2 未测（导入失败或验收器自身异常）。
 全部使用 mktemp 临时 SQLite，不碰真实 session DB。
@@ -57,6 +68,92 @@ def _c0_leak_needles():
         _ROLES = ()
     return ("ou_leak-probe", "tenant-leak-probe") + tuple(
         r for r in _ROLES if len(r) >= 5)
+
+
+# ═══════════ TS-11/TS-13 的量锚（判据体，2026-10-24） ═══════════
+#
+# 通用形状（§2.8「同一个量有两个口径」）：**检查点写在 t0 + 常量 + 1** 的断言，
+# 对「常量本身被改」恒真 —— 测试点跟着实现走。这一节的三条判据体全部用
+# **判据原文的字面量**（验收表行 114：29/31 分钟、7h59m/8h01m；行 115：4/6 分钟），
+# 一行 base.auth_session 的常量都不 import。探针实测：
+#   IDLE_SECONDS 30*60 → 45*60       旧写法 43/43 全绿（survived）
+#   ABSOLUTE_SECONDS 8h → 4h         旧写法全绿（survived）
+#   STEP_UP_SECONDS 5*60 → 90        旧写法全绿（survived）
+#   issue TTL now+STEP_UP_SECONDS → now+60   旧写法全绿（survived）
+# 加锚后四者必须全 killed（见 --controls 的实测记录）。
+
+# 判据原文的字面量（行 114 / 行 115），**不许替换成实现常量**
+_IDLE_OK_S = 29 * 60        # idle 29 分钟 → 仍有效
+_IDLE_EXP_S = 31 * 60       # idle 31 分钟 → 失效
+_ABS_OK_S = 7 * 3600 + 59 * 60    # absolute 7 小时 59 分 → 仍有效
+_ABS_EXP_S = 8 * 3600 + 60        # absolute 8 小时 01 分 → 失效
+_TTL_OK_S = 4 * 60          # token 4 分钟内用 → 成功（行 115 (a)）
+_TTL_EXP_S = 6 * 60         # 6 分钟后用 → 拒绝（行 115 (c)）
+
+
+def probe_idle_boundary(make_store, t0=20000):
+    """行 114 idle 段：29 分钟无活动仍有效、31 分钟无活动失效。返回 (ok, detail)。
+
+    make_store() 必须造一个全新 SessionStore（零参）；判据体不读实现常量。
+    两个会话分开造：get_session 会续 idle，同一个会话先读 29 分钟再读 31 分钟
+    会把窗口续到 29 分钟处、31 分钟那点就不死了（第一版踩过，controls 抓的）。
+    """
+    store = make_store()
+    try:
+        c_ok = store.create_session("ou_idle", tenant="t1", now=t0)
+        ok29 = store.get_session(c_ok, now=t0 + _IDLE_OK_S) is not None
+        c_exp = store.create_session("ou_idle2", tenant="t1", now=t0)
+        exp31 = store.get_session(c_exp, now=t0 + _IDLE_EXP_S) is None
+        return (ok29 and exp31,
+                "29 分钟=%s（须有效） / 31 分钟=%s（须失效）" % (ok29, exp31))
+    finally:
+        store.close()
+
+
+def probe_absolute_boundary(make_store, t0=30000):
+    """行 114 absolute 段：活动不断，7h59m 仍有效、8h01m 必须登出。
+
+    「不能被活动续期」的判法：活动一直敲到 8h00m（越线前一分钟），
+    8h01m 读数时 idle 距上次活动只有 1 分钟 —— 若此刻死了，只能是 absolute
+    到点；若活动能把 absolute 续住，8h01m 就还活着。两个方向一次分辨。
+    """
+    store = make_store()
+    try:
+        c = store.create_session("ou_abs", tenant="t1", now=t0)
+        # 活动每 5 分钟一次，从 t0 敲到 8h00m；中途死了就停（提前死由 7h59m 那点红）
+        t = t0
+        while t < t0 + 8 * 3600:
+            t = min(t + 5 * 60, t0 + 8 * 3600)
+            if store.get_session(c, now=t) is None:
+                break
+        ok7h59 = store.get_session(c, now=t0 + _ABS_OK_S) is not None
+        store.get_session(c, now=t0 + 8 * 3600)          # 8h00m 最后一次活动
+        exp8h01 = store.get_session(c, now=t0 + _ABS_EXP_S) is None
+        return (ok7h59 and exp8h01,
+                "7h59m=%s（须有效，活动敲到 8h00m 也不许提前死） / "
+                "8h01m=%s（须失效，上次活动才隔 1 分钟 —— 活动续不动 absolute）"
+                % (ok7h59, exp8h01))
+    finally:
+        store.close()
+
+
+def probe_ttl_boundary(make_store, t0=40000):
+    """行 115 (a)/(c)：token 4 分钟内可用、6 分钟后拒绝。返回 (ok, detail)。
+
+    两个 token 分开造（single-use 由 C3/C9 守，这里锚有效期长短）。
+    """
+    store = make_store()
+    try:
+        tok = store.issue_step_up("ou_ttl", "case-ttl", "sign", "nonce-ttl", now=t0)
+        ok4m = store.consume_step_up(
+            tok, "ou_ttl", "case-ttl", "sign", "nonce-ttl", now=t0 + _TTL_OK_S)
+        tok2 = store.issue_step_up("ou_ttl", "case-ttl", "sign", "nonce-ttl2", now=t0)
+        exp6m = store.consume_step_up(
+            tok2, "ou_ttl", "case-ttl", "sign", "nonce-ttl2", now=t0 + _TTL_EXP_S)
+        return (bool(ok4m) and not exp6m,
+                "4 分钟=%s（须成功） / 6 分钟=%s（须拒绝）" % (ok4m, exp6m))
+    finally:
+        store.close()
 
 
 def main():
@@ -167,6 +264,18 @@ def main():
         _advance(store, c2, 3000 + 3400, 3000 + ABSOLUTE_SECONDS - 100)
         report(store.get_session(c2, now=3000 + ABSOLUTE_SECONDS + 1) is None,
                "C1 absolute 8h 过期", "")
+
+        # TS-11/TS-13 量锚（行 114/115）★ 2026-10-24 探针补票：
+        #   C1/C5 的检查点写在 t0 + 实现常量 + 1，对「常量本身被改」恒真
+        #   （IDLE→45m、ABSOLUTE→4h、STEP_UP→90s 全 survived，见文件头注释）。
+        #   下面三条判据体只用判据原文的字面量，锚的是量本身。
+        _ok, _detail = probe_idle_boundary(lambda: SessionStore(":memory:"))
+        report(_ok, "TS-11 行114 idle 29 分钟有效 / 31 分钟失效（字面量锚）", _detail)
+        _ok, _detail = probe_absolute_boundary(lambda: SessionStore(":memory:"))
+        report(_ok, "TS-11 行114 absolute 7h59m 有效 / 8h01m 失效，活动续不动（字面量锚）",
+               _detail)
+        _ok, _detail = probe_ttl_boundary(lambda: SessionStore(":memory:"))
+        report(_ok, "TS-13 行115 token 4 分钟内可用 / 6 分钟后拒绝（字面量锚）", _detail)
 
         # C2 revoke
         c3 = store.create_session("ou_dave", tenant="t1", now=4000)
@@ -506,6 +615,57 @@ def controls() -> int:
             store.close()
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # ── TS-11/TS-13 量锚的反向对照（2026-10-24）──
+    #
+    # 判定体是 probe_idle_boundary / probe_absolute_boundary / probe_ttl_boundary
+    # 这三个**不读实现常量**的判据体。坏样本走 mock 层复刻探针实测的四种改坏形状：
+    #   ① IDLE 30→45 分钟  ② ABSOLUTE 8h→4h  ③ STEP_UP 5m→90s
+    #   ④ issue 的 TTL 写死成 60 秒（探针的第二变异）
+    # 每种必须让对应的判据体红；好样本（真常量）三个方向都不许误报。
+    # ★ 坏样本只在 mock 里，真模块与真 DB 一个字节都不动。
+
+        print("  ---- TS-11/TS-13 量锚：坏样本（mock 复刻探针变异）----")
+    # 坏①：IDLE_SECONDS 30*60 → 45*60 —— idle 段两条判据体都必须红
+    with mock.patch("base.auth_session.IDLE_SECONDS", 45 * 60):
+        ok("坏① IDLE→45m → 行114 idle 锚必须红",
+           probe_idle_boundary(lambda: SessionStore(":memory:"))[0] is False)
+        ok("好① IDLE→45m 时 absolute 锚不许误报（absolute 不看 idle）",
+           probe_absolute_boundary(lambda: SessionStore(":memory:"))[0] is True,
+           probe_absolute_boundary(lambda: SessionStore(":memory:"))[1])
+    # 坏②：ABSOLUTE_SECONDS 8h → 4h —— absolute 锚必须红（7h59m 那点已死）
+    with mock.patch("base.auth_session.ABSOLUTE_SECONDS", 4 * 60 * 60):
+        ok("坏② ABSOLUTE→4h → 行114 absolute 锚必须红",
+           probe_absolute_boundary(lambda: SessionStore(":memory:"))[0] is False)
+    # 坏③：_absolute_expired 用 last_activity —— 活动续得动 absolute，必须红。
+    #   与探针的「活动不续 absolute」锚变异同形（mock.last_activity 返回真值=未过期）。
+    with mock.patch("base.auth_session._absolute_expired",
+                    lambda last_activity, now: False):
+        ok("坏③ 活动可续 absolute → 行114 absolute 锚必须红（8h01m 那点活着）",
+           probe_absolute_boundary(lambda: SessionStore(":memory:"))[0] is False)
+    # 坏④：STEP_UP_SECONDS 5*60 → 90 —— TTL 锚必须红
+    with mock.patch("base.auth_session.STEP_UP_SECONDS", 90):
+        ok("坏④ STEP_UP→90s → 行115 TTL 锚必须红（4 分钟那点已死）",
+           probe_ttl_boundary(lambda: SessionStore(":memory:"))[0] is False)
+    # 坏⑤：issue 的实际 TTL 写死 60 秒（探针第二变异：now + STEP_UP_SECONDS → now + 60）
+    real_issue = SessionStore.issue_step_up
+
+    def _short_ttl(self, principal, case_id, action, nonce, now=None):
+        import base.auth_session as _m
+        with mock.patch.object(_m, "STEP_UP_SECONDS", 60):
+            return real_issue(self, principal, case_id, action, nonce, now=now)
+
+    with mock.patch("base.auth_session.SessionStore.issue_step_up", _short_ttl):
+        ok("坏⑤ issue TTL 写死 60s → 行115 TTL 锚必须红（6 分钟那点还活着）",
+           probe_ttl_boundary(lambda: SessionStore(":memory:"))[0] is False)
+
+    print("  ---- TS-11/TS-13 量锚：好样本（真常量，不许误报）----")
+    ok("好 TS-11 idle 锚 → 真常量必须绿",
+       probe_idle_boundary(lambda: SessionStore(":memory:"))[0] is True)
+    ok("好 TS-11 absolute 锚 → 真常量必须绿",
+       probe_absolute_boundary(lambda: SessionStore(":memory:"))[0] is True)
+    ok("好 TS-13 TTL 锚 → 真常量必须绿",
+       probe_ttl_boundary(lambda: SessionStore(":memory:"))[0] is True)
 
     print("-" * 78)
     if fails:
