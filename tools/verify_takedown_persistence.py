@@ -208,7 +208,7 @@ def main():
             got.get("open_count") == expect["open_count"]
             and [a["task_id"] for a in got.get("ages") or []]
             == [a["task_id"] for a in expect["ages"]]
-            and all(abs(a["age_days"] - e["age_days"]) < 0.01
+            and all(abs(a["age_days"] - e["age_days"]) < 1e-5
                     for a, e in zip(got.get("ages") or [],
                                     expect["ages"])))
         report(r_p.status_code == 200 and ages_ok,

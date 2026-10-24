@@ -1203,9 +1203,11 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
             finding for finding in state["ir"]["findings"]
             if finding.get("finding_id") == detail["finding_id"]))
     if command in TAKEDOWN_COMMANDS and "task_id" in detail:
-        result["takedown_task"] = copy.deepcopy(next(
-            t for t in state["takedown_tasks"]
-            if t.get("task_id") == detail["task_id"]))
+        # 结果装饰不崩命令（与 release 同款）：state 才是真相源。
+        task_out = next((t for t in state["takedown_tasks"]
+                         if t.get("task_id") == detail["task_id"]), None)
+        if task_out is not None:
+            result["takedown_task"] = copy.deepcopy(task_out)
     if command in APPEAL_COMMANDS:
         if "appeal_id" in detail:
             result["appeal"] = copy.deepcopy(next(
@@ -1218,9 +1220,10 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         result["report"] = copy.deepcopy(state.get("report"))
     if command in GRANT_COMMANDS and "grant_id" in detail:
         # 命令结果带出该条 grant 的完整快照 —— 调用方不用再回读 state
-        result["grant"] = copy.deepcopy(next(
-            g for g in state["grants"]
-            if g.get("grant_id") == detail["grant_id"]))
+        grant_out = next((g for g in state["grants"]
+                          if g.get("grant_id") == detail["grant_id"]), None)
+        if grant_out is not None:
+            result["grant"] = copy.deepcopy(grant_out)
     if command in RELEASE_COMMANDS:
         # 结果带出签发容器与（若有）本次签名 —— 调用方不用再回读 state
         result["release"] = copy.deepcopy(state.get("release"))
