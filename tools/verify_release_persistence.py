@@ -206,12 +206,17 @@ def main():
         sig2_ok = _make_sig(seeded, now=7000)
         sig2_ok["derived_from"] = sig["signature_id"]
         sig2_ok["signature_hash"] = signature_hash(sig2_ok)
-        st4, _, res4 = _sign(seeded, sig2_ok)
-        report([s["signature_id"] for s in st4["release"]["signatures"]]
-               == [sig["signature_id"], sig2_ok["signature_id"]]
-               and st4["release"]["signatures"][1]["derived_from"]
-               == sig["signature_id"],
-               "R4b 链上第二条签名接 derived_from")
+        try:
+            st4, _, res4 = _sign(seeded, sig2_ok)
+            report([s["signature_id"] for s in st4["release"]["signatures"]]
+                   == [sig["signature_id"], sig2_ok["signature_id"]]
+                   and st4["release"]["signatures"][1]["derived_from"]
+                   == sig["signature_id"],
+                   "R4b 链上第二条签名接 derived_from")
+        except LedgerValidation as exc:
+            # 变异（签名不落容器）会让合法第二条也被拒 —— 那是 FAIL，不是崩溃。
+            report(False, "R4b 链上第二条签名接 derived_from",
+                   "（被拒：%s）" % getattr(exc, "code", exc))
         # ---- R5 reject 路径 ----
         st5, _, res5 = _sign(_closed_state("case-rel-3"),
                              _make_sig(_closed_state("case-rel-3"),
