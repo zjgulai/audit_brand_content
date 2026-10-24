@@ -17,7 +17,8 @@ import time
 from pathlib import Path
 
 from base.artifact_store import ArtifactStore
-from base.review_reducer import initial_state, reduce_command
+from base.review_reducer import (
+    aggregate_type_for, initial_state, reduce_command)
 
 
 class AuthorityError(Exception):
@@ -351,12 +352,14 @@ class BusinessEventStore:
         seq = len(self._batches) + 1
         command_id = "cmd-%012d" % seq
         reconcile_token = secrets.token_urlsafe(24)
+        agg_type = aggregate_type_for(aggregate_id)
         batch = {
             "schema_version": "business-command-batch/v1",
             "command_id": command_id,
             "authority_seq": seq,
             "prev_manifest_sha256": self._head_hash,
-            "aggregate_type": "review_case",
+            # ★ T-314b：不是硬编码 review_case。判定只有 aggregate_type_for 一份。
+            "aggregate_type": agg_type,
             "aggregate_id": aggregate_id,
             "expected_version": effective_version,
             "result_version": int(new_state["version"]),
@@ -377,7 +380,7 @@ class BusinessEventStore:
                 "authority_seq": seq,
                 "prev_manifest_sha256": self._head_hash,
                 "command_id": command_id,
-                "aggregate_type": "review_case",
+                "aggregate_type": agg_type,
                 "aggregate_id": aggregate_id,
             },
         )

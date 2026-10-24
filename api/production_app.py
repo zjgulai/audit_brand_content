@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -25,7 +26,9 @@ from base.business_event_store import BusinessEventStore, WriterLease
 from base.principal_directory import PrincipalDirectory
 from base.projection_store import ProjectionStore
 from base.projector import Projector
-from base.rbac import can_act, can_read_content
+from base.rbac import can_act, can_read_content, can_read_report
+from base.report_render_bridge import ReportRenderBridge
+from base.report_store import ReportStore
 from base.review_command_service import ReviewCommandService
 from base.submission_service import SubmissionIngestor
 
@@ -36,6 +39,16 @@ PRODUCTION_WRITE_PATHS = {
     "/api/v1/cases/{id}/unclaim",
     "/api/v1/cases/{id}/reassign",
     "/api/v1/cases/{id}/actions",
+    # T-312b：下线六条。改前它们是 501 —— 而 `IMPLEMENTED_WRITE_PATHS` 里
+    # 一直有它们，于是「开发装配能点、生产点了报错」。
+    # ★ 只放行这六条，不放行 release-decision / release-revoke：
+    #   签发依赖 `kb_snapshot_hash`（T-310 未交付），放行等于给一个假成功。
+    "/api/v1/takedown-tasks/{id}/start",
+    "/api/v1/takedown-tasks/{id}/complete",
+    "/api/v1/takedown-tasks/{id}/fail",
+    "/api/v1/takedown-tasks/{id}/retry",
+    "/api/v1/takedown-tasks/{id}/reassign",
+    "/api/v1/takedown-tasks/{id}/waive",
 }
 COOKIE_NAME = "__Host-session"
 OAUTH_BIND_COOKIE = "__Host-oauth-bind"
@@ -75,6 +88,8 @@ class ProductionSettings:
     session_db: Path
     access_log_path: Path
     principal_directory: Path
+    # T-316d：报告落盘根。**必填，无默认值** —— 原因见 __post_init__ 的注释。
+    report_root: Path
     public_origin: str
     oauth_client_id: str
     oauth_client_secret: str
@@ -84,9 +99,17 @@ class ProductionSettings:
     tenant_allowlist: frozenset[str] = frozenset()
 
     def __post_init__(self):
+        # ★ `report_root` 必须在这里，不能只加一个字段。
+        #
+        #   `path_names` 决定两件事：路径**不许在仓内**、且**不许彼此重叠**。
+        #   报告正文是内容（含 IR 与依据），落在仓内等于把内容提交进公开仓
+        #   —— 与 `base/takedown.py` 那条「截图落仓外、不进公开仓」是同一个理由。
+        #   而「与 access_log 同一路径」会让报告文件与 audit 日志在一个文件里，
+        #   两个写者互相截断。
         path_names = (
             "authority_root", "frozen_projection_root", "review_projection_db",
             "session_db", "access_log_path", "principal_directory",
+            "report_root",
         )
         repo = Path(__file__).resolve().parent.parent
         paths = []
@@ -133,6 +156,7 @@ class ProductionSettings:
             "REVIEW_PUBLIC_ORIGIN", "REVIEW_OAUTH_CLIENT_ID",
             "REVIEW_OAUTH_CLIENT_SECRET", "REVIEW_OAUTH_REDIRECT_URI",
             "REVIEW_OAUTH_REAUTH_REDIRECT_URI", "REVIEW_TENANT_ALLOWLIST",
+            "REVIEW_REPORT_ROOT",
         )
         missing = [key for key in required if not env.get(key)]
         if missing:
@@ -165,8 +189,9 @@ class ProductionSettings:
         session_db = external("REVIEW_API_SESSION_DB")
         access_log = external("REVIEW_API_ACCESS_LOG")
         principal_directory = external("REVIEW_PRINCIPAL_DIRECTORY")
+        report_root = external("REVIEW_REPORT_ROOT", directory=True)
         paths = (authority_root, frozen_root, projection_db, session_db,
-                 access_log, principal_directory)
+                 access_log, principal_directory, report_root)
         if len(set(paths)) != len(paths):
             raise SettingsError("data_paths_must_be_distinct")
         return ProductionSettings(
@@ -176,6 +201,7 @@ class ProductionSettings:
             session_db=session_db,
             access_log_path=access_log,
             principal_directory=principal_directory,
+            report_root=report_root,
             public_origin=origin,
             oauth_client_id=env["REVIEW_OAUTH_CLIENT_ID"],
             oauth_client_secret=env["REVIEW_OAUTH_CLIENT_SECRET"],
@@ -198,6 +224,8 @@ class ProductionRuntime:
         self.projection = None
         self.service = None
         self.directory = None
+        self.report_store = None
+        self.report_bridge = None
         self.ready = False
         self.ready_error = "not_started"
 
@@ -215,6 +243,7 @@ class ProductionRuntime:
                 self.settings.review_projection_db.parent,
                 self.settings.session_db.parent,
                 self.settings.access_log_path.parent,
+                self.settings.report_root,
             ):
                 self._ensure_private_dir(directory)
             if not self.settings.frozen_projection_root.is_dir():
@@ -238,7 +267,36 @@ class ProductionRuntime:
             Projector(self.authority, self.projection).catch_up()
             if self.projection.status(self.authority.head())["status"] != "fresh":
                 raise SettingsError("projection_not_fresh")
-            self.service = ReviewCommandService(self.authority, self.projection)
+            # T-316d：报告落盘。
+            #
+            # ★ ACL 用 `can_read_content(principal, case)`，**不用**
+            #   `ReportStore._default_authorize`。后者读 `principal["role"]`
+            #   （单数、"DP3" 大写），而真实 principal 是 `roles`（复数、小写）
+            #   —— 接上即全禁，而 `verify_report_store.py` 的夹具恰好用单数大写，
+            #   所以它一直绿。这是第五处「验证器形状 ≠ 生产形状」。
+            #
+            # ★ static_base 用 public_origin + "/static"：报告正文是静态文件，
+            #   由反代服务；它不是 API 端点（`_check_static_base` 会拒含 api 的路径）。
+            self.report_store = ReportStore(
+                str(self.settings.report_root),
+                self.settings.public_origin + "/static",
+                authorize=self._report_authorize)
+            self.report_bridge = ReportRenderBridge(
+                str(Path(__file__).resolve().parent.parent))
+            self.service = ReviewCommandService(
+                self.authority, self.projection,
+                report_store=self.report_store,
+                report_bridge=self.report_bridge)
+            # T-314c：把「已批准的授权名单」注入 rbac。
+            #
+            # 改前 `TAKEDOWN_ALLOWLIST` 是模块级常量且两个名单都是空集 ——
+            # 授权写进权威后 `can_act` 仍读常量，于是「授权成功、实际不生效」。
+            #
+            # ★ 注入源里**只收 state == "approved"** 的记录：proposed / executed
+            #   都还不算授权（三权分立没走完）。差这一步，一张提案就能开下线权。
+            # ★ 读不到投影时返回空集（fail closed），不是「全放行」。
+            from base import rbac as _rbac
+            _rbac.set_allowlist_source(self.allowlist_source)
             self.ready = True
             self.ready_error = None
         except Exception as exc:
@@ -260,6 +318,36 @@ class ProductionRuntime:
         self.authority = None
         self.lease.release()
 
+    # 报告 ACL：口径与判据都在 `base/rbac.can_read_report`（单一来源）。
+    # 生产与验证器调同一个函数 —— 否则「验证器绿、生产全禁」会再来一次。
+    _report_authorize = staticmethod(can_read_report)
+
+    def allowlist_source(self):
+        """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
+
+        返回 {capability: frozenset(principal_id)}。
+
+        ★ 只读 `grant_registry` 表（投影），不读权威 —— 心跳每秒可能调很多次，
+          读 SQLite 比扫权威的 manifest 链便宜得多。投影 fresh 由
+          `maintain_once()` 的 reconcile 保证。
+        ★ 任何异常都回落空集：名单读不到时「没人能下线」比「谁都能下线」安全。
+        """
+        empty = {"takedown.execute": frozenset(), "takedown.waive": frozenset()}
+        if self.projection is None:
+            return empty
+        try:
+            out = {k: set() for k in empty}
+            for state in self.projection.list_grant_registries():
+                for grant in state.get("grants") or []:
+                    if grant.get("state") != "approved":
+                        continue
+                    cap = grant.get("capability")
+                    if cap in out and isinstance(grant.get("user_id"), str):
+                        out[cap].add(grant["user_id"])
+            return {k: frozenset(v) for k, v in out.items()}
+        except Exception:
+            return empty
+
     def maintain_once(self):
         if self.service is None or self.authority is None:
             raise RuntimeError("runtime_not_started:maintenance")
@@ -267,6 +355,14 @@ class ProductionRuntime:
             self.service.reconcile()
             for case_id in self.authority.aggregate_ids():
                 self.service.expire_if_due(case_id)
+            # T-311b：申诉「暂停超 30 天转 stale」的**唯一生产触发点**。
+            # 改前 `AppealStore.mark_stale()` 全仓只有验证器调过一次，
+            # 生产里 0 调用 —— 一条没有触发点的规则等于没有规则。
+            # 挂在心跳（30s）而不是 GET /appeals：读端点写状态会让
+            # 「打开列表」变成一次写操作，且并发下会撞版本。
+            # 失败不上浮（mark_appeals_stale 自己收集 errors），
+            # 否则一个案件的 stale 失败会让整轮心跳记成不就绪。
+            self.service.mark_appeals_stale()
             self.lease.assert_owner()
             if not self.session_store.ready() or not self.directory.ready():
                 raise RuntimeError("maintenance_dependency_unavailable")
@@ -405,6 +501,8 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             runtime.directory and runtime.directory.eligible_assignee(principal_id, case)),
         case_source=AuthorityCaseSource(RuntimeProxy(runtime, "authority")),
         submission_ingestor=SubmissionIngestor(),
+        # T-314b：approve 那一步要用它取提案人与执行人的 principal
+        grant_principal_provider=principal_provider,
         session_cookie_name=COOKIE_NAME,
         app_env="production",
         access_log_path=str(settings.access_log_path),
@@ -721,6 +819,51 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
                                samesite="lax")
         response.delete_cookie("csrf", path="/", secure=True, samesite="lax")
         return response
+
+    # ── 报告正文（T-316d）────────────────────────────────────────────
+    #
+    # ★ 为什么由本服务自己 serve，而不是交给反代：
+    #   1. 宿主机共享反代在**容器里**，看不到本服务的 `REVIEW_REPORT_ROOT`
+    #      （挂载）—— 与 SPA 那条完全同一个理由（见下段注释）。
+    #   2. 就算能看见，静态文件服务也**不做授权**。报告正文含 IR、依据、
+    #      未审说明 —— 让反代裸 serve 等于任何人拿到 URL 就能读。
+    #      本路由走 `ReportStore.read()`，那里有 `can_read_report`。
+    #
+    # ★ 路径必须与 `static_base` 一致（`public_origin + "/static"` +
+    #   `/reports/<id>.md`）。`ReportStore._valid_url` 会校验这个前缀，
+    #   两处不一致的话发布的每条报告都会被判 `bad_url`。
+    #
+    # ★ 必须注册在 SPA fallback **之前**：那个 `/{full_path:path}` 会吃掉
+    #   `/static/...` 并回落成 index.html，于是报告 URL 打开是前端首页。
+    #
+    # ★ 未登录 → 401 而不是 403：这条路径是「拿 URL 就能试」的形状，
+    #   区分「没登录」与「登录了但无权」对排障有用，且 401 不会泄露
+    #   「这个 report_id 存在」。
+    @app.get("/static/reports/{report_id}.md", include_in_schema=False)
+    def report_body(report_id: str, request: Request):
+        cookie = request.cookies.get(COOKIE_NAME)
+        session = runtime.session_store.get_session(cookie) if cookie else None
+        if not session:
+            raise HTTPException(401, "缺少或无效 session")
+        # 与 `principal_provider` 同一条路：session 只存 id/tenant，
+        # principal 本体从 directory 现取（那里是唯一真相）。
+        try:
+            principal = runtime.directory.by_id(
+                session["principal"], session["tenant"])
+        except Exception:  # noqa: BLE001
+            raise HTTPException(503, "principal_directory_unavailable")
+        if not principal:
+            raise HTTPException(401, "无法解析 principal")
+        store = runtime.report_store
+        if store is None:
+            raise HTTPException(503, "report_store_unavailable")
+        out = store.read(report_id, principal)
+        # ★ 不区分「不存在」与「无权」：两者都返回 404。
+        #   区分开会让这条路径变成一个 report_id 枚举器。
+        if not out.get("ok"):
+            raise HTTPException(404, "报告不存在")
+        return Response(content=out["content"], media_type="text/markdown; charset=utf-8",
+                        headers={"Cache-Control": "private, max-age=0, must-revalidate"})
 
     # ── SPA 静态产物 ────────────────────────────────────────────────────
     # ★ 2026-10-22：原计划由宿主机共享反代 `ai_video_nginx` 直接 serve，

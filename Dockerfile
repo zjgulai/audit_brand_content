@@ -74,6 +74,25 @@ COPY research/kb/外部标准库-v1.json ./research/kb/外部标准库-v1.json
 # 前端静态产物（阶段 1 的输⼊）
 COPY --from=web /build/dist ./web_dist
 
+# ★ 报告渲染器是**运行时依赖**，不是构建期工具。
+#
+#   `base/report_render_bridge.py` 在结案时起一个 `node` 子进程跑
+#   `tools/audit/report_render.mjs`。运行阶段基底是 `python:3.12-slim`，
+#   **没有 node** —— 不拷的话结案永远拿不到报告，而且**结案仍然成功**
+#   （桥接层返回 `node_missing`，按设计不回滚），于是故障表现为
+#   「报告模块静默不工作」，只有看 detail 才看得出来。
+#
+#   二进制从 `web` 阶段拿：那一层已经是 `node:22-bookworm-slim`，
+#   同一个 Debian 发行版，glibc 版本一致 —— 这是不额外 apt install 的理由。
+#   （若将来 web 阶段换成 alpine，这里会以 `libstdc++ not found` 的形式坏掉，
+#   所以 D12 断言「node 二进制来自 web 阶段且运行阶段存在」。）
+COPY --from=web /usr/local/bin/node /usr/local/bin/node
+COPY tools/audit/report_render.mjs ./tools/audit/report_render.mjs
+# registry.mjs → cards.mjs 是**相对 import**，三个文件缺一不可。
+# 只拷 report_render.mjs 会在运行时以 ERR_MODULE_NOT_FOUND 失败。
+COPY tools/reply-cards/registry.mjs ./tools/reply-cards/registry.mjs
+COPY tools/reply-cards/cards.mjs ./tools/reply-cards/cards.mjs
+
 # 非 root 运行
 # ★ /data 挂载点必须在 USER audit 之前由 root 建好并授权，
 #   否则切换用户后 mkdir 会 Permission denied。

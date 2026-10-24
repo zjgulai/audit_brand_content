@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import copy
+import calendar
 import hashlib
 import json
 import time
@@ -59,8 +60,28 @@ def initial_state(case_id):
         # 投影重建就是重放这些快照，所以内容随 state 走，不另设第二个权威。
         "submission_id": None,
         "submission_hash": None,
+        # T-312a: 强制下线任务。与案件同一个 aggregate。
+        "takedown_seq": 0,
+        "takedown_tasks": [],
+        # T-311a: 申诉。与案件同一个 aggregate（一条申诉天生属于一个案件）。
+        # appeal_seq 落在 state 里 —— 否则重启后申诉号会撞（见 _appeal_id）。
+        "appeal_seq": 0,
+        "appeals": [],
+        # T-314a: 名单治理聚合（aggregate_id = "grants:<tenant>"）。
+        # 与案件同住一个 reducer，是因为 BusinessEventStore.execute()
+        # 一次只提交一个 aggregate，而 grant 的状态迁移与案件一样是纯函数。
+        "grant_seq": 0,
+        "grants": [],
         "content": None,
         "ir": None,
+        # T-316b: 判定时冻结的报告渲染输入（与 ir 并列，不是 ir 的一部分）。
+        # 为什么单独存而不在结案时重算：report_render 的 evidence/unassessed
+        # 在判定时是空数组、结案后才有内容；重算会让「报告的 IR」与「报告的
+        # 证据」来自两个时刻（AGENTS.md §2.4.8 同一个量两个口径）。
+        "report_snapshot": None,
+        # T-316d: 已发布的报告。**由 `report_publish` 命令写入，不由 reducer 计算
+        # report_id** —— 内容寻址需要渲染文本，reducer 拿不到（见 T-316 施工单 §五 第 2 条）。
+        "report": None,
         "judgment": None,
         "tenant": None,
         "product_line": None,
@@ -81,7 +102,8 @@ def public_case(state):
             "last_activity", "lease_expires", "released_at",
             "released_draft_id", "primary_draft_id",
         )
-    }
+    } | ({"report": copy.deepcopy(state["report"])}
+         if state.get("report") is not None else {})
 
 
 def _draft(state, draft_id):
@@ -127,7 +149,7 @@ def _new_draft(state, actor, now, content, *, kind, derived_from=None):
 def _event(command, state, actor, now, detail=None):
     return {
         "type": "review.%s" % command,
-        "aggregate_type": "review_case",
+        "aggregate_type": aggregate_type_for(state.get("case_id")),
         "aggregate_id": state["case_id"],
         "version": state["version"],
         "actor": actor,
@@ -135,6 +157,432 @@ def _event(command, state, actor, now, detail=None):
         "detail": copy.deepcopy(detail or {}),
         "state": copy.deepcopy(state),
     }
+
+
+TAKEDOWN_COMMANDS = frozenset({"takedown_create", "takedown_transition"})
+
+
+def _takedown(state, command, actor, payload, now, detail):
+    """takedown_create / takedown_transition 的纯状态迁移。
+
+    ## 迁移表只有一份
+
+    `takedown_transition` 一律调 `base.takedown.transition()`，
+    **绝不在这里复制 `TD.TRANSITIONS`**。两份迁移表必然漂移，而漂移的后果
+    是「reducer 允许、生产拒绝」或反过来 —— 两种都只有真跑一次才看得见。
+
+    ## create 不判「该不该建」
+
+    「已发布才建任务」在 `TD.should_create_task()`；reducer 只负责落盘。
+    判断与落盘分开，才验得清是谁的错。
+    """
+    import base.takedown as TD
+
+    tasks = state.setdefault("takedown_tasks", [])
+
+    if command == "takedown_create":
+        trigger = payload.get("trigger")
+        if trigger not in ("revoke", "invalidated"):
+            raise LedgerValidation(
+                "bad_task", "trigger 必须是 revoke/invalidated，收到 %r" % (trigger,))
+        platform = _nonempty(payload.get("platform"), "platform")
+        assignee = _nonempty(payload.get("assignee"), "assignee")
+        reviewers = payload.get("reviewers") or []
+        if not isinstance(reviewers, list):
+            raise LedgerValidation("bad_task", "reviewers 必须是数组")
+        # 同案同 trigger 已有未完成任务 → 拒（否则会造出一条永远做不完的假待办）
+        if any(t.get("trigger") == trigger
+               and t.get("state") in ("pending", "in_progress")
+               for t in tasks):
+            raise LedgerConflict(
+                "duplicate_task", "同案同 trigger 已有未完成的下线任务")
+
+        seq = int(state.get("takedown_seq") or 0) + 1
+        created_at = _iso(now)
+        tid = "td-" + _hash({
+            "case_id": state["case_id"], "seq": seq,
+            "trigger": trigger, "created_at": created_at,
+        })[:16]
+        task = TD.new_task(
+            task_id=tid, case_id=state["case_id"], platform=platform,
+            tenant=payload.get("tenant") or state.get("tenant") or "",
+            product_line=payload.get("product_line") or state.get("product_line") or "",
+            created_at=created_at, assignee=assignee, reviewers=reviewers,
+            trigger=trigger, reason=payload.get("reason") or trigger)
+        task["version"] = 0
+        tasks.append(task)
+        state["takedown_seq"] = seq
+        detail.update({"task_id": tid, "trigger": trigger})
+        return
+
+    tid = _nonempty(payload.get("task_id"), "task_id")
+    target = next((t for t in tasks if t.get("task_id") == tid), None)
+    if target is None:
+        raise LedgerNotFound("task_not_found", "下线任务不存在：%s" % tid)
+    to = _nonempty(payload.get("to"), "to")
+    # ★ 迁移合法性交给 TD.transition（唯一迁移表）；它抛 TD.TakedownError，
+    #   这里原样透出 code，不吞掉、不改写。
+    try:
+        new_task = TD.transition(target, to, action=payload.get("action"),
+                                 at=_iso(now))
+    except TD.TakedownError as exc:
+        raise LedgerConflict(exc.code, exc.detail)
+    new_task["version"] = int(target.get("version") or 0) + 1
+    index = tasks.index(target)
+    tasks[index] = new_task
+    detail.update({"task_id": tid, "state": to})
+
+
+REPORT_COMMANDS = frozenset({"report_publish"})
+
+
+def _report(state, command, actor, payload, now, detail):
+    """报告落盘回写（T-316d）。**只有一条命令。**
+
+    ## 为什么 reducer 只接受算好的 report_id
+
+    `report_id` 是**内容寻址**（`ReportStore._make_id`：正文 + ir_id + version +
+    指纹的哈希）。reducer 里没有渲染文本，算不出来。
+    两边各算一次 = 两份公式必然漂移，而漂移的表现是「重建出来的 id 与盘上文件名
+    不一致」—— 那时报告文件还在，但**没有任何入口能打开它**。
+
+    ## 前置条件：必须是已结案的案件
+
+    未结案就发报告，等于给一个还能改判的案件发了「最终报告」。
+    结案（`submit_review`）才是报告的唯一合法前驱。
+    """
+    if state.get("status") != "closed":
+        raise LedgerConflict(
+            "report_requires_closed",
+            "报告只能为已结案的案件发布（当前 status=%r）" % (state.get("status"),))
+
+    report_id = _nonempty(payload.get("report_id"), "report_id")
+    # 格式校验，不是重算。`rp` + 16 位十六进制（与 ReportStore._make_id 一致）。
+    if not (report_id.startswith("rp") and len(report_id) == 18
+            and all(c in "0123456789abcdef" for c in report_id[2:])):
+        raise LedgerValidation(
+            "bad_report_id", "report_id 必须是 rp+16 位小写十六进制，收到 %r" % (report_id,))
+    sha256 = _nonempty(payload.get("sha256"), "sha256")
+    if len(sha256) != 64 or any(c not in "0123456789abcdef" for c in sha256):
+        raise LedgerValidation("bad_report", "sha256 必须是 64 位小写十六进制")
+    url = _nonempty(payload.get("url"), "url")
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise LedgerValidation("bad_report", "报告 url 必须是 http(s) 绝对地址")
+    path = _nonempty(payload.get("path"), "path")
+
+    existing = state.get("report")
+    if isinstance(existing, dict) and existing.get("report_id") != report_id:
+        # ★ 不许覆盖。报告正文不可变（`ReportStore` 那条 immutable_conflict 守着
+        #   落盘侧），这里守的是**权威侧**：一份新报告要新开一条命令，
+        #   而不是把旧的那条改掉 —— 否则「历史上发过什么」就没有答案了。
+        raise LedgerConflict(
+            "report_immutable",
+            "本案已有报告 %r，不许改写成 %r" % (existing.get("report_id"), report_id))
+    if isinstance(existing, dict) and existing.get("report_id") == report_id:
+        # 幂等：同一条报告重放（发布成功但权威写入重试）不报错、不改字段。
+        detail.update({"report_id": report_id, "replayed": True})
+        return
+
+    state["report"] = {
+        "report_id": report_id,
+        "url": url,
+        "path": path,
+        "sha256": sha256,
+        "source_ir_id": payload.get("source_ir_id"),
+        "source_ir_version": payload.get("source_ir_version"),
+        "source_ir_fingerprint": payload.get("source_ir_fingerprint"),
+        "created_at": payload.get("created_at"),
+        "published_at": _iso(now),
+        "renderer": payload.get("renderer"),
+        "published_by": actor,
+    }
+    detail.update({"report_id": report_id})
+
+
+APPEAL_COMMANDS = frozenset({"appeal_open", "appeal_pause", "appeal_stale",
+                             "appeal_migrate", "appeal_withdraw"})
+
+#: 每条命令允许改写的字段。RL-12 ④ 的判据就落在这张表上。
+APPEAL_WRITABLE = {
+    "appeal_open": {"state", "opened_at"},
+    "appeal_pause": {"state", "pause_reason", "paused_at"},
+    "appeal_stale": {"state", "stale_at"},
+    "appeal_migrate": {"state", "migrated_at"},
+    "appeal_withdraw": {"state", "withdrawn_at", "withdraw_reason"},
+}
+
+
+def _appeal_id(case_id, seq, appellant, opened_at):
+    """确定性申诉号。
+
+    ★ 不用 `"appeal-%d" % seq`：那是进程内计数器，重启归零后与历史撞号
+      （api/write_api.AppealStore 实测踩过）。这里把 case/seq/appellant/时刻
+      一起哈希，seq 落在 state 里，跨重启连续。
+    """
+    return "appeal-" + _hash({
+        "case_id": case_id, "seq": seq,
+        "appellant": appellant, "opened_at": opened_at,
+    })[:16]
+
+
+def _appeal(state, command, actor, payload, now, detail):
+    """appeal_* 五条命令的纯状态迁移。
+
+    ## 边界
+
+    - 不查案件是否存在（那是 API 层）；
+    - 不查租户（reducer 拿不到 repo）；
+    - 不消费任何 token。
+    只做五态迁移、ID 生成、时间戳、留痕。
+
+    ## 三条硬约束（各有断言）
+
+    1. **只写该写的字段**（`APPEAL_WRITABLE`）。RL-12 ④ 要求「申诉记录一个字段
+       都没被改写」—— pause/stale 只许动状态与时间戳，业务字段一个都不许碰。
+    2. **pause/stale 不关闭**。状态只能是 paused_version_invalidated / stale，
+       **不许出现 closed**。
+    3. **migrate/withdraw 只能原申诉人做**。
+    """
+    appeals = state.setdefault("appeals", [])
+
+    if command == "appeal_open":
+        reason = _nonempty(payload.get("reason"), "reason")
+        tenant = payload.get("tenant") or state.get("tenant")
+        if not isinstance(tenant, str) or not tenant.strip():
+            raise LedgerValidation("bad_appeal", "tenant 必填（申诉必须可被租户过滤）")
+        seq = int(state.get("appeal_seq") or 0) + 1
+        opened_at = _iso(now)
+        aid = _appeal_id(state["case_id"], seq, actor, opened_at)
+        if any(a.get("appeal_id") == aid for a in appeals):
+            raise LedgerConflict("duplicate_appeal", "同一申诉已存在")
+        record = {
+            "appeal_id": aid,
+            "case_id": state["case_id"],
+            # ★ tenant 必须写进每条申诉：GET /api/v1/appeals 按它过滤，
+            #   而内存版 AppealStore 从来没有这个字段（T-311 施工单 §一 第 7 条）。
+            "tenant": tenant.strip(),
+            "appellant": actor,
+            "reason": reason,
+            "state": "open",
+            "opened_at": opened_at,
+            "paused_at": None, "pause_reason": None,
+            "stale_at": None,
+            "migrated_at": None,
+            "withdrawn_at": None, "withdraw_reason": None,
+        }
+        appeals.append(record)
+        state["appeal_seq"] = seq
+        detail.update({"appeal_id": aid})
+        return
+
+    if command == "appeal_pause":
+        # 幂等：没有 open 的条目不是错误，返回空数组（与 AppealStore.pause 同义）
+        paused = []
+        for item in appeals:
+            if item.get("state") == "open":
+                item["state"] = "paused_version_invalidated"
+                item["pause_reason"] = payload.get("reason") or "version_invalidated"
+                item["paused_at"] = _iso(now)
+                paused.append(copy.deepcopy(item))
+        detail["paused"] = paused
+        return
+
+    if command == "appeal_stale":
+        days = payload.get("days", 30)
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            raise LedgerValidation("bad_appeal", "days 必须是整数")
+        marked = []
+        for item in appeals:
+            if item.get("state") != "paused_version_invalidated":
+                continue
+            paused_at = item.get("paused_at")
+            if not paused_at:
+                continue
+            try:
+                ts = calendar.timegm(
+                    time.strptime(paused_at, "%Y-%m-%dT%H:%M:%SZ"))
+            except ValueError:
+                continue
+            if float(now) - ts > days * 86400:
+                item["state"] = "stale"
+                item["stale_at"] = _iso(now)
+                marked.append(copy.deepcopy(item))
+        detail["staled"] = marked
+        return
+
+    aid = _nonempty(payload.get("appeal_id"), "appeal_id")
+    target = next((a for a in appeals if a.get("appeal_id") == aid), None)
+    if target is None:
+        raise LedgerNotFound("appeal_not_found", "申诉不存在：%s" % aid)
+
+    if command == "appeal_migrate":
+        if actor != target.get("appellant"):
+            raise LedgerConflict("not_original_appellant", "只有原申诉人可以确认迁移")
+        if target.get("state") != "paused_version_invalidated":
+            raise LedgerConflict(
+                "not_paused", "只有 paused 的申诉可迁移，当前 %r" % target.get("state"))
+        target["state"] = "migrated"
+        target["migrated_at"] = _iso(now)
+        detail.update({"appeal_id": aid, "state": "migrated"})
+        return
+
+    if command == "appeal_withdraw":
+        reason = payload.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise LedgerValidation("missing_reason", "撤销必须写 reason")
+        if actor != target.get("appellant"):
+            raise LedgerConflict("not_original_appellant", "只有原申诉人可以撤销")
+        if target.get("state") not in ("open", "paused_version_invalidated"):
+            raise LedgerConflict(
+                "terminal_state", "终态申诉不能撤销，当前 %r" % target.get("state"))
+        target["state"] = "withdrawn"
+        target["withdrawn_at"] = _iso(now)
+        target["withdraw_reason"] = reason
+        detail.update({"appeal_id": aid, "state": "withdrawn"})
+        return
+
+    raise LedgerValidation("bad_command", "未知 appeal 命令 %r" % command)
+
+
+GRANT_COMMANDS = frozenset({"grant_propose", "grant_execute", "grant_approve"})
+GRANT_AGGREGATE_PREFIX = "grants:"
+
+
+def aggregate_type_for(aggregate_id):
+    """聚合 ID -> 聚合类型。**唯一一份判定。**
+
+    ★ 为什么必须只有一份：权威批次、事件快照、投影分流三处都要知道
+      「这是不是一个案件」。三处各写一遍判断，必然漂移 ——
+      而漂移的后果不是报错，是某个聚合被当案件写进 review_cases
+      （T-314a 实测过那个形状：GET /api/v1/cases 里出现 grants:on_x）。
+    """
+    if isinstance(aggregate_id, str) and aggregate_id.startswith(GRANT_AGGREGATE_PREFIX):
+        return "grant_registry"
+    return "review_case"
+GRANT_CAPABILITIES = frozenset({"release.sign", "release.revoke",
+                               "takedown.execute", "takedown.waive"})
+
+
+def _grant_id(capability, user_id, scope, seq):
+    """确定性 grant_id。
+
+    ★ 不用自增：进程内自增在重启后归零，会和历史撞号
+      （`api/write_api.py` 的 AppealStore 踩过同一个坑，见 T-311 施工单 §一）。
+      这里用 seq + 内容哈希，seq 落在 state 里，跨重启连续。
+    """
+    return "grant-" + _hash({
+        "capability": capability, "user_id": user_id,
+        "scope": scope, "seq": seq,
+    })[:16]
+
+
+def _grant(state, command, actor, payload, now, detail):
+    """grant_propose / grant_execute / grant_approve 的纯状态迁移。
+
+    ## 为什么三方不同人在这里**也**要判，而不是只靠 validate_grant_actors
+
+    `base.rbac.validate_grant_actors()` 是**授予发生那一刻**的综合校验
+    （还查角色、能力、scope 越界）。这里判的是**逐步的**：
+    同一个人不许走完三步。两者不能互相替代 —— 前者证明「三个都合格」，
+    后者证明「不能一个人冒充三个」。少了后者，一个人可以连续调三次
+    API 走完全流程，而 validate_grant_actors 在最后一步只会看到
+    三个 id 相同 → 拒，但那时前两步已经写进权威了。
+
+    ## reason 不可改写
+
+    `reason` 是「依据」。后续命令不许动它 —— 改了就等于换了理由而留痕看不出来。
+    """
+    grants = state.setdefault("grants", [])
+
+    if command == "grant_propose":
+        capability = _nonempty(payload.get("capability"), "capability")
+        user_id = _nonempty(payload.get("user_id"), "user_id")
+        reason = _nonempty(payload.get("reason"), "reason")
+        if capability not in GRANT_CAPABILITIES:
+            raise LedgerValidation(
+                "bad_grant", "capability 必须是 %r" % (sorted(GRANT_CAPABILITIES),))
+        scope = payload.get("scope")
+        if not isinstance(scope, dict):
+            raise LedgerValidation("bad_grant", "scope 必须是对象")
+        tenant = _nonempty(scope.get("tenant"), "scope.tenant")
+        lines = scope.get("product_lines")
+        if not isinstance(lines, list) or not lines:
+            # ★ 空品线集合不是「全部品线」—— 见 rbac._scope_contains 的同一条纪律
+            raise LedgerValidation(
+                "bad_grant", "scope.product_lines 必须是非空数组（空不是通配）")
+        if any(not isinstance(x, str) or not x.strip() for x in lines):
+            raise LedgerValidation("bad_grant", "scope.product_lines 必须是非空字符串数组")
+
+        seq = int(state.get("grant_seq") or 0) + 1
+        gid = _grant_id(capability, user_id, scope, seq)
+        if any(g.get("grant_id") == gid for g in grants):
+            raise LedgerConflict("duplicate_grant", "同一 grant 已存在")
+        grants.append({
+            "grant_id": gid,
+            "capability": capability,
+            "user_id": user_id,
+            "scope": copy.deepcopy(scope),
+            "platform": payload.get("platform"),
+            "reason": reason,
+            "state": "proposed",
+            "proposed_by": actor,
+            "proposed_at": _iso(now),
+            "executed_by": None, "executed_at": None,
+            "approved_by": None, "approved_at": None,
+            # T-315 才实现撤权；这里先把结构留好，免得那时改 schema
+            "revoked_by": None, "revoked_at": None, "revoke_reason": None,
+            "history": [{
+                "action": "propose", "actor": actor, "at": _iso(now),
+                "from": None, "to": "proposed", "note": reason,
+            }],
+        })
+        state["grant_seq"] = seq
+        detail.update({"grant_id": gid, "capability": capability,
+                       "user_id": user_id})
+        return
+
+    gid = _nonempty(payload.get("grant_id"), "grant_id")
+    target = next((g for g in grants if g.get("grant_id") == gid), None)
+    if target is None:
+        raise LedgerNotFound("grant_not_found", "grant 不存在：%s" % gid)
+
+    if command == "grant_execute":
+        if target.get("state") != "proposed":
+            raise LedgerConflict(
+                "not_proposed", "只有 proposed 可执行，当前 %r" % target.get("state"))
+        if actor == target.get("proposed_by"):
+            raise LedgerConflict("same_actor", "提案人不得自己执行（三权分立）")
+        target["state"] = "executed"
+        target["executed_by"] = actor
+        target["executed_at"] = _iso(now)
+        target["history"].append({
+            "action": "execute", "actor": actor, "at": _iso(now),
+            "from": "proposed", "to": "executed",
+            "note": payload.get("note") or "",
+        })
+        detail.update({"grant_id": gid, "state": "executed"})
+        return
+
+    if command == "grant_approve":
+        if target.get("state") != "executed":
+            raise LedgerConflict(
+                "not_executed", "只有 executed 可审批，当前 %r" % target.get("state"))
+        if actor in (target.get("proposed_by"), target.get("executed_by")):
+            raise LedgerConflict("same_actor", "审批人必须是第三方（三权分立）")
+        target["state"] = "approved"
+        target["approved_by"] = actor
+        target["approved_at"] = _iso(now)
+        target["history"].append({
+            "action": "approve", "actor": actor, "at": _iso(now),
+            "from": "executed", "to": "approved",
+            "note": payload.get("note") or "",
+        })
+        detail.update({"grant_id": gid, "state": "approved"})
+        return
+
+    raise LedgerValidation("bad_command", "未知 grant 命令 %r" % command)
 
 
 def _ingest_submission(state, actor, payload, now):
@@ -163,6 +611,21 @@ def _ingest_submission(state, actor, payload, now):
     decision = ir.get("decision")
     if not isinstance(decision, dict) or decision.get("state") not in DECISION_LABELS:
         raise LedgerValidation("bad_ir", "ir.decision.state 必须在 %r" % (DECISION_LABELS,))
+    # T-316b: 报告渲染输入。允许缺省（None），但**不许是坏形状** ——
+    # 「没有报告可渲染」由 publish 时判（ReportStore 会拒），
+    # 「形状不对」必须在这里拒，否则坏快照会随权威一起被永久保存。
+    report_snapshot = payload.get("report_snapshot")
+    if report_snapshot is not None:
+        if not isinstance(report_snapshot, dict):
+            raise LedgerValidation(
+                "bad_report_snapshot", "report_snapshot 必须是对象或 null")
+        if not isinstance(report_snapshot.get("ir"), dict):
+            raise LedgerValidation(
+                "bad_report_snapshot", "report_snapshot.ir 必须是对象")
+        if not isinstance(report_snapshot.get("failure_kind_counts"), dict):
+            raise LedgerValidation(
+                "bad_report_snapshot", "report_snapshot.failure_kind_counts 必须是对象")
+
     judgment = payload.get("judgment")
     if not isinstance(judgment, dict):
         raise LedgerValidation("bad_judgment", "judgment 必须是对象")
@@ -177,6 +640,7 @@ def _ingest_submission(state, actor, payload, now):
         "submission_hash": submission_hash,
         "content": copy.deepcopy(content),
         "ir": copy.deepcopy(ir),
+        "report_snapshot": copy.deepcopy(report_snapshot),
         "judgment": copy.deepcopy(judgment),
         "tenant": _nonempty(payload.get("tenant"), "tenant"),
         "product_line": _nonempty(payload.get("product_line"), "product_line"),
@@ -364,6 +828,14 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         state["status"] = "closed"
         state["lease_expires"] = None
         detail["formal_id"] = formal_id
+    elif command in TAKEDOWN_COMMANDS:
+        _takedown(state, command, actor, payload, now, detail)
+    elif command in REPORT_COMMANDS:
+        _report(state, command, actor, payload, now, detail)
+    elif command in APPEAL_COMMANDS:
+        _appeal(state, command, actor, payload, now, detail)
+    elif command in GRANT_COMMANDS:
+        _grant(state, command, actor, payload, now, detail)
     elif command == "expire_lease":
         if state["status"] != "claimed" or state["lease_expires"] is None:
             raise LedgerConflict("not_claimed", "没有可过期的 lease")
@@ -402,6 +874,25 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         result["finding"] = copy.deepcopy(next(
             finding for finding in state["ir"]["findings"]
             if finding.get("finding_id") == detail["finding_id"]))
+    if command in TAKEDOWN_COMMANDS and "task_id" in detail:
+        result["takedown_task"] = copy.deepcopy(next(
+            t for t in state["takedown_tasks"]
+            if t.get("task_id") == detail["task_id"]))
+    if command in APPEAL_COMMANDS:
+        if "appeal_id" in detail:
+            result["appeal"] = copy.deepcopy(next(
+                a for a in state["appeals"]
+                if a.get("appeal_id") == detail["appeal_id"]))
+        for key in ("paused", "staled"):
+            if key in detail:
+                result[key] = copy.deepcopy(detail[key])
+    if command in REPORT_COMMANDS and "report_id" in detail:
+        result["report"] = copy.deepcopy(state.get("report"))
+    if command in GRANT_COMMANDS and "grant_id" in detail:
+        # 命令结果带出该条 grant 的完整快照 —— 调用方不用再回读 state
+        result["grant"] = copy.deepcopy(next(
+            g for g in state["grants"]
+            if g.get("grant_id") == detail["grant_id"]))
     return state, [event], result
 
 

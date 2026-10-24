@@ -82,6 +82,24 @@ TAKEDOWN_ALLOWLIST = {
     "takedown.waive": frozenset(),
 }
 
+#: 生产注入的名单来源：() -> {capability: frozenset(principal_id)}。
+#:
+#: T-314c。默认 None = 用上面的模块常量（开发装配与 28 处 verify_rbac 断言
+#: 一行不动）。生产在 ProductionRuntime.start() 之后注入一个读投影的函数。
+#:
+#: ★ 为什么是注入而不是改 can_act 签名：can_act 的生产调用点只有 2 处
+#:   （production_app.py:543 与 write_api.py:321），但 verify_rbac.py 有 28 处
+#:   断言直接调它。改签名会让那 28 处全 TypeError —— 一张授权票变成验证器重写。
+#:
+#: ★ 注入源未就绪时必须回落空集（fail closed），不许回落「全部放行」。
+_ALLOWLIST_SOURCE = None
+
+
+def set_allowlist_source(fn):
+    """生产启动时注入名单来源；传 None 恢复模块常量。"""
+    global _ALLOWLIST_SOURCE
+    _ALLOWLIST_SOURCE = fn
+
 # 下线权的两个能力名，单独列出来是因为它们走人级名单，其余能力走角色矩阵。
 TAKEDOWN_CAPS = frozenset({"takedown.execute", "takedown.waive"})
 
@@ -140,6 +158,17 @@ def _takedown_allowed(principal, capability):
         return False
     if capability not in TAKEDOWN_CAPS:
         return False
+    source = _ALLOWLIST_SOURCE
+    if source is not None:
+        try:
+            table = source() or {}
+        except Exception:
+            # ★ 注入源抛错 ≠ 放行。fail closed。
+            return False
+        allowed = table.get(capability)
+        if not isinstance(allowed, (set, frozenset, list, tuple)):
+            return False
+        return pid in allowed
     return pid in (TAKEDOWN_ALLOWLIST.get(capability) or frozenset())
 
 
@@ -171,6 +200,70 @@ def can_act(principal, capability, case=None):
         if not _sod_ok(principal, case):
             return False
     return True
+
+
+def can_read_report(principal, record):
+    """报告可读性 = **案件可读性**（不另立一套 ACL）。
+
+    `record` 是 `ReportStore` 索引里的那条（含 `acl`：
+    tenant / product_line / submitter_id / assigned），**没有 case_id**。
+    所以这里按 acl 重建一个「案件形状」的对象交给 `can_read_content` ——
+    它判的正好是那四个字段。
+
+    ## 为什么必须是这个函数，而不是 `ReportStore._default_authorize`
+
+    `_default_authorize` 读 `principal["role"]`（**单数**、`"DP3"` **大写**），
+    而真实 principal 是 `roles`（**复数**、**小写**）—— 接上即全禁。
+    而 `tools/verify_report_store.py:55-63` 的夹具恰好用单数大写，
+    所以它一直绿。这是第五处「验证器形状 ≠ 生产形状」。
+
+    ## 为什么不按 `acl["assigned"]` 直接判
+
+    结案时 assignee 会被清空，于是 `assigned` 通常是 `[]`。判据若要求
+    「在 assigned 里」，结案后就**谁都读不到自己的报告**。
+    正确口径是 `can_read_content` 的 coordinator / signer / submitter 分支。
+    """
+    if not isinstance(principal, dict) or not isinstance(record, dict):
+        return False
+    acl = record.get("acl") or {}
+    return can_read_content(principal, {
+        "tenant": acl.get("tenant"),
+        "product_line": acl.get("product_line"),
+        "submitter_id": acl.get("submitter_id"),
+        "assignee_id": (acl.get("assigned") or [None])[0],
+        "actionable": False,
+    })
+
+
+def can_reassign_takedown(principal, task):
+    """改派下线任务（TD-12）。**不是 `takedown.execute`。**
+
+    ## 为什么单独一个函数，而不是复用 can_act("takedown.execute", ...)
+
+    UIUX 有三处都写「coordinator 可 reassign」（§1.1 角色表、UJ-5 第 2 条、
+    TD-12），而 `coordinator` 的角色能力是
+    `{case.review, appeal.handle, admin.grant.approve, takedown.waive}`
+    —— **不含 `takedown.execute`**。
+
+    于是 `T-312` 施工单 §五 那句「`reassign` → `takedown.execute`」
+    与规格是**冲突**的：照字面接上，全系统没有任何人能改派，
+    而「改派」恰恰是任务卡在错的人手上时唯一的出路。
+    规格优先（PRD/Playbook 是目标，施工单是手段）。
+
+    ## 为什么不加一个新 capability
+
+    加 `takedown.reassign` 要同时改 `CAPABILITIES`、`_ROLE_CAPS`、
+    `verify_rbac.py` 的矩阵断言、契约枚举 —— 那是给一个角色已经说话的事
+    再造一层词汇。这里判的就是「统筹角色 + 同租户」，没有第四种情形。
+
+    ★ 改派权**不等于**执行权：coordinator 改了派仍然执行不了下线
+      （它没有 `takedown.execute`，也不在人级名单里）。两条路各自 fail closed。
+    """
+    if _has_role(principal, "machine"):
+        return False
+    if not _has_role(principal, "coordinator"):
+        return False
+    return principal.get("tenant") == task.get("tenant")
 
 
 def can_read_content(principal, case):

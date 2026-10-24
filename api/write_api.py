@@ -25,7 +25,7 @@ from base.finding_store import FindingRejected
 from base.release_gate import (
     InvalidTransition, SignatureError, SoDViolation, StepUpError,
 )
-from base.rbac import can_act
+from base.rbac import can_act, can_reassign_takedown
 from base.reviews_ledger import (
     LedgerConflict, LedgerNotFound, LedgerValidation,
 )
@@ -340,6 +340,35 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                 return
         repo.takedown_tasks.append(task)
 
+    def require_takedown(principal, task, capability="takedown.execute"):
+        """下线写操作的能力判定（T-312b）。
+
+        ## 三把钥匙，不是一把
+
+        | 路由 | 钥匙 | 为什么 |
+        |---|---|---|
+        | start / complete / fail / retry | `takedown.execute` | 「去平台上把它弄下来」 |
+        | reassign | `can_reassign_takedown`（coordinator + 同租户） | UIUX TD-12：统筹改派；统筹**没有** execute |
+        | waive | `takedown.waive` | 「宣布不用下线」——与执行方向相反 |
+
+        ★ 为什么 waive 不能靠 `takedown.execute` 满足：
+          合成一把钥匙等于让「被派去干活的人」自动获得「可以宣布不干」的资格，
+          而 waive 是双人审批 + 原签发人不得唯一 —— 它防的正是执行人自批。
+          `base/takedown.py` 的 `check_waive` 会拦「执行人当审批人」，
+          但如果执行人自己就能调 waive 路由，那道门只剩形式。
+
+        ★ 改派为什么不复用 execute：见 `rbac.can_reassign_takedown` 的 docstring。
+          照 T-312 施工单字面接 `takedown.execute` 会让改派全系统无人可做。
+
+        ## 为什么 task 能当 case 传给 can_act
+
+        `can_act` 的 scope 判定读 `tenant` 与 `product_line`，任务对象两个都有。
+        **platform 维度尚未建模**（`base/rbac.py:37` 已记），这里不假装有。
+        """
+        if not can_act(principal, capability, task):
+            raise HTTPException(
+                403, "无权执行下线动作：%s（任务 %s）" % (capability, task.get("task_id")))
+
     def raise_command_http(exc, command):
         """领域错误转稳定 HTTP；未知异常原样抛。"""
         code = getattr(exc, "code", None)
@@ -609,22 +638,121 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
             request, idempotency_key, run, actor=principal["id"],
             request_body=body.model_dump())
 
+    # ── 申诉（T-311c）────────────────────────────────────────────────
+    #
+    # 生产（review_command_service 非 None）走 reducer 的 appeal_* 命令，
+    # 状态进 authority，重启不丢；开发装配仍走内存 AppealStore。
+    #
+    # ★ 三条共同点：**不再用 _idempotent()**。那个缓存在
+    #   `app.state.idempotency`（一个进程内 dict），重启即失 ——
+    #   重启后同 key 重放会建出第二条申诉。改成走 authority 的跨重启幂等，
+    #   与 /submissions 同一条路。
+
+    def _appeal_authority(principal, case_id):
+        """申诉的服务层入口；返回 (service, actor) 或抛 503。"""
+        if review_command_service is None:
+            raise HTTPException(501, "capability_not_enabled")
+        return review_command_service, {
+            "principal_id": principal["id"], "tenant_id": principal["tenant"]}
+
+    def _appeal_conflict(exc):
+        """领域错误 → HTTP。与 raise_command_http 同口径，但只覆盖申诉会抛的码。"""
+        code = getattr(exc, "code", None)
+        detail = getattr(exc, "detail", "") or ""
+        if code in ("appeal_not_found",):
+            return HTTPException(404, "%s: %s" % (code, detail))
+        if code in ("not_original_appellant",):
+            return HTTPException(403, "%s: %s" % (code, detail))
+        if code in ("bad_appeal", "missing_reason"):
+            return HTTPException(400, "%s: %s" % (code, detail))
+        if code in ("not_paused", "terminal_state", "duplicate_appeal",
+                    "version_conflict"):
+            return HTTPException(409, "%s: %s" % (code, detail))
+        return None
+
+    def _run_appeal(principal, case_id, command, payload, idempotency_key):
+        service, actor = _appeal_authority(principal, case_id)
+        try:
+            outcome = service.execute(
+                aggregate_id=case_id, command=command, actor=actor,
+                expected_version=None, payload=payload,
+                idempotency_key=idempotency_key)
+        except Exception as exc:  # noqa: BLE001
+            mapped = _appeal_conflict(exc)
+            if mapped is not None:
+                raise mapped from exc
+            raise_command_http(exc, command)
+        response = dict(outcome["result"])
+        # ★ 平铺一层 appeal 的字段到顶层。
+        #
+        # 内存版 AppealStore 返回的是**扁平**的 {"appeal_id": ..., "state": ...}，
+        # 而权威返回把它包在 result["appeal"] 里。前端 AppealsPage 读的是
+        # `created.appeal_id` / `created.state`（顶层）——
+        # 不铺这一层，开申诉会返回 200 但前端**静默显示 undefined**，
+        # 而且没有任何断言会红（前端只在 dev 下渲染，生产走同一份代码）。
+        #
+        # 顶层与嵌套都保留：顶层保持与内存版兼容，嵌套保留完整权威结果。
+        appeal = response.get("appeal")
+        if isinstance(appeal, dict):
+            for key, value in appeal.items():
+                response.setdefault(key, value)
+        response.update({
+            "authority_snapshot": outcome["authority_snapshot"],
+            "reconcile_token": outcome["reconcile_token"],
+            "projection_lag": outcome["projection_lag"],
+            "replayed": outcome["replayed"],
+        })
+        return JSONResponse(content=response, status_code=outcome["http_status"])
+
+    def _require_key(key):
+        if not isinstance(key, str) or not key.strip():
+            raise HTTPException(400, "缺少 Idempotency-Key")
+
     @app.post("/api/v1/appeals")
     def create_appeal(request: Request, body: AppealCreate,
                       principal=Depends(principal_dep),
                       idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         require_enabled("/api/v1/appeals")
-        require_tenant(principal, case_or_404(body.case_id))
+        case = case_or_404(body.case_id)
+        require_tenant(principal, case)
+        if review_command_service is not None:
+            _require_key(idempotency_key)
+            if not isinstance(body.reason, str) or not body.reason.strip():
+                raise HTTPException(400, "bad_appeal: reason 必填")
+            return _run_appeal(
+                principal, body.case_id, "appeal_open",
+                {"reason": body.reason.strip(), "tenant": principal["tenant"]},
+                idempotency_key)
         return _idempotent(
             request, idempotency_key,
             lambda: appeals.open(body.case_id, principal["id"], body.reason),
             actor=principal["id"], request_body=body.model_dump())
+
+    def _appeal_case_id(principal, appeal_id, idempotency_key, command, payload):
+        """把 appeal_id 解析回 case_id，再走权威命令。
+
+        ★ 反查在**服务层**（`find_appeal_case`），不在这里读 state ——
+          本文件有一条硬约束 C5「API 层不计算 state/decision」，
+          第一版我在 API 里直接扫 authority.state()，被 C5 的扫描器抓到。
+          那条约束是对的：API 只编排，不碰状态。
+        """
+        service, _actor = _appeal_authority(principal, None)
+        case_id = service.find_appeal_case(appeal_id, tenant=principal["tenant"])
+        if case_id is None:
+            raise HTTPException(404, "appeal_not_found: 申诉不存在")
+        return _run_appeal(principal, case_id, command,
+                           {**payload, "appeal_id": appeal_id},
+                           idempotency_key)
 
     @app.post("/api/v1/appeals/{id}/migrate")
     def migrate_appeal(id: str, request: Request,
                        principal=Depends(principal_dep),
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         require_enabled("/api/v1/appeals/{id}/migrate")
+        if review_command_service is not None:
+            _require_key(idempotency_key)
+            return _appeal_case_id(principal, id, idempotency_key,
+                                   "appeal_migrate", {})
         try:
             appeal = appeals.get(id)
         except AppealError as exc:
@@ -645,6 +773,13 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                         principal=Depends(principal_dep),
                         idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         require_enabled("/api/v1/appeals/{id}/withdraw")
+        if review_command_service is not None:
+            _require_key(idempotency_key)
+            if not isinstance(body.reason, str) or not body.reason.strip():
+                raise HTTPException(400, "missing_reason: 撤销必须写 reason")
+            return _appeal_case_id(principal, id, idempotency_key,
+                                   "appeal_withdraw",
+                                   {"reason": body.reason.strip()})
         try:
             appeal = appeals.get(id)
         except AppealError as exc:
@@ -667,6 +802,7 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
             require_enabled("/api/v1/takedown-tasks/{id}/" + action)
             task = task_or_404(id)
             require_tenant(principal, task, "takedown task")
+            require_takedown(principal, task, "takedown.execute")
 
             def run():
                 try:
@@ -699,10 +835,15 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         require_enabled("/api/v1/takedown-tasks/{id}/complete")
         task = task_or_404(id)
         require_tenant(principal, task, "takedown task")
+        require_takedown(principal, task, "takedown.execute")
 
         def run():
             try:
-                new = TD.complete(task, body.evidence)
+                # ★ completed_by 取**已认证的 principal**，不取 body。
+                #   取 body 就等于让调用方自己声明「我是谁」——
+                #   而 require_takedown 刚刚才用 principal 判过权限，
+                #   两处用两个身份来源，等于自己给自己开门。
+                new = TD.complete(task, body.evidence, actor=principal["id"])
             except TD.TakedownError as exc:
                 raise HTTPException(400, "%s: %s" % (exc.code, exc.detail))
             new["version"] = int(new.get("version") or 0) + 1
@@ -719,6 +860,9 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         require_enabled("/api/v1/takedown-tasks/{id}/reassign")
         task = task_or_404(id)
         require_tenant(principal, task, "takedown task")
+        # TD-12：改派是统筹的职责，不是执行人的职责（见 rbac.can_reassign_takedown）
+        if not can_reassign_takedown(principal, task):
+            raise HTTPException(403, "无权改派下线任务：需本租户统筹角色")
 
         def run():
             if body.version is not None and body.version != int(task.get("version") or 0):
@@ -739,6 +883,8 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         require_enabled("/api/v1/takedown-tasks/{id}/waive")
         task = task_or_404(id)
         require_tenant(principal, task, "takedown task")
+        # ★ 另一把钥匙：takedown.execute 不能作证 waive（见 require_takedown）
+        require_takedown(principal, task, "takedown.waive")
 
         def run():
             try:

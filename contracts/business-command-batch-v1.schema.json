@@ -33,7 +33,8 @@
     },
     "aggregate_type": {
       "type": "string",
-      "enum": ["review_case"]
+      "description": "聚合类型。review_case = 案件（唯一进 review_cases 投影的类型）；grant_registry = 租户级名单治理聚合（aggregate_id 形如 grants:<tenant>，投影到 grant_registry 表，绝不进 review_cases）",
+      "enum": ["review_case", "grant_registry"]
     },
     "aggregate_id": { "type": "string", "minLength": 1 },
     "expected_version": { "type": "integer", "minimum": 0 },

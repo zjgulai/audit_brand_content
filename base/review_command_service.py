@@ -11,9 +11,15 @@ from base.projector import Projector
 
 
 class ReviewCommandService:
-    def __init__(self, authority, projection):
+    def __init__(self, authority, projection, *,
+                 report_store=None, report_bridge=None):
         self.authority = authority
         self.projection = projection
+        # T-316d：报告落盘。两者都可为 None —— 那时结案只是不产出报告，
+        # 不影响任何既有行为（现有 6 个验证器直接 `ReviewCommandService(a, p)`，
+        # 一行未动）。生产在 ProductionRuntime.start() 里注入真实实例。
+        self.report_store = report_store
+        self.report_bridge = report_bridge
         # WriterLease 只约束跨进程写者；FastAPI 同步 handler 会在线程池并发。
         # 权威提交 + 按序追投影必须在本进程再单飞，避免 seq2 先于 seq1 apply。
         self._lock = threading.RLock()
@@ -26,7 +32,166 @@ class ReviewCommandService:
     def execute(self, **command):
         with self._lock:
             committed = self.authority.execute(**command)
-            return self._respond(committed["batch"], committed["replayed"])
+            response = self._respond(committed["batch"], committed["replayed"])
+        # ★ 报告发布在**锁外**：渲染是一次最长 30 秒的子进程调用。
+        #   留在锁里会让「一人结案、渲染卡住」期间所有人的写请求排队 ——
+        #   一次下游副作用变成全局写停顿。
+        #
+        # ★ 也不回滚、不改 http_status。权威已经提交，结案**已经成立**。
+        #   把发布失败做成 500 会让用户以为结案没成功而重复提交，
+        #   而第二次会因为 version_conflict 被拒 —— 用户看到的是「点两次都失败」。
+        report = self._publish_report_after(command, response)
+        if report is not None:
+            # ★ 挂在 `result` 里，不挂顶层。
+            #
+            #   `api/write_api.py:run_review_command` 组装 HTTP body 时只取
+            #   `outcome["result"]` 再补四个 authority 字段。挂顶层的话
+            #   报告会**静默丢失**：结案 200、权威里也有报告，但响应里没有 ——
+            #   前端拿不到 report_id，用户以为没发出报告而去重试。
+            #   （第一版就是挂顶层，实测 P1 红而权威里已经有数据。）
+            response["result"]["report"] = report
+        return response
+
+    def _publish_report_after(self, command, response):
+        """结案 → 渲染 → 落盘 → 把 report 写回权威。**永不抛。**
+
+        返回
+          None                    没做（非结案 / 未装配）
+          {"ok": False, ...}      做了但失败（原因可见）
+          {"ok": True, ...}       成功
+
+        ## 为什么失败也要返回一个明确的对象
+
+        「报告没出来」有五种完全不同的原因（node 缺失 / 渲染器拒了 / IR 缺字段 /
+        落盘冲突 / 权威写入失败），把五种压成一个「报告字段是空的」，
+        下一次排障要从头再查一遍。这里每一种都带 `detail`。
+        """
+        if command.get("command") != "submit_review":
+            return None
+        if self.report_store is None or self.report_bridge is None:
+            # 未装配：**不返回失败**。开发装配与所有既有验证器都走这条路，
+            # 返回 {"ok": False} 会让它们凭空多出一个字段去断言。
+            return None
+
+        case_id = command.get("aggregate_id")
+        # ★ 从**权威 state** 取，不从 `response["result"]` 取。
+        #
+        #   `public_case()` 是给 API 客户端的对外视图，它不含 `report_snapshot`
+        #   （那是渲染入参，不是案件字段）。第一版从 result 里取，于是
+        #   snapshot 永远是 None，发布钩子静默不做事 —— 而结案仍然成功，
+        #   日志里只有一句「没有报告」。**这类静默分支必须靠 state 这一侧对齐。**
+        case_state = self.authority.state(case_id)
+        snapshot = case_state.get("report_snapshot")
+        if not isinstance(snapshot, dict):
+            return {"ok": False, "detail": "no_snapshot",
+                    "hint": "判定时未产出 report_snapshot（T-316b 断链）"}
+        rendered = self.report_bridge.render(snapshot)
+        if not rendered.get("ok"):
+            return {"ok": False, "detail": rendered.get("detail") or "render_failed",
+                    "errors": rendered.get("errors") or []}
+
+        markdown = rendered["markdown"]
+        ir = snapshot.get("ir") or {}
+
+        def render_fn(_ir, _text=markdown):
+            # ★ ReportStore 的契约是 `render_fn(ir)`；我们手里已经有渲染结果了。
+            #   这里**不重新渲染** —— 重渲染会让「持久化的正文」与
+            #   「ReportStore 校验过的正文」变成两次调用，中间任何不确定性
+            #   （时间戳、随机 id）都会让 `_check_r1` 判成不一致。
+            return _text
+
+        # ★ `assigned` 必须记**结案人**（这条命令的 actor），不能取
+        #   `case_state["assignee"]`。
+        #
+        #   原因：`submit_review` 那条命令会把 `state["assignee"]` 清空
+        #   （结案后不再有人持有该案）。于是发布这一刻 `case_state["assignee"]`
+        #   已经是 None，`assigned` 落成 `[]` —— 而 `can_read_content` 对
+        #   dp3/dp4 要求「在 assigned 里或 actionable」，两条都不成立，
+        #   **结案人读不到自己刚结案的报告**。
+        #
+        #   实测：`verify_report_publishing.py` 的 P6c 就是这么红的。
+        #   那不是判据错，是实现把 ACL 建立在一个「此刻恰好为空」的字段上。
+        closer = (command.get("actor") or {}).get("principal_id")
+        acl = {
+            "tenant": case_state.get("tenant"),
+            "product_line": case_state.get("product_line"),
+            "submitter_id": case_state.get("submitter_id"),
+            "assigned": [closer] if closer else [],
+        }
+        try:
+            published = self.report_store.publish(ir, render_fn, acl)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False,
+                    "detail": "publish_raised:%s" % type(exc).__name__}
+        if not published.get("ok"):
+            return {"ok": False, "detail": published.get("detail") or "publish_failed"}
+
+        # ★ `publish()` 的返回里**没有** source_ir_fingerprint / created_at ——
+        #   它们只在 index.jsonl 的那条记录里。不去改 ReportStore 的返回形状
+        #   （它被 30+ 条既有断言约束），而是从**索引里取那一条**：
+        #   索引才是「这份报告是谁、什么时候、依据哪个 IR」的唯一权威。
+        #
+        # ★ 取不到就判失败，不编一个默认值。缺指纹的报告在重建时无法证明
+        #   「重建结果与当初发的是同一份」，那时没有任何断言会红。
+        indexed = None
+        try:
+            idx = self.report_store.read_index()
+            indexed = next((r for r in idx.get("records") or []
+                            if r.get("report_id") == published["report_id"]), None)
+        except Exception:  # noqa: BLE001
+            indexed = None
+        if not isinstance(indexed, dict):
+            return {"ok": False, "detail": "index_record_missing",
+                    "report_id": published.get("report_id"),
+                    "file_persisted": True}
+        record = {
+            "report_id": published["report_id"],
+            "url": published["url"],
+            "path": published["path"],
+            "sha256": published["sha256"],
+            "source_ir_id": indexed.get("source_ir_id"),
+            "source_ir_version": indexed.get("source_ir_version"),
+            "source_ir_fingerprint": indexed.get("source_ir_fingerprint"),
+            "created_at": indexed.get("created_at"),
+            "renderer": "report_render.mjs@v1",
+        }
+        # ── 回写权威 ──────────────────────────────────────────────────
+        #
+        # ★ 报告**先落盘、后进权威**，顺序不许反：
+        #   反过来的话，权威里有一条指向不存在文件的报告 —— 那是「真话说早了」。
+        #   现在的顺序里最坏情况是「文件在、权威没有」：`report_store.read()`
+        #   仍能按 report_id 打开它，下一次结案重放会幂等地把权威补上。
+        #
+        # ★ 幂等键用 report_id 派生：同一份报告重放不会产生第二条命令。
+        #   不用 uuid —— 那会让每次重试都变成一条新命令。
+        try:
+            committed = self.authority.execute(
+                aggregate_id=case_id,
+                command="report_publish",
+                actor={"principal_id": command.get("actor", {}).get("principal_id")
+                       or "system", "tenant_id": command.get("actor", {}).get("tenant_id")
+                       or case_state.get("tenant") or ""},
+                expected_version=None,
+                payload=record,
+                idempotency_key="report:" + record["report_id"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            code = getattr(exc, "code", None) or type(exc).__name__
+            return {"ok": False, "detail": "authority_write_failed:%s" % code,
+                    "report_id": record["report_id"], "url": record["url"],
+                    "file_persisted": True}
+        try:
+            Projector(self.authority, self.projection).catch_up()
+        except Exception:
+            # 投影落后不是发布失败：`GET /reports` 先读权威。
+            pass
+        return {"ok": True, "report_id": record["report_id"],
+                "url": record["url"], "path": record["path"],
+                "sha256": record["sha256"],
+                "duplicate": bool(published.get("duplicate")),
+                "restored": bool(published.get("restored")),
+                "authority_seq": committed["batch"]["authority_seq"],
+                "replayed": bool(committed.get("replayed"))}
 
     def _respond(self, batch, replayed):
         """权威已提交后的统一响应：投影追平成功 200，失败 202（不回滚权威）。"""
@@ -125,6 +290,116 @@ class ReviewCommandService:
                 expected_version=state["version"], payload={},
                 idempotency_key="lease-expire:%s:%s" %
                 (aggregate_id, state["version"]), now=current)
+
+    def find_appeal_case(self, appeal_id, *, tenant):
+        """appeal_id -> case_id；找不到返回 None。
+
+        ## 为什么这个方法在服务层而不是 API 层
+
+        `api/write_api.py` 有一条硬约束（C5）：「API 层不计算 state/decision」。
+        按 appeal_id 反查所属案件需要读权威状态，那属于服务层。
+        API 只拿结果，不碰 state —— 这样 C5 那条扫描继续成立。
+
+        ## 为什么是线性扫
+
+        申诉存在案件 aggregate 里，没有 appeal_id 的二级索引。
+        规模是「本租户案件数」，当前可接受。**若案件上千，需要一条索引**——
+        这条记在 T-311c 的票里，不在这里悄悄加缓存（缓存会与权威不一致）。
+        """
+        for case_id in self.authority.aggregate_ids():
+            current = self.authority.state(case_id)
+            if current.get("tenant") != tenant:
+                continue
+            for item in current.get("appeals") or []:
+                if item.get("appeal_id") == appeal_id:
+                    return case_id
+        return None
+
+    def mark_appeals_stale(self, *, now=None, days=30):
+        """把「暂停超过 days 天」的申诉转成 stale。**扫全部案件。**
+
+        ## 这是 `AppealStore.mark_stale()` 的第一个生产触发点
+
+        T-311 施工单 §一 第 4 条：`mark_stale` 在全仓只有
+        `tools/verify_write_api.py` 调过一次 —— **生产里 0 调用**。
+        一条没有触发点的规则等于没有规则（AGENTS.md §2.4.2）。
+
+        调用点必须挂在 `ProductionRuntime.maintain_once()`
+        （30 秒一次的心跳），**不许挂在 `GET /appeals`**：
+        读端点写状态会让「打开列表」变成一次写操作，且并发下会撞版本。
+
+        ## 为什么返回计数而不是抛错
+
+        stale 是「到期自动发生」的事，没有 open/paused 的申诉也完全正常。
+        抛错会让每分钟的心跳变成一次错误日志噪音，而真正的故障
+        （authority 写不进）会被淹掉。
+
+        ## 每个 aggregate 单独 try
+
+        一个案件的 stale 迁移失败（版本冲突等）不该阻断其余案件。
+        失败的记进 errors，由调用方打日志；**不吞掉、也不上浮成整轮失败**。
+        """
+        import time
+
+        stamp = time.time() if now is None else float(now)
+        applied, errors = 0, []
+        for aggregate_id in self.authority.aggregate_ids():
+            with self._lock:
+                state = self.authority.state(aggregate_id)
+                if not any(a.get("state") == "paused_version_invalidated"
+                           for a in state.get("appeals") or []):
+                    continue
+                try:
+                    outcome = self.execute(
+                        aggregate_id=aggregate_id, command="appeal_stale",
+                        actor={"principal_id": "appeal-sweeper",
+                               "tenant_id": state.get("tenant") or "system"},
+                        expected_version=state["version"],
+                        payload={"days": int(days)},
+                        idempotency_key="appeal-stale:%s:%s" % (
+                            aggregate_id, state["version"]),
+                        now=stamp)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append((aggregate_id,
+                                   getattr(exc, "code", type(exc).__name__)))
+                    continue
+                staled = (outcome.get("result") or {}).get("staled") or []
+                if staled:
+                    applied += len(staled)
+        return {"staled": applied, "errors": errors, "at": stamp}
+
+    def list_published_reports(self):
+        """所有带报告的案件状态（只读快照列表）。**不做 ACL。**
+
+        ## 为什么这个方法在服务层
+
+        `api/review_api.py` 有一条硬约束（C5）：「API 层不计算 state/decision」。
+        第一版我在路由里直接 `state = service.authority.state(case_id)`，
+        被 C5 的扫描器抓到。那条约束是对的：API 只编排、不碰状态。
+        所以「按案件扫一遍找报告」留在服务层，API 只拿 list 再判 ACL。
+
+        ## 为什么不在这里判 ACL
+
+        ACL 需要 `can_read_content(principal, case)`，而 principal 是 API 层的东西。
+        服务层不认识 HTTP 身份。**分工：服务层给数据，API 层判可见性。**
+        """
+        out = []
+        for aggregate_id in self.authority.aggregate_ids():
+            current = self.authority.state(aggregate_id)
+            record = current.get("report")
+            if not isinstance(record, dict):
+                continue
+            row = copy.deepcopy(record)
+            row["case_id"] = current.get("case_id")
+            row.setdefault("ir_id", record.get("source_ir_id"))
+            # 判 ACL 需要的四个字段，随行带出 —— 再查一次 authority 会多一次 IO，
+            # 且两次读之间可能变（结案后 assignee 会被清空）。
+            row["_tenant"] = current.get("tenant")
+            row["_product_line"] = current.get("product_line")
+            row["_submitter_id"] = current.get("submitter_id")
+            row["_assignee"] = current.get("assignee")
+            out.append(row)
+        return out
 
     def read_your_write(self, reconcile_token, *, aggregate_id=None,
                         principal_id=None, tenant_id=None):

@@ -363,8 +363,28 @@ def check_metrics_wording(text: str) -> None:
 
 def new_task(*, task_id: str, case_id: str, platform: str, tenant: str,
              product_line: str, created_at: str, assignee: str,
-             reviewers: Sequence[str] | None = None) -> dict:
-    """建一个 pending 任务。**结构里没有 deadline。**"""
+             reviewers: Sequence[str] | None = None,
+             trigger: str | None = None, reason: str | None = None) -> dict:
+    """建一个 pending 任务。**结构里没有 deadline。**
+
+    ## trigger / reason（T-312a）
+
+    一条下线任务必须能说出**自己为什么存在**：是撤回触发的，还是自动失效触发的。
+    改前 `new_task()` 没有这两个字段，于是 #95 要求的「两条生成路径各建一条任务」
+    在任务对象上**无法区分** —— 两条路径造出来的任务一字不差。
+
+    为什么给默认值 `None` 而不是必填：这个函数被三个验证器与
+    `web/scripts/seed_projection.py` 共 12 处调用，全部在造样本。
+    改成必填会让「造一个样本」变成「补一个业务字段」，
+    而其中 11 处根本不是在验生成路径。**必填的约束放在 reducer 那一层**
+    （`takedown_create` 要求 trigger 非空），纯构造函数保持可选。
+
+    ★ 这不是「为了兼容而放宽」：判定「该不该建」的是
+      `should_create_task()`，落盘「为什么建」的是 reducer。
+      构造函数只负责把两者已经决定好的东西装进对象。
+    """
+    if trigger is not None and trigger not in ("revoke", "invalidated"):
+        raise TakedownError("E_TRIGGER", f"trigger={trigger!r} 不在 revoke/invalidated")
     return {
         "task_id": task_id,
         "case_id": case_id,
@@ -376,6 +396,8 @@ def new_task(*, task_id: str, case_id: str, platform: str, tenant: str,
         "reviewers": list(reviewers or []),
         "created_at": created_at,
         "history": [],
+        "trigger": trigger,
+        "reason": reason if reason is not None else trigger,
     }
 
 
@@ -405,12 +427,34 @@ def transition(task: dict, new_state: str, *, action: str | None = None,
     return t
 
 
-def complete(task: dict, evidence: dict, *, at: str | None = None,
+def complete(task: dict, evidence: dict, *, actor: str, at: str | None = None,
              repo_root: str | None = None, outbox=None) -> dict:
-    """完成任务。**证据不合格就不许完成** —— 这是 RL-9 的唯一执行点。"""
+    """完成任务。**证据不合格就不许完成** —— 这是 RL-9 的唯一执行点。
+
+    ## T-312b：`actor` 是必填关键字参数
+
+    `#95` 第四条要求「只有有权限的人能回填完成」。改前本函数**连 actor 都没有**
+    —— 它只能验证据齐不齐，验不了「谁填的」，于是那条判据在 base 层无对象
+    （`api/write_api.py` 的 complete 路由当时只调 `require_tenant`）。
+
+    ★ 为什么这里**不做权限判定**，只落 `completed_by`：
+      权限是 `can_act(principal, "takedown.execute", task)`，需要 principal、
+      需要人级名单、需要角色矩阵 —— 三样都在 `base/rbac.py` 与路由层。
+      在纯函数里再判一次等于开出第二份权限真相，两份必然漂移。
+      **分工**：路由层判「能不能」，本函数记「是谁」。
+
+    ★ 为什么 `actor` 必填而不是默认 `None`：
+      默认 `None` 会让现有调用点静默传入「没人」，而 `completed_by=None`
+      落库之后与「旧数据本来没有这个字段」长得一模一样 ——
+      那就永远查不出哪些任务是「无人回填」的。必填则忘传直接 TypeError。
+    """
+    if not isinstance(actor, str) or not actor.strip():
+        raise TakedownError("E_ACTOR", f"complete 必须记录执行人，收到 {actor!r}")
     ev = check_evidence(evidence, repo_root=repo_root)   # 先校验，再迁移
     t = transition(task, "completed", at=at, outbox=outbox)
     t["evidence"] = ev
+    t["completed_by"] = actor
+    t["completed_at"] = at
     return t
 
 

@@ -194,6 +194,23 @@ class SubmissionIngestor:
             "submitter_id": principal.get("id"),
             "content": unit,
             "ir": ir,
+            # T-316b: the frozen render input for the report.
+            #
+            # Deliberately carries whatever judge_entry returned, including None.
+            # This method does NOT require a snapshot, and that is a decision,
+            # not an oversight:
+            #   · tests inject custom judge_fn doubles that return a real
+            #     judgement without a snapshot (e.g. verify_finding_adjudication's
+            #     judge_with_candidate wraps judge_unit, so it does carry one —
+            #     but a double written from scratch would not);
+            #   · more importantly, judging whether "no report can be rendered"
+            #     should block ingestion is a product question (a case with no
+            #     report is still reviewable), not something this layer decides.
+            # The gate that must not be skipped lives at publish time:
+            # ReportStore.publish() refuses a snapshot it cannot render, so the
+            # failure surfaces as "report not produced", never as a report with
+            # missing sections. See T-316d.
+            "report_snapshot": judgment.get("report_snapshot"),
             "judgment": {
                 "label": label,
                 "layer": judgment.get("layer"),

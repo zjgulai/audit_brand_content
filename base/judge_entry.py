@@ -151,6 +151,22 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
         "receipt": result["receipt"],
         "steps": result["steps"],
         "run_state": result["run_state"],
+        # T-316b: report render input, previously dropped here.
+        #
+        # Orchestrator.run() always builds result["report_snapshot"] and returns
+        # it (single return at the end of run(); verified 2026-10-24), but this
+        # return dict did not carry it — so ReportStore never received render
+        # input anywhere in the production chain, while the report verifiers
+        # stayed green (they only exercise ReportStore itself).
+        #
+        # Why .get() and not a hard index: today run() has exactly one return
+        # and it always carries the key, so .get() buys nothing *now*. It is
+        # kept as a documented seam — if a future early-return path is added,
+        # downstream gets None (a case it must already handle, since the reducer
+        # decides whether a payload without a snapshot may be ingested) instead
+        # of a KeyError surfacing as "process crashed" during a review.
+        # ★ Do not read this as "ERROR path yields None" — measured false.
+        "report_snapshot": result.get("report_snapshot"),
     }
 
 

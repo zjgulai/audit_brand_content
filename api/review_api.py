@@ -458,6 +458,9 @@ WRITE_PATHS = (
     "/api/v1/notifications/{id}/ack",
     "/api/v1/admin/signer-grants",
     "/api/v1/admin/takedown-grants",
+    # T-314b：三权分立的二三步。提案用上面两条（与前端 P-11 原路径一致）。
+    "/api/v1/admin/grants/{id}/execute",
+    "/api/v1/admin/grants/{id}/approve",
 )
 
 
@@ -465,6 +468,13 @@ ACCESS_LOG_ENV = "REVIEW_API_ACCESS_LOG"
 DEFAULT_ACCESS_LOG = os.path.expanduser("~/.dsh/audit-data/access-log.jsonl")
 READONLY_WRITE_PATHS = ("/api/v1/rules", "/api/v1/control-points",
                         "/api/v1/routing")
+
+#: 两类授权各管哪些能力。**从 api/admin_api 导入，不在这里复制一份** ——
+#: 两份清单必然会漂移，而漂移的后果是「能写的提案在读接口里看不见」。
+from api.admin_api import (  # noqa: E402
+    SIGNER_CAPABILITIES as SIGNER_GRANT_CAPABILITIES,
+    TAKEDOWN_CAPABILITIES as TAKEDOWN_GRANT_CAPABILITIES,
+)
 
 
 class AccessLog(object):
@@ -521,6 +531,7 @@ def create_app(*, session_store=None, repository=None, principals=None,
                submission_ingestor=None,
                session_cookie_name="session", finding_store=None, appeals=None,
                release_gate=None, app_env=None,
+               grant_principal_provider=None,
                allow_simulated_identity=None, access_log_path=None):
     store = session_store or SessionStore(
         os.environ.get("REVIEW_API_SESSION_DB", ":memory:"))
@@ -645,6 +656,20 @@ def create_app(*, session_store=None, repository=None, principals=None,
             raise HTTPException(403, "仅内部角色可读")
         return principal
 
+    #: 授权治理专用。**比 internal_dep 多放一个 dp4**，因为
+    #: `rbac.validate_grant_actors()` 硬要求提案人必须是 dp4 ——
+    #: 不放行的话，三权分立的第二步（approve 时的综合校验）永远过不去。
+    #:
+    #: ★ 为什么不直接把 dp4 加进 internal_dep：那个 dep 还守着
+    #:   `/admin/sessions`（会话与安全审计）与 `/metrics`（租户指标）。
+    #:   给 dp4 那些等于「评审人能看全部人的登录记录」—— 那不是授权治理需要的。
+    #:   一个依赖管两件事，就会为了其中一件放宽另一件。
+    def grant_dep(principal=Depends(principal_dep)):
+        if not ({"it", "coordinator", "dp4"} & set(principal.get("roles") or [])):
+            raise HTTPException(403, "仅授权治理角色可访问")
+        return principal
+
+
     def effective_case(case):
         value = dict(case)
         if case_state_provider is not None:
@@ -697,10 +722,54 @@ def create_app(*, session_store=None, repository=None, principals=None,
         return [_summary(effective_case(c)) for c in repo.list_cases()
                 if can_read_content(principal, effective_case(c))]
 
+    # ── 报告只读（T-316d）────────────────────────────────────────────
+    #
+    # ★ 改前这两个 GET **只读 frozen `reports.json`**，而新生效的报告落在
+    #   authority state 的 `case.report` 上。两个真相源、其中一个是死的：
+    #   结案生成了报告，`GET /reports` 里看不到它 —— 与 T-314c 那两个名单
+    #   GET 完全同一个形状（读的文件盘上不存在 / 从不被写）。
+    #
+    # 改后：authority 里有报告的**已结案案件**优先，frozen 作为回落
+    #       （兼容 `verify_review_api.py` 的旧夹具）。
+
+    def _reports_from_authority(principal):
+        """从权威读出可读案件的报告。**没有 service 时返回 None（不是 []）。**
+
+        ★ 返回 None 与 [] 是两件事：None 表示「这条数据源不存在」，
+          [] 表示「存在但一条都没有」。混成一个，回落逻辑就永远走不到。
+
+        ★ 取数在服务层（`list_published_reports`），本函数只判可见性 ——
+          API 层不读 state（C5）。
+        """
+        service = review_command_service
+        if service is None:
+            return None
+        out = []
+        seen = set()
+        for row in service.list_published_reports():
+            pseudo_case = {
+                "tenant": row.get("_tenant"),
+                "product_line": row.get("_product_line"),
+                "submitter_id": row.get("_submitter_id"),
+                "assignee_id": row.get("_assignee"),
+                "actionable": False,
+            }
+            if not can_read_content(principal, pseudo_case):
+                continue
+            seen.add(row.get("report_id"))
+            out.append(row)
+        return out, seen
+
     @app.get("/api/v1/reports", response_model=List[ReportSummary])
     def list_reports(principal=Depends(principal_dep)):
+        live = _reports_from_authority(principal)
         out = []
+        if live is not None:
+            rows, _seen = live
+            out.extend(_report_summary(r) for r in rows)
         for report in repo.list_reports():
+            if live is not None and report.get("report_id") in live[1]:
+                continue
             case = repo.get_case(report.get("case_id"))
             if case is not None and can_read_content(principal, effective_case(case)):
                 out.append(_report_summary(report))
@@ -708,6 +777,11 @@ def create_app(*, session_store=None, repository=None, principals=None,
 
     @app.get("/api/v1/reports/{id}", response_model=ReportDetail)
     def get_report(id: str, principal=Depends(principal_dep)):
+        live = _reports_from_authority(principal)
+        if live is not None:
+            for row in live[0]:
+                if row.get("report_id") == id:
+                    return _report_summary(row)
         report = repo.get_report(id)
         if report is None:
             raise HTTPException(404, "报告不存在")
@@ -764,14 +838,65 @@ def create_app(*, session_store=None, repository=None, principals=None,
         tenant = principal.get("tenant")
         return [row for row in repo.takedown_tasks if row.get("tenant") == tenant]
 
+    # ── 授权名单只读（T-314c）────────────────────────────────────────
+    #
+    # ★ 改前这两个 GET 读的是 frozen `signer-grants.json` / `takedown-grants.json`，
+    #   而那两份文件**盘上都不存在**（`find` 0 个）—— 所以恒返回 []。
+    #   与此同时写侧走 authority。两个真相源，而且读的那一侧永远是空的：
+    #   用户在 P-11 里提案成功、刷新后看不到自己刚提的那条。
+    #
+    # 改后：authority 有数据就返回 authority（已批准的在前），
+    #       没有才回落 frozen（兼容旧夹具）。
+
+    def _grants_from_authority(tenant, capabilities):
+        """从权威读该租户的授权记录。不计算任何状态，只做筛选与整形。"""
+        service = review_command_service
+        if service is None:
+            return None
+        raw = service.authority.state("grants:" + tenant)
+        rows = []
+        for grant in raw.get("grants") or []:
+            if grant.get("capability") not in capabilities:
+                continue
+            rows.append({
+                "grant_id": grant.get("grant_id"),
+                "tenant": grant.get("tenant") or tenant,
+                "user_id": grant.get("user_id"),
+                "capability": grant.get("capability"),
+                # 前端 GrantRecord 读的是 product_line（单数）
+                "product_line": next(iter(
+                    (grant.get("scope") or {}).get("product_lines") or []), None),
+                "platform": grant.get("platform"),
+                "state": grant.get("state"),
+                "status": grant.get("state"),
+                "proposed_by": grant.get("proposed_by"),
+                "proposed_at": grant.get("proposed_at"),
+                "executed_by": grant.get("executed_by"),
+                "executed_at": grant.get("executed_at"),
+                "approved_by": grant.get("approved_by"),
+                "approved_at": grant.get("approved_at"),
+                "reason": grant.get("reason"),
+                "history": grant.get("history") or [],
+            })
+        # 已批准在前，然后按提案时间倒序 —— 与「最近改动的先看到」一致
+        rows.sort(key=lambda r: (r.get("state") != "approved",
+                                 str(r.get("proposed_at") or "")), reverse=False)
+        return rows
+
     @app.get("/api/v1/admin/signer-grants")
-    def signer_grants(principal=Depends(internal_dep)):
+    def signer_grants(principal=Depends(grant_dep)):
         tenant = principal.get("tenant")
+        live = _grants_from_authority(tenant, SIGNER_GRANT_CAPABILITIES)
+        if live is not None:
+            return live
         return [row for row in repo.signer_grants if row.get("tenant") == tenant]
 
     @app.get("/api/v1/admin/takedown-grants")
-    def takedown_grants(principal=Depends(internal_dep)):
+    def takedown_grants(principal=Depends(grant_dep)):
         tenant = principal.get("tenant")
+        live = _grants_from_authority(tenant, TAKEDOWN_GRANT_CAPABILITIES)
+        if live is not None:
+            return live
         return [row for row in repo.takedown_grants if row.get("tenant") == tenant]
 
     @app.get("/api/v1/admin/sessions")
@@ -794,6 +919,16 @@ def create_app(*, session_store=None, repository=None, principals=None,
         enabled_capabilities=enabled_write_capabilities,
         assignee_validator=review_assignee_validator,
         submission_ingestor=submission_ingestor)
+
+    # T-314b：四条名单治理写路由。只在生产装配（service 非 None）时注册，
+    # 否则交给下面的 501 占位 —— 开发装配的行为一行未变。
+    from api.admin_api import register_admin_routes
+    implemented = set(implemented) | register_admin_routes(
+        app, principal_dep=principal_dep,
+        review_command_service=review_command_service,
+        internal_dep=grant_dep,
+        enabled_capabilities=enabled_write_capabilities,
+        principal_provider=grant_principal_provider)
 
     def placeholder(request: Request, _principal=Depends(principal_dep)):
         raise HTTPException(501, "写端点尚未实现")

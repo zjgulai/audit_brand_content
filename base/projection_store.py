@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class ProjectionError(Exception):
@@ -52,7 +52,7 @@ class ProjectionStore:
             version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
             if version > SCHEMA_VERSION:
                 raise ProjectionError("projection_schema_newer", str(version))
-            if version == 0:
+            if version < 2:
                 self._conn.executescript("""
                 BEGIN IMMEDIATE;
                 CREATE TABLE applied_commands (
@@ -94,7 +94,16 @@ class ProjectionStore:
                 INSERT INTO projection_meta(singleton, applied_seq, manifest_sha256,
                                             rebuilt_at, last_error_code)
                   VALUES(1, 0, NULL, NULL, NULL);
-                PRAGMA user_version=1;
+                -- v2 (T-314a): grant registry projection.
+                -- ★ 单独一张表，不是 review_cases 的一列：
+                --   名单是租户级配置，没有 case_id / status / assignee，
+                --   塞进 review_cases 会让「案件列表」里出现 grants:<tenant>。
+                CREATE TABLE grant_registry (
+                  tenant TEXT PRIMARY KEY,
+                  version INTEGER NOT NULL,
+                  state_json TEXT NOT NULL
+                );
+                PRAGMA user_version=2;
                 COMMIT;
                 """)
 
@@ -146,13 +155,54 @@ class ProjectionStore:
                     "manifest_sha256,applied_at) VALUES(?,?,?,?,?)",
                     (batch["command_id"], seq, batch["request_sha256"],
                      manifest_sha, self.clock()))
-                self._conn.execute(
-                    "INSERT INTO review_cases(case_id,version,status,assignee,state_json) "
-                    "VALUES(?,?,?,?,?) ON CONFLICT(case_id) DO UPDATE SET "
-                    "version=excluded.version,status=excluded.status,assignee=excluded.assignee,"
-                    "state_json=excluded.state_json",
-                    (case_id, int(state["version"]), state["status"],
-                     state.get("assignee"), _json(state)))
+                # ★ T-314a 分流：按 aggregate_type 决定落哪张表。
+                #
+                # 改前：任何 batch 都写 review_cases。实测后果 ——
+                # 一个 aggregate_id="grants:on_x" 的名单批次会出现在
+                # GET /api/v1/cases 里，看起来像一个叫 grants:on_x 的案件，
+                # 而 can_read_content 会拿案件 ACL 给它判权限。
+                #
+                # 为什么按 aggregate_type 而不是按 id 前缀：前缀是命名约定，
+                # 可以被绕过；aggregate_type 是权威批次里的显式字段，
+                # 且它已经在 batch 里了（不用额外查询）。
+                agg_type = batch.get("aggregate_type") or "review_case"
+                if agg_type == "grant_registry":
+                    # tenant 只有一个真来源：aggregate_id 的 "grants:<tenant>"。
+                    # ★ 先读 state.get("tenant") 再回落前缀是错的 —— grant state
+                    #   没有 tenant 字段，那样写永远走回落分支，而看起来像
+                    #   「两个来源都支持」。实测：state.tenant=None 时落库成 NULL，
+                    #   然后按 tenant 查名单永远查不到（T-311 申诉号那个坑的同族）。
+                    if not isinstance(case_id, str) or ":" not in case_id:
+                        raise ProjectionError(
+                            "grant_aggregate_id", "grant 聚合 ID 必须是 grants:<tenant>")
+                    tenant = case_id.split(":", 1)[1]
+                    if not tenant:
+                        raise ProjectionError(
+                            "grant_aggregate_id", "grant 聚合 ID 的 tenant 段为空")
+                    self._conn.execute(
+                        "INSERT INTO grant_registry(tenant,version,state_json) "
+                        "VALUES(?,?,?) ON CONFLICT(tenant) DO UPDATE SET "
+                        "version=excluded.version,state_json=excluded.state_json",
+                        (tenant, int(state["version"]), _json(state)))
+                elif agg_type == "review_case":
+                    self._conn.execute(
+                        "INSERT INTO review_cases(case_id,version,status,assignee,state_json) "
+                        "VALUES(?,?,?,?,?) ON CONFLICT(case_id) DO UPDATE SET "
+                        "version=excluded.version,status=excluded.status,"
+                        "assignee=excluded.assignee,state_json=excluded.state_json",
+                        (case_id, int(state["version"]), state["status"],
+                         state.get("assignee"), _json(state)))
+                else:
+                    # ★ 未知类型必须拒，不许静默当案件写 —— 那正是这个洞的形状。
+                    raise ProjectionError(
+                        "unknown_aggregate_type", str(agg_type)[:40])
+                if agg_type != "review_case":
+                    # 非案件聚合没有 draft/formal 子表，跳过整案替换
+                    self._conn.execute(
+                        "UPDATE projection_meta SET applied_seq=?,manifest_sha256=?,"
+                        "last_error_code=NULL WHERE singleton=1", (seq, manifest_sha))
+                    self._conn.execute("COMMIT")
+                    return {"replayed": False, "applied_seq": seq}
                 # state 快照是该 aggregate 的完整投影；整案替换可避免幽灵 draft/formal。
                 self._conn.execute("DELETE FROM drafts WHERE case_id=?", (case_id,))
                 for draft in state.get("drafts") or []:
@@ -206,6 +256,25 @@ class ProjectionStore:
         row = self._conn.execute(
             "SELECT content_json FROM drafts WHERE draft_id=?", (draft_id,)).fetchone()
         return json.loads(row[0]) if row else None
+
+    def list_grant_registries(self):
+        """T-314：按 tenant 列出名单聚合状态（供名单源注入读）。
+
+        ★ tenant 是**表列**，不在 state_json 里。第一版只 SELECT state_json，
+          于是返回值里永远没有 tenant —— 而调用方按 r.get("tenant") 读会得到
+          None，看起来像「名单为空」而不是「读错了列」。
+          这里把列拼回 dict，让调用方只需要认一个形状。
+        """
+        rows = self._conn.execute(
+            "SELECT tenant, version, state_json FROM grant_registry "
+            "ORDER BY tenant").fetchall()
+        out = []
+        for tenant, version, state_json in rows:
+            state = json.loads(state_json)
+            state["tenant"] = tenant
+            state["version"] = version
+            out.append(state)
+        return out
 
     def list_formal(self, case_id):
         rows = self._conn.execute(
