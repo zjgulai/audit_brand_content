@@ -954,6 +954,17 @@
         "base/business_event_store.py",
         "base/notifications.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_release_persistence.py",
+      "asserts": "T-310b 签发三命令进 reducer：真实生产链到已结案后 release_sign/reject/revoke 的状态机（signed/已放行、rejected/已拒绝、revoked/已撤回）；红线「未结案不许签发」；签名结构/哈希/案件/版本/派生链五类守卫各自必红；撤回只改状态不追加签名且 reason/step_up_ref 必填；真权威跨重启恒等；投影含 release 且删库重建恒等",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/release_binding.py",
+        "base/release_gate.py",
+        "base/business_event_store.py",
+        "base/projection_store.py"
+      ]
     }
   ],
   "exempt": [

@@ -669,6 +669,107 @@ def _grant(state, command, actor, payload, now, detail):
 NOTIFICATION_COMMANDS = frozenset(
     {"notification_emit", "notification_read", "notification_ack"})
 
+RELEASE_COMMANDS = frozenset(
+    {"release_sign", "release_reject", "release_revoke"})
+
+
+def _release_container():
+    """T-310b：签发状态容器（T-310 施工单 §四 的 state 形状）。
+
+    active_job / successor 为 T-317 重审预留；release 放在 case aggregate 里
+    不另开聚合 —— 签名绑定 case_version，换聚合就要维护跨聚合一致。
+    """
+    return {"status": "pending_release", "release_status": "待放行",
+            "signatures": [], "events": [], "active_job": None,
+            "successor": None}
+
+
+def _release(state, command, actor, payload, now, detail):
+    """release_sign / release_reject / release_revoke 的纯状态迁移。
+
+    不消费 step-up（reducer 无 session store）、不验权限（那是 service 层的事）。
+    只做：状态机合法性、签名结构校验、派生链、事件追加。
+    判定语义与 ReleaseGate.sign/revoke 保持同一份（gate 是开发装配的内存参照，
+    这里的权威真相源；两边不一致时以本函数为准并修 gate）。
+
+    与 gate 的两处刻意差异（都是形状统一，不是语义变更）：
+    - 事件 at 用 _iso(now)（reducer 全部事件都是 ISO 串，gate 内存里用裸数）；
+    - revoke 的 reason / step_up_ref 必填 —— gate 不判，但权威侧「谁撤的、
+      凭什么 step-up」是留痕四元的必备项，缺了就是一条没法审计的撤回。
+    """
+    from base.release_gate import validate_signature  # noqa: PLC0415 纯函数，无环
+
+    release = state.get("release")
+    if command in ("release_sign", "release_reject"):
+        # 红线 R2：未结案不许签发 —— 与「未裁决不许结案」合起来，
+        # 「复核是一个真动作」才成立。少这道，签发可以绕开复核。
+        if state["status"] != "closed":
+            raise LedgerConflict(
+                "invalid_transition", "未结案不许签发，当前案件状态 %r" % state["status"])
+        if release is not None and release.get("status") != "pending_release":
+            raise LedgerConflict(
+                "invalid_transition", "只有 pending_release 可签发，当前 %r"
+                % (release or {}).get("status"))
+        expected_decision = "signed" if command == "release_sign" else "rejected"
+        sig = payload.get("signature")
+        if not isinstance(sig, dict):
+            raise LedgerValidation("bad_signature", "signature 必须是对象")
+        errs = validate_signature(sig)
+        if errs:
+            raise LedgerValidation(
+                "bad_signature", "签名不合法：%s" % "; ".join(errs))
+        if sig.get("decision") != expected_decision:
+            raise LedgerValidation(
+                "bad_signature",
+                "命令与签名 decision 不一致：%r vs %r" % (command, sig.get("decision")))
+        if sig.get("case_id") != state["case_id"]:
+            raise LedgerValidation(
+                "bad_signature", "签名绑定的是别的案件：%r" % sig.get("case_id"))
+        # 签一个旧版本 = 绑定作废（防「看起来签过、其实绑的不是这份 state」）。
+        if sig.get("case_version") != state["version"]:
+            raise LedgerValidation(
+                "bad_signature",
+                "case_version 必须等于当前版本：%r vs %r"
+                % (sig.get("case_version"), state["version"]))
+        prev = (release or {}).get("signatures") or []
+        expected_prev = prev[-1]["signature_id"] if prev else None
+        if sig.get("derived_from") != expected_prev:
+            raise LedgerValidation(
+                "bad_signature",
+                "derived_from 必须等于上一条签名 id：%r vs %r"
+                % (sig.get("derived_from"), expected_prev))
+        if release is None:
+            release = _release_container()
+            state["release"] = release
+        release["signatures"].append(copy.deepcopy(sig))
+        release["status"] = ("signed" if expected_decision == "signed"
+                             else "rejected")
+        release["release_status"] = ("已放行" if expected_decision == "signed"
+                                     else "已拒绝")
+        release["events"].append({
+            "kind": "release_signed" if expected_decision == "signed"
+            else "release_rejected",
+            "at": _iso(now), "actor": actor,
+            "step_up_ref": sig.get("step_up_ref"), "reason": sig.get("reason"),
+        })
+        detail.update({"signature_id": sig["signature_id"]})
+        return
+
+    # release_revoke：只改状态 + 追加事件，**不追加签名**（gate 同语义）。
+    if release is None or release.get("status") != "signed":
+        raise LedgerConflict(
+            "invalid_transition", "只有 signed 可撤回，当前 %r"
+            % ((release or {}).get("status") if release else None))
+    reason = _nonempty(payload.get("reason"), "revoke_reason")
+    step_up_ref = _nonempty(payload.get("step_up_ref"), "revoke_step_up_ref")
+    release["status"] = "revoked"
+    release["release_status"] = "已撤回"
+    release["events"].append({
+        "kind": "release_revoked", "at": _iso(now), "actor": actor,
+        "step_up_ref": step_up_ref, "reason": reason,
+    })
+    detail.update({"revoked": True})
+
 
 def _notification_id(ntype, dedup_key, recipient):
     """确定性通知 id。★ 不用自增：自增在重启后归零撞号（_grant_id 同一条）。"""
@@ -1036,6 +1137,8 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         _grant(state, command, actor, payload, now, detail)
     elif command in NOTIFICATION_COMMANDS:
         _notification(state, command, actor, payload, now, detail)
+    elif command in RELEASE_COMMANDS:
+        _release(state, command, actor, payload, now, detail)
     elif command == "expire_lease":
         if state["status"] != "claimed" or state["lease_expires"] is None:
             raise LedgerConflict("not_claimed", "没有可过期的 lease")
@@ -1109,6 +1212,13 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         result["grant"] = copy.deepcopy(next(
             g for g in state["grants"]
             if g.get("grant_id") == detail["grant_id"]))
+    if command in RELEASE_COMMANDS:
+        # 结果带出签发容器与（若有）本次签名 —— 调用方不用再回读 state
+        result["release"] = copy.deepcopy(state.get("release"))
+        if "signature_id" in detail:
+            result["signature"] = copy.deepcopy(next(
+                s for s in state["release"]["signatures"]
+                if s["signature_id"] == detail["signature_id"]))
     return state, [event], result
 
 
