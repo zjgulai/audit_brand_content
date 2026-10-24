@@ -965,6 +965,16 @@
         "base/business_event_store.py",
         "base/projection_store.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_takedown_persistence.py",
+      "asserts": "T-312d 下线任务：真权威落任务与跨重启恒等、跨重启不撞号（len 计数回归形状）、投影重建恒等、GET {tasks,metrics} 形状（空库 [] + open_count==0）、年龄单口径（HTTP == TD.metrics_view 复算、无超时类字段、前端静态扫描无 Date.now/formatTaskAge）、非法迁移拒且 seq 不变、无 deadline 字段",
+      "subjects": [
+        "base/takedown.py",
+        "base/review_reducer.py",
+        "base/review_command_service.py",
+        "api/review_api.py"
+      ]
     }
   ],
   "exempt": [

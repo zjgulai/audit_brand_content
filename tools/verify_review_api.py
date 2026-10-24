@@ -524,8 +524,13 @@ def _run_main():
     report(st == 200 and [row["appeal_id"] for row in body] == ["a-t1"],
            "C6c appeals 按 tenant 过滤", repr(body))
     st, body = call(app, "GET", "/api/v1/takedown-tasks", cookie=coord)
-    report(st == 200 and [row["task_id"] for row in body] == ["td-t1"],
-           "C6d takedown tasks 按 tenant 过滤", repr(body))
+    # T-312d：响应形状 {tasks, metrics}（任务年龄只有后端一个口径）。
+    report(st == 200
+           and [row["task_id"] for row in body.get("tasks") or []] == ["td-t1"]
+           and isinstance(body.get("metrics"), dict)
+           and body["metrics"].get("open_count") == 1,
+           "C6d takedown tasks 按 tenant 过滤（{tasks, metrics} 形状）",
+           repr(body))
     st, signer_rows = call(app, "GET", "/api/v1/admin/signer-grants", cookie=coord)
     st2, takedown_rows = call(app, "GET", "/api/v1/admin/takedown-grants", cookie=coord)
     report(st == 200 and st2 == 200

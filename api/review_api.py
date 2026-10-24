@@ -570,6 +570,7 @@ def create_app(*, session_store=None, repository=None, principals=None,
     from base.reviews_ledger import ReviewsLedger
     from base.finding_store import FindingStore
     from base.release_gate import ReleaseGate
+    from base import takedown as TD
     from api.write_api import register_write_routes, AppealStore
 
     app.state.session_store = store
@@ -891,8 +892,23 @@ def create_app(*, session_store=None, repository=None, principals=None,
 
     @app.get("/api/v1/takedown-tasks")
     def takedown_tasks(principal=Depends(principal_dep)):
+        # T-312d：同一个量只有一个口径 —— 任务年龄由**后端** metrics_view
+        # （bj_date 口径）计算后随列表下发；前端只许格式化，不许用 Date.now()
+        # 再算一遍（跨时区/跨零点会给出不同答案，而两者看起来都对）。
         tenant = principal.get("tenant")
-        return [row for row in repo.takedown_tasks if row.get("tenant") == tenant]
+        if review_command_service is not None:
+            rows = []
+            for cid in review_command_service.authority.aggregate_ids():
+                st = review_command_service.authority.state(cid)
+                if st.get("tenant") != tenant:
+                    continue
+                for t in st.get("takedown_tasks") or []:
+                    rows.append(t)
+        else:
+            rows = [row for row in repo.takedown_tasks
+                    if row.get("tenant") == tenant]
+        return {"tasks": rows,
+                "metrics": TD.metrics_view(rows)}
 
     # ── 授权名单只读（T-314c）────────────────────────────────────────
     #

@@ -32,19 +32,23 @@ export interface TakedownTaskItem {
   waived?: Record<string, unknown> | null;
 }
 
-function formatTaskAge(createdAt: string | undefined): string {
-  if (!createdAt) return "年龄未测（缺少 created_at）";
-  const ts = Date.parse(createdAt);
-  if (Number.isNaN(ts)) return "年龄未测";
-  const hours = Math.max(0, Math.floor((Date.now() - ts) / 3600000));
-  const days = Math.floor(hours / 24);
-  const remHours = hours % 24;
+// T-312d：任务年龄只有一个口径 —— 后端 metrics_view（北京日期）算好随列表
+// 下发，前端只做**格式化**（天/小时）；客户端时钟不参与年龄计算
+// （跨时区/跨零点会给出与后端不同但仍"看起来对"的答案）。
+function formatAgeDays(ageDays: number | undefined): string {
+  if (ageDays === undefined || ageDays === null || Number.isNaN(ageDays)) {
+    return "年龄未测（后端未给出 age_days）";
+  }
+  const totalHours = Math.max(0, Math.floor(ageDays * 24));
+  const days = Math.floor(totalHours / 24);
+  const remHours = totalHours % 24;
   return `已持续 ${days} 天 ${remHours} 小时（无硬期限 · 持续追踪）`;
 }
 
 export default function TakedownPage() {
   const { devEnabled, current, sessionEpoch } = useIdentity();
   const [tasks, setTasks] = useState<TakedownTaskItem[] | null>(null);
+  const [ageByTask, setAgeByTask] = useState<Map<string, number>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<{ ok: boolean; text: string } | null>(
     null,
@@ -76,8 +80,16 @@ export default function TakedownPage() {
 
   const loadTasks = useCallback(async () => {
     try {
-      const data = await request<TakedownTaskItem[]>("/takedown-tasks");
-      setTasks(Array.isArray(data) ? data : []);
+      // T-312d：响应形状 {tasks, metrics}；年龄一律读 metrics.ages。
+      const data = await request<{
+        tasks: TakedownTaskItem[];
+        metrics: { ages: { task_id: string; age_days: number }[] };
+      }>("/takedown-tasks");
+      const list = Array.isArray(data?.tasks) ? data.tasks : [];
+      setTasks(list);
+      setAgeByTask(new Map(
+        (data?.metrics?.ages ?? []).map((a) => [a.task_id, a.age_days]),
+      ));
       setError(null);
     } catch (e: unknown) {
       const err = e as { message?: string };
@@ -545,7 +557,7 @@ export default function TakedownPage() {
                 <dd className="font-data">{t.assignee ?? "未指派（默认投放侧）"}</dd>
                 <dt>任务年龄与积压</dt>
                 <dd className="font-data" data-takedown-age="">
-                  <Icon name="clock" size={11} /> {formatTaskAge(t.created_at)}
+                  <Icon name="clock" size={11} /> {formatAgeDays(ageByTask.get(t.task_id))}
                 </dd>
                 <dt>提醒记录</dt>
                 <dd className="font-data">
