@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT))
 
 try:
     import base.rbac as RBAC
+    from base.reviews_ledger import LedgerConflict
     from base.business_event_store import BusinessEventStore, WriterLease
     from base.projector import Projector
     from base.projection_store import ProjectionStore
@@ -214,8 +215,10 @@ def main():
             _sleep.sleep(1.1)
             try:
                 out = svc.run_reaudit(cid)
-            except InvalidTransition as exc:
+            except (InvalidTransition, LedgerConflict) as exc:
                 # 变异（失效判据被掏空）会让重审被拒 —— 那是 FAIL 不是崩溃。
+                # reducer 抛 LedgerConflict、服务层前置抛 InvalidTransition，
+                # 两个类一个码，捕获面必须都盖住。
                 # SystemExit(1) 被 mutprobe 记为 killed；后面的段落全部依赖
                 # 重审成功，跳过比各处判空更诚实。
                 report(False, "X2 重审后 ir_id 与旧版不同（#98 ①）",
