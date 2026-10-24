@@ -680,6 +680,18 @@
       "fixture": "{root}/tools/verify_cpu_first.py",
       "command": "{venv} {root}/tools/verify_cpu_first.py"
     },
+    "120": {
+      "test_id": "acceptance-120",
+      "criteria": "TS-18",
+      "fixture": "{root}/tools/verify_media_model_lock.py",
+      "command": "{venv} {root}/tools/verify_media_model_lock.py"
+    },
+    "121": {
+      "test_id": "acceptance-121",
+      "criteria": "TS-19",
+      "fixture": "{root}/tools/verify_media_model_lock.py",
+      "command": "{venv} {root}/tools/verify_media_model_lock.py"
+    },
     "122": {
       "test_id": "acceptance-122",
       "criteria": "TS-10",
