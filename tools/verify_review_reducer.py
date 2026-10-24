@@ -175,8 +175,13 @@ def main():
             "submitter_id": "alice",
             "content": {"unit_id": "u-1",
                         "fingerprint": {"text_sha256": "a" * 64}},
+            # T-310a：签发绑定字段进了 ingest 契约（缺即 bad_binding_fields）。
+            # ctv 与 ir.control_points_version 是同一个量，reducer 断言两者一致。
             "ir": {"ir_id": "ir-1", "findings": [],
-                   "decision": {"state": "REVIEW"}},
+                   "decision": {"state": "REVIEW"},
+                   "control_points_version": "cp-1"},
+            "kb_snapshot_hash": "b" * 64,
+            "conflict_table_version": "cp-1",
             "judgment": {"label": "REVIEW", "run_state": "OK"},
             "report_snapshot": {
                 "ir": {"ir_id": "ir-1", "findings": [],

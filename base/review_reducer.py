@@ -74,6 +74,15 @@ def initial_state(case_id):
         "grants": [],
         "content": None,
         "ir": None,
+        # T-310a：签发绑定的判定时点快照（T-310 施工单 §二 前置 A/B）。
+        # kb_snapshot_hash = 判定所用 KB 快照 id 的 sha256（2026-10-25 D1 裁定）；
+        # conflict_table_version 与 ir.control_points_version 是同一个量（§2.4.8），
+        # ingest 时断言两者一致。取不到一律拒建案 —— 不许补默认值让签发「先跑通」。
+        "kb_snapshot_hash": None,
+        "conflict_table_version": None,
+        "media_fingerprints": {},
+        # T-310b：签发状态容器；active_job / successor 键为 T-317 重审预留。
+        "release": None,
         # T-316b: 判定时冻结的报告渲染输入（与 ir 并列，不是 ir 的一部分）。
         # 为什么单独存而不在结案时重算：report_render 的 evidence/unassessed
         # 在判定时是空数组、结案后才有内容；重算会让「报告的 IR」与「报告的
@@ -635,6 +644,28 @@ def _ingest_submission(state, actor, payload, now):
         raise LedgerValidation("bad_judgment", "judgment.label 必须在 %r" % (DECISION_LABELS,))
     if judgment.get("label") != decision.get("state"):
         raise LedgerValidation("bad_judgment", "judgment.label 与 ir.decision.state 不一致")
+    # T-310a：签发绑定字段（T-310 施工单 §二 前置 A —— 取不到即拒，不许补默认值）。
+    hex64 = set("0123456789abcdef")
+    kb_hash = payload.get("kb_snapshot_hash")
+    if not (isinstance(kb_hash, str) and len(kb_hash) == 64
+            and set(kb_hash.lower()) <= hex64):
+        raise LedgerValidation(
+            "bad_binding_fields", "kb_snapshot_hash 必须是 64 位十六进制")
+    ctv = payload.get("conflict_table_version")
+    if not isinstance(ctv, str) or not ctv.strip():
+        raise LedgerValidation(
+            "bad_binding_fields", "conflict_table_version 必须是非空字符串")
+    # 恒等断言：与 ir.control_points_version 是同一个量，两处漂移在这里红。
+    if ctv != ir.get("control_points_version"):
+        raise LedgerValidation(
+            "bad_binding_fields",
+            "conflict_table_version 与 ir.control_points_version 不一致")
+    media_fp = payload.get("media_fingerprints")
+    if media_fp is None:
+        media_fp = {}
+    if not isinstance(media_fp, dict):
+        raise LedgerValidation(
+            "bad_binding_fields", "media_fingerprints 必须是对象")
     state.update({
         "submission_id": submission_id,
         "submission_hash": submission_hash,
@@ -642,6 +673,9 @@ def _ingest_submission(state, actor, payload, now):
         "ir": copy.deepcopy(ir),
         "report_snapshot": copy.deepcopy(report_snapshot),
         "judgment": copy.deepcopy(judgment),
+        "kb_snapshot_hash": kb_hash,
+        "conflict_table_version": ctv,
+        "media_fingerprints": copy.deepcopy(media_fp),
         "tenant": _nonempty(payload.get("tenant"), "tenant"),
         "product_line": _nonempty(payload.get("product_line"), "product_line"),
         "submitter_id": _nonempty(payload.get("submitter_id"), "submitter_id"),

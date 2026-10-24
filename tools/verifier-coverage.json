@@ -934,6 +934,16 @@
         "base/report_render_bridge.py",
         "base/rbac.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_release_binding.py",
+      "asserts": "T-310a 签发绑定字段：真实生产链（真 judge + 真 KB）prepare→ingest 后 state 带齐 kb_snapshot_hash/conflict_table_version/media_fingerprints/release；binding_from_state 输出过 _binding；ctv 与 ir.control_points_version 恒等（两处漂移 ingest 即红）；媒体占位 hash 确定性、非字符串常量；缺字段一律 bad_binding_fields 不补默认值",
+      "subjects": [
+        "base/release_binding.py",
+        "base/submission_service.py",
+        "base/review_reducer.py",
+        "base/release_gate.py"
+      ]
     }
   ],
   "exempt": [

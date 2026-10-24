@@ -186,6 +186,14 @@ class SubmissionIngestor:
             raise SubmissionRejected(
                 "judgment_failed", 422, "label 与 ir.decision.state 不一致")
         case_id = self.case_id_for(tenant, submission_id)
+        # T-310a：签发绑定的判定时点快照（T-310 施工单 §二 前置 B）。
+        # kb_snapshot_hash = 判定所用 KB 快照 id 的 sha256（2026-10-25 D1 裁定，
+        # 取不到时 _kb_snapshot() 的值仍非空，hash 照算 —— 缺失会在 binding
+        # 提取时 fail closed，这里不发明第二个口径）。
+        # conflict_table_version 与 ir.control_points_version 是同一个量；
+        # reducer 侧断言两者一致，两边漂移在 ingest 即红。
+        kb_snapshot_hash = hashlib.sha256(
+            self._kb_snapshot().encode("utf-8")).hexdigest()
         payload = {
             "submission_id": submission_id,
             "submission_hash": self.submission_hash(submission, principal=principal),
@@ -194,6 +202,9 @@ class SubmissionIngestor:
             "submitter_id": principal.get("id"),
             "content": unit,
             "ir": ir,
+            "kb_snapshot_hash": kb_snapshot_hash,
+            "conflict_table_version": ir.get("control_points_version"),
+            "media_fingerprints": ir.get("media_fingerprints") or {},
             # T-316b: the frozen render input for the report.
             #
             # Deliberately carries whatever judge_entry returned, including None.
