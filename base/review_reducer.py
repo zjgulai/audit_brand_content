@@ -1216,9 +1216,14 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         # 结果带出签发容器与（若有）本次签名 —— 调用方不用再回读 state
         result["release"] = copy.deepcopy(state.get("release"))
         if "signature_id" in detail:
-            result["signature"] = copy.deepcopy(next(
-                s for s in state["release"]["signatures"]
-                if s["signature_id"] == detail["signature_id"]))
+            # ★ next(..., None) + 条件带出：结果装饰不许崩命令 —— state 才是
+            #   真相源，装饰层拿不到（如变异/并发窗口）就少带一个字段，
+            #   让调用方显式看见缺失，而不是 500。
+            sig_out = next(
+                (s for s in (state.get("release") or {}).get("signatures") or []
+                 if s["signature_id"] == detail["signature_id"]), None)
+            if sig_out is not None:
+                result["signature"] = copy.deepcopy(sig_out)
     return state, [event], result
 
 

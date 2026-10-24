@@ -139,7 +139,7 @@ def main():
                and rel["events"][0]["actor"] == "u_signer"
                and rel["events"][0]["step_up_ref"] == "stepup:test-ref",
                "R2c 事件带 kind/actor/step_up_ref")
-        report(res["signature"]["signature_id"] == sig["signature_id"],
+        report((res.get("signature") or {}).get("signature_id") == sig["signature_id"],
                "R2d 结果带出本次签名")
         report(st2["status"] == "closed",
                "R2e 签发不改变案件结案状态")
