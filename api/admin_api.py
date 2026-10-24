@@ -37,14 +37,15 @@ from fastapi import Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from base.rbac import validate_grant_actors
+from base.rbac import can_act, validate_grant_actors
 
 SIGNER_CAPABILITIES = frozenset({"release.sign", "release.revoke"})
 TAKEDOWN_CAPABILITIES = frozenset({"takedown.execute", "takedown.waive"})
 
 PROPOSE_PATHS = ("/api/v1/admin/signer-grants", "/api/v1/admin/takedown-grants")
 TRANSITION_PATHS = ("/api/v1/admin/grants/{id}/execute",
-                    "/api/v1/admin/grants/{id}/approve")
+                    "/api/v1/admin/grants/{id}/approve",
+                    "/api/v1/admin/grants/{id}/revoke")
 
 
 class GrantProposeBody(BaseModel):
@@ -76,8 +77,10 @@ def _error(exc):
     if code in ("bad_grant", "actor_missing", "idempotency_key_missing"):
         return HTTPException(400, "%s: %s" % (code, detail))
     if code in ("not_proposed", "not_executed", "duplicate_grant",
-                "version_conflict"):
+                "version_conflict", "grant_not_active"):
         return HTTPException(409, "%s: %s" % (code, detail))
+    if code in ("self_revoke", "not_original_signer"):
+        return HTTPException(403, "%s: %s" % (code, detail))
     return None
 
 
@@ -181,6 +184,21 @@ def register_admin_routes(app, *, principal_dep, review_command_service=None,
             if body is not None and body.note:
                 payload["note"] = body.note
 
+            if action == "revoke":
+                # T-315c：撤权 = approved → revoked 的管理动作。
+                # ★ reason 必填（四元留痕的「依据」；reducer 侧也校验，两层一致）。
+                # ★ 能力判定在 service 层（单一授权真相在 rbac）：审批人或
+                #   执行人可撤；「actor ≠ 被撤人」由 reducer 判（不许自撤）。
+                if not (body is not None and body.note
+                        and body.note.strip()):
+                    raise HTTPException(
+                        400, "bad_grant: 撤权必须给 reason（note）")
+                if not (can_act(principal, "admin.grant.approve")
+                        or can_act(principal, "admin.grant.execute")):
+                    raise HTTPException(
+                        403, "grant_revoke_forbidden: 需要 admin.grant.approve "
+                             "或 admin.grant.execute")
+                payload["reason"] = body.note.strip()
             if action == "approve":
                 # ★ 三主体综合校验只在 approve 这一步做 —— 那一刻三人齐备。
                 #
@@ -222,7 +240,7 @@ def register_admin_routes(app, *, principal_dep, review_command_service=None,
                                                  TAKEDOWN_CAPABILITIES),
                       methods=["POST"])
     registered.add(PROPOSE_PATHS[1])
-    for action in ("execute", "approve"):
+    for action in ("execute", "approve", "revoke"):
         app.add_api_route("/api/v1/admin/grants/{id}/" + action,
                           _transition(action), methods=["POST"])
         registered.add("/api/v1/admin/grants/{id}/" + action)

@@ -260,16 +260,34 @@ def main():
     except SoDViolation:
         T("A7a 只有签发权 → 撤回被拒", True, "")
 
-    p_revoke_only = signer("u4", capabilities=["release.revoke"])
-    g8, s8, c8 = _signed_for("a8", "case-8", p_sign_only)
-    tk8 = token(s8, p_revoke_only, c8, action="revoke", nonce="rv8")
+    # ★ A7b 随 T-315b / #123c 重排：撤回绑定**原签发人** —— 撤回权独立的
+    #   反向对照改用「u4 是 case-8 的原签发人、且只有 release.revoke」，
+    #   证明「撤回不随签发权自动获得」的同时不暗示「可撤别人的」。
+    # ★ A7b 的可行形状：签发时必然持有 release.sign（否则签不了），
+    #   「只有撤回权」只能出现在**签发之后能力被撤**（撤权）的场景 ——
+    #   这正是 #123(a) 撤权后原签发人仍可撤回的判定。
+    p_revoke_only = signer("u4", capabilities=["release.sign", "release.revoke"])
+    g8, s8, c8 = _signed_for("a8", "case-8", p_revoke_only)
+    p_after_revoke = signer("u4", capabilities=["release.revoke"])
+    tk8 = token(s8, p_after_revoke, c8, action="revoke", nonce="rv8")
     try:
-        g8.revoke(c8, p_revoke_only, tk8, "rv8", reason="内容修改", now=1002)
-        T("A7b 只有撤回权 → 撤回放行（反向对照：不是一律拒绝）",
+        g8.revoke(c8, p_after_revoke, tk8, "rv8", reason="内容修改", now=1002)
+        T("A7b 只有撤回权的原签发人 → 撤回放行（反向对照：不是一律拒绝）",
           g8.state("case-8")["status"] == "revoked", str(g8.state("case-8")))
     except Exception as e:  # noqa: BLE001
-        T("A7b 只有撤回权 → 撤回放行（反向对照：不是一律拒绝）", False,
+        T("A7b 只有撤回权的原签发人 → 撤回放行（反向对照：不是一律拒绝）", False,
           "%s: %s" % (type(e).__name__, e))
+
+    # A7d（T-315b / #123c）：持 release.revoke 但**不是**原签发人 → 拒。
+    #   这条判定 2026-10-25 之前不存在（任何人可撤任何人的签发）。
+    p_other_revoker = signer("u9", capabilities=["release.revoke"])
+    g9d, s9d, c9d = _signed_for("a9d", "case-9d", p_sign_only)
+    tk9d = token(s9d, p_other_revoker, c9d, action="revoke", nonce="rv9d")
+    try:
+        g9d.revoke(c9d, p_other_revoker, tk9d, "rv9d", reason="x")
+        T("A7d 撤回绑定原签发人（#123c）→ 非原签发人被拒", False, "未拒")
+    except SoDViolation:
+        T("A7d 撤回绑定原签发人（#123c）→ 非原签发人被拒", True, "")
 
     p_none = signer("u5", capabilities=[])
     g9, s9, c9 = _signed_for("a9", "case-9", p_sign_only)

@@ -378,6 +378,16 @@ class ReleaseGate(object):
         if st is None or st["status"] != "signed":
             raise InvalidTransition("只有 signed 可撤回，当前 %s"
                                     % (st["status"] if st else "missing"))
+        # ★ T-315b / #123c：撤回绑定**原签发人**。此前任何持 release.revoke 者
+        #   可撤任何人的签发 —— 票面 #123(c) 的判定当时不存在。边界（施工单
+        #   §二）：名单只盖 release.sign 不盖 revoke；纯靠 grant 拿 revoke 的
+        #   人被撤权后，撤回失效是预期（角色矩阵里的 revoke 不受名单影响）。
+        sigs = st.get("signatures") or []
+        last_signer = sigs[-1].get("signer_id") if sigs else None
+        if (principal or {}).get("id") != last_signer:
+            raise SoDViolation(
+                "not_original_signer: 撤回只能由原签发人执行（#123c），"
+                "该案签发人是 %r" % last_signer)
         self._authorize(st["case"], principal, "revoke")
         step_up_ref = self._consume(
             principal, st["case"], "revoke", token, nonce, now)

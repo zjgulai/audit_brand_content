@@ -228,7 +228,8 @@ def main():
                "R5 release_reject → rejected/已拒绝")
 
         # ---- R6 revoke：只改状态 + 事件，不追加签名 ----
-        st6, _, res6 = reduce_command(st2, "release_revoke", "u_revoker",
+        # T-315b / #123c：撤回绑定原签发人 —— 撤回人是签发人本人。
+        st6, _, res6 = reduce_command(st2, "release_revoke", "u_signer",
                                       st2["version"],
                                       {"reason": "发现新证据",
                                        "step_up_ref": "stepup:revoke-1"},
@@ -249,17 +250,31 @@ def main():
                                       now=8000),
                "invalid_transition", "R6c 未 signed 不可撤 → invalid_transition")
         expect(LedgerValidation,
-               lambda: reduce_command(st2, "release_revoke", "u_r",
+               lambda: reduce_command(st2, "release_revoke", "u_signer",
                                       st2["version"],
                                       {"reason": "  ", "step_up_ref": "s"},
                                       now=8000),
                "bad_revoke_reason", "R6d 撤回缺 reason → 拒")
         expect(LedgerValidation,
-               lambda: reduce_command(st2, "release_revoke", "u_r",
+               lambda: reduce_command(st2, "release_revoke", "u_signer",
                                       st2["version"],
                                       {"reason": "x", "step_up_ref": ""},
                                       now=8000),
                "bad_revoke_step_up_ref", "R6e 撤回缺 step_up_ref → 拒")
+        # R6f（#123c）：持 step-up 但不是原签发人 → 拒（该判定 2026-10-25 前不存在）。
+        expect(LedgerConflict,
+               lambda: reduce_command(st2, "release_revoke", "u_other",
+                                      st2["version"],
+                                      {"reason": "x", "step_up_ref": "s"},
+                                      now=8000),
+               "not_original_signer", "R6f 非原签发人撤回 → 拒（#123c）")
+        st6_post = st6[0] if isinstance(st6, tuple) else st6
+        expect(LedgerConflict,
+               lambda: reduce_command(st6_post, "release_revoke", "u_signer",
+                                      st6_post["version"],
+                                      {"reason": "x", "step_up_ref": "s"},
+                                      now=8001),
+               "invalid_transition", "R6g 已 revoked 不可再撤 → invalid_transition")
 
         # ---- P 段：真权威跨重启 + 投影可重建 ----
         root = tempfile.mkdtemp(prefix="release-persist-")

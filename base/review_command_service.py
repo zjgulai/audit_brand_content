@@ -10,9 +10,10 @@ from base.business_event_store import AuthorityConflict
 from base.projector import Projector
 from base.release_binding import binding_from_state
 from base.release_gate import (SIGNATURE_VERSION, InvalidTransition,
-                               ReleaseGate, SignatureError, _binding,
-                               _canonical, _sha, signature_hash,
+                               ReleaseGate, SoDViolation, SignatureError,
+                               _binding, _canonical, _sha, signature_hash,
                                validate_signature)
+from base import rbac
 
 
 class ReviewCommandService:
@@ -345,6 +346,11 @@ class ReviewCommandService:
             raise InvalidTransition(
                 "只有 pending_release 可签发，当前 %r" % release.get("status"))
         gate._authorize(state, principal, "sign")                   # ②
+        # ②'（T-315b）：人级名单 —— 角色与 SoD 之外还要被 release.sign
+        # 名单点名（生产名单源读投影 approved grants；撤权后自动出局）。
+        # 判定留 rbac（单一授权真相），gate 不加名单分支。
+        if not rbac.can_sign_release(principal):
+            raise SoDViolation("未被 release.sign 名单点名（T-315b）")
         step_up_action = "reject" if action == "reject" else "sign"
         step_up_ref = step_up_consumer(principal, state,            # ③
                                        step_up_action, token, nonce)

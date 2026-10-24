@@ -80,6 +80,9 @@ IT_CAN_READ_CONTENT = False
 TAKEDOWN_ALLOWLIST = {
     "takedown.execute": frozenset(),
     "takedown.waive": frozenset(),
+    # T-315b：release.sign 第三本（同一套注入机制；revoke 刻意不在册，
+    # 见 RELEASE_SIGN_CAPS 的注释）。
+    "release.sign": frozenset(),
 }
 
 #: 生产注入的名单来源：() -> {capability: frozenset(principal_id)}。
@@ -102,6 +105,12 @@ def set_allowlist_source(fn):
 
 # 下线权的两个能力名，单独列出来是因为它们走人级名单，其余能力走角色矩阵。
 TAKEDOWN_CAPS = frozenset({"takedown.execute", "takedown.waive"})
+
+# T-315b：release.sign 纳入人级名单（第三本，同一套注入机制）。
+# ★ release.revoke **刻意不入名单**：名单化 revoke 会让「撤权」误伤「撤回」
+#   —— 撤权后原签发人必须还能撤回自己的历史签发（#123a），这是 T-315 施工单
+#   §二 的口径。纯靠 grant 拿 revoke 的人被撤后撤回失效是预期（见 reducer）。
+RELEASE_SIGN_CAPS = frozenset({"release.sign"})
 
 # ── 元数据对象的分类 ────────────────────────────────────
 # ★ 「元数据」不是一个整体。IT 要能查「这个人是谁、系统跑得怎么样」，
@@ -145,18 +154,22 @@ def _sod_ok(principal, case):
 
 def _takedown_allowed(principal, capability):
     """
-    下线权的人级判定。**角色只给资格，被点名才给权限。**
+    人级名单判定（T-314c 建立时只覆盖下线权；T-315b 扩到 release.sign）。
+    **角色只给资格，被点名才给权限。**
 
-    ★ 这里刻意不看角色：`can_act` 已经先过了角色矩阵，走到这里说明「有资格」。
+    ★ 这里刻意不看角色：调用方已经先过了角色矩阵，走到这里说明「有资格」。
       本条要回答的是另一件事 ——「这个人是不是被授权的那个」。
       两件事都成立才放行，任一不成立即拒。
 
-    ★ 按能力分本查：`execute` 的名单不给 `waive` 作证。
+    ★ 按能力分本查：`execute` 的名单不给 `waive` 作证，`release.sign` 的
+      名单不给任何人作证（revoke 不在名单机制里，见 RELEASE_SIGN_CAPS）。
+    ★ 函数名保留 _takedown_allowed（verify_rbac 的 M4 变异钉着它）；
+      覆盖面见 ALLOWLIST_CAPS。
     """
     pid = principal.get("id")
     if not isinstance(pid, str) or not pid:
         return False
-    if capability not in TAKEDOWN_CAPS:
+    if capability not in (TAKEDOWN_CAPS | RELEASE_SIGN_CAPS):
         return False
     source = _ALLOWLIST_SOURCE
     if source is not None:
@@ -170,6 +183,16 @@ def _takedown_allowed(principal, capability):
             return False
         return pid in allowed
     return pid in (TAKEDOWN_ALLOWLIST.get(capability) or frozenset())
+
+
+def can_sign_release(principal):
+    """release.sign 的人级名单判定（T-315b；单一授权真相在 rbac）。
+
+    角色与 SoD 由调用方（release_decision 的 gate._authorize）先过；
+    这里只回答「这个人是否被 release.sign 名单点名」。
+    未注入名单源时回落模块常量（空集 = 全拒，fail closed）。
+    """
+    return _takedown_allowed(principal or {}, "release.sign")
 
 
 def can_act(principal, capability, case=None):

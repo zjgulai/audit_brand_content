@@ -411,7 +411,8 @@ def main():
             paths = {"/api/v1/admin/signer-grants",
                      "/api/v1/admin/takedown-grants",
                      "/api/v1/admin/grants/{id}/execute",
-                     "/api/v1/admin/grants/{id}/approve"}
+                     "/api/v1/admin/grants/{id}/approve",
+                     "/api/v1/admin/grants/{id}/revoke"}
             ap_h = create_app(session_store=store_h, review_command_service=svc_h,
                               enabled_write_capabilities=paths, principals=PEOPLE,
                               grant_principal_provider=lambda pid, t: PEOPLE.get(pid))
@@ -504,6 +505,192 @@ def main():
                    "G13 authority 里三态留痕齐全",
                    repr([h["action"] for h in g_st.get("history") or []]))
 
+            # ── S 段：#123 撤权影响三样本（T-315b/c）───────────────────
+            # 名单源用**生产真身**（api.production_app.build_allowlist_source）
+            # 读本夹具的投影 —— 撤权把 grant 迁出 approved 后人自动出局（S-b）；
+            # revoke 刻意不在名单机制里（S-a：撤权后原签发人仍可撤回）。
+            from api.production_app import build_allowlist_source as _bas
+            saved_source_s = getattr(RBAC, "_ALLOWLIST_SOURCE", None)
+            RBAC.set_allowlist_source(lambda: _bas(proj_h))
+            try:
+                PEOPLE_S = dict(PEOPLE)
+                PEOPLE_S["ou_signer"] = {
+                    "id": "ou_signer", "roles": ["signer"], "tenant": "on_t1",
+                    "tenant_id": "on_t1", "product_lines": ["pump"],
+                    # 单数 product_line：gate._authorize 的跨品线检查读它
+                    # （两套口径之一；T-315b 施工单已记）。
+                    "product_line": "pump",
+                    "open_id": "ou_s1",
+                    "capabilities": ["release.sign", "release.revoke"]}
+                PEOPLE_S["ou_signer2"] = dict(PEOPLE_S["ou_signer"],
+                                              id="ou_signer2",
+                                              open_id="ou_s2")
+                ap_s = create_app(
+                    session_store=store_h, review_command_service=svc_h,
+                    enabled_write_capabilities=paths | {
+                        "/api/v1/cases/{id}/release-decision",
+                        "/api/v1/cases/{id}/release-revoke"},
+                    principals=PEOPLE_S,
+                    grant_principal_provider=lambda pid, t: PEOPLE_S.get(pid))
+                ap_s.state.app_env = "dev"
+                ap_s.state.repository.cases = []
+                # release 路由的 case_or_404 读 repo（投影侧）；权威里的案件
+                # 要以最小形状放进 repo，版本一致性由路由读权威判定。
+                for _cid in ("case-s1", "case-s2"):
+                    ap_s.state.repository.cases.append(
+                        {"case_id": _cid, "case_version": 3,
+                         "tenant": "on_t1", "product_line": "pump"})
+                s_s = store_h.create_session("ou_signer", tenant="on_t1",
+                                             provider="dev", issuer="x",
+                                             csrf_token="c1")
+                s_s2 = store_h.create_session("ou_signer2", tenant="on_t1",
+                                              provider="dev", issuer="x",
+                                              csrf_token="c1")
+                cl_s = TestClient(ap_s, cookies={"session": s_s})
+                cl_s2 = TestClient(ap_s, cookies={"session": s_s2})
+
+                def _closed_case(cid):
+                    svc_h.execute(
+                        aggregate_id=cid, command="ingest_submission",
+                        actor={"principal_id": "ou_sub", "tenant_id": "on_t1"},
+                        expected_version=0,
+                        payload={
+                            "submission_id": "s-" + cid,
+                            "submission_hash": "h" * 64,
+                            "content": {"unit_id": "u-" + cid,
+                                        "fingerprint": {"raw_sha256": "a" * 64,
+                                                        "text_sha256": "b" * 64}},
+                            "ir": {"ir_id": "ir-" + cid,
+                                   "ir_version": "review-ir-v1",
+                                   "findings": [],
+                                   "decision": {"state": "REVIEW"},
+                                   "control_points_version": "cp-1",
+                                   "coverage": {"rules_version": json.dumps(
+                                       {"version": "rules-v1",
+                                        "fingerprint": "c" * 64})},
+                                   "kb_snapshot": "kb-s"},
+                            "kb_snapshot_hash": "d" * 64,
+                            "conflict_table_version": "cp-1",
+                            "judgment": {"label": "REVIEW", "run_state": "OK"},
+                            "tenant": "on_t1", "product_line": "pump",
+                            "submitter_id": "ou_sub"},
+                        idempotency_key="ing-" + cid)
+                    svc_h.execute(aggregate_id=cid, command="claim",
+                                  actor={"principal_id": "ou_signer",
+                                         "tenant_id": "on_t1"},
+                                  expected_version=1, payload={},
+                                  idempotency_key="cl-" + cid)
+                    svc_h.execute(aggregate_id=cid, command="submit_review",
+                                  actor={"principal_id": "ou_signer",
+                                         "tenant_id": "on_t1"},
+                                  expected_version=2,
+                                  payload={"conclusion":
+                                           {"review_notes": "S 段结案"}},
+                                  idempotency_key="cl2-" + cid)
+
+                def _sign(cid, nonce):
+                    tok = store_h.issue_step_up("ou_signer", cid, "sign", nonce)
+                    return cl_s.post(
+                        f"/api/v1/cases/{cid}/release-decision",
+                        json={"decision": "sign", "version": 3,
+                              "reason": "S 段签发", "step_up_token": tok,
+                              "nonce": nonce},
+                        headers={"Idempotency-Key": "s-sign-" + nonce})
+
+                # 授权 release.sign 给 ou_signer（三权分立；grants 聚合已到 v3）
+                svc_h.execute(aggregate_id="grants:on_t1",
+                              command="grant_propose",
+                              actor={"principal_id": "ou_dp4",
+                                     "tenant_id": "on_t1"},
+                              expected_version=3,
+                              payload={"capability": "release.sign",
+                                       "user_id": "ou_signer",
+                                       "reason": "S 段签发授权",
+                                       "scope": {"tenant": "on_t1",
+                                                 "product_lines": ["pump"]}},
+                              idempotency_key="s-gp")
+                grel = next(g for g in auth_h.state("grants:on_t1")["grants"]
+                            if g["capability"] == "release.sign")
+                svc_h.execute(aggregate_id="grants:on_t1",
+                              command="grant_execute",
+                              actor={"principal_id": "ou_it",
+                                     "tenant_id": "on_t1"},
+                              expected_version=4,
+                              payload={"grant_id": grel["grant_id"]},
+                              idempotency_key="s-ge")
+                svc_h.execute(aggregate_id="grants:on_t1",
+                              command="grant_approve",
+                              actor={"principal_id": "ou_coord",
+                                     "tenant_id": "on_t1"},
+                              expected_version=5,
+                              payload={"grant_id": grel["grant_id"]},
+                              idempotency_key="s-ga")
+
+                _closed_case("case-s1")
+                r_s0 = _sign("case-s1", "n-s0")
+                report(r_s0.status_code == 200
+                       and (r_s0.json() or {}).get("release", {}).get("status")
+                       == "signed",
+                       "S0 名单点名后签发 → 200 signed",
+                       "%s %r" % (r_s0.status_code,
+                                  (r_s0.json() or {}).get("release")))
+
+                # S-c（#123c）：持 release.revoke 但非原签发人 → 403。
+                tok_c = store_h.issue_step_up("ou_signer2", "case-s1",
+                                              "revoke", "n-sc")
+                r_sc = cl_s2.post("/api/v1/cases/case-s1/release-revoke",
+                                  json={"version": 4, "reason": "别人来撤",
+                                        "step_up_token": tok_c,
+                                        "nonce": "n-sc"},
+                                  headers={"Idempotency-Key": "s-c"})
+                report(r_sc.status_code == 403
+                       and "not_original_signer"
+                       in (r_sc.json().get("message") or ""),
+                       "S-c 非原签发人撤回 → 403（#123c）",
+                       "%s %r" % (r_sc.status_code,
+                                  (r_sc.json().get("message") or "")[:50]))
+
+                # 撤权（管理动作；coord 持 admin.grant.approve）
+                r_rv = cl("ou_coord").post(
+                    f"/api/v1/admin/grants/{grel['grant_id']}/revoke",
+                    json={"note": "调岗收回"},
+                    headers={"Idempotency-Key": "s-rv"})
+                report(r_rv.status_code == 200
+                       and (r_rv.json() or {}).get("state") == "revoked"
+                       and (r_rv.json() or {}).get("revoke_reason") == "调岗收回",
+                       "S1 admin 撤权 → revoked + reason 落库",
+                       "%s %r" % (r_rv.status_code,
+                                  (r_rv.json() or {}).get("state")))
+
+                # S-a（#123a）：撤权后，原签发人撤回自己的历史签发 → 成功。
+                tok_a = store_h.issue_step_up("ou_signer", "case-s1",
+                                              "revoke", "n-sa")
+                r_sa = cl_s.post("/api/v1/cases/case-s1/release-revoke",
+                                 json={"version": 4, "reason": "撤回自己的签发",
+                                       "step_up_token": tok_a,
+                                       "nonce": "n-sa"},
+                                 headers={"Idempotency-Key": "s-a"})
+                report(r_sa.status_code == 200
+                       and (r_sa.json() or {}).get("release", {}).get("status")
+                       == "revoked",
+                       "S-a 撤权后原签发人撤回历史签发 → 成功（revoke 不入名单）",
+                       "%s %r" % (r_sa.status_code,
+                                  (r_sa.json() or {}).get("release")))
+
+                # S-b（#123b）：撤权后新签 → 403（名单已不含 ou_signer）。
+                _closed_case("case-s2")
+                r_sb = _sign("case-s2", "n-sb")
+                report(r_sb.status_code == 403,
+                       "S-b 撤权后新签 → 403（名单源随撤权收窄）",
+                       "%s %r" % (r_sb.status_code,
+                                  (r_sb.json() or {}).get("message")))
+                # S-d：结构边界 —— revoke 不在名单机制里（M4 变异的靶子）。
+                report("release.revoke" not in RBAC.TAKEDOWN_ALLOWLIST
+                       and "release.revoke" not in _bas(proj_h),
+                       "S-d release.revoke 不在名单本（边界是设计，不是巧合）")
+            finally:
+                RBAC.set_allowlist_source(saved_source_s)
+
             # G9 dp4 进不了会话审计 —— 证明 grant_dep 没有放宽错东西
             report(cl("ou_dp4").get("/api/v1/admin/sessions").status_code == 403,
                    "G14 dp4 仍读不到 /admin/sessions（grant_dep 未放宽无关能力）")
@@ -520,9 +707,16 @@ def main():
                    "G15 GET 读 authority（提案即时可见，字段与前端 GrantRecord 对齐）",
                    repr(rows_after[0] if rows_after else None)[:120])
 
-            # 两类授权不许串台
-            report(cl("ou_coord").get("/api/v1/admin/signer-grants").json() == [],
-                   "G16 takedown 类授权不出现在 signer 类列表里（能力分本）")
+            # 两类授权不许串台。★ 原式断言「恰好为空」—— S 段（T-315c）引入
+            #   合法的 release.sign 授权后即破；保意图改写：signer 列表里的
+            #   每一条都必须是 signer 类能力（takedown 类一条都不许出现）。
+            _sg = cl("ou_coord").get("/api/v1/admin/signer-grants").json()
+            report(isinstance(_sg, list)
+                   and all(g.get("capability") in ("release.sign",
+                                                   "release.revoke")
+                           for g in _sg),
+                   "G16 takedown 类授权不出现在 signer 类列表里（能力分本）",
+                   repr(_sg))
 
             # G17 名单源注入 → can_act 翻转
             import base.rbac as _rbac

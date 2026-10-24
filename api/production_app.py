@@ -53,7 +53,40 @@ PRODUCTION_WRITE_PATHS = {
     # state["release"]，不再落内存 gate —— C3j 断言随之翻转为「必须在册」。
     "/api/v1/cases/{id}/release-decision",
     "/api/v1/cases/{id}/release-revoke",
+    # T-315c：撤权端点（grant_revoke 命令；能力判定在路由 + reducer 两层）。
+    "/api/v1/admin/grants/{id}/revoke",
 }
+def build_allowlist_source(projection):
+    """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
+
+    返回 {capability: frozenset(principal_id)}。
+
+    ★ 只读 `grant_registry` 表（投影），不读权威 —— 心跳每秒可能调很多次，
+      读 SQLite 比扫权威的 manifest 链便宜得多。投影 fresh 由
+      `maintain_once()` 的 reconcile 保证。
+    ★ 任何异常都回落空集：名单读不到时「没人能下线」比「谁都能下线」安全。
+    ★ **只收 state == "approved"**：撤权（T-315a）把 grant 迁出 approved 后
+      人自动出局 —— S-b（撤权后新签被拒）的机制性来源。模块级函数是为了
+      让 verify_grant_registry 直接 import 真身，而不是在验证器里养一份镜像。
+    """
+    empty = {"takedown.execute": frozenset(), "takedown.waive": frozenset(),
+             "release.sign": frozenset()}
+    if projection is None:
+        return empty
+    try:
+        out = {k: set() for k in empty}
+        for state in projection.list_grant_registries():
+            for grant in state.get("grants") or []:
+                if grant.get("state") != "approved":
+                    continue
+                cap = grant.get("capability")
+                if cap in out and isinstance(grant.get("user_id"), str):
+                    out[cap].add(grant["user_id"])
+        return {k: frozenset(v) for k, v in out.items()}
+    except Exception:
+        return empty
+
+
 COOKIE_NAME = "__Host-session"
 OAUTH_BIND_COOKIE = "__Host-oauth-bind"
 REAUTH_BIND_COOKIE = "__Host-reauth-bind"
@@ -327,30 +360,8 @@ class ProductionRuntime:
     _report_authorize = staticmethod(can_read_report)
 
     def allowlist_source(self):
-        """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
-
-        返回 {capability: frozenset(principal_id)}。
-
-        ★ 只读 `grant_registry` 表（投影），不读权威 —— 心跳每秒可能调很多次，
-          读 SQLite 比扫权威的 manifest 链便宜得多。投影 fresh 由
-          `maintain_once()` 的 reconcile 保证。
-        ★ 任何异常都回落空集：名单读不到时「没人能下线」比「谁都能下线」安全。
-        """
-        empty = {"takedown.execute": frozenset(), "takedown.waive": frozenset()}
-        if self.projection is None:
-            return empty
-        try:
-            out = {k: set() for k in empty}
-            for state in self.projection.list_grant_registries():
-                for grant in state.get("grants") or []:
-                    if grant.get("state") != "approved":
-                        continue
-                    cap = grant.get("capability")
-                    if cap in out and isinstance(grant.get("user_id"), str):
-                        out[cap].add(grant["user_id"])
-            return {k: frozenset(v) for k, v in out.items()}
-        except Exception:
-            return empty
+        """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。"""
+        return build_allowlist_source(self.projection)
 
     def maintain_once(self):
         if self.service is None or self.authority is None:

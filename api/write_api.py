@@ -284,6 +284,9 @@ def _ledger_call(fn):
         raise HTTPException(409, "%s: %s" % (exc.code, exc.detail))
     except LedgerNotFound as exc:
         raise HTTPException(404, "%s: %s" % (exc.code, exc.detail))
+        if code == "not_original_signer":
+            # SoD 类：撤回只能由原签发人执行（T-315b / #123c）。
+            raise HTTPException(403, "%s: %s" % (exc.code, exc.detail))
     except LedgerValidation as exc:
         raise HTTPException(400, "%s: %s" % (exc.code, exc.detail))
 
@@ -387,6 +390,9 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
             raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
         if code in ("draft_not_found", "finding_not_found"):
             raise HTTPException(404, "%s: %s" % (code, getattr(exc, "detail", "")))
+        if code == "not_original_signer":
+            # SoD 类：撤回只能由原签发人执行（T-315b / #123c）。
+            raise HTTPException(403, "%s: %s" % (code, getattr(exc, "detail", "")))
         if code and (code.startswith("bad_") or code in
                      ("idempotency_key_missing", "actor_missing")):
             raise HTTPException(400, "%s: %s" % (code, getattr(exc, "detail", "")))

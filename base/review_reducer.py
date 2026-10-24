@@ -760,6 +760,15 @@ def _release(state, command, actor, payload, now, detail):
         raise LedgerConflict(
             "invalid_transition", "只有 signed 可撤回，当前 %r"
             % ((release or {}).get("status") if release else None))
+    # ★ T-315b / #123c：撤回绑定**原签发人**（权威判定点在 reducer；
+    #   gate.revoke 的同款检查是开发装配镜像）。此前任何持 release.revoke
+    #   者可撤任何人的签发 —— 该判定 2026-10-25 之前不存在。
+    sigs = release.get("signatures") or []
+    last_signer = (sigs[-1] or {}).get("signer_id") if sigs else None
+    if actor != last_signer:
+        raise LedgerConflict(
+            "not_original_signer",
+            "撤回只能由原签发人执行（#123c），该案签发人是 %r" % last_signer)
     reason = _nonempty(payload.get("reason"), "revoke_reason")
     step_up_ref = _nonempty(payload.get("step_up_ref"), "revoke_step_up_ref")
     release["status"] = "revoked"
