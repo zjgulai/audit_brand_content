@@ -223,8 +223,10 @@ def main():
         ages_ok = (
             got.get("open_count") == expect_open
             and set(got_ages) == set(expect_ages)
-            and all(abs(got_ages[k] - v) < 1e-5
+            and all(abs(got_ages[k] - v) < 0.01
                     for k, v in expect_ages.items()))
+            # ★ 容差 0.01 天：metrics_view 本身把 age 量化到两位小数（下限），
+            #   而把 age round 成整数的变异差至多 0.5（上限）—— 夹在中间。
         report(r_p.status_code == 200 and ages_ok,
                "P5 年龄只有一个口径：HTTP metrics == TD.metrics_view 复算",
                "open=%r/%r" % (got.get("open_count"), expect_open))
