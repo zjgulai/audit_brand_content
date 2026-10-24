@@ -18,7 +18,9 @@ from base import rbac
 
 class ReviewCommandService:
     def __init__(self, authority, projection, *,
-                 report_store=None, report_bridge=None):
+                 report_store=None, report_bridge=None,
+                 external_binding_provider=None, rejudge_fn=None,
+                 takedown_assignment_policy=None):
         self.authority = authority
         self.projection = projection
         # T-316d：报告落盘。两者都可为 None —— 那时结案只是不产出报告，
@@ -29,6 +31,13 @@ class ReviewCommandService:
         # WriterLease 只约束跨进程写者；FastAPI 同步 handler 会在线程池并发。
         # 权威提交 + 按序追投影必须在本进程再单飞，避免 seq2 先于 seq1 apply。
         self._lock = threading.RLock()
+        # T-317c：重审执行体的两个注入点。None = 未装配（失效检测不可用，
+        # 是「未测」不是「没有失效」——  production 在 start() 里接真身）。
+        self.external_binding_provider = external_binding_provider
+        self.rejudge_fn = rejudge_fn
+        # T-312 红线 1 的触发点 seam：撤回/失效后的下线任务指派策略
+        # （assignee / platform 是业务决定，不许在这里发明默认值）。
+        self.takedown_assignment_policy = takedown_assignment_policy
 
     def status(self):
         with self._lock:
@@ -86,7 +95,8 @@ class ReviewCommandService:
         落盘冲突 / 权威写入失败），把五种压成一个「报告字段是空的」，
         下一次排障要从头再查一遍。这里每一种都带 `detail`。
         """
-        if command.get("command") != "submit_review":
+        # T-317c：rejudge_apply（重审后的新报告）走同一条发布链。
+        if command.get("command") not in ("submit_review", "rejudge_apply"):
             return None
         if self.report_store is None or self.report_bridge is None:
             # 未装配：**不返回失败**。开发装配与所有既有验证器都走这条路，
@@ -375,6 +385,86 @@ class ReviewCommandService:
                 % (cmd, task_ref, before.get("version")))
         except Exception:  # noqa: BLE001
             return
+
+    def invalidate_if_due(self, case_id, *, now=None):
+        """失效检测（T-317c）：signed 案件的当前外部绑定 vs 签名绑定。
+
+        ★ external_binding_provider 未装配时返回 None —— 那是「未测」，
+          不是「没有失效」；production 在 start() 里接真身（规则表 +
+          KB 快照的当前值）。「无变化」是常态，静默返回 None。
+        """
+        if self.external_binding_provider is None:
+            return None
+        with self._lock:
+            state = self.authority.state(case_id)
+            if (state.get("release") or {}).get("status") != "signed":
+                return None
+            current = self.external_binding_provider()
+            if not isinstance(current, dict):
+                return None
+            try:
+                return self.execute(
+                    aggregate_id=case_id, command="release_invalidate",
+                    actor={"principal_id": "release-sweeper",
+                           "tenant_id": "system"},
+                    expected_version=state["version"],
+                    payload={"current": current},
+                    idempotency_key="release-invalidate:%s:%s"
+                    % (case_id, state["version"]), now=now)
+            except Exception as exc:  # noqa: BLE001
+                if getattr(exc, "code", "") == "nothing_to_reaudit":
+                    return None
+                raise
+
+    def run_reaudit(self, case_id, *, now=None):
+        """重审执行体（T-317c）：job start → **锁外**真重判 → rejudge_apply →
+        complete。重判（judge_unit，可达秒级）留在这把锁里 = 一次下游
+        副作用变成全局写停顿（报告渲染 30s 的同一条教训）。
+        """
+        import time as _time
+        state = self.authority.state(case_id)
+        if (state.get("release") or {}).get("status") != "signed":
+            raise InvalidTransition("只有 signed 案件可重审")
+        if self.rejudge_fn is None:
+            raise AuthorityConflict(
+                "reaudit_unwired", "rejudge_fn 未装配（T-317c）")
+        with self._lock:
+            st = self.authority.state(case_id)
+            started = self.execute(
+                aggregate_id=case_id, command="release_job_start",
+                actor={"principal_id": "release-sweeper",
+                       "tenant_id": "system"},
+                expected_version=st["version"], payload={},
+                idempotency_key="reaudit-start:%s:%s"
+                % (case_id, st["version"]), now=now)
+        prev_ir_id = (self.authority.state(case_id).get("ir")
+                      or {}).get("ir_id")
+        judged = self.rejudge_fn(self.authority.state(case_id))
+        if not isinstance(judged, dict) or not isinstance(
+                judged.get("ir"), dict):
+            return {"ok": False, "detail": "rejudge_bad_output"}
+        with self._lock:
+            st2 = self.authority.state(case_id)
+            applied = self.execute(
+                aggregate_id=case_id, command="rejudge_apply",
+                actor={"principal_id": "release-sweeper",
+                       "tenant_id": "system"},
+                expected_version=st2["version"],
+                payload={**judged, "expected_prev_ir_id": prev_ir_id},
+                idempotency_key="reaudit-apply:%s:%s" % (case_id, prev_ir_id),
+                now=now)
+            # ★ complete 的版本**现场重读**：rejudge_apply 之后发布钩子可能
+            #   又追加了一条 report_publish —— 闭着眼睛 +1 会 version_conflict。
+            done = self.execute(
+                aggregate_id=case_id, command="release_job_complete",
+                actor={"principal_id": "release-sweeper",
+                       "tenant_id": "system"},
+                expected_version=self.authority.state(case_id)["version"],
+                payload={},
+                idempotency_key="reaudit-done:%s:%s"
+                % (case_id, prev_ir_id), now=now)
+        return {"ok": True, "started": started["result"],
+                "applied": applied["result"], "done": done["result"]}
 
     def notification_read(self, *, principal, notification_id,
                           idempotency_key):

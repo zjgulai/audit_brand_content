@@ -323,10 +323,56 @@ class ProductionRuntime:
                 authorize=self._report_authorize)
             self.report_bridge = ReportRenderBridge(
                 str(Path(__file__).resolve().parent.parent))
+            # T-317c：重审执行体的两个注入点 —— 外部绑定采集（规则表 + KB
+            # 快照的**当前**值）与真重判（judge_unit 用当前快照重跑）。
+            _ingestor = SubmissionIngestor()
+            from base.control_points import ControlPointRegistry as _CPR
+
+            def _external_binding():
+                from base.rule_judge import RuleJudge as _RJ
+                reg = _CPR()
+                kb_id = _ingestor._kb_snapshot()
+                import hashlib as _hl
+                return {
+                    "rule_snapshot": {"version": "rules-v1",
+                                      # 与 judge_entry 同一来源：RuleJudge 的快照指纹
+                                      "hash": _RJ(reg).rule_snapshot_sha256},
+                    "kb_snapshot": {"version": kb_id,
+                                    "hash": _hl.sha256(
+                                        kb_id.encode("utf-8")).hexdigest()},
+                    "conflict_table_version": reg.table_version,
+                    "raw_sha256": None, "text_sha256": None,
+                    "media_fingerprints": [],
+                    "used_authority_refs": [],
+                }
+
+            def _rejudge(state):
+                judgment = _ingestor.judge_fn(
+                    state["content"],
+                    authority_query=_ingestor._query(),
+                    kb_snapshot=_ingestor._kb_snapshot())
+                return {
+                    "ir": judgment["ir"],
+                    "report_snapshot": judgment.get("report_snapshot"),
+                    "judgment": {"label": judgment.get("label"),
+                                 "layer": judgment.get("layer"),
+                                 "release_status": judgment.get("release_status"),
+                                 "run_state": judgment.get("run_state"),
+                                 "receipt": judgment.get("receipt")},
+                    "kb_snapshot_hash": __import__("hashlib").sha256(
+                        _ingestor._kb_snapshot().encode("utf-8")).hexdigest(),
+                    "conflict_table_version":
+                        judgment["ir"].get("control_points_version"),
+                    "media_fingerprints":
+                        judgment["ir"].get("media_fingerprints") or {},
+                }
+
             self.service = ReviewCommandService(
                 self.authority, self.projection,
                 report_store=self.report_store,
-                report_bridge=self.report_bridge)
+                report_bridge=self.report_bridge,
+                external_binding_provider=_external_binding,
+                rejudge_fn=_rejudge)
             # T-314c：把「已批准的授权名单」注入 rbac。
             #
             # 改前 `TAKEDOWN_ALLOWLIST` 是模块级常量且两个名单都是空集 ——
@@ -371,6 +417,13 @@ class ProductionRuntime:
             raise RuntimeError("runtime_not_started:maintenance")
         try:
             self.service.reconcile()
+            # T-317c：失效扫描 —— 每个 signed 案件当前外部绑定 vs 签名绑定；
+            # 无变化是常态（invalidate_if_due 返 None），有变化建重审 job。
+            for case_id in list(self.authority.aggregate_ids()):
+                try:
+                    self.service.invalidate_if_due(case_id)
+                except Exception:  # noqa: BLE001
+                    pass
             for case_id in self.authority.aggregate_ids():
                 self.service.expire_if_due(case_id)
             # T-311b：申诉「暂停超 30 天转 stale」的**唯一生产触发点**。

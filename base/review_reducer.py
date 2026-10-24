@@ -766,31 +766,6 @@ def _release(state, command, actor, payload, now, detail):
         detail.update({"signature_id": sig["signature_id"]})
         return
 
-    # release_revoke：只改状态 + 追加事件，**不追加签名**（gate 同语义）。
-    if release is None or release.get("status") != "signed":
-        raise LedgerConflict(
-            "invalid_transition", "只有 signed 可撤回，当前 %r"
-            % ((release or {}).get("status") if release else None))
-    # ★ T-315b / #123c：撤回绑定**原签发人**（权威判定点在 reducer；
-    #   gate.revoke 的同款检查是开发装配镜像）。此前任何持 release.revoke
-    #   者可撤任何人的签发 —— 该判定 2026-10-25 之前不存在。
-    sigs = release.get("signatures") or []
-    last_signer = (sigs[-1] or {}).get("signer_id") if sigs else None
-    if actor != last_signer:
-        raise LedgerConflict(
-            "not_original_signer",
-            "撤回只能由原签发人执行（#123c），该案签发人是 %r" % last_signer)
-    reason = _nonempty(payload.get("reason"), "revoke_reason")
-    step_up_ref = _nonempty(payload.get("step_up_ref"), "revoke_step_up_ref")
-    release["status"] = "revoked"
-    release["release_status"] = "已撤回"
-    release["events"].append({
-        "kind": "release_revoked", "at": _iso(now), "actor": actor,
-        "step_up_ref": step_up_ref, "reason": reason,
-    })
-    detail.update({"revoked": True})
-    return
-
     # ── T-317a：失效 / 重审 job / 重判应用 ──────────────────────────
     if command == "release_invalidate":
         # payload["current"] = **当前**外部绑定快照（规则表版本 / KB 快照 /
@@ -812,8 +787,10 @@ def _release(state, command, actor, payload, now, detail):
             raise LedgerConflict("nothing_to_reaudit", "五类输入无变化，无需重审")
         # job_id 确定性派生（case + version + change_set）—— 幂等重放不漂移。
         # ★ 禁含 now：_grant_id/_appeal_id 注释记录的自增/时间戳撞号同族。
+        # job_id = case + change_set（不含 version）：同案同变化集必须
+        # 汇入同一个 job（merge 语义）；带 version 会让第二次失效永远
+        # 建新 job —— 确定性与可合并不可兼得时，取可合并。
         job_id = "rj-" + _hash({"case_id": state["case_id"],
-                                "version": state["version"],
                                 "changes": changes})[:16]
         active = release.get("active_job")
         if isinstance(active, dict) and active.get("job_id") == job_id \
@@ -927,6 +904,34 @@ def _release(state, command, actor, payload, now, detail):
                                   "new_ir_id": new_ir["ir_id"]})
         detail.update({"ir_id": new_ir["ir_id"], "job_id": job["job_id"]})
         return
+
+    if command != "release_revoke":
+        raise LedgerValidation("bad_command", "未知 release 命令 %r" % command)
+    # release_revoke：只改状态 + 追加事件，**不追加签名**（gate 同语义）。
+    if release is None or release.get("status") != "signed":
+        raise LedgerConflict(
+            "invalid_transition", "只有 signed 可撤回，当前 %r"
+            % ((release or {}).get("status") if release else None))
+    # ★ T-315b / #123c：撤回绑定**原签发人**（权威判定点在 reducer；
+    #   gate.revoke 的同款检查是开发装配镜像）。此前任何持 release.revoke
+    #   者可撤任何人的签发 —— 该判定 2026-10-25 之前不存在。
+    sigs = release.get("signatures") or []
+    last_signer = (sigs[-1] or {}).get("signer_id") if sigs else None
+    if actor != last_signer:
+        raise LedgerConflict(
+            "not_original_signer",
+            "撤回只能由原签发人执行（#123c），该案签发人是 %r" % last_signer)
+    reason = _nonempty(payload.get("reason"), "revoke_reason")
+    step_up_ref = _nonempty(payload.get("step_up_ref"), "revoke_step_up_ref")
+    release["status"] = "revoked"
+    release["release_status"] = "已撤回"
+    release["events"].append({
+        "kind": "release_revoked", "at": _iso(now), "actor": actor,
+        "step_up_ref": step_up_ref, "reason": reason,
+    })
+    detail.update({"revoked": True})
+    return
+
 
 
 def _notification_id(ntype, dedup_key, recipient):

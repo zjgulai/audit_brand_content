@@ -975,6 +975,17 @@
         "base/review_command_service.py",
         "api/review_api.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_reaudit_persistence.py",
+      "asserts": "T-317 全量重审：失效检测建 queued job（job_id 确定性、同 change_set 合并、无变化返 None）；run_reaudit 锁外真重判后新 ir_id 与旧不同（#98 ①）、job done 回待放行、ir_prev 指针、旧 IR 事件链逐字节未变（#98 ②）、新报告追加旧报告文件 sha 不变（#98 ③）、重审后再签发 derived_from 接链",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/review_command_service.py",
+        "base/release_gate.py",
+        "base/report_store.py",
+        "api/production_app.py"
+      ]
     }
   ],
   "exempt": [
