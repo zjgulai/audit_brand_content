@@ -244,8 +244,23 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > —— 第五张（D5 阶段门最后一环）：**运行时镜像里没有 Node**，而唯一的报告渲染器是 Node 实现；
 > 报告的 ACL 判据读 `principal["role"]`（单数大写），真实身份是 `roles`（复数小写）→
 > **接上即全拒**；`report_snapshot` 被 `judge_entry` 丢掉；`/reports/{id}/resign` 只有路径没有语义。
+> [`PMO/implement/收尾方案-v1-20261025.md`](./PMO/implement/收尾方案-v1-20261025.md)
+> —— **P1 剩余任务的总方案**（2026-10-25）：六环节只剩签发一环；M1–M5 阶段目标与
+> 三线并行顺序；`kb_snapshot_hash` 口径裁定（D1 已裁定）；11 条 unmapped 判据逐条归属；
+> 一条共用契约（报告保持「判定时冻结」，T-310/315/317 都不动渲染器）。
+> [`PMO/implement/T-313-施工单-通知进权威-20261025.md`](./PMO/implement/T-313-施工单-通知进权威-20261025.md)
+> —— 第六张：`GET /notifications` 读 frozen 夹具、read/ack 是 501 占位、三个触发点
+> 在生产路径**零生产者**；独立 aggregate + SCHEMA_VERSION 3 必须写**独立 `==2` 迁移分支**
+> （「只加全新库→v2 老库静默跳过」是 v1→v2 崩溃的新变体）；投影必须先行部署。
+> [`PMO/implement/T-315-施工单-撤权进权威-20261025.md`](./PMO/implement/T-315-施工单-撤权进权威-20261025.md)
+> —— 第七张：全仓无 `revoke_grant`；**`gate.revoke` 不校验原签发人**（#123c 的判定今天不存在）；
+> 撤权 = grant 状态迁移，授权版本就是聚合 version；名单只盖 `release.sign` 不盖 revoke。
+> [`PMO/implement/T-317-施工单-全量重审进权威-20261025.md`](./PMO/implement/T-317-施工单-全量重审进权威-20261025.md)
+> —— 第八张：`_new_job/complete_job` 是内存桩（在 release_gate.py，**票面写错成 orchestrator.py**）；
+> 重判入口 `judge_unit` 已存在、无需重新 submission；`report_immutable` 守卫会挡住重审的新报告。
+> 判据全落产物级（#98 在 10-23 曾假绿回退）。
 > ★ 前 7 份是**读数审计**（回答「这个 passed 有多少是真的」）；
-> 后 2 份是**执行规格**（回答「接下来按什么顺序做、做到什么算完」）。
+> 后 6 份是**执行规格**（回答「接下来按什么顺序做、做到什么算完」）。
 > 两类不许混读：前者是证据，后者是计划；计划里的数字若与证据冲突，以证据为准。
 
 **Playbook / PRD**
