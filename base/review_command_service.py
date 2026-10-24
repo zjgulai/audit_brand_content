@@ -35,10 +35,24 @@ class ReviewCommandService:
             self.authority.verify_integrity()
             return self.projection.status(self.authority.head())
 
+    #: T-313c：这三个命令成功后要产通知。reducer 不发通知（纯函数纪律）；
+    #: 服务层是唯一的生产装配点。
+    _NOTIFY_ON = frozenset({"expire_lease", "unclaim", "reassign",
+                            "takedown_create", "takedown_transition"})
+
     def execute(self, **command):
         with self._lock:
+            before = None
+            if command.get("command") in self._NOTIFY_ON:
+                try:
+                    before = self.authority.state(command.get("aggregate_id"))
+                except Exception:  # noqa: BLE001
+                    before = None
             committed = self.authority.execute(**command)
             response = self._respond(committed["batch"], committed["replayed"])
+        # ★ 通知产出版在锁外（与报告发布同一条纪律）：emit 是一次权威写，
+        #   失败不许拖垮主命令，也不许占着全局锁。
+        self._emit_notifications(command, before)
         # ★ 报告发布在**锁外**：渲染是一次最长 30 秒的子进程调用。
         #   留在锁里会让「一人结案、渲染卡住」期间所有人的写请求排队 ——
         #   一次下游副作用变成全局写停顿。
@@ -278,6 +292,123 @@ class ReviewCommandService:
         with self._lock:
             Projector(self.authority, self.projection).catch_up()
             return self.projection.status(self.authority.head())
+
+    def emit_notification(self, *, tenant, recipient, ntype, dedup_key,
+                          related_case_id=None, payload=None,
+                          idempotency_key, actor_id="system"):
+        """通知 emit 进权威（T-313c）。**永不抛**。
+
+        返回 {"ok": True, "notification_id": ..., "replayed": ...} 或
+        {"ok": False, "detail": ...} —— 失败可见、不压成一个空字段
+        （与 _publish_report_after 同一条纪律：通知失败不许拖垮触发它的主命令）。
+        幂等键由调用方给稳定串（触发点 + 对象 + 版本）。
+        """
+        try:
+            committed = self.execute(
+                aggregate_id="notifications:%s:%s" % (tenant, recipient),
+                command="notification_emit",
+                actor={"principal_id": actor_id, "tenant_id": tenant},
+                expected_version=None,
+                payload={"type": ntype, "dedup_key": dedup_key,
+                         "related_case_id": related_case_id,
+                         "payload": payload or {}},
+                idempotency_key=idempotency_key)
+            return {"ok": True,
+                    "notification_id": (committed["result"].get("notification")
+                                        or {}).get("notification_id"),
+                    "replayed": committed["replayed"]}
+        except Exception as exc:  # noqa: BLE001
+            code = getattr(exc, "code", "")
+            return {"ok": False,
+                    "detail": "%s: %s" % (type(exc).__name__,
+                                          code or exc)}
+
+    def _emit_notifications(self, command, before):
+        """三个触发点的通知产出（T-313c）。**永不抛**。
+
+        | 触发 | 收件人 | 类型 | 幂等键 |
+        |---|---|---|---|
+        | expire_lease / unclaim | 被释放的 assignee | lease_released | notify:{cmd}:{case}:{version} |
+        | reassign（案件转交） | 被转走的人 | lease_released | 同上 |
+        | takedown_create / transition(reassign) | 任务 assignee | takedown | notify:{cmd}:{task}:{version} |
+        飞书通道刻意不接（票面判据「飞书调用次数 = 0」的反向对照）。
+        """
+        try:
+            cmd = command.get("command")
+            cid = command.get("aggregate_id")
+            if before is None or not isinstance(before, dict):
+                return
+            tenant = before.get("tenant")
+            if not tenant:
+                return
+            if cmd in ("expire_lease", "unclaim", "reassign"):
+                who = before.get("assignee")
+                if not who:
+                    return
+                new_assignee = (command.get("payload") or {}).get("assignee")
+                if cmd == "reassign" and who == new_assignee:
+                    return
+                self.emit_notification(
+                    tenant=tenant, recipient=who, ntype="lease_released",
+                    dedup_key="%s:%s" % (cid, before.get("version")),
+                    related_case_id=cid,
+                    payload={"reason": cmd},
+                    idempotency_key="notify:%s:%s:%s"
+                    % (cmd, cid, before.get("version")))
+                return
+            # takedown_create / takedown_transition：指派与改派通知任务 assignee。
+            payload = command.get("payload") or {}
+            if cmd == "takedown_transition" \
+                    and payload.get("action") not in (None, "reassign"):
+                return
+            who = payload.get("assignee")
+            task_ref = payload.get("task_id") or cid
+            if not who:
+                return
+            self.emit_notification(
+                tenant=tenant, recipient=who, ntype="takedown",
+                dedup_key="%s:%s:%s" % (task_ref, payload.get("action") or "create",
+                                        before.get("version")),
+                related_case_id=cid,
+                payload={"task_id": task_ref, "action": payload.get("action")},
+                idempotency_key="notify:%s:%s:%s"
+                % (cmd, task_ref, before.get("version")))
+        except Exception:  # noqa: BLE001
+            return
+
+    def notification_read(self, *, principal, notification_id,
+                          idempotency_key):
+        """已读进权威（T-313d）：聚合 = 当前 principal 自己的收件箱。"""
+        tenant = (principal or {}).get("tenant")
+        pid = (principal or {}).get("id")
+        if not all(isinstance(v, str) and v.strip()
+                   for v in (tenant, pid, notification_id or "")):
+            raise AuthorityConflict("actor_missing",
+                                    "principal/tenant/notification_id 必填")
+        return self.execute(
+            aggregate_id="notifications:%s:%s" % (tenant, pid),
+            command="notification_read",
+            actor={"principal_id": pid, "tenant_id": tenant},
+            expected_version=None,
+            payload={"notification_id": notification_id},
+            idempotency_key=idempotency_key)
+
+    def notification_ack(self, *, principal, notification_id,
+                         idempotency_key):
+        """已确认进权威（T-313d）；ack 前置 read 由 reducer 判。"""
+        tenant = (principal or {}).get("tenant")
+        pid = (principal or {}).get("id")
+        if not all(isinstance(v, str) and v.strip()
+                   for v in (tenant, pid, notification_id or "")):
+            raise AuthorityConflict("actor_missing",
+                                    "principal/tenant/notification_id 必填")
+        return self.execute(
+            aggregate_id="notifications:%s:%s" % (tenant, pid),
+            command="notification_ack",
+            actor={"principal_id": pid, "tenant_id": tenant},
+            expected_version=None,
+            payload={"notification_id": notification_id},
+            idempotency_key=idempotency_key)
 
     def release_decision(self, *, aggregate_id, principal, action, token,
                          nonce, reason, step_up_consumer, idempotency_key,

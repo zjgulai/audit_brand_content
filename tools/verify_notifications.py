@@ -124,27 +124,27 @@ def main() -> int:
         sent = []
         snd = lambda tid, kind: sent.append((tid, kind))
 
-        r1 = N.remind_takedown_task(task_id="td-1", state="pending", event_id=None,
+        r1 = N.remind_takedown_task(task_id="td-1", recipient="u_a", state="pending", event_id=None,
                                     ledger=led, sender=snd, ts=t0)
         ok("3a 首次每日提醒发出", r1["daily"] is True and len(sent) == 1, f"{r1}")
 
-        r2 = N.remind_takedown_task(task_id="td-1", state="pending", event_id=None,
+        r2 = N.remind_takedown_task(task_id="td-1", recipient="u_a", state="pending", event_id=None,
                                     ledger=led, sender=snd, ts=t0.replace(hour=18))
         ok("3b ★ 同日第二次不再发", r2["daily"] is False and len(sent) == 1,
            f"{r2} sent={len(sent)}")
 
-        r3 = N.remind_takedown_task(task_id="td-1", state="in_progress",
+        r3 = N.remind_takedown_task(task_id="td-1", recipient="u_a", state="in_progress",
                                     event_id="ev-1", ledger=led, sender=snd, ts=t0)
         ok("3c ★ 同日状态变化仍立即发（每日键不吞事件键）",
            r3["event"] is True and r3["daily"] is False and len(sent) == 2,
            f"{r3} sent={len(sent)}")
 
-        r4 = N.remind_takedown_task(task_id="td-1", state="completed",
+        r4 = N.remind_takedown_task(task_id="td-1", recipient="u_a", state="completed",
                                     event_id="ev-1", ledger=led, sender=snd, ts=t0)
         ok("3d 同一 event_id 不重复通知", r4["event"] is False and len(sent) == 2,
            f"{r4}")
 
-        r5 = N.remind_takedown_task(task_id="td-1", state="completed",
+        r5 = N.remind_takedown_task(task_id="td-1", recipient="u_a", state="completed",
                                     event_id="ev-2", ledger=led, sender=snd,
                                     ts=t0 + timedelta(days=1))
         ok("3e 次日每日提醒重新发 + 新事件发",
@@ -155,10 +155,10 @@ def main() -> int:
         p = Path(d) / "dedup2.json"
         led2 = N.DedupLedger(p)
         t1 = datetime(2026, 10, 17, 9, 0, tzinfo=N.BJT)
-        led2.claim_daily("td-9", ts=t1)
+        led2.claim_daily("td-9", "u_a", ts=t1)
         # 模拟重启：新对象读同一文件
         led3 = N.DedupLedger(p)
-        r = led3.claim_daily("td-9", ts=t1)
+        r = led3.claim_daily("td-9", "u_a", ts=t1)
         ok("4a ★ 重启后同日不重复（持久化生效）",
            r["send"] is False and r["untested"] is False, f"{r}")
 
@@ -171,7 +171,7 @@ def main() -> int:
         bad = Path(d) / "corrupt.json"
         bad.write_text("{不是 json", encoding="utf-8")
         led_bad = N.DedupLedger(bad)
-        r = led_bad.claim_daily("td-1", ts=t0)
+        r = led_bad.claim_daily("td-1", "u_a", ts=t0)
         ok("4c ★ 账本读不出 → untested 且 send=False（不发）",
            r["untested"] is True and r["send"] is False, f"{r}")
         r = led_bad.claim_event("ev-x")
@@ -199,8 +199,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         led = N.DedupLedger(Path(d) / "r3.json")
         t = datetime(2026, 10, 16, 9, 0, tzinfo=N.BJT)
-        a = led.claim_daily("td-r3", ts=t)
-        b = led.claim_daily("td-r3", ts=t.replace(hour=15))
+        a = led.claim_daily("td-r3", "u_a", ts=t)
+        b = led.claim_daily("td-r3", "u_a", ts=t.replace(hour=15))
         ok("R3 ★ 同日重复提醒被挡（不是发两次）",
            a["send"] is True and b["send"] is False, f"{a} / {b}")
 
@@ -208,8 +208,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "r4.json"
         t = datetime(2026, 10, 16, 9, 0, tzinfo=N.BJT)
-        N.DedupLedger(p).claim_daily("td-r4", ts=t)
-        again = N.DedupLedger(p).claim_daily("td-r4", ts=t)
+        N.DedupLedger(p).claim_daily("td-r4", "u_a", ts=t)
+        again = N.DedupLedger(p).claim_daily("td-r4", "u_a", ts=t)
         ok("R4 ★ 重启后同日不重复发", again["send"] is False, f"{again}")
 
     # ══════════ 6. inbox 视图 ══════════

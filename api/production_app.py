@@ -55,6 +55,9 @@ PRODUCTION_WRITE_PATHS = {
     "/api/v1/cases/{id}/release-revoke",
     # T-315c：撤权端点（grant_revoke 命令；能力判定在路由 + reducer 两层）。
     "/api/v1/admin/grants/{id}/revoke",
+    # T-313d：通知 read/ack（写自己的收件箱）。
+    "/api/v1/notifications/{id}/read",
+    "/api/v1/notifications/{id}/ack",
 }
 def build_allowlist_source(projection):
     """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
@@ -507,6 +510,11 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
         repository=frozen,
         principal_provider=principal_provider,
         review_read_store=projection_proxy,
+        # T-313d：通知收件箱读投影（按 tenant+recipient 过滤）。
+        notification_reader=lambda tenant, recipient: (
+            projection_proxy.list_notifications(tenant=tenant,
+                                                recipient=recipient)
+            if projection_proxy is not None else None),
         review_command_service=review_service_proxy,
         enabled_write_capabilities=PRODUCTION_WRITE_PATHS,
         review_freshness_provider=require_projection_fresh_for_shared_route,

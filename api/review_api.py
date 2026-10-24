@@ -529,6 +529,7 @@ def create_app(*, session_store=None, repository=None, principals=None,
                review_freshness_provider=None, case_state_provider=None,
                review_assignee_validator=None, case_source=None,
                submission_ingestor=None,
+               notification_reader=None,
                session_cookie_name="session", finding_store=None, appeals=None,
                release_gate=None, app_env=None,
                grant_principal_provider=None,
@@ -585,6 +586,9 @@ def create_app(*, session_store=None, repository=None, principals=None,
     app.state.access_log = AccessLog(access_log_path)
     repo_ledger = review_read_store or app.state.reviews_ledger
     app.state.review_command_service = review_command_service
+    # T-313d：通知收件箱的生产读法（投影 list_notifications）；
+    # None = 开发装配，回落 frozen repo。
+    app.state.notification_reader = notification_reader
     app.state.session_cookie_name = session_cookie_name
 
     @app.exception_handler(HTTPException)
@@ -811,6 +815,33 @@ def create_app(*, session_store=None, repository=None, principals=None,
         #   code=0、字段读得出、没有任何东西会红 —— 这正是 K-02 的形状。
         #   回归断言在 tools/verify_review_api.py 的 C6。
         tenant = principal.get("tenant")
+        # T-313d：authority/投影有收件箱时优先（每人的 items）；
+        # frozen JSON 退化兜底。读端点不做任何写（emit/read 都是权威命令）。
+        reader = app.state.notification_reader
+        if reader is not None:
+            try:
+                boxes = reader(tenant=tenant, recipient=principal.get("id"))
+            except Exception:  # noqa: BLE001
+                boxes = None
+            if boxes:
+                items = []
+                for box in boxes:
+                    for item in box.get("items") or []:
+                        if item.get("archived"):
+                            continue
+                        items.append({
+                            "notification_id": item.get("notification_id"),
+                            "type": item.get("type"),
+                            "recipient": box.get("recipient"),
+                            "tenant": box.get("tenant"),
+                            "case_id": item.get("related_case_id"),
+                            "created_at": item.get("created_at"),
+                            "read_at": item.get("read_at"),
+                            "acked_at": item.get("acked_at"),
+                            "unread": item.get("read_at") is None,
+                            "payload": item.get("payload") or {},
+                        })
+                return items
         return [n for n in repo.notifications
                 if n.get("tenant") == tenant
                 and n.get("recipient") in (None, principal.get("id"))]

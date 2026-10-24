@@ -230,10 +230,14 @@ class DedupLedger:
         os.replace(tmp, self.path)
 
     # ── 每日提醒 ──
-    def daily_key(self, task_id: str, ts: datetime | float | None = None) -> str:
-        return f"{task_id}|{bj_date(ts)}"
+    def daily_key(self, task_id: str, recipient: str,
+                  ts: datetime | float | None = None) -> str:
+        # ★ T-312c / #101：键加收件人维度（与 TD.ReminderLedger 同一口径，
+        #   两处不许漂移）。同一任务的两个收件人各自每天提醒一次。
+        return f"{task_id}|{recipient}|{bj_date(ts)}"
 
-    def claim_daily(self, task_id: str, *, ts: datetime | float | None = None) -> dict:
+    def claim_daily(self, task_id: str, recipient: str, *,
+                    ts: datetime | float | None = None) -> dict:
         """
         申请「今天发一次」。返回 {"send": bool, "untested": bool, "reason": str}
 
@@ -242,7 +246,7 @@ class DedupLedger:
         """
         if self.untested:
             return {"send": False, "untested": True, "reason": self.untested_reason}
-        k = self.daily_key(task_id, ts)
+        k = self.daily_key(task_id, recipient, ts)
         if k in self._daily:
             return {"send": False, "untested": False, "reason": f"今日已提醒（{k}）"}
         self._daily.add(k)
@@ -267,13 +271,14 @@ class DedupLedger:
 
 # ═══════════════════ ④ 下线任务提醒 ═══════════════════
 
-def remind_takedown_task(*, task_id: str, state: str, event_id: str | None,
+def remind_takedown_task(*, task_id: str, recipient: str, state: str,
+                         event_id: str | None,
                          ledger: DedupLedger, sender,
                          ts: datetime | float | None = None) -> dict:
     """
     下线任务提醒。两条独立通道：
 
-      每日一次（不论状态是否变）—— 键 = task_id + 北京日期
+      每日一次（不论状态是否变）—— 键 = task_id + 收件人 + 北京日期（T-312c）
       状态变化时立即 —— 键 = event_id
 
     ★ 两种键**分开判**：同一天既发过每日提醒、又发生了状态变化，
@@ -284,7 +289,7 @@ def remind_takedown_task(*, task_id: str, state: str, event_id: str | None,
     #   None 与 False 在三元判断里同真同假，但读日志的人分不清
     #   「今天不该发」和「今天该发但没发成」。
 
-    d = ledger.claim_daily(task_id, ts=ts)
+    d = ledger.claim_daily(task_id, recipient, ts=ts)
     out["untested"] = out["untested"] or d["untested"]
     out["daily_reason"] = d.get("reason", "")
     if d["send"]:

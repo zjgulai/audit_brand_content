@@ -246,11 +246,15 @@ def main() -> int:
     # ═════════ 5. 提醒去重 ═════════
     led = TD.ReminderLedger()
     t0 = datetime(2026, 10, 16, 9, 0, tzinfo=TD.BJT)
-    ok("5a 同日第一次提醒 → 该发", led.should_remind_daily("td-1", t0) is True, "")
-    ok("5b 同日第二次提醒 → 不发（去重）",
-       led.should_remind_daily("td-1", t0.replace(hour=20)) is False, "")
+    ok("5a 同日第一次提醒 → 该发",
+       led.should_remind_daily("td-1", "u_a", t0) is True, "")
+    ok("5b 同人同日第二次提醒 → 不发（去重）",
+       led.should_remind_daily("td-1", "u_a", t0.replace(hour=20)) is False, "")
     ok("5c 次日 → 重新该发",
-       led.should_remind_daily("td-1", t0 + timedelta(days=1)) is True, "")
+       led.should_remind_daily("td-1", "u_a", t0 + timedelta(days=1)) is True, "")
+    # 5c2（T-312c / #101）：键加收件人维度 —— 同任务不同收件人各自该发。
+    ok("5c2 ★ 不同收件人同日各自该发（键含 recipient）",
+       led.should_remind_daily("td-1", "u_b", t0) is True, "")
 
     # 5d：★ 北京日期口径 —— UTC 23:30 是北京次日 07:30，必须算新的一天
     utc_late = datetime(2026, 10, 16, 23, 30, tzinfo=timezone.utc)
@@ -264,7 +268,7 @@ def main() -> int:
 
     # 5g：★ 两种键不许混 —— 同日第二次状态变化仍须通知
     led2 = TD.ReminderLedger()
-    led2.should_remind_daily("td-9", t0)
+    led2.should_remind_daily("td-9", "u_a", t0)
     ok("5g ★ 每日去重不影响当日状态变化通知（两种键独立）",
        led2.should_notify_event("ev-a") is True
        and led2.should_notify_event("ev-b") is True, "")

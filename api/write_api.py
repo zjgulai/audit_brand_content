@@ -104,6 +104,11 @@ class ReleaseDecisionBody(BaseModel):
     reason: Optional[str] = None
 
 
+class NotificationItemBody(BaseModel):
+    """T-313d：通知 read/ack 的请求体（模块级 —— 局部类炸 ForwardRef）。"""
+    notification_id: str
+
+
 class ReleaseRevokeBody(BaseModel):
     version: int
     step_up_token: Optional[str] = None
@@ -247,6 +252,9 @@ IMPLEMENTED_WRITE_PATHS = {
     "/api/v1/takedown-tasks/{id}/waive",
     "/api/v1/cases/{id}/release-decision",
     "/api/v1/cases/{id}/release-revoke",
+    # T-313d：通知 read/ack（写自己的收件箱；GET 的 authority 分支在 review_api）。
+    "/api/v1/notifications/{id}/read",
+    "/api/v1/notifications/{id}/ack",
 }
 
 
@@ -1073,5 +1081,55 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         return _idempotent(
             request, idempotency_key, run, actor=principal["id"],
             request_body={"case_id": id, **body.model_dump()})
+
+    # ── T-313d：通知 read/ack ────────────────────────────────────────
+    # 写的是**自己的**收件箱（聚合 = notifications:<tenant>:<principal>），
+    # 收件人身份来自 principal，不收 body 指定 —— 否则一个人可以替别人已读。
+    # （body 模型在模块级：局部类会让 pydantic 的 ForwardRef 解析炸掉。）
+
+    def _notification_command(command):
+        def handler(body: NotificationItemBody, request: Request,
+                    principal=Depends(principal_dep),
+                    idempotency_key: Optional[str] = Header(
+                        None, alias="Idempotency-Key")):
+            path = "/api/v1/notifications/{id}/" + command
+            require_enabled(path)
+            if review_command_service is None:
+                # 开发装配：内存 repo 原位标记（重启即丢，与其它开发路径一致）。
+                for row in repo.notifications:
+                    if row.get("notification_id") == body.notification_id:
+                        row["read_at"] = row.get("read_at") or "dev"
+                        if command == "ack":
+                            row["acked_at"] = row.get("acked_at") or "dev"
+                        return {"ok": True, "notification": dict(row)}
+                raise HTTPException(404, "notification_not_found")
+            try:
+                fn = (review_command_service.notification_read
+                      if command == "read"
+                      else review_command_service.notification_ack)
+                outcome = fn(principal=principal,
+                             notification_id=body.notification_id,
+                             idempotency_key=idempotency_key)
+            except LedgerConflict as exc:
+                raise_command_http(exc, "notification_" + command)
+            except LedgerValidation as exc:
+                raise_command_http(exc, "notification_" + command)
+            except LedgerNotFound as exc:
+                raise_command_http(exc, "notification_" + command)
+            response = dict(outcome["result"])
+            response.update({
+                "authority_snapshot": outcome["authority_snapshot"],
+                "reconcile_token": outcome["reconcile_token"],
+                "projection_lag": outcome["projection_lag"],
+                "replayed": outcome["replayed"],
+            })
+            return JSONResponse(content=response,
+                                status_code=outcome["http_status"])
+        return handler
+
+    app.add_api_route("/api/v1/notifications/{id}/read",
+                      _notification_command("read"), methods=["POST"])
+    app.add_api_route("/api/v1/notifications/{id}/ack",
+                      _notification_command("ack"), methods=["POST"])
 
     return IMPLEMENTED_WRITE_PATHS

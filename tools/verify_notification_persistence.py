@@ -50,6 +50,18 @@ def _apply(state, command, payload, actor="system", now=1000):
     return new_state, result
 
 
+def store_h_like():
+    import base.auth_session as _AS
+    return _AS.SessionStore(":memory:")
+
+
+def _PROD_PATHS():
+    import sys as _sys
+    sys.path.insert(0, str(ROOT))
+    from api.production_app import PRODUCTION_WRITE_PATHS
+    return PRODUCTION_WRITE_PATHS
+
+
 def main():
     passed = failed = 0
     tmp_roots = []
@@ -293,6 +305,75 @@ def main():
             report(getattr(exc, "code", "") == "unknown_aggregate_type",
                    "M2 未知 aggregate_type 必拒", "（%s）" % getattr(exc, "code", ""))
         pbad.close()
+
+        # ---- E 段：触发点装配（T-313c）----
+        from base.review_command_service import ReviewCommandService as _RCS
+        root2 = tempfile.mkdtemp(prefix="notif-trigger-")
+        tmp_roots.append(root2)
+        lease2 = WriterLease(os.path.join(root2, "a", "lock")).acquire()
+        auth3 = BusinessEventStore(os.path.join(root2, "a"), lease=lease2)
+        proj3 = ProjectionStore(os.path.join(root2, "p.db"))
+        svc3 = _RCS(auth3, proj3)
+        cid_e = "case-trig"
+        auth3.execute(aggregate_id=cid_e, command="ingest_submission",
+                      actor={"principal_id": "ou_w", "tenant_id": "t1"},
+                      expected_version=0,
+                      payload={"submission_id": "s-trig",
+                               "submission_hash": "h" * 64,
+                               "content": {"unit_id": "u-trig",
+                                           "fingerprint": {"text_sha256": "a" * 64}},
+                               "ir": {"ir_id": "ir-trig", "ir_version": "v1",
+                                      "findings": [],
+                                      "decision": {"state": "REVIEW"},
+                                      "control_points_version": "cp-1"},
+                               "kb_snapshot_hash": "b" * 64,
+                               "conflict_table_version": "cp-1",
+                               "judgment": {"label": "REVIEW", "run_state": "OK"},
+                               "tenant": "t1", "product_line": "pump",
+                               "submitter_id": "ou_w"},
+                      idempotency_key="ing", now=1000)
+        auth3.execute(aggregate_id=cid_e, command="claim",
+                      actor={"principal_id": "ou_w", "tenant_id": "t1"},
+                      expected_version=1, payload={}, idempotency_key="cl",
+                      now=1001)
+        # E1：expire_lease → lease_released 通知给被释放的 assignee
+        # ★ 经服务层：钩子在 ReviewCommandService.execute（裸 authority 不产通知）。
+        svc3.execute(aggregate_id=cid_e, command="expire_lease",
+                     actor={"principal_id": "sweeper", "tenant_id": "t1"},
+                     expected_version=2, payload={}, idempotency_key="exp",
+                     now=1001 + 10 ** 9)
+        inbox_w = auth3.state("notifications:t1:ou_w")
+        report(any(i["type"] == "lease_released" and i["read_at"] is None
+                   for i in inbox_w["items"]),
+               "E1 expire_lease 产出 lease_released 给被释放人")
+        # E2：emit 失败可见不抛（坏 type → ok False）
+        bad = svc3.emit_notification(tenant="t1", recipient="ou_w",
+                                     ntype="no_such", dedup_key="k",
+                                     idempotency_key="e-bad")
+        report(bad.get("ok") is False and bool(bad.get("detail")),
+               "E2 emit 失败可见（永不抛）", repr(bad.get("detail")))
+        # E3：同键重放只一条（幂等）
+        out_e = svc3.emit_notification(tenant="t1", recipient="ou_x",
+                                       ntype="case_overdue", dedup_key="d1",
+                                       idempotency_key="e-x")
+        out_e2 = svc3.emit_notification(tenant="t1", recipient="ou_x",
+                                        ntype="case_overdue", dedup_key="d1",
+                                        idempotency_key="e-x")
+        report(out_e.get("ok") and out_e2.get("ok")
+               and out_e2.get("replayed") is True
+               and len(auth3.state("notifications:t1:ou_x")["items"]) == 1,
+               "E3 emit 幂等键重放不多写")
+
+        # ---- D 段：API 转正（T-313d）----
+        from api.review_api import create_app as _ca
+        reader = lambda tenant, recipient: (  # noqa: E731 生产读法的镜像：读投影
+            proj3.list_notifications(tenant=tenant, recipient=recipient))
+        app_d = _ca(session_store=store_h_like(), review_command_service=svc3,
+                    notification_reader=reader)
+        proj3.close()
+        report("/api/v1/notifications/{id}/read" in _PROD_PATHS()
+               and "/api/v1/notifications/{id}/ack" in _PROD_PATHS(),
+               "D1 read/ack 进生产能力表")
 
         # ---- S 段：reducer 不发通知的结构判据（运行时半边在 T-313c/d 验证器）----
         src = (ROOT / "base" / "review_reducer.py").read_text(encoding="utf-8")

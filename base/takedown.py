@@ -275,12 +275,16 @@ class ReminderLedger:
         self._daily: set[str] = set()
         self._events: set[str] = set()
 
-    def daily_key(self, task_id: str, ts: datetime | float | None = None) -> str:
-        return f"{task_id}|{bj_date(ts)}"
+    def daily_key(self, task_id: str, recipient: str,
+                  ts: datetime | float | None = None) -> str:
+        # ★ T-312c / #101：键加收件人维度 —— 同一任务的两个收件人
+        #   各自每天该提醒一次，共享一个键会让第二个人永远收不到。
+        return f"{task_id}|{recipient}|{bj_date(ts)}"
 
-    def should_remind_daily(self, task_id: str, ts: datetime | float | None = None) -> bool:
-        """返回 True 表示「该发」，同时记账（同日第二次返回 False）。"""
-        k = self.daily_key(task_id, ts)
+    def should_remind_daily(self, task_id: str, recipient: str,
+                            ts: datetime | float | None = None) -> bool:
+        """返回 True 表示「该发」，同时记账（同人同日第二次返回 False）。"""
+        k = self.daily_key(task_id, recipient, ts)
         if k in self._daily:
             return False
         self._daily.add(k)
