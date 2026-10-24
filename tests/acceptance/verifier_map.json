@@ -668,6 +668,12 @@
       "timeout": 60,
       "cpu_seconds": 45
     },
+    "118": {
+      "test_id": "acceptance-118",
+      "criteria": "TS-16",
+      "fixture": "{root}/tools/verify_media_portability.py",
+      "command": "{venv} {root}/tools/verify_media_portability.py"
+    },
     "119": {
       "test_id": "acceptance-119",
       "criteria": "TS-17",

@@ -6,8 +6,17 @@
 
 | 要求 | 本文件 | 当前读数 |
 |---|---|---|
-| 静态扫 macOS Vision/Speech 等宿主原生调用 | **M1**（剥注释/docstring 后扫可执行源码） | ❌ **红** |
+| 静态扫 macOS Vision/Speech 等宿主原生调用 | **M1**（剥注释/docstring 后扫可执行源码） | ⚠️ **数到 3 处，但按裁定「空真」** |
+| 生产进件是否已打开媒体 | **G1/G2**（行为级读 `SUPPORTED_SOURCE_KINDS`） | ✅ 未打开；一旦打开立刻退 1 |
 | Linux 容器内跑真实图片与视频并断言有结果 | — | ❌ **无对象**（无 docker daemon、镜像无引擎、无素材） |
+
+> ★ 2026-10-24 更正：上表第一行原先写「❌ 红」，**那已经过期**。
+> `verify_media_portability.py` 现在退 **0**，因为按裁定把「仓里有原生调用」
+> 记成了**空真读数**（生产进件未开媒体），并把真正的守卫放在 G2：
+> 一旦 `SUPPORTED_SOURCE_KINDS` 出现 image/video 就退 1。
+> 实测（`mutprobe`）：把 `image` 加进 `base/submission_service.py` 的那个集合
+> → 退 1，红项点名要先改 `base/ocr_vision.m`。
+> **文件头写「红」而程序退 0，是同一个量两个口径 —— 已改成两行分开写。**
 
 ## 为什么 M1 今天是红的（不是误报）
 

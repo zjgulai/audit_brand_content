@@ -2,20 +2,20 @@
  "schema_version": 1,
  "policy": "T-145 · 验收棘轮地板",
  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
- "passed_floor": 120,
+ "passed_floor": 121,
  "recorded_at": "2026-10-24",
  "recorded_reading": {
-  "passed": 120,
+  "passed": 121,
   "failed": 0,
-  "untested": 16,
+  "untested": 15,
   "untested_split": {
-   "machine": 9,
+   "machine": 8,
    "manual": 7,
    "unverifiable": 0,
    "unknown": 0
   },
   "untested_origin": {
-   "unmapped": 15,
+   "unmapped": 14,
    "executed_rc2": 1
   }
  },
@@ -103,6 +103,12 @@
    "to": "120",
    "at": "2026-10-24",
    "reason": "#11 映射：委托方裁定「判据只成立一半也计 passed」，与 #124/#136 统一口径。verify_parse_convergence 三项断言有活执行点（把 _untested_result 的 status 改成 ok → 退 1）。"
+  },
+  {
+   "from": "120",
+   "to": "121",
+   "at": "2026-10-24",
+   "reason": "#118 映射：G2 守卫实测有效（把 image 加进 SUPPORTED_SOURCE_KINDS → 退 1）。同时更正了该验证器文件头「M1 红」的过期说法 —— 它退 0，红的是空真读数。"
   }
  ],
  "notes": [
