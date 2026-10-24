@@ -673,6 +673,12 @@
       "fixture": "{root}/tools/verify_review_api.py",
       "command": "{venv} {root}/tools/verify_review_api.py"
     },
+    "124": {
+      "test_id": "acceptance-124",
+      "criteria": "TS-21",
+      "fixture": "{root}/tools/verify_asr_no_diarization.py",
+      "command": "{venv} {root}/tools/verify_asr_no_diarization.py"
+    },
     "125": {
       "test_id": "acceptance-125",
       "criteria": "TS-22",
@@ -742,6 +748,12 @@
       "command": "{venv} {root}/tools/verify_auth_session.py && {venv} {root}/tools/verify_backend_recovery.py && {venv} {root}/tools/verify_production_app.py",
       "timeout": 60,
       "cpu_seconds": 45
+    },
+    "136": {
+      "test_id": "acceptance-136",
+      "criteria": "TS-33",
+      "fixture": "{root}/tools/verify_lease_release.py",
+      "command": "{venv} {root}/tools/verify_lease_release.py"
     }
   }
 }
