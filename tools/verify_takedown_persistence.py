@@ -161,10 +161,10 @@ def main():
                                  "to": "pending", "action": "retry"},
                         idempotency_key="t-bad")
             report(False, "P6 非法迁移 → 拒", "（未拒绝）")
-        except LedgerConflict:
-            report(auth2.head()["seq"] == seq_before,
-                   "P6 非法迁移 → 拒且权威 seq 不变")
-        except LedgerValidation:
+        except (LedgerConflict, LedgerValidation):
+            # 两种拒都算「拦住了」；但 seq 必须没动（失败不落案）。
+            # 变异下 task_id 缺失会以 bad_task_id 先拒 —— 也落到这里，
+            # 此时 P0/P1/P2 已红，本条不再为此负责。
             report(auth2.head()["seq"] == seq_before,
                    "P6 非法迁移 → 拒且权威 seq 不变")
 
