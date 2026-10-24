@@ -299,7 +299,7 @@ def main():
         auth2 = BusinessEventStore(os.path.join(root, "a"), lease=lease)
         rel_after = auth2.state(cid)["release"]
         report(rel_after["status"] == "signed"
-               and rel_after["signatures"][0]["signature_hash"]
+               and (rel_after.get("signatures") or [{}])[0].get("signature_hash")
                == sig_auth["signature_hash"],
                "P2 重启恒等：签名与状态原样读回")
 
