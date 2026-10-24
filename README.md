@@ -198,6 +198,55 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > —— 按链路环节重排的主线优先级。
 > ★ 这几份的共同点：**它们是「判断的记录」，不是「成果的说明」** ——
 > 读它们是为了知道**当时凭什么这么定**，以及**哪些结论后来被推翻了**。
+>
+> 2026-10-24 的 9 份（7 份读数审计报告 + 1 份交付执行规格 + 1 份票清单）：
+> [`PMO/audit/T111-styles裸值取证与可复算基线-20261023.md`](./PMO/audit/T111-styles裸值取证与可复算基线-20261023.md)
+> —— 设计 Token 裸值 103→95 的逐条取证与可复算基线；
+> [`PMO/audit/前端校验三个假绿形状-20261024.md`](./PMO/audit/前端校验三个假绿形状-20261024.md)
+> —— `awaitPromise` 默认 false / `rem` 基数 13px / `Page.navigate` 丢内存态：三条恒真断言的识别特征；
+> [`PMO/audit/变异探针审计-剩余42行-20261023.md`](./PMO/audit/变异探针审计-剩余42行-20261023.md)
+> —— 首次全表覆盖：映射里 42 行逐行有 killed 变异，41 条 survived 是子条款缺口；
+> [`PMO/audit/审计-verify_decision_table-16行-20261023.md`](./PMO/audit/审计-verify_decision_table-16行-20261023.md)
+> —— 16 行里只有 4 行是行为覆盖的逐条依据；
+> [`PMO/audit/覆盖率审计-剩余10组fanout-33行-20261023.md`](./PMO/audit/覆盖率审计-剩余10组fanout-33行-20261023.md)
+> —— fan-out 把一次绿记到整组的证据，以及 30 行回退的判据；
+> [`PMO/audit/验收读数审计-report与metrics共15行-20261023.md`](./PMO/audit/验收读数审计-report与metrics共15行-20261023.md)
+> —— 报告渲染与指标读模型 15 行的假绿清单；
+> [`PMO/implement/覆盖率审计-release_gate-与-normalizer-20261023.md`](./PMO/implement/覆盖率审计-release_gate-与-normalizer-20261023.md)
+> —— `release_gate` 与 `normalizer` 两组的行为覆盖缺口；
+> [`PMO/implement/内容审核工作台-交付执行计划-v1-20261024.md`](./PMO/implement/内容审核工作台-交付执行计划-v1-20261024.md)
+> —— **P0–P4 四阶段、阶段门、DoD 七条、止损条件**（主规格）；
+> [`PMO/implement/执行票清单-v1-20261024.md`](./PMO/implement/执行票清单-v1-20261024.md)
+> —— `T-300..T-392` 的可派工粒度、依赖、可执行判据与执行记录；
+> [`PMO/implement/T-310-施工单-签发撤回进权威-20261024.md`](./PMO/implement/T-310-施工单-签发撤回进权威-20261024.md)
+> —— 第一张关键路径票的施工单：**签发绑定 11 个字段今天一个都没有生产者**这个事实、
+> 拆成 a/b/c/d 四张子票、落进 state 的确切形状、三条断言与四个必红变异；
+> [`PMO/implement/T-311-施工单-申诉进权威-20261024.md`](./PMO/implement/T-311-施工单-申诉进权威-20261024.md)
+> —— 第二张：**申诉号是进程内自增计数器（重启撞号）**、`mark_stale` 在生产里 0 调用、
+> 申诉记录没有 `tenant` 字段这三处真缺陷，以及 RL-12 的哪一半其实属 T-317；
+> [`PMO/implement/T-312-施工单-下线任务进权威-20261024.md`](./PMO/implement/T-312-施工单-下线任务进权威-20261024.md)
+> —— 第三张：**生产里没有任何创建下线任务的路径**（7 条写路径全是「对已有任务做迁移」）、
+> 六条路由从不检查 `takedown.*` 能力、以及 `published` 这个事实全仓不存在；
+> [`PMO/implement/T-314-施工单-名单治理写路径-20261024.md`](./PMO/implement/T-314-施工单-名单治理写路径-20261024.md)
+> —— 第四张（P1 瓶颈，同时挡着 T-312b 与 T-315）：`@app.post("/api/v1/admin` 全仓 **0 个**、
+> 两份 grants JSON **盘上不存在**、P-11 前端只有提案一段、
+> `validate_grant_actors()` 写得完整但**零调用点**，以及 `release.*` 能力判定
+> **有两套口径**（`release_gate` 读 `capabilities` 字段 / `can_act` 读角色矩阵）；
+> [`PMO/implement/上线交付说明-20261024.md`](./PMO/implement/上线交付说明-20261024.md)
+> —— **上线前唯一该读的一份**：哪些能上、哪些不能上、六条必跑命令、
+> 两个待决策（报告要不要 Node / 结案无报告能否接受）、合入顺序与止损。
+> [`PMO/implement/冷启动交接-Prompt-20261025.md`](./PMO/implement/冷启动交接-Prompt-20261025.md)
+> —— **新会话冷启动的第一条消息**（整段复制给 Claude Code）。先清 pyc、
+> 再跑 11 个验证器拿基线、交代未提交的 37 改 8 新、`.venv/bin/python`
+> 已被沙箱脚本覆盖需重建、以及「零件对、接线错」这一类缺陷为什么只有
+> 真实生产装配能抓到。
+> [`PMO/implement/T-316-施工单-报告生产落盘-20261024.md`](./PMO/implement/T-316-施工单-报告生产落盘-20261024.md)
+> —— 第五张（D5 阶段门最后一环）：**运行时镜像里没有 Node**，而唯一的报告渲染器是 Node 实现；
+> 报告的 ACL 判据读 `principal["role"]`（单数大写），真实身份是 `roles`（复数小写）→
+> **接上即全拒**；`report_snapshot` 被 `judge_entry` 丢掉；`/reports/{id}/resign` 只有路径没有语义。
+> ★ 前 7 份是**读数审计**（回答「这个 passed 有多少是真的」）；
+> 后 2 份是**执行规格**（回答「接下来按什么顺序做、做到什么算完」）。
+> 两类不许混读：前者是证据，后者是计划；计划里的数字若与证据冲突，以证据为准。
 
 **Playbook / PRD**
 

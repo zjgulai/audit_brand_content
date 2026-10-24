@@ -617,6 +617,8 @@ metrics_snapshots, control_points, routing, rule_class_switches, authority_confl
 | POST | `/api/v1/notifications/{id}/ack` | ack |
 | GET/POST | `/api/v1/admin/signer-grants` | 签发授权治理 |
 | GET/POST | `/api/v1/admin/takedown-grants` | 下线授权治理 |
+| POST | `/api/v1/admin/grants/{id}/execute` | 授权三权分立·执行（T-314b 补；原表只写了提案一步） |
+| POST | `/api/v1/admin/grants/{id}/approve` | 授权三权分立·审批（T-314b 补） |
 | GET | `/api/v1/admin/sessions` | 会话/安全审计 |
 | GET | `/metrics` | 指标（内部，不做独立页面） |
 
