@@ -197,6 +197,23 @@ def judge(rc, output, mutated_paths=()):
     """
     if rc == 0:
         return SURVIVED, "变异后命令仍退 0 —— 这条判据没有活着的执行点"
+    # ★★ rc == 2 是**未测**，不是抓住。
+    #
+    #   全项目约定：0 通过 / 1 红 / 2 未测。可变异的探针里这个区别尤其要命 ——
+    #   验收器退 2 意味着「我没测出来」，它和「我测出来了、它不对」是两件事。
+    #
+    #   实测撞上（2026-10-24，行 136）：把 `expire_lease` 的过期阈值 +10 分钟，
+    #   `verify_lease_release.py` 退 **2** 并打印「⚠️ 未测：LedgerConflict:
+    #   lease_active」—— 它把被测函数抛的冲突当成了「环境没准备好」。
+    #   第一版判据只看「非零且无 Traceback」→ 记成 killed。
+    #   **那会把一条没有可判红断言的判据说成「有活执行点」。**
+    #
+    #   这与假 killed 是同一个病：它们都让「没验」看起来像「验了」。
+    if rc == 2:
+        return UNTESTED, (
+            "变异后命令退 **2（未测）** —— 验收器说「我没测出来」，"
+            "这不是断言抓住了。该行不能据此记账。输出尾部：%s"
+            % ("\n" + "\n".join(output.strip().splitlines()[-3:]) if output.strip() else "（无输出）"))
     if not RE_TRACEBACK.search(output):
         return KILLED, "变异后命令退 %d 且无 Traceback —— 有断言拦住了它" % rc
 
@@ -316,6 +333,29 @@ def selftest():
                       "new": "return 1 + 3"}], "python3 checker_assert.py", 60)[0]
     ok("S8 反向对照：验收器的 AssertionError **必须**算 killed（别修过头）",
        v8 == KILLED, str(v8))
+
+    # ★ S9/S10：退 2 是「未测」，不是抓住。这一对是 2026-10-24 行 136 撞出来的。
+    # ★ 必须是「基线绿、变异后才退 2」—— 若基线就退 2，probe 会直接拒跑
+    #   （那是另一条正确的拒跑理由，测不到 S9 想测的那件事）。
+    with open(os.path.join(tmp, "checker_rc2.py"), "w") as f:
+        f.write("import sys, mod\n"
+                "if mod.f() != 2:\n"
+                "    print('⚠️ 未测：环境没准备好')\n"
+                "    sys.exit(2)\n"
+                "print('基线绿')\n")
+    v9 = probe(tmp, [{"file": "mod.py", "old": "return 1 + 1",
+                      "new": "return 1 + 3"}], "python3 checker_rc2.py", 60)[0]
+    ok("S9 ★ 命令退 2（未测）不许算 killed —— 未测 ≠ 红", v9 == UNTESTED, str(v9))
+
+    with open(os.path.join(tmp, "checker_rc1.py"), "w") as f:
+        f.write("import sys, mod\n"
+                "if mod.f() != 2:\n"
+                "    print('✗ 断言不成立')\n"
+                "    sys.exit(1)\n"
+                "print('基线绿')\n")
+    v10 = probe(tmp, [{"file": "mod.py", "old": "return 1 + 1",
+                       "new": "return 1 + 3"}], "python3 checker_rc1.py", 60)[0]
+    ok("S10 反向对照：退 1 仍必须算 killed（别把 S9 修过头）", v10 == KILLED, str(v10))
 
     ok("S6 ★ 主检出目录（.git 是目录）→ 拒绝",
        _expect_refuse() == "refused")
