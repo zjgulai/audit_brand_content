@@ -471,7 +471,8 @@ def _appeal(state, command, actor, payload, now, detail):
     raise LedgerValidation("bad_command", "未知 appeal 命令 %r" % command)
 
 
-GRANT_COMMANDS = frozenset({"grant_propose", "grant_execute", "grant_approve"})
+GRANT_COMMANDS = frozenset({"grant_propose", "grant_execute", "grant_approve",
+                            "grant_revoke"})
 GRANT_AGGREGATE_PREFIX = "grants:"
 # T-313a：通知聚合（收件箱按人一份）。类型清单是 base/notifications.py 的
 # TYPES —— 同一个量不写第二份口径（§2.4.8）。
@@ -636,6 +637,30 @@ def _grant(state, command, actor, payload, now, detail):
             "note": payload.get("note") or "",
         })
         detail.update({"grant_id": gid, "state": "approved"})
+        return
+
+    if command == "grant_revoke":
+        # T-315a：撤权 = approved → revoked 的状态迁移（**不是删除**）。
+        # 逐步校验在这里（validate_grant_actors 不能替代逐步校验，见 docstring）；
+        # 能力级判定（谁有 admin.grant.approve/execute）在 service 层 ——
+        # reducer 只判「这个人此刻能不能对这条 grant 做这件事」。
+        if target.get("state") != "approved":
+            raise LedgerConflict(
+                "grant_not_active", "只有 approved 可撤权，当前 %r" % target.get("state"))
+        if actor == target.get("user_id"):
+            # 自己撤自己的授权 = 三权分立被绕开的最短路径。
+            raise LedgerConflict(
+                "self_revoke", "不许自己撤自己的授权（三权分立）")
+        reason = _nonempty(payload.get("reason"), "revoke_reason")
+        target["state"] = "revoked"
+        target["revoked_by"] = actor
+        target["revoked_at"] = _iso(now)
+        target["revoke_reason"] = reason
+        target["history"].append({
+            "action": "revoke", "actor": actor, "at": _iso(now),
+            "from": "approved", "to": "revoked", "note": reason,
+        })
+        detail.update({"grant_id": gid, "state": "revoked"})
         return
 
     raise LedgerValidation("bad_command", "未知 grant 命令 %r" % command)

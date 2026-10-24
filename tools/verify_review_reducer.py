@@ -241,6 +241,86 @@ def main():
             except LedgerValidation as exc:
                 rejected = exc.code == "bad_report_snapshot"
             report(rejected, "C15 report_snapshot %s → 拒绝" % name)
+
+        # ── G 段：grant_revoke（T-315a：撤权 = approved→revoked，不是删除）──
+        def _approved_grant(case_id):
+            s = initial_state(case_id)
+            s, _, r = apply(s, "grant_propose", "dp4", 0, {
+                "capability": "takedown.execute", "user_id": "u_x",
+                "reason": "值班需要",
+                "scope": {"tenant": "t1", "product_lines": ["home"]}})
+            gid = r["grant"]["grant_id"]
+            s, _, _ = apply(s, "grant_execute", "it1", s["version"],
+                            {"grant_id": gid})
+            s, _, _ = apply(s, "grant_approve", "appr1", s["version"],
+                            {"grant_id": gid})
+            return s, gid
+
+        gs, gid_g = _approved_grant("case-grant")
+        gs2, _, rg = apply(gs, "grant_revoke", "admin1", gs["version"],
+                           {"grant_id": gid_g, "reason": "调岗收回"})
+        report(rg["grant"]["state"] == "revoked"
+               and rg["grant"]["revoked_by"] == "admin1"
+               and rg["grant"]["revoke_reason"] == "调岗收回"
+               and rg["grant"]["revoked_at"] is not None,
+               "G1 revoke 置 revoked 并落三字段")
+        report(any(h.get("action") == "revoke" and h.get("from") == "approved"
+                   and h.get("to") == "revoked" and h.get("note") == "调岗收回"
+                   for h in rg["grant"]["history"]),
+               "G1b history 追加 revoke 行（不重写）")
+        report(gs2["version"] == gs["version"] + 1,
+               "G1c 授权版本 = 聚合 version，撤权命令递增 1")
+
+        def _revoke_twice():
+            s, gid = _approved_grant("case-grant-2")
+            s, _, _ = apply(s, "grant_revoke", "admin1", s["version"],
+                            {"grant_id": gid, "reason": "第一次"})
+            return apply(s, "grant_revoke", "admin2", s["version"],
+                         {"grant_id": gid, "reason": "第二次"})
+        try:
+            _revoke_twice()
+            report(False, "G2 重复撤权 → grant_not_active", "（未拒绝）")
+        except LedgerConflict as exc:
+            report(exc.code == "grant_not_active",
+                   "G2 重复撤权 → grant_not_active", "（%s）" % exc.code)
+
+        def _self_revoke():
+            s, gid = _approved_grant("case-grant-3")
+            return apply(s, "grant_revoke", "u_x", s["version"],
+                         {"grant_id": gid, "reason": "自己撤自己"})
+        try:
+            _self_revoke()
+            report(False, "G3 自己撤自己 → self_revoke", "（未拒绝）")
+        except LedgerConflict as exc:
+            report(exc.code == "self_revoke",
+                   "G3 自己撤自己 → self_revoke", "（%s）" % exc.code)
+
+        def _no_reason():
+            s, gid = _approved_grant("case-grant-4")
+            return apply(s, "grant_revoke", "admin1", s["version"],
+                         {"grant_id": gid, "reason": "  "})
+        try:
+            _no_reason()
+            report(False, "G4 空 reason → bad_revoke_reason", "（未拒绝）")
+        except LedgerValidation as exc:
+            report(exc.code == "bad_revoke_reason",
+                   "G4 空 reason → bad_revoke_reason", "（%s）" % exc.code)
+
+        def _revoke_before_approve():
+            s = initial_state("case-grant-5")
+            s, _, r = apply(s, "grant_propose", "dp4", 0, {
+                "capability": "takedown.execute", "user_id": "u_x",
+                "reason": "值班需要",
+                "scope": {"tenant": "t1", "product_lines": ["home"]}})
+            return apply(s, "grant_revoke", "admin1", s["version"],
+                         {"grant_id": r["grant"]["grant_id"], "reason": "太早"})
+        try:
+            _revoke_before_approve()
+            report(False, "G5 proposed 状态不可撤 → grant_not_active", "（未拒绝）")
+        except LedgerConflict as exc:
+            report(exc.code == "grant_not_active",
+                   "G5 proposed 状态不可撤 → grant_not_active", "（%s）" % exc.code)
+
     except AssertionError as exc:
         print("UNTESTED: 验收器内部断言失败: %s" % exc, file=sys.stderr)
         return 2
