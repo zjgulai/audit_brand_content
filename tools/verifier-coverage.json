@@ -944,6 +944,16 @@
         "base/review_reducer.py",
         "base/release_gate.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_notification_persistence.py",
+      "asserts": "T-313a/b 通知聚合：aggregate_type_for 单一判定与聚合 ID 形状校验；emit/read/ack 纯函数状态机（ack_without_read、duplicate_notification、inbox 上限归档、未读永不淘汰）；真权威跨重启恒等与幂等重放；投影 list_notifications 按列拼回、不污染 review_cases、删库重建恒等；真 v2 库升 v3 的 notifications 表迁移；未知 aggregate_type 必拒",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/projection_store.py",
+        "base/business_event_store.py",
+        "base/notifications.py"
+      ]
     }
   ],
   "exempt": [

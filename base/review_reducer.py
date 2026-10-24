@@ -41,8 +41,24 @@ def _nonempty(value, name):
 
 
 def initial_state(case_id):
+    aid = _nonempty(case_id, "case_id")
+    # T-313a：通知聚合的初始形状。★ 必须在 initial_state 里分支 ——
+    # BusinessEventStore.state() 对没见过的 aggregate_id 直接调
+    # initial_state(aggregate_id)（business_event_store.py），只在命令分支里
+    # 兜底的话，读一个空收件箱就会炸。case_id 槽仍放聚合 ID：
+    # _event / apply_event / 投影的 aggregate_mismatch 校验都靠它当身份。
+    if aid.startswith(NOTIFICATION_AGGREGATE_PREFIX):
+        tenant, recipient = _notification_aggregate_parts(aid)
+        return {
+            "case_id": aid,
+            "version": 0,
+            "tenant": tenant,
+            "recipient": recipient,
+            "items": [],
+            "archived_count": 0,
+        }
     return {
-        "case_id": _nonempty(case_id, "case_id"),
+        "case_id": aid,
         "status": "unassigned",
         "assignee": None,
         "version": 0,
@@ -457,6 +473,34 @@ def _appeal(state, command, actor, payload, now, detail):
 
 GRANT_COMMANDS = frozenset({"grant_propose", "grant_execute", "grant_approve"})
 GRANT_AGGREGATE_PREFIX = "grants:"
+# T-313a：通知聚合（收件箱按人一份）。类型清单是 base/notifications.py 的
+# TYPES —— 同一个量不写第二份口径（§2.4.8）。
+NOTIFICATION_AGGREGATE_PREFIX = "notifications:"
+NOTIFICATION_AGGREGATE_TYPE = "notifications"
+# D3（收尾方案 §四）：每人收件箱 200 条显式上限，超限先归档最旧已读，未读永不淘汰。
+NOTIFICATION_INBOX_LIMIT = 200
+
+# 延迟导入写法说明：模块级 import 会把 notifications.py 的 sys.path 侧效带进
+# reducer 的每个使用方；这里是唯一消费点，函数内导入一次并缓存。
+_NOTIFICATION_TYPES_CACHE = None
+
+
+def _notification_types():
+    global _NOTIFICATION_TYPES_CACHE
+    if _NOTIFICATION_TYPES_CACHE is None:
+        from base.notifications import TYPES as _TYPES
+        _NOTIFICATION_TYPES_CACHE = frozenset(_TYPES)
+    return _NOTIFICATION_TYPES_CACHE
+
+
+def _notification_aggregate_parts(aggregate_id):
+    """notifications:<tenant>:<recipient> -> (tenant, recipient)；形状不对即拒。"""
+    parts = aggregate_id.split(":")
+    if len(parts) != 3 or not parts[1] or not parts[2]:
+        raise LedgerValidation(
+            "bad_notification_aggregate",
+            "通知聚合 ID 必须是 notifications:<tenant>:<recipient>")
+    return parts[1], parts[2]
 
 
 def aggregate_type_for(aggregate_id):
@@ -469,6 +513,9 @@ def aggregate_type_for(aggregate_id):
     """
     if isinstance(aggregate_id, str) and aggregate_id.startswith(GRANT_AGGREGATE_PREFIX):
         return "grant_registry"
+    if isinstance(aggregate_id, str) \
+            and aggregate_id.startswith(NOTIFICATION_AGGREGATE_PREFIX):
+        return NOTIFICATION_AGGREGATE_TYPE
     return "review_case"
 GRANT_CAPABILITIES = frozenset({"release.sign", "release.revoke",
                                "takedown.execute", "takedown.waive"})
@@ -592,6 +639,98 @@ def _grant(state, command, actor, payload, now, detail):
         return
 
     raise LedgerValidation("bad_command", "未知 grant 命令 %r" % command)
+
+
+NOTIFICATION_COMMANDS = frozenset(
+    {"notification_emit", "notification_read", "notification_ack"})
+
+
+def _notification_id(ntype, dedup_key, recipient):
+    """确定性通知 id。★ 不用自增：自增在重启后归零撞号（_grant_id 同一条）。"""
+    return "notif-" + _hash({
+        "type": ntype, "dedup_key": dedup_key, "recipient": recipient,
+    })[:16]
+
+
+def _notification(state, command, actor, payload, now, detail):
+    """notification_emit / read / ack 的纯状态迁移（T-313b）。
+
+    语义映射自 base/notifications.py 的 mark_read / mark_acked：
+    ack 必须先读（E_ACK_WITHOUT_READ -> LedgerConflict("ack_without_read")）。
+    这里只做权威侧的状态迁移；飞书通道、去重台账都在 service 层 ——
+    reducer 不发通知（文件头纪律）。
+    """
+    if state.get("tenant") is None:
+        raise LedgerValidation(
+            "bad_notification_aggregate", "通知聚合状态缺 tenant")
+    items = state.setdefault("items", [])
+
+    if command == "notification_emit":
+        ntype = _nonempty(payload.get("type"), "notification_type")
+        if ntype not in _notification_types():
+            raise LedgerValidation(
+                "bad_notification", "type 必须在 base.notifications.TYPES")
+        dedup_key = _nonempty(payload.get("dedup_key"), "dedup_key")
+        # ★ 关联案件用 related_case_id，不用 case_id：BusinessEventStore.execute
+        #   会把 payload["case_id"] 无条件注入成 aggregate_id（案件聚合的约定），
+        #   通知聚合若也读 case_id，读到的永远是收件箱自己的 id 而不是业务案件。
+        case_ref = payload.get("related_case_id")
+        if case_ref is not None and (not isinstance(case_ref, str) or not case_ref.strip()):
+            raise LedgerValidation(
+                "bad_notification", "related_case_id 必须是非空字符串或 null")
+        nid = _notification_id(ntype, dedup_key, state["recipient"])
+        if any(i.get("notification_id") == nid for i in items):
+            raise LedgerConflict(
+                "duplicate_notification",
+                "同 (type, dedup_key, recipient) 的通知已存在：%s" % nid)
+        # 超限归档（D3）：先归档最旧的已读条目；只剩未读时拒 —— 未读永不淘汰。
+        active = [i for i in items if not i.get("archived")]
+        if len(active) >= NOTIFICATION_INBOX_LIMIT:
+            for old in sorted(active, key=lambda x: (x.get("created_at") or "",
+                                                     x.get("notification_id") or "")):
+                if old.get("read_at") is not None:
+                    old["archived"] = True
+                    state["archived_count"] = int(state.get("archived_count") or 0) + 1
+                    break
+            else:
+                raise LedgerConflict(
+                    "inbox_full",
+                    "收件箱已满（%d 条未读），且没有可归档的已读条目" % len(active))
+        item = {
+            "notification_id": nid,
+            "type": ntype,
+            "dedup_key": dedup_key,
+            "related_case_id": case_ref,
+            "created_at": _iso(now),
+            "read_at": None,
+            "acked_at": None,
+            "archived": False,
+            "payload": copy.deepcopy(payload.get("payload") or {}),
+        }
+        items.append(item)
+        detail.update({"notification_id": nid})
+        return
+
+    nid = _nonempty(payload.get("notification_id"), "notification_id")
+    item = next((i for i in items if i.get("notification_id") == nid), None)
+    if item is None or item.get("archived"):
+        raise LedgerNotFound("notification_not_found", "通知不存在或已归档：%s" % nid)
+    if command == "notification_read":
+        if item.get("read_at") is not None:
+            raise LedgerConflict("already_read", "通知已读：%s" % nid)
+        item["read_at"] = _iso(now)
+        detail.update({"notification_id": nid})
+        return
+    if command == "notification_ack":
+        if item.get("read_at") is None:
+            raise LedgerConflict(
+                "ack_without_read", "通知必须先读才能确认（E_ACK_WITHOUT_READ）")
+        if item.get("acked_at") is not None:
+            raise LedgerConflict("already_acked", "通知已确认：%s" % nid)
+        item["acked_at"] = _iso(now)
+        detail.update({"notification_id": nid})
+        return
+    raise LedgerValidation("bad_command", "未知 notification 命令 %r" % command)
 
 
 def _ingest_submission(state, actor, payload, now):
@@ -870,6 +1009,8 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         _appeal(state, command, actor, payload, now, detail)
     elif command in GRANT_COMMANDS:
         _grant(state, command, actor, payload, now, detail)
+    elif command in NOTIFICATION_COMMANDS:
+        _notification(state, command, actor, payload, now, detail)
     elif command == "expire_lease":
         if state["status"] != "claimed" or state["lease_expires"] is None:
             raise LedgerConflict("not_claimed", "没有可过期的 lease")
@@ -892,6 +1033,22 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
 
     state["version"] += 1
     event = _event(command, state, actor, now, detail)
+    if command in NOTIFICATION_COMMANDS:
+        # 通知聚合的结果是收件箱形状，不是 public_case 的案件形状。
+        result = {
+            "aggregate_id": state["case_id"],
+            "tenant": state["tenant"],
+            "recipient": state["recipient"],
+            "version": state["version"],
+            "items": copy.deepcopy(
+                [i for i in state["items"] if not i.get("archived")]),
+            "archived_count": state["archived_count"],
+        }
+        if "notification_id" in detail:
+            result["notification"] = copy.deepcopy(next(
+                i for i in state["items"]
+                if i.get("notification_id") == detail["notification_id"]))
+        return state, [event], result
     result = public_case(state)
     if command == "ingest_submission":
         result["submission_id"] = state["submission_id"]

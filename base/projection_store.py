@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class ProjectionError(Exception):
@@ -104,7 +104,17 @@ class ProjectionStore:
                   version INTEGER NOT NULL,
                   state_json TEXT NOT NULL
                 );
-                PRAGMA user_version=2;
+                -- v3 (T-313a): notification inbox projection（按收件人一行）。
+                -- ★ 不是 review_cases 的一列：通知跨案件、按人收件；
+                --   塞进 review_cases 会让「案件列表」里出现 notifications:<t>:<u>。
+                CREATE TABLE notifications (
+                  tenant TEXT NOT NULL,
+                  recipient TEXT NOT NULL,
+                  version INTEGER NOT NULL,
+                  state_json TEXT NOT NULL,
+                  PRIMARY KEY (tenant, recipient)
+                );
+                PRAGMA user_version=3;
                 COMMIT;
                 """)
                 return
@@ -129,6 +139,32 @@ class ProjectionStore:
                   state_json TEXT NOT NULL
                 );
                 PRAGMA user_version=2;
+                COMMIT;
+                """)
+                # ★ 阶梯式链升，不 return：v1 老库要一次升到顶（C16 判据）。
+                #   各分支 return 的话，v1 库第一次打开停在 v2 —— 若此时已经有
+                #   v3 的批次要落库（如生产先升 v1 再立刻发通知），中间态就是
+                #   「v3 代码 + v2 表结构」，第一条通知批次以 no such table 爆炸。
+                version = 2
+            if version == 2:
+                # ★ v2 → v3 增量迁移（T-313a）。**只加 v3 新增的东西。**
+                #
+                # f1d8ba4 教训的同族新变体，写下来防止第三次：
+                # 若只把新表塞进上面「全新库」脚本而忘写本分支，v2 老库会
+                # 匹配不到任何迁移分支而**静默跳过**（user_version 停在 2，
+                # 不报错）—— 直到第一条通知批次落库时才以
+                # `OperationalError: no such table` 爆炸。
+                # 「启动没炸」不等于「迁移对了」。
+                self._conn.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS notifications (
+                  tenant TEXT NOT NULL,
+                  recipient TEXT NOT NULL,
+                  version INTEGER NOT NULL,
+                  state_json TEXT NOT NULL,
+                  PRIMARY KEY (tenant, recipient)
+                );
+                PRAGMA user_version=3;
                 COMMIT;
                 """)
                 return
@@ -210,6 +246,22 @@ class ProjectionStore:
                         "VALUES(?,?,?) ON CONFLICT(tenant) DO UPDATE SET "
                         "version=excluded.version,state_json=excluded.state_json",
                         (tenant, int(state["version"]), _json(state)))
+                elif agg_type == "notifications":
+                    # T-313a：通知收件箱投影，按 (tenant, recipient) 一行。
+                    # ★ tenant/recipient 只有一个真来源：aggregate_id 的
+                    #   "notifications:<tenant>:<recipient>"。state 里的同名字段
+                    #   不做回落 —— grants 分支实测过「回落永远走不到，
+                    #   而看起来像两个来源都支持」的坑。
+                    parts = case_id.split(":") if isinstance(case_id, str) else []
+                    if len(parts) != 3 or not parts[1] or not parts[2]:
+                        raise ProjectionError(
+                            "notification_aggregate_id",
+                            "通知聚合 ID 必须是 notifications:<tenant>:<recipient>")
+                    self._conn.execute(
+                        "INSERT INTO notifications(tenant,recipient,version,state_json) "
+                        "VALUES(?,?,?,?) ON CONFLICT(tenant,recipient) DO UPDATE SET "
+                        "version=excluded.version,state_json=excluded.state_json",
+                        (parts[1], parts[2], int(state["version"]), _json(state)))
                 elif agg_type == "review_case":
                     self._conn.execute(
                         "INSERT INTO review_cases(case_id,version,status,assignee,state_json) "
@@ -302,6 +354,32 @@ class ProjectionStore:
             out.append(state)
         return out
 
+    def list_notifications(self, *, tenant=None, recipient=None):
+        """T-313a：按收件人列通知收件箱聚合状态（GET /notifications 的读法）。
+
+        ★ tenant/recipient 是**表列**，不在 state_json 里 —— 与
+          list_grant_registries 同一条纪律：把列拼回 dict，
+          让调用方只需要认一个形状。
+        """
+        sql = ("SELECT tenant, recipient, version, state_json FROM notifications WHERE 1=1")
+        args = []
+        if tenant is not None:
+            sql += " AND tenant=?"
+            args.append(tenant)
+        if recipient is not None:
+            sql += " AND recipient=?"
+            args.append(recipient)
+        sql += " ORDER BY tenant, recipient"
+        rows = self._conn.execute(sql, args).fetchall()
+        out = []
+        for tenant_v, recipient_v, version, state_json in rows:
+            state = json.loads(state_json)
+            state["tenant"] = tenant_v
+            state["recipient"] = recipient_v
+            state["version"] = version
+            out.append(state)
+        return out
+
     def list_formal(self, case_id):
         rows = self._conn.execute(
             "SELECT content_json FROM formal_reviews WHERE case_id=? "
@@ -315,6 +393,9 @@ class ProjectionStore:
             DELETE FROM drafts;
             DELETE FROM formal_reviews;
             DELETE FROM review_cases;
+            DELETE FROM notifications;
+            -- ★ grant_registry 此处刻意不删（T-313a 不扩大范围）：历史上 reset
+            --   就不清它，靠 rebuild 重放 upsert 收敛；要改它须先核对既有断言。
             DELETE FROM applied_commands;
             UPDATE projection_meta SET applied_seq=0,manifest_sha256=NULL,
               rebuilt_at=NULL,last_error_code=NULL WHERE singleton=1;
