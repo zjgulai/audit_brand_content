@@ -142,13 +142,13 @@ def main():
         svc.execute(aggregate_id="case-td", command="takedown_transition",
                     actor={"principal_id": "u_td", "tenant_id": "t1"},
                     expected_version=None,
-                    payload={"task_id": task1["task_id"], "to": "in_progress",
+                    payload={"task_id": task1.get("task_id"), "to": "in_progress",
                                  "action": "start"},
                     idempotency_key="t-start")
         svc.execute(aggregate_id="case-td", command="takedown_transition",
                     actor={"principal_id": "u_td", "tenant_id": "t1"},
                     expected_version=None,
-                    payload={"task_id": task1["task_id"], "to": "completed",
+                    payload={"task_id": task1.get("task_id"), "to": "completed",
                              "action": "complete",
                              "evidence": {"url": "https://x"}},
                     idempotency_key="t-done")
@@ -205,15 +205,26 @@ def main():
             st = auth2.state(cid)
             if st.get("tenant") == "t1":
                 tasks_live.extend(st.get("takedown_tasks") or [])
-        expect = TD.metrics_view(tasks_live)
+        # ★ 期望值**自算**，不调 TD.metrics_view —— 对拍双方共用被测函数时，
+        #   变异（如 round）会让两边一起变，对拍恒等（M4 第一版 survived 的根因）。
+        from datetime import datetime, timezone as _tz
+        now_utc = datetime.now(_tz.utc)
+        expect_open = sum(1 for t in tasks_live if t.get("state") != "completed")
+        expect_ages = {}
+        for t in tasks_live:
+            if t.get("state") == "completed":
+                continue
+            c = datetime.fromisoformat(
+                (t.get("created_at") or "").replace("Z", "+00:00"))
+            expect_ages[t["task_id"]] = (
+                now_utc - c).total_seconds() / 86400.0
         got = body_p.get("metrics") or {}
+        got_ages = {a["task_id"]: a["age_days"] for a in got.get("ages") or []}
         ages_ok = (
-            got.get("open_count") == expect["open_count"]
-            and [a["task_id"] for a in got.get("ages") or []]
-            == [a["task_id"] for a in expect["ages"]]
-            and all(abs(a["age_days"] - e["age_days"]) < 1e-5
-                    for a, e in zip(got.get("ages") or [],
-                                    expect["ages"])))
+            got.get("open_count") == expect_open
+            and set(got_ages) == set(expect_ages)
+            and all(abs(got_ages[k] - v) < 1e-5
+                    for k, v in expect_ages.items()))
         report(r_p.status_code == 200 and ages_ok,
                "P5 年龄只有一个口径：HTTP metrics == TD.metrics_view 复算",
                "open=%r/%r" % (got.get("open_count"), expect["open_count"]))
