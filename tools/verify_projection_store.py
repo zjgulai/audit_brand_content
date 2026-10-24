@@ -25,7 +25,8 @@ sys.path.insert(0, ROOT)
 
 try:
     from base.business_event_store import BusinessEventStore, WriterLease
-    from base.projection_store import ProjectionError, ProjectionStore
+    from base.projection_store import (
+        SCHEMA_VERSION, ProjectionError, ProjectionStore)
     from base.projector import Projector
     from base.review_command_service import ReviewCommandService
 except Exception as exc:  # noqa: BLE001
@@ -427,6 +428,72 @@ def main():
 
         projection2.close()
         lease.release()
+
+        # ── C16 v1 老库能升级到 v2（真机踩过的启动崩溃）──
+        #
+        # ★ 这一条为什么必须有：`SCHEMA_VERSION` 从 1 改成 2 时，
+        #   我把「全新库建表」与「v1 升级」写成同一段 `if version < 2:`。
+        #   拿一个 v1 老库跑会报
+        #   `OperationalError: table applied_commands already exists` ——
+        #   **线上任何 v1 投影库升级上来都会启动失败**。
+        #   而当时全部验证器与新样本都用 version=0 的新库，所以一路全绿。
+        #
+        #   这不是假设：2026-10-24 在宿主上跑 `verify_backend_recovery`
+        #   报 `projection_sidecar_open`，追下去才发现是这个。
+        #   判据要**造一个真的 v1 库**，不是模拟 —— 模拟出来的结构总会
+        #   恰好与实现一致。
+        import sqlite3 as _sqlite3
+        v1_dir = tempfile.mkdtemp(prefix="projection-v1-")
+        extra_roots.append(v1_dir)
+        v1_path = os.path.join(v1_dir, "v1.db")
+        conn = _sqlite3.connect(v1_path)
+        conn.executescript("""
+        BEGIN IMMEDIATE;
+        CREATE TABLE applied_commands (
+          command_id TEXT PRIMARY KEY, authority_seq INTEGER NOT NULL UNIQUE,
+          request_sha256 TEXT NOT NULL, manifest_sha256 TEXT NOT NULL,
+          applied_at REAL NOT NULL);
+        CREATE TABLE review_cases (
+          case_id TEXT PRIMARY KEY, version INTEGER NOT NULL, status TEXT NOT NULL,
+          assignee TEXT, state_json TEXT NOT NULL);
+        CREATE TABLE drafts (
+          draft_id TEXT PRIMARY KEY, case_id TEXT NOT NULL, snapshot_seq INTEGER NOT NULL,
+          author TEXT, content_json TEXT NOT NULL);
+        CREATE INDEX drafts_case_idx ON drafts(case_id, snapshot_seq);
+        CREATE TABLE formal_reviews (
+          formal_id TEXT PRIMARY KEY, case_id TEXT NOT NULL, submitted_at TEXT,
+          content_json TEXT NOT NULL);
+        CREATE INDEX formal_case_idx ON formal_reviews(case_id, submitted_at);
+        CREATE TABLE projection_meta (
+          singleton INTEGER PRIMARY KEY CHECK(singleton=1), applied_seq INTEGER NOT NULL,
+          manifest_sha256 TEXT, rebuilt_at REAL, last_error_code TEXT);
+        INSERT INTO projection_meta VALUES(1, 0, NULL, NULL, NULL);
+        PRAGMA user_version=1;
+        COMMIT;
+        """)
+        conn.close()
+
+        opened = verify_error = None
+        try:
+            opened = ProjectionStore(v1_path)
+        except Exception as exc:  # noqa: BLE001
+            verify_error = "%s: %s" % (type(exc).__name__, exc)
+        if opened is not None:
+            uv = opened._conn.execute("PRAGMA user_version").fetchone()[0]
+            has_reg = bool(opened._conn.execute(
+                "SELECT name FROM sqlite_master WHERE name='grant_registry'").fetchone())
+            has_old = bool(opened._conn.execute(
+                "SELECT name FROM sqlite_master WHERE name='applied_commands'").fetchone())
+            opened.close()
+            report(uv == SCHEMA_VERSION and has_reg and has_old,
+                   "C16 ★ v1 老库能升级到 v%d（不重跑 v1 的建表语句）"
+                   % SCHEMA_VERSION,
+                   "user_version=%r grant_registry=%r 旧表仍在=%r"
+                   % (uv, has_reg, has_old))
+        else:
+            report(False,
+                   "C16 ★ v1 老库能升级到 v%d" % SCHEMA_VERSION,
+                   verify_error or "打开失败")
     finally:
         shutil.rmtree(root, ignore_errors=True)
         for extra in extra_roots:

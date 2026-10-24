@@ -52,7 +52,8 @@ class ProjectionStore:
             version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
             if version > SCHEMA_VERSION:
                 raise ProjectionError("projection_schema_newer", str(version))
-            if version < 2:
+            if version < 1:
+                # 全新库：一次建好 v2 的全部结构。
                 self._conn.executescript("""
                 BEGIN IMMEDIATE;
                 CREATE TABLE applied_commands (
@@ -106,6 +107,31 @@ class ProjectionStore:
                 PRAGMA user_version=2;
                 COMMIT;
                 """)
+                return
+            if version == 1:
+                # ★ v1 → v2 增量迁移。**只加 v2 新增的东西。**
+                #
+                # 实测过的 bug：上一版把「全新库建表」与「v1 升级」写成同一段
+                # `if version < 2:`，于是拿一个 v1 老库跑会报
+                # `OperationalError: table applied_commands already exists` ——
+                # 线上任何 v1 投影库升级上来都会**启动失败**。
+                # 而验证器全用新库（version=0）跑，所以一路全绿。
+                #
+                # ★ 仍然用 `IF NOT EXISTS`：v1 之前还有一段历史（更早的库可能
+                #   只建了部分表），重跑不该把能救的库拒之门外。但
+                #   **不能只靠它** —— `PRAGMA user_version` 的分支仍要分开，
+                #   否则「建全表」与「补一列」这两件事会在同一个脚本里互相覆盖。
+                self._conn.executescript("""
+                BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS grant_registry (
+                  tenant TEXT PRIMARY KEY,
+                  version INTEGER NOT NULL,
+                  state_json TEXT NOT NULL
+                );
+                PRAGMA user_version=2;
+                COMMIT;
+                """)
+                return
 
     def watermark(self):
         row = self._conn.execute(
