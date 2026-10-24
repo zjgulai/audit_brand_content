@@ -21,6 +21,14 @@ export interface GrantRecord {
   user_id?: string;
   capability?: string;
   status?: string;
+  // T-314d：三态走 state（reducer 的真相源）；status 仅为旧数据兜底。
+  state?: "proposed" | "executed" | "approved" | "revoked" | string;
+  proposed_at?: string;
+  executed_at?: string;
+  approved_at?: string;
+  revoked_by?: string;
+  revoked_at?: string;
+  revoke_reason?: string;
   proposed_by?: string;
   executed_by?: string;
   approved_by?: string;
@@ -101,6 +109,42 @@ export default function AdminGrantsPage() {
         setFlash({
           ok: false,
           text: `提交响应（HTTP ${cause.status}）：${cause.message}`,
+        });
+      } else {
+        setFlash({ ok: false, text: String(cause) });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // T-314d：执行 / 审批两段。★ 显隐只是减少误点；真正的三主体判定在
+  // 后端 validate_grant_actors 与 reducer 的逐步校验（curl 直打照样 403，
+  // 反向对照在 verify_grant_registry G11/G12）。
+  const handleTransition = async (grant: GrantRecord, action: "execute" | "approve") => {
+    if (busy || !grant.grant_id && !grant.id) return;
+    setBusy(true);
+    setFlash(null);
+    const gid = String(grant.grant_id ?? grant.id);
+    try {
+      await request(`/admin/grants/${encodeURIComponent(gid)}/${action}`, {
+        method: "POST",
+        body: { note: `${action === "execute" ? "执行" : "审批"}自 P-11` },
+        idempotencyKey: crypto.randomUUID(),
+      });
+      setFlash({
+        ok: true,
+        text:
+          action === "execute"
+            ? "已执行，等待第二审批人核准。"
+            : "已核准，授权进入 approved。",
+      });
+      await loadGrants();
+    } catch (cause: unknown) {
+      if (cause instanceof ApiError) {
+        setFlash({
+          ok: false,
+          text: `响应（HTTP ${cause.status}）：${cause.message}`,
         });
       } else {
         setFlash({ ok: false, text: String(cause) });
@@ -293,8 +337,28 @@ export default function AdminGrantsPage() {
                   </td>
                   <td>
                     <span className="badge badge--pending" data-status-badge="">
-                      {g.status ?? "active"}
+                      {g.state ?? g.status ?? "active"}
                     </span>
+                    {(g.state ?? g.status) === "proposed" && (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => handleTransition(g, "execute")}
+                      >
+                        执行
+                      </button>
+                    )}
+                    {(g.state ?? g.status) === "executed" && (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => handleTransition(g, "approve")}
+                      >
+                        审批
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
