@@ -138,35 +138,39 @@ def main():
         except Exception as exc:  # noqa: BLE001
             report(False, "P7 任务无 deadline 字段", "%s" % exc)
 
-        # P6 失败不落案：非法迁移 completed→pending
-        svc.execute(aggregate_id="case-td", command="takedown_transition",
-                    actor={"principal_id": "u_td", "tenant_id": "t1"},
-                    expected_version=None,
-                    payload={"task_id": task1.get("task_id"), "to": "in_progress",
-                                 "action": "start"},
-                    idempotency_key="t-start")
-        svc.execute(aggregate_id="case-td", command="takedown_transition",
-                    actor={"principal_id": "u_td", "tenant_id": "t1"},
-                    expected_version=None,
-                    payload={"task_id": task1.get("task_id"), "to": "completed",
-                             "action": "complete",
-                             "evidence": {"url": "https://x"}},
-                    idempotency_key="t-done")
+        # P6 失败不落案：非法迁移 completed→pending。
+        # ★ 整块包住：变异下 task_id 缺失会让前置迁移先拒 —— 那是 FAIL 不是崩溃。
         seq_before = auth2.head()["seq"]
+        p6_rejected = False
         try:
             svc.execute(aggregate_id="case-td", command="takedown_transition",
                         actor={"principal_id": "u_td", "tenant_id": "t1"},
                         expected_version=None,
                         payload={"task_id": task1.get("task_id"),
-                                 "to": "pending", "action": "retry"},
-                        idempotency_key="t-bad")
-            report(False, "P6 非法迁移 → 拒", "（未拒绝）")
+                                 "to": "in_progress", "action": "start"},
+                        idempotency_key="t-start")
+            svc.execute(aggregate_id="case-td", command="takedown_transition",
+                        actor={"principal_id": "u_td", "tenant_id": "t1"},
+                        expected_version=None,
+                        payload={"task_id": task1.get("task_id"),
+                                 "to": "completed", "action": "complete",
+                                 "evidence": {"url": "https://x"}},
+                        idempotency_key="t-done")
+            try:
+                svc.execute(aggregate_id="case-td",
+                            command="takedown_transition",
+                            actor={"principal_id": "u_td", "tenant_id": "t1"},
+                            expected_version=None,
+                            payload={"task_id": task1.get("task_id"),
+                                     "to": "pending", "action": "retry"},
+                            idempotency_key="t-bad")
+                p6_rejected = False   # 未拒绝
+            except (LedgerConflict, LedgerValidation):
+                p6_rejected = True    # 拦住了；seq 在下方核
         except (LedgerConflict, LedgerValidation):
-            # 两种拒都算「拦住了」；但 seq 必须没动（失败不落案）。
-            # 变异下 task_id 缺失会以 bad_task_id 先拒 —— 也落到这里，
-            # 此时 P0/P1/P2 已红，本条不再为此负责。
-            report(auth2.head()["seq"] == seq_before,
-                   "P6 非法迁移 → 拒且权威 seq 不变")
+            p6_rejected = False       # 前置步骤就拒了 —— 变异形状，不算抓住
+        report(p6_rejected and auth2.head()["seq"] == seq_before,
+               "P6 非法迁移 → 拒且权威 seq 不变")
 
         # P4/P5：GET 形状与年龄口径（dev 装配走 repo；形状两装配一致）
         from api.review_api import create_app as _ca
