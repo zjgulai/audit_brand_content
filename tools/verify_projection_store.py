@@ -494,6 +494,71 @@ def main():
             report(False,
                    "C16 ★ v1 老库能升级到 v%d" % SCHEMA_VERSION,
                    verify_error or "打开失败")
+
+        # ── C17 close() 会做 checkpoint ──
+        #
+        # ★ 这条断言写了三版，三版都记下来，因为教训是通用的。
+        #
+        # **v1**：写数据 → close() → 断言 `-wal` 不存在。
+        #   Linux 上**恒真**（OS 在最后写连接关闭时自动删 WAL），
+        #   变异「删掉 checkpoint」照样绿 —— 测的是 OS 的脾气。
+        #
+        # **v2**：写入 → 读 WAL（非空）→ close() → 读 WAL（为空）。
+        #   前半有了，后半仍靠 OS。变异**还是绿**。
+        #
+        # **v3**：试图用第二个连接（plain / mode=ro / immutable / 写连接）
+        #   挡住 OS 的自动 checkpoint。**四种全失败** —— Linux 上 SQLite 在
+        #   最后一个**写**连接关闭时一定 checkpoint，只读连接不算。
+        #
+        # **结论（v4，本版）**：在 Linux 上**无法**让这条断言对变异敏感。
+        #   所以它不硬撑了：改成测**合并这件事本身**（`wal_checkpoint` 的返回值），
+        #   并如实标注：**它在 Linux 上对「删掉那一行」不敏感，只在 macOS 上才红。**
+        #
+        #   ★ 一个只在某个平台上才可能红的断言，在别的平台上绿**不代表没问题**。
+        #     把它标出来，比让它假装是绿的好。真判据在宿主上：
+        #     `verify_backend_recovery` 的 `projection_sidecar_open` 会红。
+        c17_dir = tempfile.mkdtemp(prefix="projection-wal-")
+        extra_roots.append(c17_dir)
+        c17_path = os.path.join(c17_dir, "wal.db")
+        store17 = ProjectionStore(c17_path)
+        store17._conn.execute(
+            "INSERT INTO grant_registry(tenant, version, state_json) "
+            "VALUES('t-wal', 1, '{}')")
+        store17._conn.commit()
+        wal = c17_path + "-wal"
+        wal_before = os.path.getsize(wal) if os.path.exists(wal) else 0
+
+        # 直接问 SQLite「合并之后 WAL 里还剩几帧」。返回 (busy, log, checkpointed)：
+        # log=0 表示 WAL 已空。这比看文件是否存在更直接 —— 文件可能被 OS 删，
+        # 也可能被 OS 留，但 log 帧数是库自己说的。
+        probe = store17._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        frames_left = int(probe[1]) if probe else -1
+        store17.close()
+
+        report(wal_before > 0 and frames_left == 0,
+               "C17 checkpoint 后 WAL 帧数归零（库自报，不看文件是否被删）",
+               "wal_before=%dB frames_after_checkpoint=%d" % (wal_before, frames_left))
+        # ★ C17b 第一版我写成 `report(True, "…说明…")` —— 那是**恒真断言**，
+        #   正是本轮反复批评的形状（"没红过的断言不算验证过它"）。
+        #   换成能红的结构判据：`close()` 里必须**真的**有那一行 checkpoint，
+        #   且在 `conn.close()` **之前**。删掉或挪后都会红。
+        import inspect as _inspect
+        close_src = _inspect.getsource(ProjectionStore.close)
+        body = [ln.strip() for ln in close_src.splitlines()]
+        try:
+            i_ckpt = next(i for i, ln in enumerate(body)
+                          if "wal_checkpoint" in ln and ln.startswith("self._conn.execute"))
+            i_close = next(i for i, ln in enumerate(body)
+                           if ln == "self._conn.close()")
+            order_ok = i_ckpt < i_close
+        except StopIteration:
+            i_ckpt = i_close = -1
+            order_ok = False
+        report(order_ok,
+               "C17b ★ close() 里 checkpoint 真的存在且在 conn.close() 之前"
+               "（结构判据；C17 的数值判据在 Linux 上对变异不敏感）",
+               "ckpt_line=%r close_line=%r" % (i_ckpt, i_close))
+
     finally:
         shutil.rmtree(root, ignore_errors=True)
         for extra in extra_roots:

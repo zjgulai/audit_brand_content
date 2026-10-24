@@ -396,6 +396,41 @@ class ProjectionStore:
         }
 
     def close(self):
+        """关连接，并**把 WAL 合并回主库**。
+
+        ## 为什么不能只 `conn.close()`
+
+        SQLite 在 WAL 模式下，最后一个连接关闭时**通常**会做 checkpoint 并删掉
+        `-wal` / `-shm`。但「通常」不等于「一定」：
+
+        - 关闭时还有别的连接（同进程的 `ProjectionStore` 或外部 sqlite3 客户端）
+          持有该库 → 它成为最后一个，`-wal` 留着；
+        - macOS 上实测：`close()` 之后 `-wal` 仍然存在（Linux 上会自动清掉）。
+          同一个函数在两个平台行为不同，**而判据是按 Linux 写的**。
+
+        `base/backend_recovery.py` 的恢复流程正是靠这个判据决定「临时投影库
+        是否还有未落盘的数据」（`projection_sidecar_open`）。它没有错 ——
+        错在 `close()` 没把「我要关干净」这件事做完。
+
+        ## 为什么是 TRUNCATE 而不是 PASSIVE
+
+        `PASSIVE` 在有人读的时候会静默少做（它只尽量合并，不阻塞）。
+        这里是**关库前**，本就该独占，`TRUNCATE` 会把 WAL 截到 0 并保留文件本身；
+        真正删除文件由随后的 `close()` 完成。用 `FULL` 也行，但 `FULL` 不截断，
+        在「文件还在但已空」与「文件不在」之间多一个状态，判据要多认一种。
+
+        ## 失败时静默
+
+        checkpoint 失败（只读库、被占用）时**不抛**：`close()` 的契约是
+        「尽力关掉」，调用方（如 `ProductionRuntime.stop()`）不该因为清理
+        动作失败而崩溃。真正需要在意的调用方（恢复流程）自己会检查 sidecar ——
+        那才是判据的落点。
+        """
+        try:
+            # 先合并再关。顺序不能反：关掉连接后就没有句柄做 checkpoint 了。
+            self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            pass
         try:
             self._conn.close()
         except sqlite3.Error:
