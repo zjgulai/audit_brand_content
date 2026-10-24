@@ -212,7 +212,13 @@ def main():
             #   否则 #98 ①「新 ir_id」在同秒内不成立。这是已知边角，记进票清单。
             import time as _sleep
             _sleep.sleep(1.1)
-            out = svc.run_reaudit(cid)
+            try:
+                out = svc.run_reaudit(cid)
+            except InvalidTransition as exc:
+                # 变异（失效判据被掏空）会让重审被拒 —— 那是 FAIL 不是崩溃。
+                report(False, "X2 重审后 ir_id 与旧版不同（#98 ①）",
+                       "（重审被拒：%s）" % getattr(exc, "code", exc))
+                raise AssertionError("X2 reaudit rejected") from exc
             new_state = auth.state(cid)
             new_ir = new_state["ir"]
             report(out.get("ok") is True
