@@ -2,7 +2,7 @@
   "schema_version": 1,
   "policy": "T-145 · 验收棘轮地板",
   "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 124,
+  "passed_floor": 126,
   "recorded_at": "2026-10-25",
   "recorded_reading": {
     "passed": 124,
@@ -121,6 +121,12 @@
       "to": "124",
       "at": "2026-10-25",
       "reason": "宿主（macOS）实测 passed=124 failed=0 untested=12 —— 这是**量到的读数**，不是估计。此前的 note 记着「#93 已映射但地板不动」，理由是那时沙盒侧读数 120、且差额归因到 4 条环境假红（ocr 是 Mach-O 二进制、缺 Python 3.9/3.12、缺 Chrome）。重建 venv（fastapi/pydantic 装好）并修掉两个真 bug（v1 投影库迁移崩溃、close() 未 checkpoint 导致 macOS 判 projection_sidecar_open）之后，宿主上 failed=0、读数升到 124，那条 note 的前提消失，故撤销它并把地板抬到 124。剩余 12 条 untested 构成：unmapped 11（无映射，多为人工/待建）+ executed_rc2 1（#112 的 9 项人工签收）。"
+    },
+    {
+      "at": "2026-10-25",
+      "from": 124,
+      "to": 126,
+      "why": "T-317（#98 全量重审）与 T-315（#123 撤权影响）落地并映射进验收执行：#98 → verify_reaudit_persistence（12 项产物级判据：新 ir_id / 旧 IR 事件链逐字节未变 / 新报告追加旧文件 sha 不变）；#123 → verify_grant_registry S 段（撤权后原签发人可撤回、新签被拒、非原签发人撤回被拒）。passed 124 → 126，failed=0。"
     }
   ],
   "notes": [

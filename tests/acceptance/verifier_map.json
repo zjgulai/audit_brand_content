@@ -786,6 +786,18 @@
       "fixture": "{root}/tools/verify_grant_registry.py",
       "command": "{venv} {root}/tools/verify_grant_registry.py",
       "note": "判据列了四类名单变更（新增 / 扩大范围 / 授予撤回权 / 撤销授权）。现覆盖**新增授予**这一类，且是三权 + 四元留痕的全链：G1（propose→execute→approve 三态）、G2a/G2b/G2c/G11/G12/G12c（三主体不得兼任，reducer 与 rbac 两层各拦一次）、G7（每条 history 的 actor/at/from/to 四元齐全）、G13（权威侧留痕齐全）、G3c/G3d（跨租户/越品线授予被拒）。★ 边界：`grant_revoke` 这条命令**尚未实现**（T-315），所以「撤销授权」那一类今天没有对象；「扩大范围」按「新增一条更宽的授予」表达，不是对既有 grant 的原地改写（reducer 的 scope 不可变）。按本项目既有口径（#11/#124/#136）「判据只成立一半也计 passed」，故映射；T-315 落地后应补 revoke 那一类的断言，并把 note 去掉边界。"
+    },
+    "98": {
+      "test_id": "acceptance-98",
+      "criteria": "RL-10",
+      "fixture": "{root}/tools/verify_reaudit_persistence.py",
+      "command": "{venv} {root}/tools/verify_reaudit_persistence.py"
+    },
+    "123": {
+      "test_id": "acceptance-123",
+      "criteria": "TS-20",
+      "fixture": "{root}/tools/verify_grant_registry.py",
+      "command": "{venv} {root}/tools/verify_grant_registry.py"
     }
   }
 }

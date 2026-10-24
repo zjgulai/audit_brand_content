@@ -4,7 +4,9 @@
 
 主体：base/review_reducer.py（release_invalidate / job / rejudge_apply）、
 base/review_command_service.py（invalidate_if_due / run_reaudit）、
-base/release_gate.py（_changes 唯一一份）、报告追加（state["reports"]）。
+base/release_gate.py（_changes 唯一一份）、base/report_store.py 与
+api/production_app.py（报告发布链与生产装配的 rejudge_fn 接线，
+经 service 的注入点间接受证）、报告追加（state["reports"]）。
 
 设计纪律：案件走真实生产链（真 judge + 真 KB）到签发；
 失效的「外部绑定变化」由验证器注入一个**不同的** KB 快照模拟；
