@@ -76,9 +76,22 @@ def check_boundary(R) -> list[str]:
     except R.LedgerConflict as e:
         if e.code != "lease_active":
             problems.append(f"L1 29 分钟被拒的原因不是 lease_active：{e.code}")
-    st2, _ev, _r = R.reduce_command(
-        st, "expire_lease", "system", st["version"], {"case_id": "case-lease"},
-        now=T0 + LEASE + 1, lease_seconds=LEASE)
+    # ★ 2026-10-24：这个调用原先**没有 try/except**。
+    #   后果实测（把 reducer 的过期阈值 +10 分钟）：`reduce_command` 抛
+    #   `LedgerConflict("lease_active")`，异常一路穿过 assess()，被 main 的
+    #   `except Exception` 兜成 **rc=2（未测）**，打印「⚠️ 未测：LedgerConflict」。
+    #
+    #   **也就是说这一行永远不会红：它只可能绿，或「未测」。**
+    #   一条判据如果不能红，它就不是判据 —— 这正是本行此前一直不映射的原因之一。
+    #   现在把冲突折成一条红项：生产在 30 分 01 秒仍说「尚未过期」，就是结论错了。
+    try:
+        st2, _ev, _r = R.reduce_command(
+            st, "expire_lease", "system", st["version"], {"case_id": "case-lease"},
+            now=T0 + LEASE + 1, lease_seconds=LEASE)
+    except R.LedgerConflict as e:
+        problems.append("L1 30 分 01 秒未释放：reduce_command 抛 %s（%s）"
+                        % (e.code, e))
+        return problems
     if st2.get("status") != "released":
         problems.append(f"L1 30 分 01 秒未释放：status={st2.get('status')!r}")
     return problems
@@ -93,9 +106,16 @@ def check_draft_handoff(R) -> list[str]:
         {"case_id": "case-lease", "notes": "已核 3 条", "form": {"severity": "L4"},
          "evidence_selections": ["E-1"]},
         now=T0 + 60, lease_seconds=LEASE)
-    st, _ev, _r = R.reduce_command(
-        st, "expire_lease", "system", st["version"], {"case_id": "case-lease"},
-        now=T0 + LEASE + 1, lease_seconds=LEASE)
+    # ★ 同 L1：这一处也缺 try/except（2026-10-24 一并修）。
+    #   否则「该释放却没释放」会以「⚠️ 未测」的形式溜走，而不是一条红项。
+    try:
+        st, _ev, _r = R.reduce_command(
+            st, "expire_lease", "system", st["version"], {"case_id": "case-lease"},
+            now=T0 + LEASE + 1, lease_seconds=LEASE)
+    except R.LedgerConflict as e:
+        problems.append("L2 30 分 01 秒未释放：reduce_command 抛 %s（%s）"
+                        % (e.code, e))
+        return problems
     drafts = st.get("drafts") or []
     if not drafts:
         problems.append("L2 释放后 drafts 为空 —— 交接内容丢了")
