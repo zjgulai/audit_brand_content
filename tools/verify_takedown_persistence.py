@@ -99,7 +99,7 @@ def main():
 
         _ingest_and_close(svc, "case-td")
         out1 = _create_task(svc, "case-td", "1",
-                            now=time.time() - 2 * 86400)
+                            now=time.time() - 2 * 86400 - 5 * 3600)
         task1 = out1["result"].get("takedown_task") or {}
         report(task1["task_id"].startswith("td-")
                and task1["assignee"] == "u_td"
@@ -110,15 +110,15 @@ def main():
         auth2 = BusinessEventStore(os.path.join(root, "a"), lease=lease)
         tasks_after = auth2.state("case-td")["takedown_tasks"]
         report(len(tasks_after) == 1
-               and tasks_after[0]["task_id"] == task1["task_id"],
+               and tasks_after[0]["task_id"] == task1.get("task_id"),
                "P1 重启恒等：任务仍在")
         # P2 跨重启不撞号（同案同 trigger 会撞 duplicate_task —— 那是另一条
         # 守卫；跨重启撞号用第二个案件测）
         _ingest_and_close(svc, "case-td2")
         out2 = _create_task(svc, "case-td2", "2", assignee="u_td2",
-                            now=time.time() - 2 * 86400)
+                            now=time.time() - 2 * 86400 - 5 * 3600)
         task2 = out2["result"].get("takedown_task") or {}
-        report(task2["task_id"] != task1["task_id"],
+        report(task2.get("task_id") not in (None, task1.get("task_id")),
                "P2 重启后第二条 task_id 不撞号")
         # P3 投影可重建
         Projector(auth2, proj).catch_up()
