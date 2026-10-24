@@ -269,6 +269,34 @@ def self_test() -> int:
            (apply_mapping(parse_table(DEFAULT_TABLE), load_mapping())[0])
            or 0) >= 10)(), "")
 
+    # ★ S9/S10（2026-10-24 加）：**映射被跳过必须报出来**。
+    #
+    #   这是 T-141 修的那个洞：`apply_mapping` 在 criteria 不匹配时静默 `continue`，
+    #   于是「映射写了但没生效」与「根本没写映射」在输出里长得一模一样。
+    #   `#105` 当时就是这么被漏掉的。
+    #
+    #   ★ 但这条自测**从来没验过它** —— 我用 mutprobe 打它，把
+    #   `if item.get("criteria") and ...` 整条改成 `if False:`（回到旧的静默行为），
+    #   自测 **8/8 仍然全过**。也就是说：修了洞，却没有任何断言守着那个修。
+    #   下面两条把它钉住。
+    _rows = [{"n": 9999, "criteria": "表格里的判据", "action": "selftest",
+              "test_id": None, "fixture": None, "command": None}]
+    _map = {"9999": {"test_id": "t", "criteria": "映射写成了别的东西",
+                     "fixture": "/tmp/x", "command": "true"}}
+    _filled, _skipped = apply_mapping([dict(x) for x in _rows], _map)
+    ok("S9 ★ criteria 不匹配的映射必须被跳过（不许填进去）",
+       _filled[0].get("command") is None, str(_filled[0].get("command")))
+    ok("S10 ★ 被跳过的映射必须记进 skipped（否则静默 = 看不见）",
+       len(_skipped) == 1 and _skipped[0]["n"] == 9999, str(_skipped))
+    # 反向对照：criteria 一致时必须填进去（否则上两条对「永远跳过」也恒真）
+    _ok_rows, _ok_skip = apply_mapping(
+        [dict(x) for x in _rows],
+        {"9999": {"test_id": "t", "criteria": "表格里的判据",
+                  "fixture": "/tmp/x", "command": "true"}})
+    ok("S11 反向对照：criteria 一致时必须填进去、且不记跳过",
+       _ok_rows[0].get("command") == "true" and _ok_skip == [],
+       "%r %r" % (_ok_rows[0].get("command"), _ok_skip))
+
     passed = sum(1 for _, p, _ in results if p)
     total = len(results)
     print("=" * 62)
