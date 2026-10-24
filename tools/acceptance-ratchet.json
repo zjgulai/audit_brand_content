@@ -2,20 +2,20 @@
   "schema_version": 1,
   "policy": "T-145 · 验收棘轮地板",
   "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 123,
-  "recorded_at": "2026-10-24",
+  "passed_floor": 124,
+  "recorded_at": "2026-10-25",
   "recorded_reading": {
-    "passed": 123,
+    "passed": 124,
     "failed": 0,
-    "untested": 13,
+    "untested": 12,
     "untested_split": {
-      "machine": 8,
+      "machine": 7,
       "manual": 5,
       "unverifiable": 0,
       "unknown": 0
     },
     "untested_origin": {
-      "unmapped": 12,
+      "unmapped": 11,
       "executed_rc2": 1
     }
   },
@@ -115,6 +115,12 @@
       "to": "123",
       "at": "2026-10-24",
       "reason": "#120/#121 映射：verify_media_model_lock 的三段里 M1/M2 有活执行点（Playbook 的「候选/过门后才锁」改成「已选定」→ 退 1）；M3 今天未锁定 → 门不适用，是事实行不是绿。"
+    },
+    {
+      "from": "123",
+      "to": "124",
+      "at": "2026-10-25",
+      "reason": "宿主（macOS）实测 passed=124 failed=0 untested=12 —— 这是**量到的读数**，不是估计。此前的 note 记着「#93 已映射但地板不动」，理由是那时沙盒侧读数 120、且差额归因到 4 条环境假红（ocr 是 Mach-O 二进制、缺 Python 3.9/3.12、缺 Chrome）。重建 venv（fastapi/pydantic 装好）并修掉两个真 bug（v1 投影库迁移崩溃、close() 未 checkpoint 导致 macOS 判 projection_sidecar_open）之后，宿主上 failed=0、读数升到 124，那条 note 的前提消失，故撤销它并把地板抬到 124。剩余 12 条 untested 构成：unmapped 11（无映射，多为人工/待建）+ executed_rc2 1（#112 的 9 项人工签收）。"
     }
   ],
   "notes": [
@@ -122,11 +128,6 @@
       "at": "2026-10-24",
       "about": "#66 的覆盖状态（经 05 复核后更正）",
       "text": "#66 判据有两句：① 「1 个 confirmed L4/L5 + 2 个 L1/L2，不许被数量盖掉」；② 「多条同质 finding 仍只有一句、不逐条刷屏」。前半由 `#60a` 覆盖（`worstFinding → findings[0]` 变异在改前即 killed，实测确认）。后半此前在 `verify_report_render.mjs` 里 **0 处执行点** —— `#60` 判据原文是「五个标签各构造一条消息」，单条口径，与后半的多条口径不重叠。已补 `C4d`（3 条同质 finding：`【BLOCK】` 恰好 1 次、命中 1 条）+ 反向对照（1 条也是 1 次，证明不是按条数循环）。变异「按 finding 数量循环输出」→ killed。**#66 因此转 passed。**"
-    },
-    {
-      "at": "2026-10-24",
-      "about": "#93 已映射，但地板**不动**（123 保持不变）",
-      "text": "`#93`（名单治理三主体 + 四元留痕）本轮映射到 `verify_grant_registry.py`，该验证器读数 41/41，八个变异各自命中。**但地板没有上调**，理由是硬的：棘轮的规矩是「今天的地板是今天的读数」，而我今天在沙盒里量到的读数是 **passed=120**，不是 124 —— 差的 4 条全部是环境假红，逐条核过：① `#11` `.tools/bin/ocr` 是 Mach-O arm64 二进制，沙盒是 Linux，`Exec format error`；② `#105` `verify_pycompat.py` 找不到 Python 3.9；③ `#106` `uv` 找不到 Python 3.12；④ `#112`/`#116` `a11y_check.mjs` 找不到 Chrome。四条都与本轮改动无关，在本机（macOS + Chrome + uv）应转绿 —— **但「应该」不是读数**。凭估计把地板抬到 124，等于用一个我没量到的数字去守后面的倒退，那时真出现倒退就分不清是回归还是这个估计偏高。正确做法：在宿主上跑一次 `verify_acceptance_run.py`，拿到真实读数，再按读数上调地板（预计 124~125）。在那之前，floor=123 保持不变，沙盒读数低于地板这件事**已知、已归因、记在这里**。"
     }
   ]
 }
