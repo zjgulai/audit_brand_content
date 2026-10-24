@@ -104,6 +104,9 @@ def initial_state(case_id):
         # 在判定时是空数组、结案后才有内容；重算会让「报告的 IR」与「报告的
         # 证据」来自两个时刻（AGENTS.md §2.4.8 同一个量两个口径）。
         "report_snapshot": None,
+        # T-317b: 已发布报告的**追加列表**（重审产新报告时旧条目原样保留）；
+        # `report` 键保留为「最新一份」兼容读侧。
+        "reports": [],
         # T-316d: 已发布的报告。**由 `report_publish` 命令写入，不由 reducer 计算
         # report_id** —— 内容寻址需要渲染文本，reducer 拿不到（见 T-316 施工单 §五 第 2 条）。
         "report": None,
@@ -296,17 +299,18 @@ def _report(state, command, actor, payload, now, detail):
     path = _nonempty(payload.get("path"), "path")
 
     existing = state.get("report")
-    if isinstance(existing, dict) and existing.get("report_id") != report_id:
-        # ★ 不许覆盖。报告正文不可变（`ReportStore` 那条 immutable_conflict 守着
-        #   落盘侧），这里守的是**权威侧**：一份新报告要新开一条命令，
-        #   而不是把旧的那条改掉 —— 否则「历史上发过什么」就没有答案了。
-        raise LedgerConflict(
-            "report_immutable",
-            "本案已有报告 %r，不许改写成 %r" % (existing.get("report_id"), report_id))
     if isinstance(existing, dict) and existing.get("report_id") == report_id:
         # 幂等：同一条报告重放（发布成功但权威写入重试）不报错、不改字段。
         detail.update({"report_id": report_id, "replayed": True})
         return
+    # T-317b：不同 id = 重审后的**新**报告 → 追加进 reports 列表，
+    # `report` 键指向最新一份。旧条目原样保留（R2：旧报告不改不删）；
+    # 文件侧天然共存（ReportStore 内容寻址 + index.jsonl 只追加）。
+    reports = state.setdefault("reports", [])
+    if isinstance(existing, dict) \
+            and not any(r.get("report_id") == existing.get("report_id")
+                        for r in reports):
+        reports.append(copy.deepcopy(existing))
 
     state["report"] = {
         "report_id": report_id,
@@ -321,6 +325,8 @@ def _report(state, command, actor, payload, now, detail):
         "renderer": payload.get("renderer"),
         "published_by": actor,
     }
+    if not any(r.get("report_id") == report_id for r in reports):
+        reports.append(copy.deepcopy(state["report"]))
     detail.update({"report_id": report_id})
 
 
@@ -669,8 +675,12 @@ def _grant(state, command, actor, payload, now, detail):
 NOTIFICATION_COMMANDS = frozenset(
     {"notification_emit", "notification_read", "notification_ack"})
 
-RELEASE_COMMANDS = frozenset(
-    {"release_sign", "release_reject", "release_revoke"})
+RELEASE_COMMANDS = frozenset({
+    "release_sign", "release_reject", "release_revoke",
+    # T-317a：失效 / 重审 job / 重判应用。_changes 保持唯一一份
+    # （复用 ReleaseGate._changes，不许复制第二份失效判据）。
+    "release_invalidate", "release_job_start", "release_job_complete",
+    "rejudge_apply"})
 
 
 def _release_container():
@@ -697,7 +707,8 @@ def _release(state, command, actor, payload, now, detail):
     - revoke 的 reason / step_up_ref 必填 —— gate 不判，但权威侧「谁撤的、
       凭什么 step-up」是留痕四元的必备项，缺了就是一条没法审计的撤回。
     """
-    from base.release_gate import validate_signature  # noqa: PLC0415 纯函数，无环
+    from base.release_gate import (ReleaseGate,  # noqa: PLC0415 纯函数，无环
+                                   validate_signature)
 
     release = state.get("release")
     if command in ("release_sign", "release_reject"):
@@ -778,6 +789,144 @@ def _release(state, command, actor, payload, now, detail):
         "step_up_ref": step_up_ref, "reason": reason,
     })
     detail.update({"revoked": True})
+    return
+
+    # ── T-317a：失效 / 重审 job / 重判应用 ──────────────────────────
+    if command == "release_invalidate":
+        # payload["current"] = **当前**外部绑定快照（规则表版本 / KB 快照 /
+        # 依据版本等，由服务层 sweeper 采集传入）。变化判定复用
+        # ReleaseGate._changes —— 失效判据全仓只许这一份。
+        if release is None or release.get("status") != "signed":
+            raise LedgerConflict(
+                "nothing_to_reaudit", "只有 signed 案件可失效重审，当前 %r"
+                % ((release or {}).get("status") if release else None))
+        sigs = release.get("signatures") or []
+        if not sigs:
+            raise LedgerConflict("nothing_to_reaudit", "没有签名可比对")
+        current = payload.get("current")
+        if not isinstance(current, dict):
+            raise LedgerValidation(
+                "bad_reaudit", "current 绑定缺失（外部快照未采集）")
+        changes = ReleaseGate._changes(sigs[-1], current)
+        if not changes:
+            raise LedgerConflict("nothing_to_reaudit", "五类输入无变化，无需重审")
+        # job_id 确定性派生（case + version + change_set）—— 幂等重放不漂移。
+        # ★ 禁含 now：_grant_id/_appeal_id 注释记录的自增/时间戳撞号同族。
+        job_id = "rj-" + _hash({"case_id": state["case_id"],
+                                "version": state["version"],
+                                "changes": changes})[:16]
+        active = release.get("active_job")
+        if isinstance(active, dict) and active.get("job_id") == job_id \
+                and active.get("state") in ("queued", "running"):
+            detail.update({"job_id": job_id, "merged": True})
+            return
+        new_job = {"job_id": job_id, "state": "queued",
+                   "change_set": copy.deepcopy(changes),
+                   "queued_at": _iso(now), "successor": None}
+        if isinstance(active, dict) and active.get("state") == "running":
+            # running 建后继（gate complete_job 语义的镜像）：完成后顶上。
+            new_job["predecessor"] = active["job_id"]
+            release["successor"] = new_job
+        else:
+            release["active_job"] = new_job
+        release["events"].append({
+            "kind": "release_invalidated", "at": _iso(now), "actor": actor,
+            "change_count": len(changes)})
+        detail.update({"job_id": job_id, "change_count": len(changes)})
+        return
+
+    if command == "release_job_start":
+        job = release.get("active_job") if release else None
+        if not isinstance(job, dict) or job.get("state") != "queued":
+            raise LedgerConflict(
+                "invalid_transition", "只有 queued job 可启动，当前 %r"
+                % ((job or {}).get("state") if job else None))
+        job["state"] = "running"
+        job["started_at"] = _iso(now)
+        release["events"].append({"kind": "release_job_started",
+                                  "at": _iso(now), "actor": actor})
+        detail.update({"job_id": job["job_id"]})
+        return
+
+    if command == "release_job_complete":
+        job = release.get("active_job") if release else None
+        if not isinstance(job, dict) or job.get("state") != "running":
+            raise LedgerConflict(
+                "invalid_transition", "只有 running job 可完成，当前 %r"
+                % ((job or {}).get("state") if job else None))
+        job["state"] = "done"
+        job["completed_at"] = _iso(now)
+        succ = release.get("successor")
+        if isinstance(succ, dict):
+            release["active_job"] = succ
+            release["successor"] = None
+            release["events"].append({"kind": "release_job_done",
+                                      "at": _iso(now), "actor": actor,
+                                      "successor": succ.get("job_id")})
+        else:
+            # 重审完成 → 回 pending_release（再签发走 T-310 的 release_sign，
+            # derived_from 接上一条签名 —— 链不断）。
+            release["status"] = "pending_release"
+            release["release_status"] = "待放行"
+            release["events"].append({"kind": "release_job_done",
+                                      "at": _iso(now), "actor": actor})
+        detail.update({"job_id": job["job_id"]})
+        return
+
+    if command == "rejudge_apply":
+        # 重判结果应用：换 ir / report_snapshot / judgment / 绑定快照。
+        # ★ expected_prev_ir_id 乐观校验 —— 防并发重判互相覆盖。
+        job = release.get("active_job") if release else None
+        if not isinstance(job, dict) or job.get("state") != "running":
+            raise LedgerConflict(
+                "invalid_transition", "只有 running job 能应用重判")
+        new_ir = payload.get("ir")
+        if not isinstance(new_ir, dict) or not isinstance(
+                new_ir.get("ir_id"), str) or not new_ir["ir_id"]:
+            raise LedgerValidation("bad_rejudge", "ir 必须是含 ir_id 的对象")
+        findings = new_ir.get("findings")
+        if not isinstance(findings, list):
+            raise LedgerValidation("bad_rejudge", "ir.findings 必须是数组")
+        if not isinstance(new_ir.get("decision"), dict) \
+                or new_ir["decision"].get("state") not in DECISION_LABELS:
+            raise LedgerValidation(
+                "bad_rejudge", "ir.decision.state 必须在五档内")
+        prev_ir = state.get("ir") or {}
+        if payload.get("expected_prev_ir_id") != prev_ir.get("ir_id"):
+            raise LedgerConflict(
+                "ir_moved", "重判基于的 ir 已变化：%r vs %r"
+                % (payload.get("expected_prev_ir_id"), prev_ir.get("ir_id")))
+        kb_hash = payload.get("kb_snapshot_hash")
+        if not (isinstance(kb_hash, str) and len(kb_hash) == 64
+                and set(kb_hash.lower()) <= set("0123456789abcdef")):
+            raise LedgerValidation(
+                "bad_rejudge", "kb_snapshot_hash 必须是 64 位十六进制")
+        ctv = payload.get("conflict_table_version")
+        if not isinstance(ctv, str) or not ctv.strip() \
+                or ctv != new_ir.get("control_points_version"):
+            raise LedgerValidation(
+                "bad_rejudge",
+                "conflict_table_version 与新 ir.control_points_version 不一致")
+        media_fp = payload.get("media_fingerprints") or {}
+        if not isinstance(media_fp, dict):
+            raise LedgerValidation("bad_rejudge", "media_fingerprints 必须是对象")
+        state["ir_prev"] = {"ir_id": prev_ir.get("ir_id"),
+                            "ir_version": prev_ir.get("ir_version")}
+        state["ir"] = copy.deepcopy(new_ir)
+        new_snap = payload.get("report_snapshot")
+        if new_snap is not None and not isinstance(new_snap, dict):
+            raise LedgerValidation(
+                "bad_rejudge", "report_snapshot 必须是对象或 null")
+        state["report_snapshot"] = copy.deepcopy(new_snap)
+        state["judgment"] = copy.deepcopy(payload.get("judgment") or {})
+        state["kb_snapshot_hash"] = kb_hash
+        state["conflict_table_version"] = ctv
+        state["media_fingerprints"] = copy.deepcopy(media_fp)
+        release["events"].append({"kind": "release_rejudged",
+                                  "at": _iso(now), "actor": actor,
+                                  "new_ir_id": new_ir["ir_id"]})
+        detail.update({"ir_id": new_ir["ir_id"], "job_id": job["job_id"]})
+        return
 
 
 def _notification_id(ntype, dedup_key, recipient):

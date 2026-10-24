@@ -412,21 +412,23 @@ def main():
         s7, rep = st_closed(), {}
         report(False, "P7b report lands in state", str(exc))
 
-    # P8 不同 report_id 不许覆盖
+    # P8 ★ 随 T-317b 翻转：不同 report_id = 重审的新报告 → **追加**（不覆盖），
+    #   旧条目原样保留在 state["reports"]；`report` 指向最新一份。
+    #   旧断言「refused」是 T-316d 的契约；重审（T-317）必然产新 report_id，
+    #   不改守卫重审就发不出报告（10-23 #98 假绿的根因之一：产物没动）。
     try:
         other_id = "rp" + "d" * 16
-        code = None
-        try:
-            reduce_command(s7, "report_publish", "u1", int(
-                s7["version"]), {**GOOD, "report_id": other_id,
-                                 "case_id": "case-rp"}, now=2000)
-        except (LedgerConflict, LedgerValidation) as exc:
-            code = exc.code
-        report(code == "report_immutable",
-               "P8 ★ a different report_id is refused (report is immutable)",
-               repr(code))
+        s8, _ev8, r8 = reduce_command(s7, "report_publish", "u1", int(
+            s7["version"]), {**GOOD, "report_id": other_id,
+                             "case_id": "case-rp"}, now=2000)
+        reports = s8.get("reports") or []
+        report(s8["report"]["report_id"] == other_id
+               and [r["report_id"] for r in reports]
+               == [rep["report_id"], other_id],
+               "P8 ★ 不同 report_id 追加为第二条，旧条目原样保留（T-317b）",
+               repr([r["report_id"] for r in reports]))
     except Exception as exc:  # noqa: BLE001
-        report(False, "P8 ★ different report_id refused", str(exc))
+        report(False, "P8 ★ 不同 report_id 追加为第二条", str(exc))
 
     # P9 同一 report_id 幂等
     try:

@@ -118,9 +118,12 @@ def main():
                    name, "（%s）" % getattr(exc, "code", ""))
 
     try:
-        report(RELEASE_COMMANDS == frozenset(
-            {"release_sign", "release_reject", "release_revoke"}),
-            "R0 三条命令在册")
+        # T-317a：命令集扩到七条（签发三 + 失效/job 两步/重判）。
+        report({"release_sign", "release_reject", "release_revoke",
+                "release_invalidate", "release_job_start",
+                "release_job_complete", "rejudge_apply"}
+               <= RELEASE_COMMANDS,
+               "R0 七条 release 命令在册（签发三 + 重审四）")
 
         state = _closed_state("case-rel-1")
         report(state["status"] == "closed" and state.get("release") is None,
