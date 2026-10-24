@@ -17,6 +17,9 @@
 ## 本脚本断言的六件事
 
   A 名册完整   每个已跟踪的 `verify_*` 都在册，且在册的每个都真实存在（双向）
+               ── 「在册」包含 `exempt` 这一类（见下）；两者加起来必须等于全集
+  A2 豁免有据   标了 `exempt` 的必须写 `reason`，且该文件**不得**同时出现在
+               `verifiers` 里（一个脚本两种身份 = 两份真相）
   B 主体存在   每条 `subjects[]` 在盘上存在
   C 主体被引用 每条 `subjects[]` 在该 verifier 的源码里**逐字出现** ← 反证的核心
   D 空即声明   `subjects` 为空的必须写明 `dynamic` 原因，不许留空
@@ -90,9 +93,38 @@ def check(reg, tracked, root=ROOT):
         by_path[v] = e
 
     # A 名册完整（双向）
+    #
+    # ★ `exempt` 这一类是 2026-10-24 补的，起因是一条**真的够硬**的豁免请求：
+    #   `tools/verify_must_words.py` 只出读数、明确不判红（它服务的验收行 #43
+    #   原文就没有阈值，自己定一个阈值等于替委托方定判据）。
+    #   它留在册外是**对的**，但 A 组当时只有「在册 / 不在册」两种，于是
+    #   一条正确的决定被报成了缺口。**判据盖不住的情形出现时，改判据，
+    #   不是把那个文件硬塞进一张它不属于的表。**
+    #
+    # ★ 但豁免必须自己也被反证，否则它就是免死金牌：
+    #   ① 必须有非空 `reason`（空白豁免 = 无理由豁免）；
+    #   ② 不得与 `verifiers` 重名（同时是两种身份 = 两份真相）；
+    #   ③ 必须真实存在且确实被 git 跟踪（豁免一个不存在的文件是空的）。
+    exempt = {}
+    for e in (reg.get("exempt") or []):
+        if not isinstance(e, dict) or not e.get("verifier"):
+            F.append(("A2 豁免有据", "exempt 条目缺 verifier 字段"))
+            continue
+        if not isinstance(e.get("reason"), str) or not e["reason"].strip():
+            F.append(("A2 豁免有据", "%s 标了 exempt 却没写 reason" % e["verifier"]))
+        exempt[e["verifier"]] = e
+    for p in sorted(set(exempt) & set(by_path)):
+        F.append(("A2 豁免有据", "%s 同时在 verifiers 与 exempt 里（两种身份）" % p))
+    for p in sorted(exempt):
+        if not os.path.exists(os.path.join(root, p)):
+            F.append(("A2 豁免有据", "exempt 指向不存在的文件：%s" % p))
+        elif p not in tracked:
+            F.append(("A2 豁免有据",
+                      "exempt 指向未被 git 跟踪的文件：%s（换机器就失效）" % p))
+
     actual = sorted(p for p in tracked if VERIFIER_RE.search(p))
     for p in actual:
-        if p not in by_path:
+        if p not in by_path and p not in exempt:
             F.append(("A 名册完整", "%s 是验算器但不在册 —— 它的覆盖无人登记" % p))
     for p in sorted(by_path):
         if not os.path.exists(os.path.join(root, p)):
@@ -237,6 +269,12 @@ def run_controls(reg, tracked):
         ("C5 空 subjects 且没有 dynamic 原因",
          lambda r: r["verifiers"].append({"verifier": "tools/verify_depad.py",
                                           "asserts": "x", "subjects": []})),
+        ("C7 豁免没写 reason",
+         lambda r: r.setdefault("exempt", []).append(
+             {"verifier": "tools/verify_must_words.py"})),
+        ("C8 同一个脚本既在册又豁免",
+         lambda r: r.setdefault("exempt", []).append(
+             {"verifier": r["verifiers"][0]["verifier"], "reason": "x"})),
         ("C6 拿 untracked 当免死金牌",
          lambda r: r["verifiers"].append({
              "verifier": "tools/verify_kb.py", "asserts": "x",

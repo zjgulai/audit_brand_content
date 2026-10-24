@@ -21,11 +21,13 @@
 | D4 compose 的 api 服务**只绑 127.0.0.1** | 80/443 是宿主机共享反代 `ai_video_nginx` 的 |
 | D5 compose 有独立 project name 与独立网络 | 「不要干扰其他应用」的可核对形式 |
 | D6 `.env.production` 被 gitignore、`.example` 不被忽略 | 凭据不入库 |
-| D7 `.example` 里 12 个必填键齐全 | 与 `ProductionSettings.from_env` 的 required 逐项一致 |
+| D7 `.example` 里 13 个必填键齐全 | 与 `ProductionSettings.from_env` 的 required 逐项一致 |
 | D8 `.example` 不含任何凭据形态的值 | 模板不该有真值 |
-| D9 六个数据路径互不重叠且不在 /app 下 | `ProductionSettings.__post_init__` 会校验；这里提前拦 |
+| D9 七个数据路径互不重叠且不在 /app 下 | `ProductionSettings.__post_init__` 会校验；这里提前拦 |
 | D10 镜像里**不带** `web/dist` 之外的构建缓存 | 产物臃肿 / 泄露源映射 |
 | D11 compose 的 healthcheck 打 `/healthz` 而不是 `/readyz` | readyz 依赖外部存储，抖动会误判容器不健康 |
+| D12 运行阶段有 node + 渲染器 + **它的相对 import 链** | 缺一个 .mjs 就是 ERR_MODULE_NOT_FOUND，而结案仍成功 |
+| D13 报告渲染器不从 PATH 外部装 node（二进制来自 web 阶段） | apt 装 node 会让镜像多 200MB 且版本与应用层不同 |
 
 ## 退出码
 
@@ -54,6 +56,7 @@ REQUIRED_ENV = (
     "REVIEW_PUBLIC_ORIGIN", "REVIEW_OAUTH_CLIENT_ID",
     "REVIEW_OAUTH_CLIENT_SECRET", "REVIEW_OAUTH_REDIRECT_URI",
     "REVIEW_OAUTH_REAUTH_REDIRECT_URI", "REVIEW_TENANT_ALLOWLIST",
+    "REVIEW_REPORT_ROOT",
 )
 
 results = []
@@ -81,6 +84,20 @@ def required_env_from_source():
     if not m:
         return None
     return tuple(re.findall(r'"(REVIEW_[A-Z_]+)"', m.group(1)))
+
+
+def _runtime_stage(dockerfile):
+    """切出最后一个 `FROM ... AS runtime` 之后的全部内容。
+
+    ★ 为什么要切而不是全文搜：`web` 阶段本来就有 node，
+      全文搜 `node` 恒真 —— 一条恒真的断言比没有断言更糟。
+    """
+    if not dockerfile:
+        return ""
+    marks = list(re.finditer(r"^FROM\s+\S+\s+AS\s+runtime\s*$", dockerfile, re.M))
+    if not marks:
+        return ""
+    return dockerfile[marks[-1].end():]
 
 
 def main():
@@ -162,7 +179,7 @@ def main():
           "gitignore 规则不对：真值被忽略=%s，模板被忽略=%s"
           % (ignores_real, ignores_example))
 
-    # ── D7 12 个键齐全，且与源码一致 ────────────────────────────────────
+    # ── D7 13 个键齐全，且与源码一致 ────────────────────────────────────
     if example is None:
         check("D7", False, ".env.production.example 不存在")
         check("D8", False, ".env.production.example 不存在")
@@ -176,7 +193,7 @@ def main():
             missing = sorted(set(src_keys) - have)
             extra = sorted(have - set(src_keys))
             check("D7", not missing,
-                  "12 个必填键齐全，且与 from_env 的 required 逐项一致"
+                  "13 个必填键齐全，且与 from_env 的 required 逐项一致"
                   if not missing else
                   "模板缺键 %s；多出 %s" % (missing, extra))
             # 两处硬编码的 REQUIRED_ENV 也必须一致（防止本文件自己漂移）
@@ -204,7 +221,8 @@ def main():
         pairs = dict(re.findall(r"^(REVIEW_[A-Z_]+)=(/\S+)$", example, re.M))
         path_keys = ("REVIEW_AUTHORITY_ROOT", "REVIEW_FROZEN_PROJECTION_ROOT",
                      "REVIEW_PROJECTION_DB", "REVIEW_API_SESSION_DB",
-                     "REVIEW_API_ACCESS_LOG", "REVIEW_PRINCIPAL_DIRECTORY")
+                     "REVIEW_API_ACCESS_LOG", "REVIEW_PRINCIPAL_DIRECTORY",
+                     "REVIEW_REPORT_ROOT")
         vals = {k: pairs.get(k) for k in path_keys}
         problems = []
         if any(v is None for v in vals.values()):
@@ -219,8 +237,39 @@ def main():
                 if v == "/app" or v.startswith("/app/"):
                     problems.append("%s 落在 /app 内（仓库目录）" % k)
         check("D9", not problems,
-              "六个数据路径互不重叠、且不在 /app 下（生产启动不会拒）"
+              "七个数据路径互不重叠、且不在 /app 下（生产启动不会拒）"
               if not problems else "路径问题：%s" % problems)
+
+    # ── D12 报告渲染器在运行阶段可用 ─────────────────────────────────────
+    #
+    # ★ 为什么需要这条：T-316c/d 落地后，「结案 → 报告」是生产链路的一环，
+    #   而运行阶段基底是 `python:3.12-slim`（**没有 node**）。
+    #   不拷 node 的后果不是启动失败 —— 桥接层返回 `node_missing`、
+    #   **结案仍然 200**，于是故障静默：报告模块一直不工作，而所有
+    #   启动检查、健康检查、既有断言全绿。
+    #
+    # ★ 也不能只断言「这几个文件名在 COPY 列表里」：
+    #   `registry.mjs` 相对 import `./cards.mjs`，只拷前者会在运行时
+    #   ERR_MODULE_NOT_FOUND。所以这里断言的是**整条链**（三个文件各一条）。
+    if dockerfile is None:
+        check("D12", False, "Dockerfile 不存在 —— 无法判断运行阶段是否有 node")
+    else:
+        runtime_part = _runtime_stage(dockerfile)
+        needs = {
+            "node 二进制": "--from=web /usr/local/bin/node",
+            "report_render.mjs": "tools/audit/report_render.mjs",
+            "registry.mjs": "tools/reply-cards/registry.mjs",
+            "cards.mjs": "tools/reply-cards/cards.mjs",
+        }
+        missing = [k for k, needle in needs.items() if needle not in runtime_part]
+        check("D12", not missing,
+              "运行阶段有 node + 渲染器 + 整条相对 import 链"
+              if not missing else "运行阶段缺：%s" % missing)
+        # 反向：不许在运行阶段用 apt 装 node（版本会与应用层分叉）
+        apt_node = re.search(r"^\s*RUN[^\n]*apt-get[^\n]*node", runtime_part, re.M)
+        check("D13", apt_node is None,
+              "node 二进制来自 web 阶段，不是 apt 另装（版本不分叉）"
+              if apt_node is None else "运行阶段用 apt 装了 node，版本分叉")
 
     # ── D11 healthcheck 打 /healthz ─────────────────────────────────────
     want_healthz = "/healthz" in compose

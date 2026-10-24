@@ -7,6 +7,12 @@
   C1  actions：confirm/reject 走 finding_store 新建条目 + derived_from；版本冲突 409
   C2  appeals：open/pause/migrate/withdraw/stale；非原申诉人 migrate → 403
   C3  takedown：start/complete/fail/retry/reassign/waive 接 base/takedown，回填校验
+      T-312b：六条路由接能力（execute / waive 两把钥匙 + 改派走 TD-12）、
+      complete 落 completed_by（取已认证 principal）、六条进生产能力表。
+      实测变异（全部命中）：去掉 require_takedown → 5 红；waive 复用 execute
+      → 1 红；改派复用 execute → 2 红；complete 不落 completed_by → 2 红；
+      actor 写死 → 1 红；actor 取 task.assignee → 2 红；
+      改派不限 coordinator → 2 红；改派完全不判 → 2 红。
   C4  release-decision/revoke → 501「release_gate 未实现」，不得假成功
   C5  静态扫描：API 层不 import 判定实现、不计算 state
   R1  Idempotency-Key 重复请求不得产生第二条
@@ -286,11 +292,21 @@ def main():
                      "roles": ["signer"], "product_lines": ["pump"],
                      "product_line": "pump",
                      "capabilities": ["release.sign", "release.revoke"]},
+        # T-312b：下线执行人。**必须是 signer 或持有 takedown.execute 的角色**，
+        # 且被点名进人级名单 —— 两条都成立才放行（见 C3c/C3d）。
+        "u_exec": {"open_id": "ou_u_exec", "tenant_id": "t1",
+                   "roles": ["signer"], "product_lines": ["pump"],
+                   "product_line": "pump"},
+        # 改派用的统筹：有 coordinator 角色，**没有** takedown.execute（TD-12）
+        "u_coord2": {"open_id": "ou_u_coord2", "tenant_id": "t1",
+                     "roles": ["coordinator"], "product_lines": ["pump"],
+                     "product_line": "pump"},
     }
     store = SessionStore(":memory:")
     sub = store.create_session("u_sub", tenant="t1", now=time.time())
     coord = store.create_session("u_dp3", tenant="t1", now=time.time())
     signer = store.create_session("u_signer", tenant="t1", now=time.time())
+    execu = store.create_session("u_exec", tenant="t1", now=time.time())
     fs = FindingStore()
     for fid in ("f-1", "f-2", "f-3"):
         fs.insert(candidate(fid))
@@ -433,48 +449,174 @@ def main():
     report(st == 200 and wd["state"] == "withdrawn",
            "C2 withdraw → withdrawn", "%s %r" % (st, wd))
 
-    # C3 takedown
-    st, t1 = call(app, "POST", "/api/v1/takedown-tasks/t-1/start", coord,
-                  "K-td-start-1", {})
-    report(st == 200 and t1["state"] == "in_progress",
-           "C3 takedown start", "%s %r" % (st, t1))
-    st, t1c = call(app, "POST", "/api/v1/takedown-tasks/t-1/complete", coord,
-                   "K-td-complete-1",
-                   {"evidence": {"platform": "amazon", "executed_by": "u_dp3",
-                                 "executed_at": "2026-10-19T00:00:00Z",
-                                 "receipt_id": "R-1"}})
-    report(st == 200 and t1c["state"] == "completed" and t1c.get("evidence"),
-           "C3 takedown complete 回填校验通过", "%s %r" % (st, t1c))
-    st, _ = call(app, "POST", "/api/v1/takedown-tasks/t-4/start", coord,
-                 "K-td-start-4", {})
-    st, _ = call(app, "POST", "/api/v1/takedown-tasks/t-4/complete", coord,
-                 "K-td-empty", {"evidence": {}})
-    report(st == 400, "C3 无证据 complete → 400", str(st))
-    call(app, "POST", "/api/v1/takedown-tasks/t-2/start", coord,
-         "K-td-start-2", {})
-    st, failed_task = call(app, "POST", "/api/v1/takedown-tasks/t-2/fail", coord,
-                           "K-td-fail-2", {})
-    st, retried = call(app, "POST", "/api/v1/takedown-tasks/t-2/retry", coord,
-                       "K-td-retry-2", {})
-    st, re2 = call(app, "POST", "/api/v1/takedown-tasks/t-2/reassign", coord,
-                   "K-td-reassign-2", {"assignee": "u_dp3b"})
-    report(failed_task["state"] == "failed" and retried["state"] == "pending"
-           and re2["assignee"] == "u_dp3b",
-           "C3 fail → retry → reassign",
-           repr((failed_task, retried, re2)))
-    call(app, "POST", "/api/v1/takedown-tasks/t-3/start", coord,
-         "K-td-start-3", {})
-    call(app, "POST", "/api/v1/takedown-tasks/t-3/fail", coord,
-         "K-td-fail-3", {})
-    st, waived = call(
-        app, "POST", "/api/v1/takedown-tasks/t-3/waive", coord, "K-td-waive-3",
-        {"approvers": [
-            {"actor": "u_a", "scopes": ["takedown.waive"], "scope_match": True},
-            {"actor": "u_b", "scopes": ["takedown.waive"], "scope_match": True}],
-         "reason": "已协商", "evidence": {"note": "ok"}})
-    report(st == 200 and waived.get("waived", {}).get("approvers")
-           == ["u_a", "u_b"],
-           "C3 waive 双人审批通过", "%s %r" % (st, waived))
+    # C3 takedown —— T-312b：六条路由接能力 + 改派口径 + completed_by
+    #
+    # ★ 这一段的顺序是「先红后绿」，不是「先跑通再补断言」：
+    #   C3a 在名单为空时打六条，**全部必须 403**。
+    #   改前六条只调 require_tenant，任何同租户的人都能跑——
+    #   于是 C3a 会是 200/409 而不是 403，红得非常明确。
+    import base.rbac as _rbac
+    TAKEDOWN_PATHS = {
+        "start": ("/api/v1/takedown-tasks/t-1/start", {}),
+        "complete": ("/api/v1/takedown-tasks/t-1/complete",
+                     {"evidence": {"platform": "amazon", "executed_by": "u_exec",
+                                   "executed_at": "2026-10-19T00:00:00Z",
+                                   "receipt_id": "R-x"}}),
+        "fail": ("/api/v1/takedown-tasks/t-1/fail", {}),
+        "retry": ("/api/v1/takedown-tasks/t-1/retry", {}),
+        "reassign": ("/api/v1/takedown-tasks/t-1/reassign",
+                     {"assignee": "u_dp3b"}),
+        "waive": ("/api/v1/takedown-tasks/t-1/waive",
+                  {"approvers": [], "reason": "x", "evidence": {}}),
+    }
+
+    _saved_src = getattr(_rbac, "_ALLOWLIST_SOURCE", None)
+    try:
+        # ── C3a fail closed：名单空集 + 调用方不是 coordinator 改派 ──
+        _rbac.set_allowlist_source(
+            lambda: {"takedown.execute": frozenset(),
+                     "takedown.waive": frozenset()})
+        empty_codes = {}
+        for name, (path, body) in TAKEDOWN_PATHS.items():
+            code, _ = call(app, "POST", path, execu, "K-td-empty-%s" % name, body)
+            empty_codes[name] = code
+        report(all(c == 403 for c in empty_codes.values()),
+               "C3a ★ 名单空集 → 六条路由全 403（fail closed，不是默认放行）",
+               repr(empty_codes))
+
+        # ── C3b 反向对照：只点名 execute，waive 仍必须 403 ──
+        _rbac.set_allowlist_source(
+            lambda: {"takedown.execute": frozenset({"u_exec"}),
+                     "takedown.waive": frozenset()})
+        st_exec, _ = call(app, "POST", "/api/v1/takedown-tasks/t-1/start",
+                          execu, "K-td-x-only", {})
+        st_waive, wb = call(
+            app, "POST", "/api/v1/takedown-tasks/t-3/waive", execu,
+            "K-td-x-waive",
+            {"approvers": [
+                {"actor": "u_a", "scopes": ["takedown.waive"], "scope_match": True},
+                {"actor": "u_b", "scopes": ["takedown.waive"], "scope_match": True}],
+             "reason": "已协商", "evidence": {"note": "ok"}})
+        report(st_exec == 200 and st_waive == 403,
+               "C3b ★ takedown.execute 不能作证 takedown.waive（两把钥匙分开）",
+               "start=%s waive=%s %r" % (st_exec, st_waive, wb))
+
+        # ── C3c 角色 ≠ 授权：有 execute 角色但未点名 → 403 ──
+        #   u_coord2 是 coordinator，角色矩阵里**没有** takedown.execute；
+        #   u_dp3 的 coordinator 同样没有。用它证明「角色给了也不行」。
+        st, _ = call(app, "POST", "/api/v1/takedown-tasks/t-1/fail", coord,
+                     "K-td-coord-exec", {})
+        report(st == 403, "C3c 角色无 takedown.execute 且未点名 → 403", str(st))
+
+        # ── C3d 两向都断言：点名后同一主体由 403 变 200 ──
+        _rbac.set_allowlist_source(
+            lambda: {"takedown.execute": frozenset({"u_exec"}),
+                     "takedown.waive": frozenset({"u_exec"})})
+        st, t1 = call(app, "POST", "/api/v1/takedown-tasks/t-4/start", execu,
+                      "K-td-start-4d", {})
+        report(st == 200 and t1["state"] == "in_progress",
+               "C3d 点名后 start 由 403 变 200（两向都断言）",
+               "%s %r" % (st, t1))
+
+        # ── C3e complete：evidence 校验 + completed_by 取 principal ──
+        st, t1c = call(app, "POST", "/api/v1/takedown-tasks/t-1/complete", execu,
+                       "K-td-complete-1",
+                       {"evidence": {"platform": "amazon",
+                                     "executed_by": "u_exec",
+                                     "executed_at": "2026-10-19T00:00:00Z",
+                                     "receipt_id": "R-1"}})
+        report(st == 200 and t1c["state"] == "completed" and t1c.get("evidence"),
+               "C3e takedown complete 回填校验通过", "%s %r" % (st, t1c))
+        report(t1c.get("completed_by") == "u_exec",
+               "C3e2 ★ completed_by 取已认证 principal（不是 body 自报）",
+               "completed_by=%r" % (t1c.get("completed_by"),))
+        # ★ C3e3 第一版是假判据：它往 body 里塞 `completed_by` 期望被忽略，
+        #   但 `TakedownEvidence` 没有 `extra="allow"`，pydantic 会静默丢掉
+        #   未声明字段 —— 于是那条断言在「actor 被写死成常量」的变异下**照样绿**
+        #   （实测 M3 变异 0 条红）。塞不进去的东西，测不到。
+        #
+        # 换成能红的形状：**换一个调用人，completed_by 必须跟着换**。
+        # 变异「actor 写死成 u_exec」或「actor 取 task.assignee」都会让这条红。
+        _rbac.set_allowlist_source(
+            lambda: {"takedown.execute": frozenset({"u_exec", "u_signer"}),
+                     "takedown.waive": frozenset({"u_exec"})})
+        st, t1c2 = call(app, "POST", "/api/v1/takedown-tasks/t-4/complete", signer,
+                        "K-td-complete-signer",
+                        {"evidence": {"platform": "amazon",
+                                      "executed_by": "u_signer",
+                                      "executed_at": "2026-10-19T00:00:00Z",
+                                      "receipt_id": "R-9"}})
+        report(t1c2.get("completed_by") == "u_signer"
+               and t1c2.get("completed_by") != t1c.get("completed_by"),
+               "C3e3 ★ 换调用人 completed_by 跟着换（不是写死/不是取 assignee）",
+               "%s exec=%r signer=%r" % (st, t1c.get("completed_by"),
+                                         t1c2.get("completed_by")))
+        _rbac.set_allowlist_source(
+            lambda: {"takedown.execute": frozenset({"u_exec"}),
+                     "takedown.waive": frozenset({"u_exec"})})
+
+        st, _ = call(app, "POST", "/api/v1/takedown-tasks/t-2/start", execu,
+                     "K-td-start-2", {})
+        st, _ = call(app, "POST", "/api/v1/takedown-tasks/t-2/complete", execu,
+                     "K-td-empty", {"evidence": {}})
+        report(st == 400, "C3f 无证据 complete → 400", str(st))
+
+        # ── C3g TD-12 改派：coordinator 且同租户才能改派，与 execute 无关 ──
+        _rbac.set_allowlist_source(
+            lambda: {"takedown.execute": frozenset({"u_exec"}),
+                     "takedown.waive": frozenset({"u_exec"})})
+        st, re2 = call(app, "POST", "/api/v1/takedown-tasks/t-2/reassign", coord,
+                       "K-td-reassign-2", {"assignee": "u_dp3b"})
+        report(st == 200 and re2["assignee"] == "u_dp3b",
+               "C3g ★ 统筹可改派（TD-12；它没有 takedown.execute）",
+               "%s %r" % (st, re2))
+        # 反向：执行人（signer，非 coordinator）改派 → 403
+        st, _ = call(app, "POST", "/api/v1/takedown-tasks/t-2/reassign", execu,
+                     "K-td-reassign-exec", {"assignee": "u_dp3c"})
+        report(st == 403, "C3g2 ★ 执行人不能改派（改派不是执行权）", str(st))
+
+        # ── C3h fail → retry → waive 全链（waive 需独立钥匙 + 双人） ──
+        call(app, "POST", "/api/v1/takedown-tasks/t-2/start", execu,
+             "K-td-start-2b", {})
+        st, failed_task = call(app, "POST", "/api/v1/takedown-tasks/t-2/fail",
+                               execu, "K-td-fail-2", {})
+        st, retried = call(app, "POST", "/api/v1/takedown-tasks/t-2/retry", execu,
+                           "K-td-retry-2", {})
+        report(failed_task["state"] == "failed" and retried["state"] == "pending",
+               "C3h fail → retry", repr((failed_task.get("state"),
+                                         retried.get("state"))))
+        call(app, "POST", "/api/v1/takedown-tasks/t-3/start", execu,
+             "K-td-start-3", {})
+        call(app, "POST", "/api/v1/takedown-tasks/t-3/fail", execu,
+             "K-td-fail-3", {})
+        st, waived = call(
+            app, "POST", "/api/v1/takedown-tasks/t-3/waive", execu, "K-td-waive-3",
+            {"approvers": [
+                {"actor": "u_a", "scopes": ["takedown.waive"], "scope_match": True},
+                {"actor": "u_b", "scopes": ["takedown.waive"], "scope_match": True}],
+             "reason": "已协商", "evidence": {"note": "ok"}})
+        report(st == 200 and waived.get("waived", {}).get("approvers")
+               == ["u_a", "u_b"],
+               "C3h2 waive 双人审批通过", "%s %r" % (st, waived))
+    finally:
+        _rbac.set_allowlist_source(_saved_src)
+
+    # C3i 生产能力表必须放行这六条（改前它们是 501）
+    missing_prod = sorted(p for p in (
+        "/api/v1/takedown-tasks/{id}/start",
+        "/api/v1/takedown-tasks/{id}/complete",
+        "/api/v1/takedown-tasks/{id}/fail",
+        "/api/v1/takedown-tasks/{id}/retry",
+        "/api/v1/takedown-tasks/{id}/reassign",
+        "/api/v1/takedown-tasks/{id}/waive",
+    ) if p not in PRODUCTION_WRITE_PATHS)
+    report(not missing_prod,
+           "C3i ★ 六条下线写路径已进 PRODUCTION_WRITE_PATHS（不再 501）",
+           repr(missing_prod))
+    # 反向：签发两条仍未放行（T-310 未交付，放行等于假成功）
+    report("/api/v1/cases/{id}/release-decision" not in PRODUCTION_WRITE_PATHS
+           and "/api/v1/cases/{id}/release-revoke" not in PRODUCTION_WRITE_PATHS,
+           "C3j ★ release 两条仍未进生产能力表（避免假成功）")
 
     # C4 release-decision / revoke：真实 ReleaseGate + step-up + SoD + 版本
     st, _ = call(app, "POST", "/api/v1/cases/case-release/release-decision",

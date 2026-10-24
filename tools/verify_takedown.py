@@ -173,13 +173,34 @@ def main() -> int:
                "path": "/tmp/x.png", "sha256": "abc"}}), "E_SCREENSHOT")
 
     reject("3i ★ complete() 无证据直接拒（不是先完成后校验）",
-           lambda: TD.complete(task, {}), "E_EVIDENCE")
+           lambda: TD.complete(task, {}, actor="alice"), "E_EVIDENCE")
     try:
-        done = TD.complete(t, good_ev, at="2026-10-16T09:00:00+08:00")
+        done = TD.complete(t, good_ev, actor="alice",
+                           at="2026-10-16T09:00:00+08:00")
         ok("3j complete() 带合法证据成功且落 evidence",
            done["state"] == "completed" and done["evidence"]["receipt_id"] == "R-123", "")
     except TD.TakedownError as e:
         ok("3j complete() 带合法证据成功且落 evidence", False, str(e))
+
+    # 3k/3l：T-312b —— 执行人（#95 第四条「只有有权限的人能回填」的落点）
+    reject("3k ★ complete() 不传 actor → 拒（不是静默记成没人回填）",
+           lambda: TD.complete(t, good_ev, actor=""), "E_ACTOR")
+    try:
+        _n = TD.complete(t, good_ev, actor="alice", at="2026-10-16T09:00:00+08:00")
+        ok("3l ★ complete() 落 completed_by（谁填的可查）",
+           _n.get("completed_by") == "alice", f"completed_by={_n.get('completed_by')!r}")
+    except TD.TakedownError as e:
+        ok("3l ★ complete() 落 completed_by（谁填的可查）", False, str(e))
+    # 3m 反向对照：把 actor 钉成常量，3l 必须红 —— 证明它读的是入参不是写死的。
+    _orig_complete = TD.complete
+    try:
+        def _hardcoded(task, evidence, *, actor, **kw):
+            return _orig_complete(task, evidence, actor="synthetic", **kw)
+        _hc = _hardcoded(t, good_ev, actor="alice", at="2026-10-16T09:00:00+08:00")
+        ok("3m ★ 反向对照：actor 写死 → completed_by 不是入参（3l 能看出差别）",
+           _hc.get("completed_by") != "alice", f"completed_by={_hc.get('completed_by')!r}")
+    finally:
+        TD.complete = _orig_complete
 
     # ═════════ 4. waive ═════════
     A = {"actor": "carol", "scopes": ["takedown.waive"], "scope_match": True}
@@ -398,6 +419,7 @@ def main() -> int:
         TD.complete(_tc95, {"platform": "tiktok", "executed_by": "alice",
                             "executed_at": "2026-10-16T09:00:00+08:00",
                             "receipt_id": "R-95"},
+                    actor="alice",
                     at="2026-10-16T09:00:00+08:00", outbox=_b2)
         _kinds2 = _sent_kinds(*_b2.records)
         ok("8c ★ completed 迁移 → emit takedown_completed",
@@ -558,6 +580,7 @@ def controls() -> int:
         TD.complete(_tm2, {"platform": "tiktok", "executed_by": "alice",
                            "executed_at": "2026-10-16T09:00:00+08:00",
                            "receipt_id": "R-ctl"},
+                    actor="alice",
                     at="2026-10-16T09:00:00+08:00", outbox=_bmut2)
         _km2 = _sent_kinds(*_bmut2.records)
         ok("101-坏③ STATE_EVENT 清空 → completed 也不发事件（8c 针必须红）",

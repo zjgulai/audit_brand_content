@@ -88,6 +88,30 @@ def main():
            "parse_error",
            "C5 failed unit 不调 RuleJudge，落未审查/DP0")
 
+    # ── C6–C9（T-316b）：report_snapshot 必须被透传出去 ──────────────
+    #
+    # 为什么这四条要住在本文件而不是 verify_report_store.py：
+    # 缺口在 judge_entry 的**返回值**上（Orchestrator 产出、judge_entry 丢掉），
+    # 而 ReportStore 一直是好的 —— 把它放进报告验证器，会让「谁丢了它」这件事
+    # 查错方向。§2.4.7：判据要盖住事故发生的那一跳。
+    snap = r1.get("report_snapshot")
+    report(snap is not None,
+           "C6 report_snapshot 被 judge_entry 透传（不是 None）",
+           "keys=%r" % (sorted(r1),))
+    report(isinstance(snap, dict) and snap.get("ir") == r1["ir"],
+           "C7 snapshot.ir 与本次判定的 IR 是同一个（不是另一份）", "")
+    # 渲染器要的六键；只断言「在不在」，不重抄渲染器的校验（两份必然漂移）
+    need = {"ir", "failure_kind_counts", "unknown_bucket_counts",
+            "evidence", "unassessed", "receipt"}
+    report(isinstance(snap, dict) and need <= set(snap),
+           "C8 snapshot 含渲染器要求的六键",
+           "missing=%r" % (sorted(need - set(snap or {})),))
+    # ★ 反向面：failed unit（未审查/DP0）也必须带 snapshot。
+    #   这一条防的是「只在 OK 路径上透传」那种写法 —— 而 failed 报告同样要出。
+    report(failed_result.get("report_snapshot") is not None,
+           "C9 failed unit 也带 report_snapshot（未审查报告同样要能渲染）",
+           "label=%r" % (failed_result.get("label"),))
+
     print("----------------------------------------")
     if failed == 0:
         print("✅ %d/%d 全过" % (passed, passed + failed))

@@ -36,10 +36,26 @@
       ]
     },
     {
+      "verifier": "tools/verify_acceptance_ratchet.py",
+      "asserts": "T-145 验收执行门的**棘轮**判据。执行器今天退 2（untested=20，其中 7 条 manual 永远不会转 passed），所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视它。三条判据：① failed 必须为 0 ② 计数之和必须等于 136（防「删了几行所以看起来没倒退」——这条最容易漏：删行时 passed 没降、failed 也是 0）③ passed 不得低于 tools/acceptance-ratchet.json 的地板；地板只许上调，下调是一次有记录的决定。另有：分账之和必须等于 untested；没有分账行即红（分不开「该写 verifier」与「按人工验收」，两者动作相反）。★ 不判 CI 是否真在跑（那是 verify_acceptance_trigger.py），也不判 7 条 manual 有没有人工验收过（机器看不见）。9 项反向对照",
+      "subjects": [
+        "tools/verify_acceptance_run.py",
+        "tools/acceptance-ratchet.json"
+      ]
+    },
+    {
       "verifier": "tools/verify_acceptance_run.py",
       "asserts": "只读验收表逐行执行：test_id/fixture/command 缺一或 fixture 不存在 → untested；command 非 0 → 红",
       "subjects": [
         "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_acceptance_trigger.py",
+      "asserts": "T-142 验收执行器有没有**自动触发点**：三条通道（CI / 本地 hook / 远端分支保护）**分别**给读数，不许一条盖掉另外两条。★ 把常被混成一句「我们配了 CI」的三件事分开报：① 配了 CI ② CI 会跑**验收执行器**（而不是只跑 pytest）③ CI 真能拦住合并。只报①会让人以为三件都成立。★「假触发」单列判红：配置里有 acceptance/验收 字样、却不引用 verify_acceptance_run —— 这比完全没有 CI 更危险，它让人相信验收已经自动在跑。★「仓库里有 hook 脚本但 core.hooksPath 未设」也单列，不与「没有」混为一谈。★ 远端分支保护本机读不到（无 gh、离线、带凭据详情 401）→ **永远落未测且照报**，不许静默消失。★ 没有任何通道跑它 → **必须红**，不是「未测就好」。11 项反向对照",
+      "subjects": [
+        "tools/verify_acceptance_run.py",
+        "tools/verify_regression_set.py"
       ]
     },
     {
@@ -64,6 +80,22 @@
         "api/review_api.py",
         "tools/smoke_end_to_end.py",
         "base/auth_session.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_appeal_registry.py",
+      "asserts": "申诉进权威：申诉号内容派生（非进程计数器）、每条带 tenant、open/pause/stale/migrate/withdraw 五态、pause/stale 只写自己的字段（RL-12④）、非原申诉人 migrate/withdraw 被拒、pause 幂等、stale 不 closed、进事件快照",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/projection_store.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_asr_no_diarization.py",
+      "asserts": "行 124（依赖侧）：pyproject 依赖组、uv.lock、base/api/tools 的 import 行都不许出现 diarization 包（pyannote/resemblyzer/wespeaker/nemo…逐名匹配，注释不算）。片段完整性 / start-end / speaker=unknown 三条**无对象**（无 ASR 后端、无音频素材、接口无分段位），#124 不映射。5 项反向对照",
+      "subjects": [
+        "pyproject.toml",
+        "uv.lock"
       ]
     },
     {
@@ -105,6 +137,13 @@
       ]
     },
     {
+      "verifier": "tools/verify_brand_rules.py",
+      "asserts": "品牌用词候选规则的 context_exclusion 与 match.exclude_patterns 集合恒等；每个 pattern 可编译；note/id 非空；两侧有/无一致",
+      "subjects": [
+        "PMO/implement/品牌用词规则-候选-v1.json"
+      ]
+    },
+    {
       "verifier": "tools/verify_browser_ext_artifact.py",
       "asserts": "L1 里那件 418KB 产物（Q39 选项 A）：跑一遍构建配方再逐文件 sha256 对回 dsh-browser-ext/ —— A2 产物都在且都被 git 跟踪 · A3 配方退 0 · A4 文件集合与内容全等 · A5 分母钉在 16；`.vendor/` 不在盘上（换台机器就是这样）→ **退 2 未测**，不是绿。★ 配方本体（`cd .vendor/dsh-browser-main/extensions/dsh-browser && node scripts/build.mjs`）就在这个文件的 docstring 里。★ 已知的口径缺口，明着写在这里而不是绕过去：本器**真正依赖的 `.vendor/…` 不在 subjects 里** —— verify_coverage.py 的 `untracked` 是**每条目一个开关**（face E 会对该条目的**所有** subjects 要求未被跟踪），所以「已跟踪主体 + 未跟踪主体」这个组合它目前表达不了；本器选前者。",
       "subjects": [
@@ -140,6 +179,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_combination_escalation.py",
+      "asserts": "行 29：组合规则共现升级（分析引擎 score.py 的 _apply_escalation）——共现 → escalated / severity 升到 to_severity / disposition 改写；单要素不升；去掉 escalation 字段不升（证明升级来自规则数据）。**生产引擎 rule_judge 无 escalation 实现**，故 #29 不映射",
+      "subjects": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/skeleton/score.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_contracts.py",
       "asserts": "五份 contracts/*.schema.json 的结构与正负样本；fresh seq/hash 恒等式；真实 judge_entry 图片 ReviewIR/receipt 分别经 B-8/B-9 喂 schema，旧 receipt step 字段名必须拒绝",
       "subjects": [],
@@ -168,6 +215,29 @@
       ]
     },
     {
+      "verifier": "tools/verify_coverage_reason_ir.py",
+      "asserts": "空族的「未做·无控制点」能不能从 IR 读到：schema 的 why 枚举含 no_control_points 且允许 label / 真实入口 judge_unit() 读回 IR 后逐族 why==no_control_points、label==未做·无控制点 / 整段符合分段契约 / **未知 why 的降级闸仍在** / 前端 WHY_TEXT 有独立文案（不再说成「没接线」）/ verifier_map #72/#73 指向本 verifier。16 项反向对照，含一条真·行为级：把 VALID_REASON 里的 no_control_points 临时拿掉后走真实入口，IR 必须退化且判据必红",
+      "subjects": [
+        "contracts/review-ir-v1.schema.json",
+        "base/orchestrator.py",
+        "research/governance/control-points-v1.json",
+        "web/src/pages/CaseDetailPage.tsx",
+        "tests/acceptance/verifier_map.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_cpu_first.py",
+      "asserts": "行119/TS-17：编排定义（compose/Dockerfile）剥整行注释后无 GPU 预留键与 GPU 基础镜像；依赖清单无 GPU-only 包；不达标时出显式读数（ms + cer/wer，缺 gold/引擎异常落 untested+reason 且读数必须 null 不是 0）；无不自动扩容写法；media 路径无自动放行。A4/C2 成对反向对照每次主检查都跑（注释里提到→不报，真配置→报）",
+      "subjects": [
+        "docker-compose.yml",
+        "Dockerfile",
+        "pyproject.toml",
+        "uv.lock",
+        "tools/benchmark_media.py",
+        "base/media.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_decision_table.py",
       "asserts": "decision_table：15 条链逐条可达 / I1–I7 / 五标签与并行义务 / 唯一判定实现",
       "subjects": [
@@ -179,6 +249,27 @@
       "asserts": "全仓生成物可读性：有没有文件被环境 +4096 填充成 read 工具打不开",
       "subjects": [],
       "dynamic": "目标是『全仓所有文本文件』，运行时递归枚举，没有可声明的静态子集"
+    },
+    {
+      "verifier": "tools/verify_dependency_lock.py",
+      "asserts": "行106/TS-3：pyproject 与 uv.lock 都在盘上且被 git 跟踪；requires-python 逐字相等；每个直接依赖精确 == 且与 lock 里 resolved version 一致，**且与 lock 自带的 metadata.requires-dist/requires-dev 声明逐字一致**（两道都过才算一致 —— 只比 resolved 抓不到「锁文件没跟上 pyproject」）；行为面有锁 rc=0、**无锁（只拷 pyproject 不拷 lock）必须 rc≠0 且 stderr 提到 lockfile**；Dockerfile 每条 uv sync 必须带 --locked 且不许 pip install（G-02 的执行点）；uv.lock 不被 .dockerignore 排除",
+      "subjects": [
+        "pyproject.toml",
+        "uv.lock",
+        "Dockerfile",
+        ".dockerignore"
+      ]
+    },
+    {
+      "verifier": "tools/verify_deploy.py",
+      "asserts": "部署工件静态自证：Dockerfile 多阶段 / CMD 不含 --workers（flock writer lease）/ CMD 带 --factory / compose 不绑 0.0.0.0 / 独立 project name 与独立网络 / .env.production 被忽略而 .example 不被忽略 / 12 个必填键与 ProductionSettings.from_env 逐项一致 / 本文件写死的 REQUIRED_ENV 与源码无漂移 / 模板无凭据形态值 / 六个数据路径互不重叠且不在 /app 下 / .dockerignore 排除 .git 与凭据 / healthcheck 打 /healthz 而非依赖外部存储的 /readyz。结论行明写「只证明工件写对了，不证明镜像能构建、容器能起来」",
+      "subjects": [
+        "Dockerfile",
+        "docker-compose.yml",
+        ".env.production.example",
+        ".dockerignore",
+        "api/production_app.py"
+      ]
     },
     {
       "verifier": "tools/verify_disposition_router.py",
@@ -267,6 +358,15 @@
       ]
     },
     {
+      "verifier": "tools/verify_grant_registry.py",
+      "asserts": "名单治理（grants）：投影隔离（grant_registry 不进 review_cases）、propose→execute→approve 三态、三权分立三条各拒、空品线集合不是通配、重启恒等、名单注入生效与反向（空源必 False）、留痕四元、grant_id 跨重启不撞号、reducer 不复制角色矩阵",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/projection_store.py",
+        "base/rbac.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_image_judgment.py",
       "asserts": "Q4-② 图片接线：盘上120图 row→ContentUnit→RuleJudge/Orchestrator；实时中性后缀 file path + stable URI；成功/失败 parse_status、empty 四值、五标签、OCR文字边界与源码变异断线必红",
       "subjects": [
@@ -323,10 +423,57 @@
       ]
     },
     {
+      "verifier": "tools/verify_lease_notifications.py",
+      "asserts": "行 136 通知半边：真实 ReviewsLedger 的 claim→到期释放，lease_released 通知落 inbox、收件人是原领取人、**飞书 sender 调用次数 = 0**；遍历全部 INBOX_ONLY 类型断言 sender 不被调用；反向对照 dispatch(takedown) 必须让计数 +1（证明计数器不是恒 0）。**未覆盖**：生产装配无 outbox、新领取人无通知对象（claim 不在 NOTIFYING_KINDS），故 #136 不映射。5 项反向对照",
+      "subjects": [
+        "base/notifications.py",
+        "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_lease_release.py",
+      "asserts": "行 136（reducer 一侧）：29 分钟仍独占 / 30 分 01 秒释放 / 释放前草稿保留且新领取人看得到 / 陈旧 expected_version 被拒（version_conflict）。3 项反向对照（改租约 1900 秒后 1801 秒不许放；正确 version 的写入必须成功）。**通知那半无对象**（生产无通知生产者），未断言",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_media_model_lock.py",
+      "asserts": "行 120/121 的**机器半边**：Playbook TS-18/TS-19 仍标「候选」且写着「过门后才锁版本」（出现「已选定/已锁定」即红）；阶段3-准备评估.md 的候选矩阵仍在；**配置里一旦锁定 OCR/ASR 版本，四项（OCR）/五项（ASR）读数必须齐备**，缺一项即红。今天仓内 0 份锁定配置 → 门不适用（打印为事实行，不冒充「门验过了」）。7 项反向对照。**人工实测那一半没有对象**，#120/#121 不映射",
+      "subjects": [
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+        "PMO/implement/阶段3-准备评估.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_media_portability.py",
+      "asserts": "行 118（静态半边）：剥注释/docstring/块注释后扫 base/ api/ 的 .py/.m/.mm/.swift/.sh，不许出现 Vision/Speech/AVFoundation/Quartz 等宿主原生媒体调用。**当前 rc=1**：仓内唯一 OCR 就是 macOS Vision（ocr_vision.m / build_ocr.sh），这是事实读数，不是新引入的问题；容器内真跑那半**无对象**（无 docker daemon、镜像无引擎、音视频素材 0 个）。3 项反向对照",
+      "subjects": [
+        "base/ocr_vision.m",
+        "base/build_ocr.sh"
+      ]
+    },
+    {
       "verifier": "tools/verify_metrics_read_model.py",
       "asserts": "metrics_read_model：四指标七要素 / 未测不是 0 / 样本不足不出比率 / 抽样层与 BLOCK 全量复核 / 目标线待基线",
       "subjects": [
         "base/metrics_read_model.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_model_selection.py",
+      "asserts": "S1–S8 选型依据与 magpie 实时清单一致：vod/tokenhub 无 embedding 与 rerank、ASR 计数、glm-5.3-flash 无 audio 但有 video（按 id×provider 核）、音画对齐候选同时含 audio+video 且出现在 vod、两网关清单无价格元数据、可索引规模（字节+文件数双断言）。清单缺失判未测退 2；--controls 12 项（含 80/420 两端文件数与 0.1× 字节）",
+      "subjects": [
+        "PMO/implement/多模态与向量模型-选型-20261021.md"
+      ],
+      "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
+    },
+    {
+      "verifier": "tools/verify_multimodal_provider.py",
+      "asserts": "多模态契约：空注册表/空任务落 untested 而非通过 · 先授权后出境 · 出境清单可指认 · 12 条变异对照删守卫必红",
+      "subjects": [
+        "base/multimodal_provider.py"
       ]
     },
     {
@@ -379,6 +526,33 @@
       ]
     },
     {
+      "verifier": "tools/verify_p_code_not_severity.py",
+      "asserts": "行 42：扫报告模板 / 群消息模板 / 指标定义 / 验收表，出现「P0 高危」「P0 严重」「最高危 P0」即红；反向对照证明 P0 层 / DP0 / 正则层不被误报；验收表第 42 行本身写出的坏样本按行排除。5 项反向对照",
+      "subjects": [
+        "tools/audit/report_render.mjs",
+        "tools/reply-cards/contract.md",
+        "base/metrics_read_model.py",
+        "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_parse_convergence.py",
+      "asserts": "行 11（OCR 半边）：生产入口 image_file_row→judge_row 同图真跑 3 次，结论归一化成 (control_code, rule_key, 同名规则内序号) 集合，两两相等；正文前插空格后集合不变（逐字差异不许导致误判）；无 provider 时 VLM 必须落 untested。采样配置 model_id/temperature/seed **无对象**（Vision 编译期常量），#11 不映射",
+      "subjects": [
+        "base/media.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_pass_reachability.py",
+      "asserts": "PASS 为什么出不来，逐环可核：声明空族==数据空族（该族 0 条控制点）→ 真实样本 coverage 恒 partial 且 IR 里逐族指得出 → 输出空间 ⊆ {BLOCK,REVIEW,未审查,待自决} 且不含 PASS → 因果对（empty_families=[] 时合成器出 full、判定表出 PASS）→ Playbook 三句原文仍在 → 源码不许写死空族数；**空族补齐后自动改口要求干净样本必须出 PASS**（U8，不误报）；BLOCK 夹具证明引擎没坏。21 项反向对照",
+      "subjects": [
+        "base/coverage_composer.py",
+        "base/decision_table.py",
+        "research/governance/control-points-v1.json",
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md"
+      ]
+    },
+    {
       "verifier": "tools/verify_pending.py",
       "asserts": "待收清单：承诺必须指得出上游原话；我方提问不许写成对方承诺（C2/C3）",
       "subjects": [
@@ -419,6 +593,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_pycompat.py",
+      "asserts": "行 105 Python 3.9 vs 3.12 退出码逐条相同。三个要点：① **逐条比退出码**，不是比「有没有红」—— 一条两边都红，对行 105 是合格的（它证明版本不改变结论）；② **变绿也算失败**：3.9 红、3.12 绿说明该检查器原本没在测（判据不稳，不是升级修好了）；③ 两边都红只说明这一半合格，**不说明检查器本身对不对**（后者各有自己的票）。★ 3.9 **按版本号探测不按命令名**：第一版查 `python3.9` 命令名没找到就写「本机无 3.9」，实际 `/usr/bin/python3` 就是 3.9.6 —— 命令名不是解释器本体。找不到 → 退 2。★ `verify_cards.mjs` 是 node，**不参与对比**：混进去会得到一个永远相同的假样本，分母掺水。5 项反向对照（含「3.12 专有语法两边必须不同」证明判据不是恒真）",
+      "subjects": [
+        "tools/verify_depad.py",
+        "tools/verify_kb.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_rbac.py",
       "asserts": "RBAC 与对象 ACL：角色能力 / 提交人仅自己 / DP3·DP4 tenant+product_line+assigned / SoD / 越权 403",
       "subjects": [
@@ -437,6 +619,22 @@
       "asserts": "零引用可执行文件的棘轮：只许减不许增；基线不许拿不在册的文件充数；分母塌了（git 取不到 / 口径被改）要红，而不是伪装成「0 个零引用」；基线自身排除出提及池（否则它把自己钉住的名单刷成有人提及）",
       "subjects": [
         "tools/reference-census-baseline.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_regression_governance.py",
+      "asserts": "行86/SEC-6-GS-4 的**机器半边**：① owner 段必须指向产品且维护记录含 at/by/what（当前红：产品归属未定、不替产品认领）；② 按**先定义后测量**的判据（命中任一 external_ref 非空的规则）找出涉及法规的样本，逐条要求 legal_confirmation{by,at}（当前红：7 条涉及法规、0 条有确认）；③ 签署真实性**无机器判据，如实留 manual**。不并进 verify_regression_set.py —— 那一支映射到行 85，混入会让 85 因不属于它的理由变红",
+      "subjects": [
+        "research/governance/regression-set-v1.json",
+        "research/governance/skeleton/rules-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_regression_set.py",
+      "asserts": "行85/SEC-6-GS-*：冻结回归集规模 50-100（含端点）；四个陷阱字面量（Best Seller / 100% cotton / 最新 / first-time mom）都在且标成负样本；按族覆盖——有控制点族 ≥3 条、空族 0 条（**运行时读 control-points-v1.json 的 empty_families**，不写死「四族」）；控制点主表 status_note 与 empty_families 不许自相矛盾；每条样本指纹可复算；changelog 三项（operator/at/reason）；规则变更合并门判定函数（无回执拒/坏回执拒/非规则变更放行）。不证明远端分支保护真的拦住合并（本仓无 CI、main 无保护），不证明样本语义正确（83 条为人工编写的通用广告语）",
+      "subjects": [
+        "research/governance/regression-set-v1.json",
+        "research/governance/control-points-v1.json"
       ]
     },
     {
@@ -461,6 +659,14 @@
       "subjects": [
         "base/report_store.py",
         "tools/audit/report_render.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_report_coverage_reason.py",
+      "asserts": "报告里读不读得到「未做·无控制点」：真实路径 judge_unit() → IR → RenderSnapshot → tools/audit/report_render.mjs 的 renderReport()；覆盖证明段逐族出现「族名（未做·无控制点）」/ 正文不许出现原始枚举串 no_control_points / **溯源**：把 IR 的 label 拿掉后重渲染，句子必须降级（若仍显示中文标签则说明渲染器有第二份映射）/ 降级后必须显示原始 why，不许静默变成「未说明」。7 项反向对照",
+      "subjects": [
+        "tools/audit/report_render.mjs",
+        "research/governance/control-points-v1.json"
       ]
     },
     {
@@ -499,6 +705,14 @@
       "asserts": "T2-02a 复核台账：claim 原子独占与重复拒绝；30 分钟 lease/心跳/版本冲突；draft 全字段快照且 autosave 不产 formal；adopt 派生且原稿不变；PASS/待自决/REVIEW/未审查四层抽样 + BLOCK 全量；五条反向对照",
       "subjects": [
         "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_rule_change_regression.py",
+      "asserts": "行87/戊·SEC-6-GS-5·SEC-8-6：在 tempdir 副本上分别做规则**新增/删除/修改**各一次（不动仓内规则文件），每次跑冻结回归集 83 条，断言产出**同一组样本的 before 与 after 两份读数**及 changed_ids；缺 before（只有单点）、样本 ID 集不等、变更没改变任何样本 → 各自红。三层分开报：本文件是第三层（真跑出两份读数），不替代 GS-GATE（纯函数）与触发者（有没有东西在跑）",
+      "subjects": [
+        "research/governance/skeleton/rules-v1.json",
+        "research/governance/regression-set-v1.json"
       ]
     },
     {
@@ -574,6 +788,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_stop_conditions.py",
+      "asserts": "行 36：Playbook §3.3.7 的停机条件登记恰好 6 条、编号 1..6、每条第一阶段状态为 not_applicable_stage1；真实判定入口五步各一次且 skipped 为空；回执 schema 的跳过原因枚举不含 early_stop/no_progress；剥注释后扫 base/ api/ 的可执行代码，不许出现 early_stop/no_progress/consecutive_rounds 行为。5 项反向对照",
+      "subjects": [
+        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
+        "contracts/receipt-v1.schema.json"
+      ]
+    },
+    {
       "verifier": "tools/verify_submission_pipeline.py",
       "asserts": "T-100…T-103：submission_router 四维校验 → judge_entry → authority → GET 案件读回；依据解析器让 BLOCK 路径可达；同 key 重放不重判、同 submission 异 key 不重复建案；REVIEW 与 PASS 不可达口径；坏输入/判定抛错/run_state≠OK 不建案；没有 IR 的案件不得冒充空 findings；空 frozen 目录且无 cases.json 也能建案；cases.json 写入扫描器正反例",
       "subjects": [
@@ -606,10 +828,35 @@
       ]
     },
     {
+      "verifier": "tools/verify_takedown_registry.py",
+      "asserts": "下线任务进权威：create/transition 两条命令、task_id 内容派生、同案同 trigger 未完成不得重复建、trigger 必填且取值域、迁移一律走 TD.transition（history 由 TD 追加、E_ACTION 由 TD 判）、无 deadline 字段、进事件快照、per-task version 递增",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/takedown.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_taxonomy.py",
       "asserts": "`base/taxonomy.py` 的回归与门槛",
       "subjects": [
         "base/taxonomy.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_ts15_deploy.py",
+      "asserts": "行117/TS-15：按缩进解析 compose（不扫全文）断 restart 真实取值为 unless-stopped/always；healthcheck 段完整（test/interval/timeout/retries）且打 /healthz（剥整行注释后再判，与 verify_deploy D11 的全文子串匹配不同）；**行为级 0700**：把生产数据目录 chmod 0777 → /readyz 503 且 data_permissions=false，恢复后回 200/True（成对，避免「readiness 恒 503」冒充）；Dockerfile 基础镜像无浮动 tag、依赖走 npm ci / uv sync --locked。不证明容器真被拉起、不证明镜像可复现、不证明目标机 compose 与仓内一致",
+      "subjects": [
+        "docker-compose.yml",
+        "Dockerfile",
+        "api/production_app.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_ui_coverage_label.py",
+      "asserts": "前端读不读得到 IR 的 label：interface NotEvaluated 声明 label / CaseDetailPage 渲染理由的表达式读 label（不是只查 WHY_TEXT[why]）/ WHY_TEXT 里空族文案与 not_wired 不同句。**源码级**，不启动浏览器；web/ 归 ea，本脚本只测量。6 项反向对照",
+      "subjects": [
+        "web/src/api/client.ts",
+        "web/src/pages/CaseDetailPage.tsx"
       ]
     },
     {
@@ -618,6 +865,14 @@
       "subjects": [
         "research/governance/skeleton/context-guards-v1.json",
         "research/governance/skeleton/whitelist-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_waivers.py",
+      "asserts": "砍掉项 waiver：九字段齐备 / owner 恰好一个具名 / 到期即红（当天算到期）/ 出处 quote 必须在该文件里逐字找到 / 到期依据不许「顺延」/ 180 天上限 / 与 ticket 清单逐名对账；28 项反向对照含该红、该绿、该未测三侧",
+      "subjects": [
+        "PMO/audit/waiver-v1.json",
+        "PMO/上线Ticket清单-20261022.md"
       ]
     },
     {
@@ -649,234 +904,42 @@
       "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
     },
     {
-      "verifier": "tools/verify_model_selection.py",
-      "asserts": "S1–S8 选型依据与 magpie 实时清单一致：vod/tokenhub 无 embedding 与 rerank、ASR 计数、glm-5.3-flash 无 audio 但有 video（按 id×provider 核）、音画对齐候选同时含 audio+video 且出现在 vod、两网关清单无价格元数据、可索引规模（字节+文件数双断言）。清单缺失判未测退 2；--controls 12 项（含 80/420 两端文件数与 0.1× 字节）",
+      "verifier": "tools/verify_report_render_bridge.py",
+      "asserts": "报告渲染适配层（T-316c）：真渲染器产出六区块 + R1 指纹；node 缺失返回 node_missing 而**不抛异常**；渲染器缺失；坏快照由渲染器自己拒（桥接层不二次校验）；超时显式且真的会切断；快照走 stdin 且不出现 argv；输出只留三键、`ok` 必须字面 True、空 markdown 判失败、失败不泄漏 markdown；无重试；坏输入（None/list/str/不可序列化）一律返回 ok False 而绝不抛",
       "subjects": [
-        "PMO/implement/多模态与向量模型-选型-20261021.md"
-      ],
-      "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
-    },
-    {
-      "verifier": "tools/verify_multimodal_provider.py",
-      "asserts": "多模态契约：空注册表/空任务落 untested 而非通过 · 先授权后出境 · 出境清单可指认 · 12 条变异对照删守卫必红",
-      "subjects": [
-        "base/multimodal_provider.py"
+        "base/report_render_bridge.py",
+        "tools/audit/report_render.mjs"
       ]
     },
     {
-      "verifier": "tools/verify_brand_rules.py",
-      "asserts": "品牌用词候选规则的 context_exclusion 与 match.exclude_patterns 集合恒等；每个 pattern 可编译；note/id 非空；两侧有/无一致",
+      "verifier": "tools/verify_report_publishing.py",
+      "asserts": "报告发布进权威（T-316d）：结案→渲染→落盘→report_publish 全链；重启后 report_id/url/sha256 恒等；盘上 .md 的 sha256 与权威一致且含六区块；带 source_ir_fingerprint（可重建）；published_by 记结案人；node 缺失时**结案仍成功**只是报告缺席且带原因；每个案件产出各自报告（id 与 IR id 都不串）；报告 ACL = 案件可读性，且结案人自己读得回；带单数 `role` 的主体一律不认；report_publish 必须已结案、不许覆盖成另一个 report_id、同 id 幂等；report_id/sha256/url/path 形状校验 7 条",
       "subjects": [
-        "PMO/implement/品牌用词规则-候选-v1.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_waivers.py",
-      "asserts": "砍掉项 waiver：九字段齐备 / owner 恰好一个具名 / 到期即红（当天算到期）/ 出处 quote 必须在该文件里逐字找到 / 到期依据不许「顺延」/ 180 天上限 / 与 ticket 清单逐名对账；28 项反向对照含该红、该绿、该未测三侧",
-      "subjects": [
-        "PMO/audit/waiver-v1.json",
-        "PMO/上线Ticket清单-20261022.md"
-      ]
-    },
-    {
-      "verifier": "tools/verify_deploy.py",
-      "asserts": "部署工件静态自证：Dockerfile 多阶段 / CMD 不含 --workers（flock writer lease）/ CMD 带 --factory / compose 不绑 0.0.0.0 / 独立 project name 与独立网络 / .env.production 被忽略而 .example 不被忽略 / 12 个必填键与 ProductionSettings.from_env 逐项一致 / 本文件写死的 REQUIRED_ENV 与源码无漂移 / 模板无凭据形态值 / 六个数据路径互不重叠且不在 /app 下 / .dockerignore 排除 .git 与凭据 / healthcheck 打 /healthz 而非依赖外部存储的 /readyz。结论行明写「只证明工件写对了，不证明镜像能构建、容器能起来」",
-      "subjects": [
-        "Dockerfile",
-        "docker-compose.yml",
-        ".env.production.example",
-        ".dockerignore",
-        "api/production_app.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_cpu_first.py",
-      "asserts": "行119/TS-17：编排定义（compose/Dockerfile）剥整行注释后无 GPU 预留键与 GPU 基础镜像；依赖清单无 GPU-only 包；不达标时出显式读数（ms + cer/wer，缺 gold/引擎异常落 untested+reason 且读数必须 null 不是 0）；无不自动扩容写法；media 路径无自动放行。A4/C2 成对反向对照每次主检查都跑（注释里提到→不报，真配置→报）",
-      "subjects": [
-        "docker-compose.yml",
-        "Dockerfile",
-        "pyproject.toml",
-        "uv.lock",
-        "tools/benchmark_media.py",
-        "base/media.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_dependency_lock.py",
-      "asserts": "行106/TS-3：pyproject 与 uv.lock 都在盘上且被 git 跟踪；requires-python 逐字相等；每个直接依赖精确 == 且与 lock 里 resolved version 一致，**且与 lock 自带的 metadata.requires-dist/requires-dev 声明逐字一致**（两道都过才算一致 —— 只比 resolved 抓不到「锁文件没跟上 pyproject」）；行为面有锁 rc=0、**无锁（只拷 pyproject 不拷 lock）必须 rc≠0 且 stderr 提到 lockfile**；Dockerfile 每条 uv sync 必须带 --locked 且不许 pip install（G-02 的执行点）；uv.lock 不被 .dockerignore 排除",
-      "subjects": [
-        "pyproject.toml",
-        "uv.lock",
-        "Dockerfile",
-        ".dockerignore"
-      ]
-    },
-    {
-      "verifier": "tools/verify_ts15_deploy.py",
-      "asserts": "行117/TS-15：按缩进解析 compose（不扫全文）断 restart 真实取值为 unless-stopped/always；healthcheck 段完整（test/interval/timeout/retries）且打 /healthz（剥整行注释后再判，与 verify_deploy D11 的全文子串匹配不同）；**行为级 0700**：把生产数据目录 chmod 0777 → /readyz 503 且 data_permissions=false，恢复后回 200/True（成对，避免「readiness 恒 503」冒充）；Dockerfile 基础镜像无浮动 tag、依赖走 npm ci / uv sync --locked。不证明容器真被拉起、不证明镜像可复现、不证明目标机 compose 与仓内一致",
-      "subjects": [
-        "docker-compose.yml",
-        "Dockerfile",
-        "api/production_app.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_pass_reachability.py",
-      "asserts": "PASS 为什么出不来，逐环可核：声明空族==数据空族（该族 0 条控制点）→ 真实样本 coverage 恒 partial 且 IR 里逐族指得出 → 输出空间 ⊆ {BLOCK,REVIEW,未审查,待自决} 且不含 PASS → 因果对（empty_families=[] 时合成器出 full、判定表出 PASS）→ Playbook 三句原文仍在 → 源码不许写死空族数；**空族补齐后自动改口要求干净样本必须出 PASS**（U8，不误报）；BLOCK 夹具证明引擎没坏。21 项反向对照",
-      "subjects": [
-        "base/coverage_composer.py",
-        "base/decision_table.py",
-        "research/governance/control-points-v1.json",
-        "Playbook/内容审查Agent-产品Playbook-v1.1.md"
-      ]
-    },
-    {
-      "verifier": "tools/verify_regression_set.py",
-      "asserts": "行85/SEC-6-GS-*：冻结回归集规模 50-100（含端点）；四个陷阱字面量（Best Seller / 100% cotton / 最新 / first-time mom）都在且标成负样本；按族覆盖——有控制点族 ≥3 条、空族 0 条（**运行时读 control-points-v1.json 的 empty_families**，不写死「四族」）；控制点主表 status_note 与 empty_families 不许自相矛盾；每条样本指纹可复算；changelog 三项（operator/at/reason）；规则变更合并门判定函数（无回执拒/坏回执拒/非规则变更放行）。不证明远端分支保护真的拦住合并（本仓无 CI、main 无保护），不证明样本语义正确（83 条为人工编写的通用广告语）",
-      "subjects": [
-        "research/governance/regression-set-v1.json",
-        "research/governance/control-points-v1.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_coverage_reason_ir.py",
-      "asserts": "空族的「未做·无控制点」能不能从 IR 读到：schema 的 why 枚举含 no_control_points 且允许 label / 真实入口 judge_unit() 读回 IR 后逐族 why==no_control_points、label==未做·无控制点 / 整段符合分段契约 / **未知 why 的降级闸仍在** / 前端 WHY_TEXT 有独立文案（不再说成「没接线」）/ verifier_map #72/#73 指向本 verifier。16 项反向对照，含一条真·行为级：把 VALID_REASON 里的 no_control_points 临时拿掉后走真实入口，IR 必须退化且判据必红",
-      "subjects": [
-        "contracts/review-ir-v1.schema.json",
-        "base/orchestrator.py",
-        "research/governance/control-points-v1.json",
-        "web/src/pages/CaseDetailPage.tsx",
-        "tests/acceptance/verifier_map.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_report_coverage_reason.py",
-      "asserts": "报告里读不读得到「未做·无控制点」：真实路径 judge_unit() → IR → RenderSnapshot → tools/audit/report_render.mjs 的 renderReport()；覆盖证明段逐族出现「族名（未做·无控制点）」/ 正文不许出现原始枚举串 no_control_points / **溯源**：把 IR 的 label 拿掉后重渲染，句子必须降级（若仍显示中文标签则说明渲染器有第二份映射）/ 降级后必须显示原始 why，不许静默变成「未说明」。7 项反向对照",
-      "subjects": [
-        "tools/audit/report_render.mjs",
-        "research/governance/control-points-v1.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_ui_coverage_label.py",
-      "asserts": "前端读不读得到 IR 的 label：interface NotEvaluated 声明 label / CaseDetailPage 渲染理由的表达式读 label（不是只查 WHY_TEXT[why]）/ WHY_TEXT 里空族文案与 not_wired 不同句。**源码级**，不启动浏览器；web/ 归 ea，本脚本只测量。6 项反向对照",
-      "subjects": [
-        "web/src/api/client.ts",
-        "web/src/pages/CaseDetailPage.tsx"
-      ]
-    },
-    {
-      "verifier": "tools/verify_acceptance_trigger.py",
-      "asserts": "T-142 验收执行器有没有**自动触发点**：三条通道（CI / 本地 hook / 远端分支保护）**分别**给读数，不许一条盖掉另外两条。★ 把常被混成一句「我们配了 CI」的三件事分开报：① 配了 CI ② CI 会跑**验收执行器**（而不是只跑 pytest）③ CI 真能拦住合并。只报①会让人以为三件都成立。★「假触发」单列判红：配置里有 acceptance/验收 字样、却不引用 verify_acceptance_run —— 这比完全没有 CI 更危险，它让人相信验收已经自动在跑。★「仓库里有 hook 脚本但 core.hooksPath 未设」也单列，不与「没有」混为一谈。★ 远端分支保护本机读不到（无 gh、离线、带凭据详情 401）→ **永远落未测且照报**，不许静默消失。★ 没有任何通道跑它 → **必须红**，不是「未测就好」。11 项反向对照",
-      "subjects": [
-        "tools/verify_acceptance_run.py",
-        "tools/verify_regression_set.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_acceptance_ratchet.py",
-      "asserts": "T-145 验收执行门的**棘轮**判据。执行器今天退 2（untested=20，其中 7 条 manual 永远不会转 passed），所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视它。三条判据：① failed 必须为 0 ② 计数之和必须等于 136（防「删了几行所以看起来没倒退」——这条最容易漏：删行时 passed 没降、failed 也是 0）③ passed 不得低于 tools/acceptance-ratchet.json 的地板；地板只许上调，下调是一次有记录的决定。另有：分账之和必须等于 untested；没有分账行即红（分不开「该写 verifier」与「按人工验收」，两者动作相反）。★ 不判 CI 是否真在跑（那是 verify_acceptance_trigger.py），也不判 7 条 manual 有没有人工验收过（机器看不见）。9 项反向对照",
-      "subjects": [
-        "tools/verify_acceptance_run.py",
-        "tools/acceptance-ratchet.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_lease_release.py",
-      "asserts": "行 136（reducer 一侧）：29 分钟仍独占 / 30 分 01 秒释放 / 释放前草稿保留且新领取人看得到 / 陈旧 expected_version 被拒（version_conflict）。3 项反向对照（改租约 1900 秒后 1801 秒不许放；正确 version 的写入必须成功）。**通知那半无对象**（生产无通知生产者），未断言",
-      "subjects": [
+        "base/report_render_bridge.py",
+        "base/report_store.py",
+        "base/review_command_service.py",
         "base/review_reducer.py",
-        "base/reviews_ledger.py"
+        "api/review_api.py",
+        "api/production_app.py"
       ]
     },
     {
-      "verifier": "tools/verify_parse_convergence.py",
-      "asserts": "行 11（OCR 半边）：生产入口 image_file_row→judge_row 同图真跑 3 次，结论归一化成 (control_code, rule_key, 同名规则内序号) 集合，两两相等；正文前插空格后集合不变（逐字差异不许导致误判）；无 provider 时 VLM 必须落 untested。采样配置 model_id/temperature/seed **无对象**（Vision 编译期常量），#11 不映射",
+      "verifier": "tools/verify_stage_gate_d5.py",
+      "asserts": "D5 阶段门：**真实生产装配**（create_production_app + ProductionRuntime.start）而非手工 create_app。提交→判定→领取→结案全链走 HTTP；结案发布报告到 REPORT_ROOT 并进权威；重启（新 runtime 同数据根）后 report_id/sha256/url/字节全等；rbac 名单源由 start() 真实注入；六条下线写路径在生产已开启；release 两条仍 501；心跳 maintain_once 可跑；非能力内写路径答 501 而非 403/500。★ 它抓的是「零件都对、生产接线错」这一类 —— 本轮五个缺陷里三个是这个形状。",
       "subjects": [
-        "base/media.py"
+        "api/production_app.py",
+        "api/review_api.py",
+        "api/write_api.py",
+        "base/review_command_service.py",
+        "base/report_render_bridge.py",
+        "base/rbac.py"
       ]
-    },
+    }
+  ],
+  "exempt": [
     {
-      "verifier": "tools/verify_stop_conditions.py",
-      "asserts": "行 36：Playbook §3.3.7 的停机条件登记恰好 6 条、编号 1..6、每条第一阶段状态为 not_applicable_stage1；真实判定入口五步各一次且 skipped 为空；回执 schema 的跳过原因枚举不含 early_stop/no_progress；剥注释后扫 base/ api/ 的可执行代码，不许出现 early_stop/no_progress/consecutive_rounds 行为。5 项反向对照",
-      "subjects": [
-        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
-        "contracts/receipt-v1.schema.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_asr_no_diarization.py",
-      "asserts": "行 124（依赖侧）：pyproject 依赖组、uv.lock、base/api/tools 的 import 行都不许出现 diarization 包（pyannote/resemblyzer/wespeaker/nemo…逐名匹配，注释不算）。片段完整性 / start-end / speaker=unknown 三条**无对象**（无 ASR 后端、无音频素材、接口无分段位），#124 不映射。5 项反向对照",
-      "subjects": [
-        "pyproject.toml",
-        "uv.lock"
-      ]
-    },
-    {
-      "verifier": "tools/verify_media_portability.py",
-      "asserts": "行 118（静态半边）：剥注释/docstring/块注释后扫 base/ api/ 的 .py/.m/.mm/.swift/.sh，不许出现 Vision/Speech/AVFoundation/Quartz 等宿主原生媒体调用。**当前 rc=1**：仓内唯一 OCR 就是 macOS Vision（ocr_vision.m / build_ocr.sh），这是事实读数，不是新引入的问题；容器内真跑那半**无对象**（无 docker daemon、镜像无引擎、音视频素材 0 个）。3 项反向对照",
-      "subjects": [
-        "base/ocr_vision.m",
-        "base/build_ocr.sh"
-      ]
-    },
-    {
-      "verifier": "tools/verify_rule_change_regression.py",
-      "asserts": "行87/戊·SEC-6-GS-5·SEC-8-6：在 tempdir 副本上分别做规则**新增/删除/修改**各一次（不动仓内规则文件），每次跑冻结回归集 83 条，断言产出**同一组样本的 before 与 after 两份读数**及 changed_ids；缺 before（只有单点）、样本 ID 集不等、变更没改变任何样本 → 各自红。三层分开报：本文件是第三层（真跑出两份读数），不替代 GS-GATE（纯函数）与触发者（有没有东西在跑）",
-      "subjects": [
-        "research/governance/skeleton/rules-v1.json",
-        "research/governance/regression-set-v1.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_pycompat.py",
-      "asserts": "行 105 Python 3.9 vs 3.12 退出码逐条相同。三个要点：① **逐条比退出码**，不是比「有没有红」—— 一条两边都红，对行 105 是合格的（它证明版本不改变结论）；② **变绿也算失败**：3.9 红、3.12 绿说明该检查器原本没在测（判据不稳，不是升级修好了）；③ 两边都红只说明这一半合格，**不说明检查器本身对不对**（后者各有自己的票）。★ 3.9 **按版本号探测不按命令名**：第一版查 `python3.9` 命令名没找到就写「本机无 3.9」，实际 `/usr/bin/python3` 就是 3.9.6 —— 命令名不是解释器本体。找不到 → 退 2。★ `verify_cards.mjs` 是 node，**不参与对比**：混进去会得到一个永远相同的假样本，分母掺水。5 项反向对照（含「3.12 专有语法两边必须不同」证明判据不是恒真）",
-      "subjects": [
-        "tools/verify_depad.py",
-        "tools/verify_kb.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_media_model_lock.py",
-      "asserts": "行 120/121 的**机器半边**：Playbook TS-18/TS-19 仍标「候选」且写着「过门后才锁版本」（出现「已选定/已锁定」即红）；阶段3-准备评估.md 的候选矩阵仍在；**配置里一旦锁定 OCR/ASR 版本，四项（OCR）/五项（ASR）读数必须齐备**，缺一项即红。今天仓内 0 份锁定配置 → 门不适用（打印为事实行，不冒充「门验过了」）。7 项反向对照。**人工实测那一半没有对象**，#120/#121 不映射",
-      "subjects": [
-        "Playbook/内容审查Agent-产品Playbook-v1.1.md",
-        "PMO/implement/阶段3-准备评估.md"
-      ]
-    },
-    {
-      "verifier": "tools/verify_lease_notifications.py",
-      "asserts": "行 136 通知半边：真实 ReviewsLedger 的 claim→到期释放，lease_released 通知落 inbox、收件人是原领取人、**飞书 sender 调用次数 = 0**；遍历全部 INBOX_ONLY 类型断言 sender 不被调用；反向对照 dispatch(takedown) 必须让计数 +1（证明计数器不是恒 0）。**未覆盖**：生产装配无 outbox、新领取人无通知对象（claim 不在 NOTIFYING_KINDS），故 #136 不映射。5 项反向对照",
-      "subjects": [
-        "base/notifications.py",
-        "base/reviews_ledger.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_regression_governance.py",
-      "asserts": "行86/SEC-6-GS-4 的**机器半边**：① owner 段必须指向产品且维护记录含 at/by/what（当前红：产品归属未定、不替产品认领）；② 按**先定义后测量**的判据（命中任一 external_ref 非空的规则）找出涉及法规的样本，逐条要求 legal_confirmation{by,at}（当前红：7 条涉及法规、0 条有确认）；③ 签署真实性**无机器判据，如实留 manual**。不并进 verify_regression_set.py —— 那一支映射到行 85，混入会让 85 因不属于它的理由变红",
-      "subjects": [
-        "research/governance/regression-set-v1.json",
-        "research/governance/skeleton/rules-v1.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_p_code_not_severity.py",
-      "asserts": "行 42：扫报告模板 / 群消息模板 / 指标定义 / 验收表，出现「P0 高危」「P0 严重」「最高危 P0」即红；反向对照证明 P0 层 / DP0 / 正则层不被误报；验收表第 42 行本身写出的坏样本按行排除。5 项反向对照",
-      "subjects": [
-        "tools/audit/report_render.mjs",
-        "tools/reply-cards/contract.md",
-        "base/metrics_read_model.py",
-        "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
-      ]
-    },
-    {
-      "verifier": "tools/verify_combination_escalation.py",
-      "asserts": "行 29：组合规则共现升级（分析引擎 score.py 的 _apply_escalation）——共现 → escalated / severity 升到 to_severity / disposition 改写；单要素不升；去掉 escalation 字段不升（证明升级来自规则数据）。**生产引擎 rule_judge 无 escalation 实现**，故 #29 不映射",
-      "subjects": [
-        "research/governance/skeleton/rules-v1.json",
-        "research/governance/skeleton/score.py"
-      ]
+      "verifier": "tools/verify_must_words.py",
+      "reason": "只出读数、**不判红**，因此没有可登记的 subjects —— 它验的不是某个文件的行为，而是「验收表第 43 行所要求的元判据读数」。第 43 行原文首句即「不作为执行验收项」，且没有给「空话出现多少次算问题」的阈值；自己定一个阈值再标红，等于替委托方定了一条判据。所以它刻意不进 verifier_map、不挂执行点，`#43` 保持 untested、读数不变。★ 这不是「暂时没登记」，是有理由的永久豁免 —— 若将来 #43 有了阈值，应当把本文件移出 exempt 并补上 subjects，而不是留着它。"
     }
   ]
 }

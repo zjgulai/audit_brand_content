@@ -393,6 +393,13 @@ def samples() -> dict:
             ("未知 command", {**good_command, "command": "sign"}, False),
             ("缺 request_sha256", {k: v for k, v in good_command.items() if k != "request_sha256"}, False),
             ("额外字段", {**good_command, "secret": "no"}, False),
+            # T-314b: aggregate_type 从 enum:["review_case"] 扩到两个值。
+            # ★ 扩 enum 必须同时有「第三个值仍被拒」的负样本 ——
+            #   否则这次放宽等于把 enum 退化成 any string，而 82 项会照旧全绿。
+            ("grant_registry 是合法聚合类型",
+             {**good_command, "aggregate_type": "grant_registry"}, True),
+            ("★ 未知 aggregate_type（third kind）仍被拒",
+             {**good_command, "aggregate_type": "user_profile"}, False),
         ],
         "projection-status-v1": [
             ("好样本", good_projection, True),

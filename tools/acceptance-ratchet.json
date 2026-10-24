@@ -1,127 +1,132 @@
 {
- "schema_version": 1,
- "policy": "T-145 · 验收棘轮地板",
- "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
- "passed_floor": 123,
- "recorded_at": "2026-10-24",
- "recorded_reading": {
-  "passed": 123,
-  "failed": 0,
-  "untested": 13,
-  "untested_split": {
-   "machine": 8,
-   "manual": 5,
-   "unverifiable": 0,
-   "unknown": 0
+  "schema_version": 1,
+  "policy": "T-145 · 验收棘轮地板",
+  "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
+  "passed_floor": 123,
+  "recorded_at": "2026-10-24",
+  "recorded_reading": {
+    "passed": 123,
+    "failed": 0,
+    "untested": 13,
+    "untested_split": {
+      "machine": 8,
+      "manual": 5,
+      "unverifiable": 0,
+      "unknown": 0
+    },
+    "untested_origin": {
+      "unmapped": 12,
+      "executed_rc2": 1
+    }
   },
-  "untested_origin": {
-   "unmapped": 12,
-   "executed_rc2": 1
-  }
- },
- "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
- "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
- "lower_history": [
-  {
-   "from": "121",
-   "to": "116",
-   "at": "2026-10-23",
-   "reason": "读数审计发现 5 行是假绿，已回退映射：#9（指标没算 empty/parse_error/unsupported）、#29（决策表脚本不加载组合规则）、#42（无「P 当严重度」扫描器）、#62（群消息渲染不读 obligations/candidate）、#66（验证器全程只有 1 条 finding）。",
-   "why_not_a_regression": "这不是「功能退步」，是「原先那 5 条 passed 本来就不成立」。回退让读数变诚实，而不是让能力变弱。",
-   "how_to_restore": "按 PMO/audit 下三份审计报告的缺口清单逐条补断言，补一条涨一格。"
-  },
-  {
-   "from": "116",
-   "to": "113",
-   "at": "2026-10-23",
-   "reason": "58 的审计（12 agent 对抗复核，0 推翻）发现 release_gate 的 20 行里 0 行行为覆盖。回退其中 3 条 truly `uncovered`：#93（名单治理三主体留痕，脚本 C1–C5 是签发 SoD 与它无关）、#98（只有重审 job 状态机，产物一个都没有）、#123（脚本里没有「撤权」这个对象）。",
-   "why_not_a_regression": "同上一轮：不是功能退步，是原先那 3 条 passed 本来就不成立。",
-   "how_to_restore": "补断言后逐条转回。另 11 条 partial 保留 passed，在审计报告里标「部分覆盖」，补完再核。"
-  },
-  {
-   "from": "113",
-   "to": "84",
-   "at": "2026-10-23",
-   "reason": "剩余 10 个 fan-out 组（33 行）的覆盖率审计完成：真覆盖仅 #97，30 行 partial、2 行 uncovered（#20/#22）。委托方裁定「全部回退 untested」。另一条独立复核证据：定向变异证明这些验证器对判据本身不敏感 —— 删掉 send_gateway 的裸「通过」分支后仍 34/34 绿；把 auth_session 的 STEP_UP_SECONDS 5 分钟改成 90 秒、ABSOLUTE_SECONDS 8 小时改成 2 小时，仍 40/40 绿；finding_store 接受悬空 derived_from、自指 derived_from 与 control_code=123。",
-   "why_not_a_regression": "不是功能退步，是这 30 条 passed 从来就不成立 —— 验证器只验了判据的一部分子条款，而 fan-out 把同一次绿同时记到了整组每一行上。",
-   "how_to_restore": "逐行补断言后转回。#97 已用两次定向变异证明真会红（摘必填字段校验 → 3b 三条红；只删『无取证即拒』→ 3c 红），保留 passed。"
-  },
-  {
-   "from": "84",
-   "to": "82",
-   "at": "2026-10-23",
-   "reason": "变异探针审计（wf_f7d730ec-950，43 行 / 104 个变异）判出两行全假绿：#4（把 raw_sha256 从 _unit_id 公式删掉、或构造缺 raw_sha256 的 IR，103/103 仍全绿——原件重算与 schema 拒绝两支都没有执行点）、#127（逐项改动 frame/keyframe/ocr/asr/model/sampling 六类指纹，invalidate 全部返回 False，只有 media_fingerprints 集合 root 会失效——四类媒体指纹逐项失效既没实现也没人验）。",
-   "why_not_a_regression": "同理，这两条的 passed 从来就不成立。",
-   "how_to_restore": "#4 补『用原件字节重算 raw_sha256 与字段相等』+『缺 raw_sha256 由 schema 拒绝』两支；#127 先在生产侧实现逐项指纹失效，再补六类改动各一次的断言。"
-  }
- ],
- "raise_history": [
-  {
-   "from": "116",
-   "to": "120",
-   "at": "2026-10-23",
-   "why": "T-85/T-87/#76/#36/#108/#129/#105 等陆续转 passed。地板不跟上会让余量掩盖下一次倒退。"
-  },
-  {
-   "from": "120",
-   "to": "121",
-   "at": "2026-10-23",
-   "why": "#105 的映射此前因 criteria 不匹配被静默跳过（f0c80ff 修），它终于真的跑起来了。地板跟上。"
-  },
-  {
-   "from": "113",
-   "to": "114",
-   "at": "2026-10-23",
-   "why": "#42 补齐后转 passed（f3 的 `verify_p_code_not_severity.py`，5/5 对照）。"
-  },
-  {
-   "from": "82",
-   "to": "86",
-   "at": "2026-10-24",
-   "why": "本轮补断言后转 passed 4 条：#9（#9 四类 failure_kind 计数，生产侧补齐 empty/parse_error/unsupported 三键）、#62（renderMessage 读 obligations 与 candidate 并渲染并行义务短标记）、#117（单写者约束，跨进程验）、#47 ④（LABELS 词表）。#66 **未转** —— 见下。"
-  },
-  {
-   "from": "86",
-   "to": "87",
-   "at": "2026-10-24",
-   "why": "#66 转 passed：补 `C4d` 覆盖其判据后半「多条同质 finding 不逐条刷屏」（前半早由 #60a 覆盖）。变异「按条数循环输出」→ killed。原判定「改前已覆盖」不成立 —— 那是只看前半。"
-  },
-  {
-   "from": "87",
-   "to": "117",
-   "at": "2026-10-24",
-   "reason": "第三波补断言（e81bde1 + ce0784a）：第二批回退的 30 行先探针再补断言，30 条探针变异全部复测 killed 后加回映射。mapped 88 → 118。"
-  },
-  {
-   "from": "117",
-   "to": "119",
-   "at": "2026-10-24",
-   "reason": "#124 / #136 映射（0d84ccd + 本轮）：#136 修完两处 try/except 后 expire 阈值变异变红；#124 pyproject 真加 pyannote 依赖后变红。"
-  },
-  {
-   "from": "119",
-   "to": "120",
-   "at": "2026-10-24",
-   "reason": "#11 映射：委托方裁定「判据只成立一半也计 passed」，与 #124/#136 统一口径。verify_parse_convergence 三项断言有活执行点（把 _untested_result 的 status 改成 ok → 退 1）。"
-  },
-  {
-   "from": "120",
-   "to": "121",
-   "at": "2026-10-24",
-   "reason": "#118 映射：G2 守卫实测有效（把 image 加进 SUPPORTED_SOURCE_KINDS → 退 1）。同时更正了该验证器文件头「M1 红」的过期说法 —— 它退 0，红的是空真读数。"
-  },
-  {
-   "from": "121",
-   "to": "123",
-   "at": "2026-10-24",
-   "reason": "#120/#121 映射：verify_media_model_lock 的三段里 M1/M2 有活执行点（Playbook 的「候选/过门后才锁」改成「已选定」→ 退 1）；M3 今天未锁定 → 门不适用，是事实行不是绿。"
-  }
- ],
- "notes": [
-  {
-   "at": "2026-10-24",
-   "about": "#66 的覆盖状态（经 05 复核后更正）",
-   "text": "#66 判据有两句：① 「1 个 confirmed L4/L5 + 2 个 L1/L2，不许被数量盖掉」；② 「多条同质 finding 仍只有一句、不逐条刷屏」。前半由 `#60a` 覆盖（`worstFinding → findings[0]` 变异在改前即 killed，实测确认）。后半此前在 `verify_report_render.mjs` 里 **0 处执行点** —— `#60` 判据原文是「五个标签各构造一条消息」，单条口径，与后半的多条口径不重叠。已补 `C4d`（3 条同质 finding：`【BLOCK】` 恰好 1 次、命中 1 条）+ 反向对照（1 条也是 1 次，证明不是按条数循环）。变异「按 finding 数量循环输出」→ killed。**#66 因此转 passed。**"
-  }
- ]
+  "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
+  "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
+  "lower_history": [
+    {
+      "from": "121",
+      "to": "116",
+      "at": "2026-10-23",
+      "reason": "读数审计发现 5 行是假绿，已回退映射：#9（指标没算 empty/parse_error/unsupported）、#29（决策表脚本不加载组合规则）、#42（无「P 当严重度」扫描器）、#62（群消息渲染不读 obligations/candidate）、#66（验证器全程只有 1 条 finding）。",
+      "why_not_a_regression": "这不是「功能退步」，是「原先那 5 条 passed 本来就不成立」。回退让读数变诚实，而不是让能力变弱。",
+      "how_to_restore": "按 PMO/audit 下三份审计报告的缺口清单逐条补断言，补一条涨一格。"
+    },
+    {
+      "from": "116",
+      "to": "113",
+      "at": "2026-10-23",
+      "reason": "58 的审计（12 agent 对抗复核，0 推翻）发现 release_gate 的 20 行里 0 行行为覆盖。回退其中 3 条 truly `uncovered`：#93（名单治理三主体留痕，脚本 C1–C5 是签发 SoD 与它无关）、#98（只有重审 job 状态机，产物一个都没有）、#123（脚本里没有「撤权」这个对象）。",
+      "why_not_a_regression": "同上一轮：不是功能退步，是原先那 3 条 passed 本来就不成立。",
+      "how_to_restore": "补断言后逐条转回。另 11 条 partial 保留 passed，在审计报告里标「部分覆盖」，补完再核。"
+    },
+    {
+      "from": "113",
+      "to": "84",
+      "at": "2026-10-23",
+      "reason": "剩余 10 个 fan-out 组（33 行）的覆盖率审计完成：真覆盖仅 #97，30 行 partial、2 行 uncovered（#20/#22）。委托方裁定「全部回退 untested」。另一条独立复核证据：定向变异证明这些验证器对判据本身不敏感 —— 删掉 send_gateway 的裸「通过」分支后仍 34/34 绿；把 auth_session 的 STEP_UP_SECONDS 5 分钟改成 90 秒、ABSOLUTE_SECONDS 8 小时改成 2 小时，仍 40/40 绿；finding_store 接受悬空 derived_from、自指 derived_from 与 control_code=123。",
+      "why_not_a_regression": "不是功能退步，是这 30 条 passed 从来就不成立 —— 验证器只验了判据的一部分子条款，而 fan-out 把同一次绿同时记到了整组每一行上。",
+      "how_to_restore": "逐行补断言后转回。#97 已用两次定向变异证明真会红（摘必填字段校验 → 3b 三条红；只删『无取证即拒』→ 3c 红），保留 passed。"
+    },
+    {
+      "from": "84",
+      "to": "82",
+      "at": "2026-10-23",
+      "reason": "变异探针审计（wf_f7d730ec-950，43 行 / 104 个变异）判出两行全假绿：#4（把 raw_sha256 从 _unit_id 公式删掉、或构造缺 raw_sha256 的 IR，103/103 仍全绿——原件重算与 schema 拒绝两支都没有执行点）、#127（逐项改动 frame/keyframe/ocr/asr/model/sampling 六类指纹，invalidate 全部返回 False，只有 media_fingerprints 集合 root 会失效——四类媒体指纹逐项失效既没实现也没人验）。",
+      "why_not_a_regression": "同理，这两条的 passed 从来就不成立。",
+      "how_to_restore": "#4 补『用原件字节重算 raw_sha256 与字段相等』+『缺 raw_sha256 由 schema 拒绝』两支；#127 先在生产侧实现逐项指纹失效，再补六类改动各一次的断言。"
+    }
+  ],
+  "raise_history": [
+    {
+      "from": "116",
+      "to": "120",
+      "at": "2026-10-23",
+      "why": "T-85/T-87/#76/#36/#108/#129/#105 等陆续转 passed。地板不跟上会让余量掩盖下一次倒退。"
+    },
+    {
+      "from": "120",
+      "to": "121",
+      "at": "2026-10-23",
+      "why": "#105 的映射此前因 criteria 不匹配被静默跳过（f0c80ff 修），它终于真的跑起来了。地板跟上。"
+    },
+    {
+      "from": "113",
+      "to": "114",
+      "at": "2026-10-23",
+      "why": "#42 补齐后转 passed（f3 的 `verify_p_code_not_severity.py`，5/5 对照）。"
+    },
+    {
+      "from": "82",
+      "to": "86",
+      "at": "2026-10-24",
+      "why": "本轮补断言后转 passed 4 条：#9（#9 四类 failure_kind 计数，生产侧补齐 empty/parse_error/unsupported 三键）、#62（renderMessage 读 obligations 与 candidate 并渲染并行义务短标记）、#117（单写者约束，跨进程验）、#47 ④（LABELS 词表）。#66 **未转** —— 见下。"
+    },
+    {
+      "from": "86",
+      "to": "87",
+      "at": "2026-10-24",
+      "why": "#66 转 passed：补 `C4d` 覆盖其判据后半「多条同质 finding 不逐条刷屏」（前半早由 #60a 覆盖）。变异「按条数循环输出」→ killed。原判定「改前已覆盖」不成立 —— 那是只看前半。"
+    },
+    {
+      "from": "87",
+      "to": "117",
+      "at": "2026-10-24",
+      "reason": "第三波补断言（e81bde1 + ce0784a）：第二批回退的 30 行先探针再补断言，30 条探针变异全部复测 killed 后加回映射。mapped 88 → 118。"
+    },
+    {
+      "from": "117",
+      "to": "119",
+      "at": "2026-10-24",
+      "reason": "#124 / #136 映射（0d84ccd + 本轮）：#136 修完两处 try/except 后 expire 阈值变异变红；#124 pyproject 真加 pyannote 依赖后变红。"
+    },
+    {
+      "from": "119",
+      "to": "120",
+      "at": "2026-10-24",
+      "reason": "#11 映射：委托方裁定「判据只成立一半也计 passed」，与 #124/#136 统一口径。verify_parse_convergence 三项断言有活执行点（把 _untested_result 的 status 改成 ok → 退 1）。"
+    },
+    {
+      "from": "120",
+      "to": "121",
+      "at": "2026-10-24",
+      "reason": "#118 映射：G2 守卫实测有效（把 image 加进 SUPPORTED_SOURCE_KINDS → 退 1）。同时更正了该验证器文件头「M1 红」的过期说法 —— 它退 0，红的是空真读数。"
+    },
+    {
+      "from": "121",
+      "to": "123",
+      "at": "2026-10-24",
+      "reason": "#120/#121 映射：verify_media_model_lock 的三段里 M1/M2 有活执行点（Playbook 的「候选/过门后才锁」改成「已选定」→ 退 1）；M3 今天未锁定 → 门不适用，是事实行不是绿。"
+    }
+  ],
+  "notes": [
+    {
+      "at": "2026-10-24",
+      "about": "#66 的覆盖状态（经 05 复核后更正）",
+      "text": "#66 判据有两句：① 「1 个 confirmed L4/L5 + 2 个 L1/L2，不许被数量盖掉」；② 「多条同质 finding 仍只有一句、不逐条刷屏」。前半由 `#60a` 覆盖（`worstFinding → findings[0]` 变异在改前即 killed，实测确认）。后半此前在 `verify_report_render.mjs` 里 **0 处执行点** —— `#60` 判据原文是「五个标签各构造一条消息」，单条口径，与后半的多条口径不重叠。已补 `C4d`（3 条同质 finding：`【BLOCK】` 恰好 1 次、命中 1 条）+ 反向对照（1 条也是 1 次，证明不是按条数循环）。变异「按 finding 数量循环输出」→ killed。**#66 因此转 passed。**"
+    },
+    {
+      "at": "2026-10-24",
+      "about": "#93 已映射，但地板**不动**（123 保持不变）",
+      "text": "`#93`（名单治理三主体 + 四元留痕）本轮映射到 `verify_grant_registry.py`，该验证器读数 41/41，八个变异各自命中。**但地板没有上调**，理由是硬的：棘轮的规矩是「今天的地板是今天的读数」，而我今天在沙盒里量到的读数是 **passed=120**，不是 124 —— 差的 4 条全部是环境假红，逐条核过：① `#11` `.tools/bin/ocr` 是 Mach-O arm64 二进制，沙盒是 Linux，`Exec format error`；② `#105` `verify_pycompat.py` 找不到 Python 3.9；③ `#106` `uv` 找不到 Python 3.12；④ `#112`/`#116` `a11y_check.mjs` 找不到 Chrome。四条都与本轮改动无关，在本机（macOS + Chrome + uv）应转绿 —— **但「应该」不是读数**。凭估计把地板抬到 124，等于用一个我没量到的数字去守后面的倒退，那时真出现倒退就分不清是回归还是这个估计偏高。正确做法：在宿主上跑一次 `verify_acceptance_run.py`，拿到真实读数，再按读数上调地板（预计 124~125）。在那之前，floor=123 保持不变，沙盒读数低于地板这件事**已知、已归因、记在这里**。"
+    }
+  ]
 }

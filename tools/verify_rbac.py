@@ -13,6 +13,7 @@
   C7 机器仅既定 API，无人类能力
   C8 grant 提案/执行/审批三方不同人
   C9 角色→能力矩阵（含 takedown.* 不得是死能力）
+  C14 改派下线（TD-12）：统筹可改派，**不是** takedown.execute
   C10 多角色并集：不得被第一个匹配角色短路
   C11 每个能力至少一个角色持有（死能力检测）
   C12 release.revoke 的 scope + SoD
@@ -35,7 +36,7 @@ try:
     from base.rbac import (
         ROLES, CAPABILITIES, role_capabilities,
         can_act, can_read_content, can_read_metadata,
-        validate_grant_actors, deny_all,
+        validate_grant_actors, deny_all, can_reassign_takedown,
     )
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入 base.rbac: %s" % exc)
@@ -302,6 +303,36 @@ def main():
                   "product_lines": ["pump"]}
         report(can_act(p_noid, "takedown.execute", case_other) is False,
                "C13 ★ 无 id 主体 → 拒（不是通配）", "")
+
+    # C14 改派下线任务（TD-12）：**不是** takedown.execute
+    #
+    # ★ 这一条为什么必须单独存在：T-312 施工单写「reassign → takedown.execute」，
+    #   而 UIUX §1.1 / UJ-5② / TD-12 三处都说「coordinator 可改派」，
+    #   且 coordinator 的角色能力里**没有** takedown.execute。
+    #   两条规则各有正式来源，冲突是真实的 —— 这里钉住的是**规格那一边**。
+    task_t1 = {"task_id": "td-1", "tenant": "t1", "product_line": "pump"}
+    task_t2 = {"task_id": "td-2", "tenant": "t2", "product_line": "pump"}
+    report(can_reassign_takedown(p_coord, task_t1) is True,
+           "C14 ★ 统筹可改派（TD-12）", "")
+    report(can_reassign_takedown(p_coord, task_t2) is False,
+           "C14 统筹跨租户改派 → 拒", "")
+    report(can_reassign_takedown(p_signer, task_t1) is False,
+           "C14 ★ 签发人（有 takedown.execute 资格）不能改派", "")
+    report(can_reassign_takedown(p_dp3, task_t1) is False,
+           "C14 DP3 不能改派", "")
+    p_machine = P("m-1", ["machine"])
+    report(can_reassign_takedown(p_machine, task_t1) is False,
+           "C14 机器不能改派", "")
+    # ★ 反向对照：把「只有 coordinator」这条判定摘掉，签发人必须变成可改派。
+    #   ★ 第一版写 `lambda principal, role: True`，结果这条自己红了 ——
+    #     因为 `_has_role(p, "machine")` 也走了那个桩，于是函数在第一行就
+    #     return False。**桩打得太宽会把被测对象整个短路**，而短路的表现
+    #     是「期望红没红」的反面：期望绿也没绿。现在只让 coordinator 成立。
+    with mock.patch("base.rbac._has_role",
+                    lambda principal, role: role == "coordinator"):
+        report(can_reassign_takedown(p_signer, task_t1) is True,
+               "C14 反向对照：摘掉角色判定 → 任何同租户都能改派（前面靠它）",
+               "")
 
     # R1: 测试注入去掉 scope -> 跨租户被放行
     with mock.patch("base.rbac._scope_ok", lambda principal, case: True):

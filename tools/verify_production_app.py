@@ -117,6 +117,8 @@ def settings(root):
         session_db=root / "session" / "session.db",
         access_log_path=root / "audit" / "access.jsonl",
         principal_directory=principal,
+        # T-316d：报告落盘根。与其它数据路径一样必须在仓外且互不重叠。
+        report_root=root / "reports",
         public_origin="https://ca.example",
         oauth_client_id="cli_fake",
         oauth_client_secret="not-a-real-secret",
@@ -1052,6 +1054,7 @@ def main():
                 "REVIEW_API_SESSION_DB": str(env_root / "same.db"),
                 "REVIEW_API_ACCESS_LOG": str(env_root / "access.jsonl"),
                 "REVIEW_PRINCIPAL_DIRECTORY": str(env_root / "principals.json"),
+                "REVIEW_REPORT_ROOT": str(env_root / "reports"),
                 "REVIEW_PUBLIC_ORIGIN": "https://ca.example",
                 "REVIEW_OAUTH_CLIENT_ID": "cli_independent",
                 "REVIEW_OAUTH_CLIENT_SECRET": "not-real",

@@ -161,6 +161,81 @@ def main():
         except LedgerValidation as exc:
             denied = exc.code == "bad_command"
         report(denied, "C11 未知命令 fail closed")
+
+        # ── C12–C15（T-316b）：ingest 携带的报告渲染输入 ──────────────
+        #
+        # 缺口：judge_entry 丢弃 snapshot 那段已在 verify_judge_entry 的 C6–C9
+        # 验过。这里验的是**另一半** —— reducer 收到它之后是否原样保留、
+        # 坏形状是否被拒。两处分开，是因为一个是「有没有传」、一个是
+        # 「传到了以后会不会被悄悄改掉」，失败时要查的文件不同。
+        base_payload = {
+            "submission_id": "s-snap",
+            "submission_hash": "h" * 64,
+            "tenant": "t1", "product_line": "p",
+            "submitter_id": "alice",
+            "content": {"unit_id": "u-1",
+                        "fingerprint": {"text_sha256": "a" * 64}},
+            "ir": {"ir_id": "ir-1", "findings": [],
+                   "decision": {"state": "REVIEW"}},
+            "judgment": {"label": "REVIEW", "run_state": "OK"},
+            "report_snapshot": {
+                "ir": {"ir_id": "ir-1", "findings": [],
+                       "decision": {"state": "REVIEW"}},
+                "failure_kind_counts": {"fetch_error": 0, "parse_error": 0,
+                                        "empty": 0, "unsupported": 0},
+                "unknown_bucket_counts": {},
+                "evidence": [], "unassessed": [],
+                "receipt": {"skill": "s", "version": "1"},
+            },
+        }
+
+        snap_state, snap_events, _ = reduce_command(
+            initial_state("case-snap"), "ingest_submission", "alice", 0,
+            {**base_payload, "case_id": "case-snap"}, now=5000)
+        report(snap_state["report_snapshot"] is not None
+               and snap_state["report_snapshot"]["ir"]["ir_id"] == "ir-1",
+               "C12 ingest 保留 report_snapshot（不被丢弃）")
+        # ★ 反向面：事件快照是权威的持久形态。只要 state 里有而事件里没有，
+        #   重放就会把它丢掉 —— 这条防的正是那种写法。
+        report(snap_events[0]["state"]["report_snapshot"] is not None,
+               "C13 report_snapshot 进入事件快照（重放后仍在）")
+
+        # 缺省必须被接受（不是所有 judge_fn 都会给），且落成 None 不是缺键
+        # ★ C14 必须自己 try/except，不能让它抛到 main 的兜底。
+        #   第一版没写，实测：把 report_snapshot 改成必填后，本验证器退 2
+        #   并打印「UNTESTED: bad_report_snapshot: 必填」—— 一条判据如果只可能
+        #   绿或「未测」，它就不是判据（#136 / 0d84ccd 的同一个形状）。
+        no_snap = {k: v for k, v in base_payload.items() if k != "report_snapshot"}
+        try:
+            ns_state, _, _ = reduce_command(
+                initial_state("case-nosnap"), "ingest_submission", "alice", 0,
+                {**no_snap, "case_id": "case-nosnap"}, now=5000)
+            absent_ok = ("report_snapshot" in ns_state
+                         and ns_state["report_snapshot"] is None)
+            absent_detail = ""
+        except LedgerValidation as exc:
+            absent_ok = False
+            absent_detail = "%s: %s" % (exc.code, exc.detail)
+        report(absent_ok,
+               "C14 不给 report_snapshot → 键仍在且为 None（缺省不是错误）",
+               absent_detail)
+
+        # 坏形状必须拒 —— 坏快照一旦随权威落盘就是永久的
+        for name, mutate in (
+                ("不是对象", lambda v: v.update({"report_snapshot": ["x"]})),
+                ("ir 不是对象", lambda v: v["report_snapshot"].update({"ir": "x"})),
+                ("failure_kind_counts 不是对象",
+                 lambda v: v["report_snapshot"].update({"failure_kind_counts": []})),
+        ):
+            bad = copy.deepcopy({**base_payload, "case_id": "case-badsnap"})
+            mutate(bad)
+            try:
+                reduce_command(initial_state("case-badsnap"), "ingest_submission",
+                               "alice", 0, bad, now=5000)
+                rejected = False
+            except LedgerValidation as exc:
+                rejected = exc.code == "bad_report_snapshot"
+            report(rejected, "C15 report_snapshot %s → 拒绝" % name)
     except AssertionError as exc:
         print("UNTESTED: 验收器内部断言失败: %s" % exc, file=sys.stderr)
         return 2
