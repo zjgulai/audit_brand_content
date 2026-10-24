@@ -61,6 +61,13 @@
       "fixture": "{root}/tools/verify_normalizer.py",
       "command": "{venv} {root}/tools/verify_normalizer.py"
     },
+    "11": {
+      "test_id": "acceptance-11",
+      "criteria": "L1-4b",
+      "fixture": "{root}/tools/verify_parse_convergence.py",
+      "command": "{venv} {root}/tools/verify_parse_convergence.py",
+      "timeout": 180
+    },
     "12": {
       "test_id": "acceptance-12",
       "criteria": "SEC-3.3.1-1 / SEC-3.3.1-2 / SEC-3.3.1-3",
