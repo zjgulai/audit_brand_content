@@ -216,9 +216,11 @@ def main():
                 out = svc.run_reaudit(cid)
             except InvalidTransition as exc:
                 # 变异（失效判据被掏空）会让重审被拒 —— 那是 FAIL 不是崩溃。
+                # SystemExit(1) 被 mutprobe 记为 killed；后面的段落全部依赖
+                # 重审成功，跳过比各处判空更诚实。
                 report(False, "X2 重审后 ir_id 与旧版不同（#98 ①）",
                        "（重审被拒：%s）" % getattr(exc, "code", exc))
-                raise AssertionError("X2 reaudit rejected") from exc
+                raise SystemExit(1) from exc
             new_state = auth.state(cid)
             new_ir = new_state["ir"]
             report(out.get("ok") is True
