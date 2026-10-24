@@ -41,14 +41,18 @@ PRODUCTION_WRITE_PATHS = {
     "/api/v1/cases/{id}/actions",
     # T-312b：下线六条。改前它们是 501 —— 而 `IMPLEMENTED_WRITE_PATHS` 里
     # 一直有它们，于是「开发装配能点、生产点了报错」。
-    # ★ 只放行这六条，不放行 release-decision / release-revoke：
-    #   签发依赖 `kb_snapshot_hash`（T-310 未交付），放行等于给一个假成功。
     "/api/v1/takedown-tasks/{id}/start",
     "/api/v1/takedown-tasks/{id}/complete",
     "/api/v1/takedown-tasks/{id}/fail",
     "/api/v1/takedown-tasks/{id}/retry",
     "/api/v1/takedown-tasks/{id}/reassign",
     "/api/v1/takedown-tasks/{id}/waive",
+    # T-310c：签发两条进权威。原先不放行的原因（缺 kb_snapshot_hash）
+    # 已由 T-310a 消除（D1 裁定口径，判定时点写入 state）；
+    # 生产分支走 ReviewCommandService.release_decision，状态落
+    # state["release"]，不再落内存 gate —— C3j 断言随之翻转为「必须在册」。
+    "/api/v1/cases/{id}/release-decision",
+    "/api/v1/cases/{id}/release-revoke",
 }
 COOKIE_NAME = "__Host-session"
 OAUTH_BIND_COOKIE = "__Host-oauth-bind"

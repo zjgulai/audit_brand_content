@@ -8,6 +8,11 @@ import threading
 
 from base.business_event_store import AuthorityConflict
 from base.projector import Projector
+from base.release_binding import binding_from_state
+from base.release_gate import (SIGNATURE_VERSION, InvalidTransition,
+                               ReleaseGate, SignatureError, _binding,
+                               _canonical, _sha, signature_hash,
+                               validate_signature)
 
 
 class ReviewCommandService:
@@ -272,6 +277,106 @@ class ReviewCommandService:
         with self._lock:
             Projector(self.authority, self.projection).catch_up()
             return self.projection.status(self.authority.head())
+
+    def release_decision(self, *, aggregate_id, principal, action, token,
+                         nonce, reason, step_up_consumer, idempotency_key,
+                         now=None):
+        """签发/驳回/撤回进权威（T-310c）。
+
+        ① 读权威 state → ② SoD/能力校验 → ③ 消费 step-up → ④ 构造签名 →
+        ⑤ authority.execute。
+
+        ★ 顺序不能换，两段各自有理由：
+          ③ 必须在 ② **之后** —— 顺序反了，一个没有 release.sign 的人
+            也能烧掉别人的 step-up token（拒绝服务）；
+          ③ 必须在 ⑤ **之前** —— 先消费后提交：权限之外任何一步失败，
+            token 已烧、权威未动（P3 的判据「失败不落案」）。
+
+        判定函数与开发装配是**同一份** ReleaseGate._authorize / _binding /
+        validate_signature —— 两条分支不是两套逻辑，只是状态落点不同
+        （开发装配落在内存 gate._cases，生产落在权威 state["release"]）。
+        读代码的人不要在这里找第二套判定。
+
+        step_up_consumer(principal, state, action, token, nonce) -> ref：
+        由 API 层注入（它持有 runtime 的 session store）；service 不持有
+        session —— 与 reducer 不消费 step-up 是同一条分工。
+
+        ## 签名的构造位置
+
+        gate.sign 在内存里构造签名；这里在服务层构造（reducer 只校验不构造，
+        —— reducer 是纯函数，构造需要 step-up ref 与当前时间）。字段集与
+        gate.sign 逐字段一致（含 sid 的哈希输入），唯一来源是本方法。
+        """
+        import time
+        if action not in ("sign", "reject", "revoke"):
+            raise ValueError("action 必须是 sign/reject/revoke")
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise AuthorityConflict("idempotency_key_missing", "Idempotency-Key 必填")
+        principal_id = (principal or {}).get("id")
+        tenant = (principal or {}).get("tenant")
+        if not all(isinstance(v, str) and v.strip() for v in (principal_id, tenant)):
+            raise AuthorityConflict("actor_missing", "principal id/tenant 必填")
+        actor = {"principal_id": principal_id.strip(), "tenant_id": tenant.strip()}
+        state = self.authority.state(aggregate_id)
+        if not isinstance(state, dict) or not state.get("case_id"):
+            raise InvalidTransition("案件不存在或未入库：%r" % (aggregate_id,))
+
+        gate = ReleaseGate(sessions=None)  # 只用它的判定函数，不落状态
+        if action == "revoke":
+            release = state.get("release")
+            if (release or {}).get("status") != "signed":
+                raise InvalidTransition(
+                    "只有 signed 可撤回，当前 %r" % (release or {}).get("status"))
+            gate._authorize(state, principal, "revoke")            # ②
+            step_up_ref = step_up_consumer(principal, state,        # ③
+                                           "revoke", token, nonce)
+            committed = self.execute(                               # ⑤
+                aggregate_id=aggregate_id, command="release_revoke",
+                actor=actor, expected_version=state["version"],
+                payload={"reason": reason or "", "step_up_ref": step_up_ref},
+                idempotency_key=idempotency_key, now=now)
+            return committed
+
+        if state.get("status") != "closed":
+            raise InvalidTransition(
+                "未结案不许签发，当前案件状态 %r" % state.get("status"))
+        release = state.get("release")
+        if release is not None and release.get("status") != "pending_release":
+            raise InvalidTransition(
+                "只有 pending_release 可签发，当前 %r" % release.get("status"))
+        gate._authorize(state, principal, "sign")                   # ②
+        step_up_action = "reject" if action == "reject" else "sign"
+        step_up_ref = step_up_consumer(principal, state,            # ③
+                                       step_up_action, token, nonce)
+        decision = "rejected" if action == "reject" else "signed"
+        signatures = (release or {}).get("signatures") or []
+        timestamp = time.time() if now is None else float(now)
+        sid = "sig-" + _sha(_canonical({
+            "case_id": state["case_id"], "case_version": state["version"],
+            "signed_at": timestamp, "nonce": nonce, "n": len(signatures),
+        }))[:16]
+        sig = dict(_binding(binding_from_state(state)))             # ④
+        sig.update({
+            "signature_id": sid,
+            "signature_version": SIGNATURE_VERSION,
+            "signer_id": principal_id,
+            "signed_at": str(timestamp),
+            "step_up_ref": step_up_ref,
+            "decision": decision,
+            "reason": reason or "",
+            "derived_from": (signatures[-1]["signature_id"]
+                             if signatures else None),
+        })
+        sig["signature_hash"] = signature_hash(sig)
+        errs = validate_signature(sig)
+        if errs:
+            raise SignatureError("签名不合法：%s" % "; ".join(errs))
+        return self.execute(                                        # ⑤
+            aggregate_id=aggregate_id,
+            command="release_sign" if decision == "signed" else "release_reject",
+            actor=actor, expected_version=state["version"],
+            payload={"signature": sig},
+            idempotency_key=idempotency_key, now=now)
 
     def expire_if_due(self, aggregate_id, *, now=None,
                       actor_id="lease-sweeper"):

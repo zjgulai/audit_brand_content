@@ -831,6 +831,31 @@ def create_app(*, session_store=None, repository=None, principals=None,
         if case is None:
             raise HTTPException(404, "案件不存在")
         require_read(principal, case)
+        # T-310c：authority 有值时优先（签发状态住在 state["release"]）；
+        # frozen JSON 退化为兜底。★ 没有签发状态时返回 pending_release/
+        # 待放行，**不是 {}** —— 前端要拿「待放行」这个状态，空对象会让
+        # 「还没签」与「读不到」长得一样（T-310 施工单 §T-310c）。
+        if case_state_provider is not None:
+            # 变量名用 live：C5/R1 静态扫描禁 `*state =` 赋值（API 不计算 state，
+            # 只读 provider）—— 与本文件 :675 的既有读法一致。
+            live = case_state_provider(id)
+            if isinstance(live, dict):
+                release = live.get("release")
+                if isinstance(release, dict):
+                    sigs = release.get("signatures") or []
+                    return {
+                        "status": release.get("status"),
+                        "release_status": release.get("release_status"),
+                        "signatures_count": len(sigs),
+                        "last_signed_at": (sigs[-1] or {}).get("signed_at")
+                        if sigs else None,
+                        "last_event_kind": (release.get("events") or [{}])[-1].get(
+                            "kind") if release.get("events") else None,
+                    }
+                if live.get("status") == "closed":
+                    return {"status": "pending_release",
+                            "release_status": "待放行",
+                            "signatures_count": 0, "last_signed_at": None}
         return repo.release_readiness.get(id, {})
 
     @app.get("/api/v1/takedown-tasks")

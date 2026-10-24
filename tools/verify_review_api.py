@@ -406,6 +406,48 @@ def _run_main():
            "C5b TS-10 /cases/{id} 明细 IR 与夹具对上（样本真的经 API 读到）",
            "%s dt_tag=%r" % (st, ir_in.get("dt_tag")))
 
+    # ── C8 /release-readiness 的 authority 分支（T-310c）──
+    # authority 有 release → signed/已放行/计数；closed 未签 → pending_release
+    # （**不是 {}**）；既非 closed 也无 release → 落 frozen 兜底。
+    ready_cases = probe_cases()
+    ready_state_signed = {
+        "case_id": "c-block", "status": "closed", "version": 4,
+        "release": {"status": "signed", "release_status": "已放行",
+                    "signatures": [{"signed_at": "2026-10-25T00:00:00Z"}],
+                    "events": [{"kind": "release_signed"}]}}
+    ready_state_open = {"case_id": "c-cand", "status": "closed", "version": 3}
+    ready_app = create_app(
+        session_store=SessionStore(":memory:"), repository=probe_repo,
+        principals=principals,
+        case_state_provider=lambda cid: (
+            ready_state_signed if cid == "c-block"
+            else ready_state_open if cid == "c-cand" else None))
+    ready_sess = ready_app.state.session_store.create_session(
+        "u_dp3", tenant="t1", now=time.time())
+    st, body_r = call(ready_app, "GET",
+                      "/api/v1/cases/c-block/release-readiness",
+                      cookie=ready_sess)
+    report(st == 200 and body_r.get("status") == "signed"
+           and body_r.get("release_status") == "已放行"
+           and body_r.get("signatures_count") == 1
+           and body_r.get("last_signed_at") == "2026-10-25T00:00:00Z",
+           "C8a readiness authority 分支：signed 读回（含 last_signed_at）",
+           "%s %r" % (st, body_r))
+    st, body_o = call(ready_app, "GET",
+                      "/api/v1/cases/c-cand/release-readiness",
+                      cookie=ready_sess)
+    report(st == 200 and body_o.get("status") == "pending_release"
+           and body_o.get("release_status") == "待放行"
+           and body_o.get("signatures_count") == 0,
+           "C8b closed 未签 → pending_release/待放行（不是 {}）",
+           "%s %r" % (st, body_o))
+    st, body_f = call(ready_app, "GET",
+                      "/api/v1/cases/c-clean/release-readiness",
+                      cookie=ready_sess)
+    report(st == 200 and body_f == {},
+           "C8c 无 release 且未 closed → frozen 兜底（空）",
+           "%s %r" % (st, body_f))
+
     # C5c 复算路径独立性：本验收器 import 的 decide 必须是 base/decision_table 的
     # 真身（不是 API 层 re-export 的同一个名字），且三档期望值齐全且互不相同 ——
     # 否则对拍就退化成「同一个函数两次输出恒等」的自比恒真。

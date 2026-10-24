@@ -73,12 +73,24 @@ def make_settings(root, *, report_root=None, tenant_allowlist=None):
     frozen = root / "frozen"
     frozen.mkdir(parents=True, exist_ok=True)
     principal = root / "principals.json"
-    principal.write_text(json.dumps({"principals": [{
-        "id": "u1", "tenant_id": TENANT, "open_id": "ou-u1",
-        "roles": ["dp3", "coordinator", "signer"], "product_lines": [PRODUCT_LINE],
-        "product_line": PRODUCT_LINE, "capabilities": [], "status": "active",
-        "authz_version": "u1-v1",
-    }]}), encoding="utf-8")
+    # 两个身份：u1 提交/复核（coordinator），u2 签发（signer）——
+    # SoD 禁止提交人签发自己的案件，单身份走不通签发腿。
+    principal.write_text(json.dumps({"principals": [
+        {
+            "id": "u1", "tenant_id": TENANT, "open_id": "ou-u1",
+            "roles": ["dp3", "coordinator"], "product_lines": [PRODUCT_LINE],
+            "product_line": PRODUCT_LINE, "capabilities": [], "status": "active",
+            "authz_version": "u1-v1",
+        },
+        {
+            "id": "u2", "tenant_id": TENANT, "open_id": "ou-u2",
+            "roles": ["dp3", "signer"], "product_lines": [PRODUCT_LINE],
+            "product_line": PRODUCT_LINE, "status": "active",
+            # T-310c：签发的 SoD 判定读 principal["capabilities"]（gate._authorize
+            # 既有口径；与 can_act 的角色矩阵是两套口径，T-315b 名单化时统一）。
+            "capabilities": ["release.sign", "release.revoke"],
+            "authz_version": "u2-v1",
+        }]}), encoding="utf-8")
     return ProductionSettings(
         authority_root=root / "authority",
         frozen_projection_root=frozen,
@@ -96,7 +108,7 @@ def make_settings(root, *, report_root=None, tenant_allowlist=None):
     )
 
 
-def cookie_for(runtime):
+def cookie_for(runtime, pid="u1"):
     """建 session，并返回 (sid, csrf)。
 
     ★ CSRF token 由**调用方**生成后交给 store（store 只存它的 hash），
@@ -105,7 +117,7 @@ def cookie_for(runtime):
     """
     csrf = "csrf-" + os.urandom(8).hex()
     sid = runtime.session_store.create_session(
-        "u1", tenant=TENANT, csrf_token=csrf)
+        pid, tenant=TENANT, csrf_token=csrf)
     return sid, csrf
 
 
@@ -212,9 +224,12 @@ def main():
         report(takedown_paths <= set(PRODUCTION_WRITE_PATHS),
                "D5-6 ★ six takedown write paths enabled in production",
                repr(sorted(takedown_paths - set(PRODUCTION_WRITE_PATHS))))
-        report("/api/v1/cases/{id}/release-decision" not in PRODUCTION_WRITE_PATHS
-               and "/api/v1/cases/{id}/release-revoke" not in PRODUCTION_WRITE_PATHS,
-               "D5-7 ★ release paths still 501 (T-310 not delivered)")
+        # T-310c：签发两条进生产能力表（D5-7 原断言「仍 501」随交付翻转 ——
+        # 那条防假成功的反向对照，如今判据反过来：放行必须有真实现撑着，
+        # 由下面的 D5-9（真签发）与 D5-13（重启后仍在）证明不是假成功。
+        report("/api/v1/cases/{id}/release-decision" in PRODUCTION_WRITE_PATHS
+               and "/api/v1/cases/{id}/release-revoke" in PRODUCTION_WRITE_PATHS,
+               "D5-7 ★ release 两条已进生产能力表（T-310c 交付，有真实现）")
 
         session, csrf = cookie_for(runtime)
         client = TestClient(app)
@@ -302,16 +317,41 @@ def main():
             hb_ok, hb_detail = False, "%s: %s" % (type(exc).__name__, exc)
         report(hb_ok, "D5-8 maintain_once() runs (heartbeat live)", hb_detail)
 
-        # D5-9 release-decision is 501, not 403/500
-        st, body9 = call(client, "POST",
-                         "/api/v1/cases/%s/release-decision" % case_id,
-                         "d5-release", csrf=csrf,
-                         payload={"decision": "sign", "version": 1,
-                                  "reason": "x"})
-        msg = str((body9 or {}).get("message") or "")
-        report(st == 501 and "capability_not_enabled" in msg,
-               "D5-9 ★ release-decision answers 501 capability_not_enabled",
-               "%s %r" % (st, msg))
+        # D5-9 release-decision 进权威（T-310c）：step-up 真消费、签名真构造、
+        # 状态落 state["release"]。原断言「501」随交付翻转。
+        # ★ 用 u2 签发：SoD 禁止提交人（u1）签发自己的案件 —— 单身份走不通。
+        live_version = (runtime.authority.state(case_id) or {}).get("version")
+        sid_u2, csrf_u2 = cookie_for(runtime, "u2")
+        client_u2 = TestClient(app)
+        client_u2.cookies.set("__Host-session", sid_u2)
+        token9 = runtime.session_store.issue_step_up(
+            "u2", case_id, "sign", "n-d5-sign")
+        st9, body9 = call(client_u2, "POST",
+                          "/api/v1/cases/%s/release-decision" % case_id,
+                          "d5-release", csrf=csrf_u2,
+                          payload={"decision": "sign", "version": live_version,
+                                   "reason": "D5 签发", "step_up_token": token9,
+                                   "nonce": "n-d5-sign"})
+        rel9 = (body9 or {}).get("release") or {}
+        sig9 = (body9 or {}).get("signature") or {}
+        report(st9 == 200 and rel9.get("status") == "signed"
+               and rel9.get("release_status") == "已放行"
+               and len(sig9.get("signature_hash", "")) == 64
+               and sig9.get("kb_snapshot_hash") == (runtime.authority.state(case_id)
+                                                    or {}).get("kb_snapshot_hash"),
+               "D5-9 ★ 生产装配真实签发（signed/已放行/绑定 kb_snapshot_hash）",
+               "%s %r" % (st9, rel9.get("status")))
+        # 缺 step-up 必须 403 且权威 seq 不变（失败不落案）
+        seq_before = runtime.authority.head()["seq"]
+        live_version2 = (runtime.authority.state(case_id) or {}).get("version")
+        st9b, body9b = call(client_u2, "POST",
+                            "/api/v1/cases/%s/release-revoke" % case_id,
+                            "d5-revoke-nostep", csrf=csrf_u2,
+                            payload={"version": live_version2, "reason": "x"})
+        report(st9b == 403
+               and runtime.authority.head()["seq"] == seq_before,
+               "D5-9b 缺 step-up 的撤回 → 403 且权威不落批次",
+               "%s seq %r" % (st9b, seq_before))
 
         # D5-4 restart identity
         before = dict(record)
@@ -331,6 +371,14 @@ def main():
                    "D5-4 ★ restart keeps report_id/sha256/url/bytes identical",
                    "id %r -> %r" % (before.get("report_id"),
                                     after.get("report_id")))
+            # D5-13 签发重启恒等（T-310b/c）：重启后 state["release"] 仍 signed。
+            # （/release-readiness 的 authority 分支在 verify_review_api 里测 ——
+            #   这里再造第二个 runtime app 会跟 writer lease 打架。）
+            rel_after = (runtime2.authority.state(case_id) or {}).get("release") or {}
+            report(rel_after.get("status") == "signed"
+                   and len(rel_after.get("signatures") or []) == 1,
+                   "D5-13 ★ 签发跨重启仍在（state['release'] 恒等）",
+                   repr(rel_after.get("status")))
         finally:
             runtime2.stop()
             runtime = None

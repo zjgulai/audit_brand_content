@@ -26,6 +26,7 @@ from base.release_gate import (
     InvalidTransition, SignatureError, SoDViolation, StepUpError,
 )
 from base.rbac import can_act, can_reassign_takedown
+from base.business_event_store import AuthorityConflict
 from base.reviews_ledger import (
     LedgerConflict, LedgerNotFound, LedgerValidation,
 )
@@ -379,7 +380,8 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                     "not_assignee", "not_primary", "primary_requires_adopt",
                     "lease_expired", "lease_active", "not_claimed",
                     "idempotency_conflict", "already_ingested",
-                    "unadjudicated_findings", "invalid_finding_transition"):
+                    "unadjudicated_findings", "invalid_finding_transition",
+                    "invalid_transition"):
             if command == "ingest_submission" and code == "version_conflict":
                 raise HTTPException(409, "already_ingested: 该 submission 已建案")
             raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
@@ -905,6 +907,23 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
             request, idempotency_key, run, actor=principal["id"],
             request_body={"task_id": id, **body.model_dump()})
 
+    def _consume_step_up(principal, state, action, token, nonce, now=None):
+        """step-up 消费（T-310c）。与 ReleaseGate._consume 同一形状；
+        store 来自 app.state —— 生产装配是 RuntimeProxy，开发装配是真 store。
+        service 不持有 session（与 reducer 不消费 step-up 同一条分工）。
+        """
+        store = app.state.session_store
+        if store is None:
+            raise StepUpError("没有 session store —— step-up 无法消费，拒绝签发")
+        if not isinstance(token, str) or not token:
+            raise StepUpError("step-up token 缺失")
+        ref = store.consume_step_up_ref(
+            token, principal.get("id"), state.get("case_id"), action,
+            nonce, now=now)
+        if not ref:
+            raise StepUpError("step-up token 无效（过期/已用/绑定不符）")
+        return ref
+
     @app.post("/api/v1/cases/{id}/release-decision")
     async def release_decision(id: str, request: Request, body: ReleaseDecisionBody,
                          principal=Depends(principal_dep),
@@ -913,6 +932,52 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         case = case_or_404(id)
         if body.decision not in ("sign", "reject"):
             raise HTTPException(400, "decision 必须是 sign/reject")
+        if review_command_service is not None:
+            # 生产读权威版本（投影/frozen 的 case 形状没有 case_version 键，
+            # 统一用 case.get("case_version") 会在生产恒 409）。
+            live = review_command_service.authority.state(id) or {}
+            if body.version != live.get("version"):
+                raise HTTPException(409, "version_conflict: 案件版本已变化")
+            # 生产分支（T-310c）：签发进权威 state["release"]。
+            # ★ 判定函数与下面的内存分支是同一份（ReleaseGate._authorize /
+            #   _binding / validate_signature），只是状态落点不同 ——
+            #   这不是双口径，两条分支并存是施工单 §T-310c 的明文决定。
+            def run_prod():
+                try:
+                    outcome = review_command_service.release_decision(
+                        aggregate_id=id, principal=principal,
+                        action=body.decision, token=body.step_up_token,
+                        nonce=body.nonce, reason=body.reason or "",
+                        step_up_consumer=_consume_step_up,
+                        idempotency_key=idempotency_key)
+                except (SoDViolation, StepUpError, InvalidTransition,
+                        SignatureError) as exc:
+                    code = type(exc).__name__
+                    status = {"SoDViolation": 403, "StepUpError": 403,
+                              "InvalidTransition": 409,
+                              "SignatureError": 400}[code]
+                    raise HTTPException(status, "%s: %s" % (code, exc))
+                except AuthorityConflict as exc:
+                    raise_command_http(exc, "release_sign")
+                except LedgerConflict as exc:
+                    raise_command_http(exc, body.decision)
+                except LedgerValidation as exc:
+                    raise_command_http(exc, body.decision)
+                response = dict(outcome["result"])
+                response.update({
+                    "authority_snapshot": outcome["authority_snapshot"],
+                    "reconcile_token": outcome["reconcile_token"],
+                    "projection_lag": outcome["projection_lag"],
+                    "replayed": outcome["replayed"],
+                })
+                return JSONResponse(content=response,
+                                    status_code=outcome["http_status"])
+            # 生产幂等走权威（BusinessEventStore 的跨重启幂等），不走
+            # _idempotent 的进程内缓存 —— 与 submission 同一条路。
+            if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+                raise HTTPException(400, "缺少 Idempotency-Key")
+            return run_prod()
+
         if body.version != case.get("case_version"):
             raise HTTPException(409, "version_conflict: 案件版本已变化")
 
@@ -945,6 +1010,43 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                        idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")):
         require_enabled("/api/v1/cases/{id}/release-revoke")
         case = case_or_404(id)
+
+        if review_command_service is not None:
+            # 生产读权威版本（同 release-decision 的理由）。
+            live = review_command_service.authority.state(id) or {}
+            if body.version != live.get("version"):
+                raise HTTPException(409, "version_conflict: 案件版本已变化")
+            def run_prod():
+                try:
+                    outcome = review_command_service.release_decision(
+                        aggregate_id=id, principal=principal, action="revoke",
+                        token=body.step_up_token, nonce=body.nonce,
+                        reason=body.reason or "",
+                        step_up_consumer=_consume_step_up,
+                        idempotency_key=idempotency_key)
+                except (SoDViolation, StepUpError, InvalidTransition,
+                        SignatureError) as exc:
+                    code = type(exc).__name__
+                    status = {"SoDViolation": 403, "StepUpError": 403,
+                              "InvalidTransition": 409,
+                              "SignatureError": 400}[code]
+                    raise HTTPException(status, "%s: %s" % (code, exc))
+                except (AuthorityConflict, LedgerConflict,
+                        LedgerValidation) as exc:
+                    raise_command_http(exc, "release_revoke")
+                response = dict(outcome["result"])
+                response.update({
+                    "authority_snapshot": outcome["authority_snapshot"],
+                    "reconcile_token": outcome["reconcile_token"],
+                    "projection_lag": outcome["projection_lag"],
+                    "replayed": outcome["replayed"],
+                })
+                return JSONResponse(content=response,
+                                    status_code=outcome["http_status"])
+            if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+                raise HTTPException(400, "缺少 Idempotency-Key")
+            return run_prod()
+
         if body.version != case.get("case_version"):
             raise HTTPException(409, "version_conflict: 案件版本已变化")
 

@@ -613,10 +613,11 @@ def main():
     report(not missing_prod,
            "C3i ★ 六条下线写路径已进 PRODUCTION_WRITE_PATHS（不再 501）",
            repr(missing_prod))
-    # 反向：签发两条仍未放行（T-310 未交付，放行等于假成功）
-    report("/api/v1/cases/{id}/release-decision" not in PRODUCTION_WRITE_PATHS
-           and "/api/v1/cases/{id}/release-revoke" not in PRODUCTION_WRITE_PATHS,
-           "C3j ★ release 两条仍未进生产能力表（避免假成功）")
+    # T-310c：签发两条已进生产能力表（原「仍未放行」的反向对照随交付翻转；
+    # 「放行必须有真实现撑着」由 verify_stage_gate_d5 的 D5-9/D5-13 真签发证明）
+    report("/api/v1/cases/{id}/release-decision" in PRODUCTION_WRITE_PATHS
+           and "/api/v1/cases/{id}/release-revoke" in PRODUCTION_WRITE_PATHS,
+           "C3j ★ release 两条已进生产能力表（T-310c 交付）")
 
     # C4 release-decision / revoke：真实 ReleaseGate + step-up + SoD + 版本
     st, _ = call(app, "POST", "/api/v1/cases/case-release/release-decision",
@@ -815,9 +816,11 @@ def main():
                     "/api/v1/cases/case-release/release-decision", signer,
                     "K-prod-rel", {"decision": "sign", "version": 1})
     message = str((body or {}).get("message") or "")
-    report(st == 501 and "capability_not_enabled" in message
-           and "release_gate 未实现" not in message,
-           "T-102 生产 capability 下 release 只报 capability_not_enabled",
+    # T-310c：release 两条进了生产能力表，探针从「必须 501」翻转为
+    # 「不得 501」—— 放行之后的行为正确性由 verify_stage_gate_d5 的
+    # D5-9（真签发）/D5-13（重启恒等）背书，这里只钉「白名单与实现一致」。
+    report(st != 501 and "capability_not_enabled" not in message,
+           "T-102 生产 capability 下 release 不再 501（T-310c 交付）",
            "%s %r" % (st, message))
 
     print("----------------------------------------")

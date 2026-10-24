@@ -137,7 +137,13 @@ def _routing_gaps(cp_codes, route_rows):
 
 # ── #53 / #68：release_status 生产点全量扫描 ────────────────────────────
 RELEASE_OUTCOMES = ("待放行", "已放行", "已拒绝", "已撤回", "已失效")
-HUMAN_GATE_FILE = os.path.join("base", "release_gate.py")
+# T-310b（2026-10-25）：人工门状态机的权威住址搬进 review_reducer.py
+# （签发进权威），release_gate.py 保留开发装配的内存路径 —— 两处是同一台
+# 状态机的两个落点（施工单 §T-310c），**第三个文件出现仍然红**。
+HUMAN_GATE_FILES = frozenset({
+    os.path.join("base", "release_gate.py"),
+    os.path.join("base", "review_reducer.py"),
+})
 RELEASE_PRODUCERS = ("base/disposition_router.py", "base/decision_table.py",
                      "base/judge_entry.py", "base/media.py",
                      "base/release_gate.py", "base/case_watch.py",
@@ -170,7 +176,8 @@ def _scan_release_writes(sources):
     """E4 判定器：多文件 release_status 常量扫描（#53 / #68）。
     sources = {相对路径: 源码文本} → 违规清单（空 = 通过）。
       ① 常量值只允许五档结局；
-      ② 人工门结局（非「待放行」）只许出现在 release_gate.py。
+      ② 人工门结局（非「待放行」）只许出现在 HUMAN_GATE_FILES
+        （release_gate.py 内存路径 + review_reducer.py 权威路径，T-310b）。
     ★ 结局清单来自判据原文，不从被扫文件读 —— 常量改了断言不会跟着绿。"""
     bad = []
     for rel in sorted(sources):
@@ -184,8 +191,9 @@ def _scan_release_writes(sources):
                 continue        # ERROR 骨架里的占位 None
             if v not in RELEASE_OUTCOMES:
                 bad.append("%s: release_status 常量 %r 不在五档结局内" % (rel, v))
-            elif v != "待放行" and rel != HUMAN_GATE_FILE:
-                bad.append("%s: 人工门结局 %r 出现在 release_gate.py 之外" % (rel, v))
+            elif v != "待放行" and rel not in HUMAN_GATE_FILES:
+                bad.append("%s: 人工门结局 %r 出现在人工门状态机文件之外"
+                           % (rel, v))
     return bad
 
 
