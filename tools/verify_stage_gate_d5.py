@@ -87,9 +87,21 @@ def make_settings(root, *, report_root=None, tenant_allowlist=None):
             "roles": ["dp3", "signer"], "product_lines": [PRODUCT_LINE],
             "product_line": PRODUCT_LINE, "status": "active",
             # T-310c：签发的 SoD 判定读 principal["capabilities"]（gate._authorize
-            # 既有口径；与 can_act 的角色矩阵是两套口径，T-315b 名单化时统一）。
+            # 既有口径）；名单层（can_sign_release）由 D5-8 的授权链证明。
             "capabilities": ["release.sign", "release.revoke"],
             "authz_version": "u2-v1",
+        },
+        {
+            "id": "u3", "tenant_id": TENANT, "open_id": "ou-u3",
+            "roles": ["dp4"], "product_lines": [PRODUCT_LINE],
+            "product_line": PRODUCT_LINE, "capabilities": [], "status": "active",
+            "authz_version": "u3-v1",
+        },
+        {
+            "id": "u4", "tenant_id": TENANT, "open_id": "ou-u4",
+            "roles": ["it"], "product_lines": [PRODUCT_LINE],
+            "product_line": PRODUCT_LINE, "capabilities": [], "status": "active",
+            "authz_version": "u4-v1",
         }]}), encoding="utf-8")
     return ProductionSettings(
         authority_root=root / "authority",
@@ -317,10 +329,60 @@ def main():
             hb_ok, hb_detail = False, "%s: %s" % (type(exc).__name__, exc)
         report(hb_ok, "D5-8 maintain_once() runs (heartbeat live)", hb_detail)
 
+        # D5-8 授权链（T-315b）：signer 必须被 release.sign 名单点名。
+        # 名单源读投影 approved grants —— 先证明「未点名 → 403 且不烧 token」，
+        # 再走 propose(dp4) → execute(it) → approve(coordinator) 三权分立。
+        live_version = (runtime.authority.state(case_id) or {}).get("version")
+        sid_u2_pre, csrf_u2_pre = cookie_for(runtime, "u2")
+        client_u2_pre = TestClient(app)
+        client_u2_pre.cookies.set("__Host-session", sid_u2_pre)
+        tok_pre = runtime.session_store.issue_step_up(
+            "u2", case_id, "sign", "n-d5-pre")
+        st8a, _ = call(client_u2_pre, "POST",
+                       "/api/v1/cases/%s/release-decision" % case_id,
+                       "d5-sign-pre", csrf=csrf_u2_pre,
+                       payload={"decision": "sign", "version": live_version,
+                                "reason": "未点名", "step_up_token": tok_pre,
+                                "nonce": "n-d5-pre"})
+        report(st8a == 403,
+               "D5-8a 未被 release.sign 名单点名 → 403（step-up 不消费）",
+               str(st8a))
+        svc = runtime.service
+        gagg = "grants:%s" % TENANT
+        gp = svc.execute(aggregate_id=gagg, command="grant_propose",
+                         actor={"principal_id": "u3", "tenant_id": TENANT},
+                         expected_version=0,
+                         payload={"capability": "release.sign", "user_id": "u2",
+                                  "reason": "D5 签发授权",
+                                  "scope": {"tenant": TENANT,
+                                            "product_lines": [PRODUCT_LINE]}},
+                         idempotency_key="d5-gp")
+        gid = gp["result"]["grant"]["grant_id"]
+        svc.execute(aggregate_id=gagg, command="grant_execute",
+                    actor={"principal_id": "u4", "tenant_id": TENANT},
+                    expected_version=1, payload={"grant_id": gid},
+                    idempotency_key="d5-ge")
+        svc.execute(aggregate_id=gagg, command="grant_approve",
+                    actor={"principal_id": "u1", "tenant_id": TENANT},
+                    expected_version=2, payload={"grant_id": gid},
+                    idempotency_key="d5-ga")
+        report("u2" in (runtime.allowlist_source().get("release.sign")
+                        or frozenset()),
+               "D5-8b 三权分立授权链后 u2 进 release.sign 名单")
+        # 反向：提案人自己审批 → 403（三权分立仍活着）
+        try:
+            svc.execute(aggregate_id=gagg, command="grant_approve",
+                        actor={"principal_id": "u3", "tenant_id": TENANT},
+                        expected_version=3, payload={"grant_id": gid},
+                        idempotency_key="d5-ga-bad")
+            report(False, "D5-8c 提案人自审 → 拒", "（未拒绝）")
+        except Exception as exc:  # noqa: BLE001
+            report(True, "D5-8c 提案人自审 → 拒",
+                   "%s" % getattr(exc, "code", type(exc).__name__))
+
         # D5-9 release-decision 进权威（T-310c）：step-up 真消费、签名真构造、
         # 状态落 state["release"]。原断言「501」随交付翻转。
         # ★ 用 u2 签发：SoD 禁止提交人（u1）签发自己的案件 —— 单身份走不通。
-        live_version = (runtime.authority.state(case_id) or {}).get("version")
         sid_u2, csrf_u2 = cookie_for(runtime, "u2")
         client_u2 = TestClient(app)
         client_u2.cookies.set("__Host-session", sid_u2)
