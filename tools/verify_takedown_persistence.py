@@ -36,7 +36,8 @@ except Exception as exc:  # noqa: BLE001
     sys.exit(2)
 
 
-def _ingest_and_close(svc, cid, actor="ou_w"):
+def _ingest_and_close(svc, cid, actor="ou_w", now=None):
+    base_t = now if now is not None else time.time()
     svc.execute(aggregate_id=cid, command="ingest_submission",
                 actor={"principal_id": actor, "tenant_id": "t1"},
                 expected_version=0,
@@ -53,26 +54,26 @@ def _ingest_and_close(svc, cid, actor="ou_w"):
                          "judgment": {"label": "REVIEW", "run_state": "OK"},
                          "tenant": "t1", "product_line": "pump",
                          "submitter_id": actor},
-                idempotency_key="ing-" + cid)
+                idempotency_key="ing-" + cid, now=base_t)
     svc.execute(aggregate_id=cid, command="claim",
                 actor={"principal_id": actor, "tenant_id": "t1"},
                 expected_version=1, payload={},
-                idempotency_key="cl-" + cid)
+                idempotency_key="cl-" + cid, now=base_t + 1)
     svc.execute(aggregate_id=cid, command="submit_review",
                 actor={"principal_id": actor, "tenant_id": "t1"},
                 expected_version=2,
                 payload={"conclusion": {"review_notes": "结案"}},
-                idempotency_key="close-" + cid)
+                idempotency_key="close-" + cid, now=base_t + 2)
 
 
-def _create_task(svc, cid, key, assignee="u_td"):
+def _create_task(svc, cid, key, assignee="u_td", now=None):
     return svc.execute(
         aggregate_id=cid, command="takedown_create",
         actor={"principal_id": "ou_coord", "tenant_id": "t1"},
         expected_version=None,
         payload={"trigger": "revoke", "platform": "amazon_us",
                  "assignee": assignee, "reason": "签发撤回"},
-        idempotency_key="td-" + key)
+        idempotency_key="td-" + key, now=now if now is not None else time.time())
 
 
 def main():
@@ -97,8 +98,9 @@ def main():
         svc = ReviewCommandService(auth, proj)
 
         _ingest_and_close(svc, "case-td")
-        out1 = _create_task(svc, "case-td", "1")
-        task1 = out1["result"]["takedown_task"]
+        out1 = _create_task(svc, "case-td", "1",
+                            now=time.time() - 2 * 86400)
+        task1 = out1["result"].get("takedown_task") or {}
         report(task1["task_id"].startswith("td-")
                and task1["assignee"] == "u_td"
                and task1.get("completed_by") is None,
@@ -113,8 +115,9 @@ def main():
         # P2 跨重启不撞号（同案同 trigger 会撞 duplicate_task —— 那是另一条
         # 守卫；跨重启撞号用第二个案件测）
         _ingest_and_close(svc, "case-td2")
-        out2 = _create_task(svc, "case-td2", "2", assignee="u_td2")
-        task2 = out2["result"]["takedown_task"]
+        out2 = _create_task(svc, "case-td2", "2", assignee="u_td2",
+                            now=time.time() - 2 * 86400)
+        task2 = out2["result"].get("takedown_task") or {}
         report(task2["task_id"] != task1["task_id"],
                "P2 重启后第二条 task_id 不撞号")
         # P3 投影可重建
