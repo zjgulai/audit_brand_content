@@ -101,7 +101,7 @@ def main():
         out1 = _create_task(svc, "case-td", "1",
                             now=time.time() - 2 * 86400 - 5 * 3600)
         task1 = out1["result"].get("takedown_task") or {}
-        report(task1["task_id"].startswith("td-")
+        report((task1.get("task_id") or "").startswith("td-")
                and task1["assignee"] == "u_td"
                and task1.get("completed_by") is None,
                "P0 takedown_create 经真权威落任务")
@@ -157,7 +157,7 @@ def main():
             svc.execute(aggregate_id="case-td", command="takedown_transition",
                         actor={"principal_id": "u_td", "tenant_id": "t1"},
                         expected_version=None,
-                        payload={"task_id": task1["task_id"],
+                        payload={"task_id": task1.get("task_id"),
                                  "to": "pending", "action": "retry"},
                         idempotency_key="t-bad")
             report(False, "P6 非法迁移 → 拒", "（未拒绝）")
@@ -227,7 +227,7 @@ def main():
                     for k, v in expect_ages.items()))
         report(r_p.status_code == 200 and ages_ok,
                "P5 年龄只有一个口径：HTTP metrics == TD.metrics_view 复算",
-               "open=%r/%r" % (got.get("open_count"), expect["open_count"]))
+               "open=%r/%r" % (got.get("open_count"), expect_open))
         # P5b 生产装配的年龄判定不允许出现超时类字段（结构上不给画绿标的机会）
         report(all(k not in got for k in ("on_time", "overdue", "healthy")),
                "P5b metrics 无 on_time/overdue/healthy 字段")
