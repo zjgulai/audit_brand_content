@@ -688,6 +688,170 @@ def main():
         finally:
             shutil.rmtree(appeal_root, ignore_errors=True)
 
+        # ── T-402：名单治理四条在生产装配下必须真的可用（不再是 501）────────
+        #
+        # ★ 这一组**必须是独立的数据根 + 三个真实身份**：
+        #   三权分立的执行点在 reducer（same_actor）与 rbac
+        #   （validate_grant_actors，要求 proposer 是 dp4、executor 是 it、
+        #   approver 有 admin.grant.approve，且三人互不相同）。
+        #   用同一个身份跑完三步，会**恰好**被 same_actor 拦住 ——
+        #   于是断言绿了，而它证明的是「拒绝生效」，不是「链路通了」。
+        grant_root = tempfile.mkdtemp(prefix="production-grants-")
+        try:
+            grant_cfg = settings(grant_root)
+            grant_provider = FakeOAuthProvider({
+                "as-proposer": OAuthIdentity("t1", "ou-proposer"),
+                "as-it": OAuthIdentity("t1", "ou-itsvc"),
+                "as-coord": OAuthIdentity("t1", "ou-coord"),
+            })
+            grant_app = create_production_app(grant_cfg,
+                                             oauth_provider=grant_provider)
+
+            def _identities(client):
+                """在同一 client 上依次登录三个身份，返回 {角色: (cookies, csrf)}。
+
+                ★ 为什么不用三个嵌套 TestClient：每个 TestClient 进一次 lifespan
+                  → `runtime.start()` → `WriterLease.acquire()`，而 flock 对
+                  **同一进程的不同 fd** 仍然互斥 —— 第二个就 `writer_lease_held`。
+                  这不是被测代码的缺陷（生产里本来就只能有一个写者），
+                  是我把夹具搭错了形状。
+                """
+                out = {}
+                for role, code in (("proposer", "as-proposer"),
+                                   ("it", "as-it"),
+                                   ("coord", "as-coord")):
+                    client.cookies.clear()
+                    resp = client.get("/auth/login", follow_redirects=False)
+                    st = parse_qs(urlparse(resp.headers["location"]).query)["state"][0]
+                    client.get("/auth/callback",
+                               params={"code": code, "state": st},
+                               follow_redirects=False)
+                    out[role] = (dict(client.cookies), client.cookies.get("csrf"))
+                client.cookies.clear()
+                return out
+
+            def _as(client, ids, role, key):
+                cookies, token = ids[role]
+                return dict(cookies=cookies,
+                            headers={"Origin": "https://ca.example",
+                                     "X-CSRF-Token": token,
+                                     "Idempotency-Key": key})
+
+            with TestClient(grant_app, base_url="https://ca.example") as gc:
+                ids = _identities(gc)
+                # G1 propose：改前这里是 501 capability_not_enabled
+                r = gc.post("/api/v1/admin/takedown-grants",
+                            **_as(gc, ids, "proposer", "g-propose"),
+                            json={"user_id": "reviewer",
+                                  "capability": "takedown.execute",
+                                  "product_line": "pump",
+                                  "reason": "需要下线"})
+                gid = (r.json() or {}).get("grant_id")
+                report(r.status_code == 200 and isinstance(gid, str)
+                       and (r.json() or {}).get("state") == "proposed",
+                       "T402-G1 ★ dp4 propose → 200/proposed（改前 501）",
+                       "%s %r" % (r.status_code, (r.text or "")[:120]))
+
+                # G2 反向对照：同一个人 execute 必须被拒（三权分立没被放开）
+                r = gc.post(f"/api/v1/admin/grants/{gid}/execute",
+                            **_as(gc, ids, "proposer", "g-self-exec"),
+                            json={})
+                report(r.status_code == 403
+                       and "same_actor" in (r.json().get("message") or ""),
+                       "T402-G2 提案人自己 execute → 403 same_actor（SoD 仍生效）",
+                       "%s %r" % (r.status_code, (r.text or "")[:120]))
+
+                r = gc.post(f"/api/v1/admin/grants/{gid}/execute",
+                            **_as(gc, ids, "it", "g-exec"),
+                            json={"note": "已执行"})
+                report(r.status_code == 200
+                       and (r.json() or {}).get("state") == "executed",
+                       "T402-G3 ★ it execute → 200/executed（改前 501）",
+                       "%s %r" % (r.status_code, (r.text or "")[:120]))
+
+                r = gc.post(f"/api/v1/admin/grants/{gid}/approve",
+                            **_as(gc, ids, "it", "g-self-approve"),
+                            json={})
+                report(r.status_code == 403,
+                       "T402-G4 执行人自己 approve → 403（SoD 仍生效）",
+                       "%s %r" % (r.status_code, (r.text or "")[:120]))
+
+                r = gc.post("/api/v1/admin/grants/{id}/approve".replace(
+                    "{id}", gid),
+                    **_as(gc, ids, "coord", "g-approve"),
+                    json={"note": "批准"})
+                report(r.status_code == 200
+                       and (r.json() or {}).get("state") == "approved",
+                       "T402-G5 ★ coordinator approve → 200/approved",
+                       "%s %r" % (r.status_code, (r.text or "")[:120]))
+
+                # G6 读侧立刻可见（写进去的状态不是只躺在响应体里）
+                cookies, token = ids["coord"]
+                rows = gc.get("/api/v1/admin/takedown-grants",
+                              cookies=cookies).json()
+                states = {(x.get("grant_id"), x.get("state"))
+                          for x in rows if isinstance(x, dict)}
+                report((gid, "approved") in states,
+                       "T402-G6 ★ GET takedown-grants 读得到 approved 那条",
+                       repr(sorted(states))[:160])
+
+            # G7 重启后状态仍在（不是内存字典）
+            grant_app2 = create_production_app(grant_cfg,
+                                               oauth_provider=grant_provider)
+            with TestClient(grant_app2, base_url="https://ca.example") as g2:
+                ids2 = _identities(g2)
+                cookies2, _ = ids2["coord"]
+                rows = g2.get("/api/v1/admin/takedown-grants",
+                              cookies=cookies2).json()
+                states = {(x.get("grant_id"), x.get("state"))
+                          for x in rows if isinstance(x, dict)}
+                report((gid, "approved") in states,
+                       "T402-G7 ★ 重启后 GET takedown-grants 仍是 approved",
+                       repr(sorted(states))[:160])
+
+            # G8 反向对照：把四条从生产能力表里摘掉，必须回到 501。
+            #   ★ 直接在模块常量上摘、finally 里还原 —— 用 monkeypatch 改的是
+            #     进程内同一个对象，漏还原会让**后面的段落**在错误配置下跑，
+            #     而那种污染只在特定顺序下暴露（本仓已踩过：自证有副作用）。
+            removed = {
+                "/api/v1/admin/signer-grants",
+                "/api/v1/admin/takedown-grants",
+                "/api/v1/admin/grants/{id}/execute",
+                "/api/v1/admin/grants/{id}/approve",
+            }
+            saved_paths = set(PRODUCTION_WRITE_PATHS)
+            off_root = tempfile.mkdtemp(prefix="production-grants-off-")
+            try:
+                PRODUCTION_WRITE_PATHS.difference_update(removed)
+                off_app = create_production_app(
+                    settings(off_root), oauth_provider=grant_provider)
+                with TestClient(off_app, base_url="https://ca.example") as off:
+                    ids_off = _identities(off)
+                    codes = []
+                    for i, (path, body) in enumerate((
+                            ("/api/v1/admin/signer-grants",
+                             {"user_id": "x", "capability": "release.sign",
+                              "product_line": "pump", "reason": "x"}),
+                            ("/api/v1/admin/takedown-grants",
+                             {"user_id": "x", "capability": "takedown.execute",
+                              "product_line": "pump", "reason": "x"}),
+                            ("/api/v1/admin/grants/g-x/execute", {}),
+                            ("/api/v1/admin/grants/g-x/approve", {}))):
+                        rr = off.post(path,
+                                      **_as(off, ids_off, "proposer",
+                                            "off-%d" % i),
+                                      json=body)
+                        codes.append(rr.status_code)
+                    report(codes == [501, 501, 501, 501],
+                           "T402-G8 ★ 反向对照：四条不在生产能力表时各返 501",
+                           repr(codes))
+            finally:
+                PRODUCTION_WRITE_PATHS.clear()
+                PRODUCTION_WRITE_PATHS.update(saved_paths)
+                shutil.rmtree(off_root, ignore_errors=True)
+        finally:
+            shutil.rmtree(grant_root, ignore_errors=True)
+
         # reassign 后 ACL 跟随权威 assignee；未知目标拒绝，冻结 assignee 不再承权。
         acl_root = tempfile.mkdtemp(prefix="production-reassign-acl-")
         try:

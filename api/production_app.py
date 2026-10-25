@@ -58,6 +58,23 @@ PRODUCTION_WRITE_PATHS = {
     # T-313d：通知 read/ack（写自己的收件箱）。
     "/api/v1/notifications/{id}/read",
     "/api/v1/notifications/{id}/ack",
+    # T-402：名单治理四条（propose ×2 / execute / approve）。
+    #
+    # ★ 改前它们**不在**本表，而 `api/admin_api.register_admin_routes()` 已经在
+    #   生产装配（service 非 None）里注册了它们 —— 于是「开发装配能点、
+    #   生产点了返 501 capability_not_enabled」。与 T-312b 那六条下线同形状。
+    #
+    # ★ 为什么要这四条**一起**进：它们是三权分立的**同一条链**的三个必经步骤。
+    #   只放 propose 会让人提了单永远批不了（execute/approve 仍 501），
+    #   而「提案成功」这个 200 看起来像功能可用 —— 那比全 501 更误导。
+    #
+    # ★ `/admin/grants/{id}/revoke` 早就在本表里（T-315c 直接加的生产表，
+    #   没经过 `IMPLEMENTED_WRITE_PATHS`）。它不在这四条之内，本票不改它；
+    #   这处表间不一致由 T-408 的「spec ≡ 实现表」断言显式表态。
+    "/api/v1/admin/signer-grants",
+    "/api/v1/admin/takedown-grants",
+    "/api/v1/admin/grants/{id}/execute",
+    "/api/v1/admin/grants/{id}/approve",
     # T-401a：申诉三条（open / migrate / withdraw）。
     #
     # ★ 与 T-312b/T-402 同一个病：`IMPLEMENTED_WRITE_PATHS` 里一直有它们、
