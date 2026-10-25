@@ -1011,6 +1011,15 @@
       "subjects": [
         "base/report_store.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_tenant_isolation.py",
+      "asserts": "T-409 租户边界 + 领取原子性（★ 不含 TS-11，那一半已由 verify_auth_session 47 项覆盖，本文件刻意不重复）：A1 GET /cases 只返回本租户；A2 ★ 跨租户 GET /cases/{id} → 403 且响应体不含任何案件字段（只判状态码的实现会绿）；A3 /queue 同样隔离；A4 正样本「本租户读得到」（防全 403 假绿）；A5 反向 A 读 B；B1 ★ **真线程并发**领取恰一成功（顺序两次 claim 在任何实现下都成立，证不到 TS-31）；B2 失败方是明确 409 不是静默 200；B3 领取后 assignee 唯一（读台账不读投影 —— dev 装配的 claim 只写台账）；C1 ★ lease 到期自动释放；C2 ★ 释放前先存草稿。--controls 3 项：摘掉 _scope_ok → C1 红；摘掉 already_claimed → C2 红；不存草稿 → C3 红（三条独立变红）",
+      "subjects": [
+        "base/reviews_ledger.py",
+        "base/rbac.py",
+        "api/review_api.py"
+      ]
     }
   ],
   "exempt": [
