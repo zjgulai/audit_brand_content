@@ -365,6 +365,14 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > [`PMO/implement/冷启动交接-Prompt-20261026.md`](./PMO/implement/冷启动交接-Prompt-20261026.md)
 > —— 本轮开工时使用的冷启动提示词正文（含「先做这三件事」「硬约束」「已踩过的坑」）。
 >
+> [`PMO/implement/T-410-点火清单-v1-20261026.md`](./PMO/implement/T-410-点火清单-v1-20261026.md)
+> —— 七步点火清单（每步含前置、命令、逐字段期望输出、失败说明了什么）；
+> [`PMO/implement/T-410-无凭据真跑-20261026.md`](./PMO/implement/T-410-无凭据真跑-20261026.md)
+> —— ★ 不需要真实凭据的那部分真跑取证（捞到两个 P0：镜像缺 `tools/redact.py`
+> 导致容器 import 期就死；生产 bundle 打 `/review-api` 而服务只提供 `/api/v1`）；
+> [`PMO/audit/验收行109-110-111-128-执行点-分类与变异验证-20261026.md`](./PMO/audit/验收行109-110-111-128-执行点-分类与变异验证-20261026.md)
+> —— 四行验收的 A/B 分类（A 类今天可判、B 类必须等 T-333）+ 8 条变异验证。
+>
 > Web 联调：`web/scripts/PAIRING-README.md`（browser harness 用法 + 第一次真跑抓到的四个真实缺陷，
 > 以及「`dev-up.sh` 从来没跑通过」那三环）。
 
