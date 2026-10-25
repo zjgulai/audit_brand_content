@@ -12,6 +12,7 @@
     "verify:visual": "node scripts/check_visual.mjs --check",
     "verify:a11y:manual": "node scripts/verify_manual_a11y.mjs",
     "verify:tokens": "node scripts/check_design_tokens.mjs --check",
+    "verify:pages": "node scripts/check_page_routes.mjs",
     "verify:budget": "node scripts/check_bundle_budget.mjs --dir dist",
     "verify:auth": "node --experimental-strip-types scripts/check_auth_headers.mjs"
   },

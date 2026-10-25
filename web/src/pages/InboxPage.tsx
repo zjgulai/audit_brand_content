@@ -124,10 +124,13 @@ export default function InboxPage() {
 
       <h2>
         <Icon name="bell" size={13} /> 工作台通知收件箱（
-        {(notifications ?? []).length} 条）
+        {notifications === null
+          ? "尚未读取"
+          : `${notifications.length} 条`}
+        ）
       </h2>
       {notifications === null ? (
-        <p className="hint">加载通知中…</p>
+        <p className="hint">{error ? "无可读通知。" : "加载通知中…"}</p>
       ) : notifications.length === 0 ? (
         <div className="state">
           <p className="hint">当前主体暂无工作台内通知记录。</p>
@@ -176,13 +179,13 @@ export default function InboxPage() {
 
       <h2>
         <Icon name="inbox" size={13} /> 待自决专区（DP1 业务自审 ·{" "}
-        {pendingSelfCases.length} 条）
+        {cases === null ? "尚未读取" : `${pendingSelfCases.length} 条`}）
       </h2>
       <p className="hint">
         「待自决」不等同于「通过」或「已放行」（UIUX §5.1）：请核对提示后选择修改重提或进入案件补充说明。
       </p>
       {cases === null ? (
-        <p className="hint">加载案件中…</p>
+        <p className="hint">{error ? "无可读案件。" : "加载案件中…"}</p>
       ) : pendingSelfCases.length === 0 ? (
         <div className="empty">
           <p className="empty__title">当前没有处于「待自决」状态的案件</p>

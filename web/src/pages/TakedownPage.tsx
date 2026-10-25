@@ -302,7 +302,8 @@ export default function TakedownPage() {
           </p>
         </div>
         <span className="font-data hint">
-          积压与历史任务：{(tasks ?? []).length} 项
+          积压与历史任务：
+          {tasks === null ? "尚未读取" : `${tasks.length} 项`}
         </span>
       </div>
 
@@ -522,7 +523,7 @@ export default function TakedownPage() {
       )}
 
       {tasks === null ? (
-        <p className="hint">加载下线任务中…</p>
+        <p className="hint">{error ? "无可读任务。" : "加载下线任务中…"}</p>
       ) : tasks.length === 0 ? (
         <div className="empty">
           <p className="empty__title">当前租户没有待执行的下线任务</p>
