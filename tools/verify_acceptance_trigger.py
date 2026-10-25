@@ -248,7 +248,8 @@ def judge(ci: dict, hook: dict, remote: dict):
         #   而那会改变本工作区的推送行为 —— 那是使用者的决定，不是缺陷。
         notes.append(f"**仓库里有 hook 脚本（{HOOK_SCRIPTS_DIR}）但未安装** ——"
                      f"`git config core.hooksPath` 未设置。这是一个**未采用的选项**，"
-                     f"不是缺陷；CI 里它永远是未设的。")
+                     f"不是缺陷；CI 里它永远是未设的。"
+                     f"本 clone 想启用：`bash tools/install_hooks.sh`（T-411）")
     elif hook.get("why"):
         untested.append(f"本地 hook 通道读不出：{hook['why']}")
 

@@ -1020,6 +1020,15 @@
         "base/rbac.py",
         "api/review_api.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_rule_change_gate.py",
+      "asserts": "T-411 / GA-08 规则变更门有没有真的接上（★ 不重复验回归集本身，那由 verify_regression_set 8 项 + verify_rule_change_regression 7 项各自覆盖）：G1 存在**独立 job**（判据是它自己的 paths 点了规则文件，不是全文出现过 rules-v1 —— 注释里出现也算的那种是假执行点）；G2 ★ paths **逐个点名**全部规则文件（集合恒等，写宽写窄都红）；G3 门里真跑回归集与规则变更对比两个验证器；G4 ★ 不许 continue-on-error / || true / if: false（只扫代码行不扫注释 —— 被自己解释文字绊倒过两次）；G5 门所在 workflow 挂在 pull_request 上。--controls 5 项：漏一个 path / 删掉跑回归那步 / 加 continue-on-error / 加 || true 四条各自独立红，加一条好样本必须不红（防「一律红」式假判据）",
+      "subjects": [
+        ".github/workflows/acceptance.yml",
+        "tools/verify_regression_set.py",
+        "tools/verify_rule_change_regression.py"
+      ]
     }
   ],
   "exempt": [

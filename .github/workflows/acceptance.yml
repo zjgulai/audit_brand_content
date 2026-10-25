@@ -175,3 +175,59 @@ jobs:
           name: acceptance-run
           path: acceptance-run.txt
           retention-days: 14
+
+  # ── 第三层：规则变更门（T-411 / GA-08）────────────────────────────────
+  #
+  # 为什么是**独立 job + paths 过滤**，而不是并进上面两个 job：
+  #   上面两个 job 每次推送都跑；而「改了规则就必须跑冻结回归集」这件事
+  #   只在**规则文件真的变了**时才有意义。并进去的代价是每次推送都多跑一遍
+  #   83 条样本的引擎响应（分钟级），而人会开始嫌慢、然后去关它。
+  #
+  # ★ `paths` 必须**逐个点名**规则文件，不能写 `research/**`：
+  #   写宽了等于「几乎每次推送都跑」，写窄了（少一个文件）等于「改了规则
+  #   却不跑」—— 后者更坏，因为它**不会红**。
+  #   这条形状由 `tools/verify_rule_change_gate.py` 的 G2 断言（集合恒等）。
+  #
+  # ★ 不许写 `continue-on-error: true` 或 `|| true`：
+  #   「回归集没跑成」必须让这条 job **红**。写成软失败，就等于
+  #   「门在那儿，但谁都能走过去」—— 那比没有门更糟，因为它看起来有门。
+  #   由 G4 断言（只扫代码行，不扫注释）。
+  #
+  # ★ 这里**不**声明 `needs: static`：规则变更门与静态检查彼此独立，
+  #   挂上依赖会让「静态检查偶发红」连带把规则门也跳过。
+  rule-change-gate:
+    name: 规则变更门
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.event_name != 'workflow_dispatch'
+    # ★ 逐个点名，不用通配。见上面那段注释与 verify_rule_change_gate.py 的 G2。
+    paths:
+      - research/governance/skeleton/rules-v1.json
+      - research/governance/skeleton/engine-manifest.json
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          # 需要基线才能出「before/after」两份读数（行 87 的原话：
+          # 只出单点数值即红）。
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "0.13.1"
+
+      - name: 建 .venv（与其它 job 同一个路径，映射里的 {venv} 依赖它）
+        run: uv sync --locked
+
+      - name: 门自身接线自检
+        run: .venv/bin/python tools/verify_rule_change_gate.py
+
+      - name: 冻结回归集结构（规模/覆盖/指纹/变更记录）
+        run: .venv/bin/python tools/verify_regression_set.py
+
+      - name: 规则变更 → 回归集前后对比（真跑一次变更）
+        run: .venv/bin/python tools/verify_rule_change_regression.py
