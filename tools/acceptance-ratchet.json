@@ -5,20 +5,21 @@
   "passed_floor": 126,
   "recorded_at": "2026-10-25",
   "recorded_reading": {
-    "passed": 124,
+    "passed": 126,
     "failed": 0,
-    "untested": 12,
+    "untested": 10,
     "untested_split": {
-      "machine": 7,
+      "machine": 5,
       "manual": 5,
       "unverifiable": 0,
       "unknown": 0
     },
     "untested_origin": {
-      "unmapped": 11,
+      "unmapped": 9,
       "executed_rc2": 1
     }
   },
+  "recorded_note": "2026-10-26 更正：此前 recorded_reading.passed=124 而 passed_floor=126，两者自相矛盾（地板高于当次读数）。核对 git 历史：floor 是 2026-10-25 一次上调后写入，但 recorded_reading 没跟着更新。★ 修法是补 recorded_reading，不动 floor —— floor 下调是倒退，而这里的事实是「读数当时就已经是 126，只是没记」。",
   "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
   "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
   "lower_history": [

@@ -346,6 +346,30 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 
 ---
 
+> 2026-10-25/26 的 T-400 段（6 份）：
+> [`PMO/implement/最终上线差距分析-v1-20261026.md`](./PMO/implement/最终上线差距分析-v1-20261026.md)
+> —— GA-01..GA-10 + GW-01..GW-22 三十二**条差距（其中四条的前提经实测为错，见下两份）**；
+> [`PMO/implement/执行票清单-v2-20261026.md`](./PMO/implement/执行票清单-v2-20261026.md)
+> —— T-400 段 13 票，三批派工顺序；
+> [`PMO/implement/执行方案-T400对账与施工-v1-20261025.md`](./PMO/implement/执行方案-T400对账与施工-v1-20261025.md)
+> —— **开工前逐条复现八票前提**的对账结果（四票票面是错的）+ 六节施工记录 + 一次 `cat >>` 写坏中文文件的事故；
+> [`PMO/implement/T400段-ready收尾报告-20261026.md`](./PMO/implement/T400段-ready收尾报告-20261026.md)
+> —— 八票总账、四票票面错在哪、剩余四票 blocked 各自缺什么；
+> [`PMO/implement/T-405-T390裁定申请-v1-20261026.md`](./PMO/implement/T-405-T390裁定申请-v1-20261026.md)
+> —— 语义判定 P1 接入的 A/B/C 裁定申请书（含实测样本：选 B 会让 98/232 条零命中内容从 REVIEW 变 BLOCK）；
+> [`PMO/implement/T-407-样本签署申请-v1-20261026.md`](./PMO/implement/T-407-样本签署申请-v1-20261026.md)
+> —— 83 条冻结样本的分层签署申请（★ 捞到 `GS-011` 期望值与法务 D2 决定相反）；
+> [`PMO/implement/T-412-OCR-ASR选型申请-v1-20261026.md`](./PMO/implement/T-412-OCR-ASR选型申请-v1-20261026.md)
+> —— 容器内 OCR/ASR 的选型申请书（含 `verify_media_portability` 实测：行 118 今天是**空真**，不是违规）。
+>
+> [`PMO/implement/冷启动交接-Prompt-20261026.md`](./PMO/implement/冷启动交接-Prompt-20261026.md)
+> —— 本轮开工时使用的冷启动提示词正文（含「先做这三件事」「硬约束」「已踩过的坑」）。
+>
+> Web 联调：`web/scripts/PAIRING-README.md`（browser harness 用法 + 第一次真跑抓到的四个真实缺陷，
+> 以及「`dev-up.sh` 从来没跑通过」那三环）。
+
+---
+
 ## 三、自证命令表（改了哪个子系统，就跑到它变绿）
 
 `AGENTS.md` §2.1 是这张表的权威版本，本表与它必须一致。**退出码语义**：全过退 0；
