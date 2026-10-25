@@ -1029,6 +1029,30 @@
         "tools/verify_regression_set.py",
         "tools/verify_rule_change_regression.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_image_shape.py",
+      "asserts": "★ 镜像形状 vs 仓内形状（T-410 收尾；既有两套自证都跑在仓内文件系统上，所以盖不住这一类）：I1 扫 base/ 与 api/ 里每一处 `from tools.X`，逐个要求 Dockerfile 有 COPY 且未被 .dockerignore 排除；I3 ★ 在临时目录里**按 Dockerfile 的 COPY 结果**建出最小子树、隔离 PYTHONPATH **真 import 一次**（I1 只证明文本上对得上，而 send_gateway 那条是 import 期失败）；D1 生产 bundle 里不许出现 /review-api（那是 Vite dev 的代理前缀，生产没有那层代理，请求会落到 SPA 兜底返回 200 text/html）。--controls：注释掉 redact 的 COPY → I1 必红",
+      "subjects": [
+        "Dockerfile",
+        ".dockerignore",
+        "base/send_gateway.py",
+        "web/src/api/client.ts"
+      ]
+    },
+    {
+      "verifier": "web/scripts/verify_frontend_stack_contract.mjs",
+      "asserts": "#109/#110/#111/#128 的执行点，逐条分 A/B 两类：A 类=今天就能判（删掉被断言的代码必红），B 类=必须等 T-333 迁移，阻断时退 2（未测）不许报成通过、也不许报成红。含 #128 失效即重拉的真库打桩探针（库不在盘上 → 未测）",
+      "subjects": [
+        "web/package.json",
+        "web/package-lock.json",
+        "web/src/App.tsx",
+        "web/src/styles.css",
+        "web/design-baseline.json",
+        "web/scripts/dt3-bare.mjs",
+        ".github/workflows/acceptance.yml",
+        "PMO/audit/waiver-v1.json"
+      ]
     }
   ],
   "exempt": [

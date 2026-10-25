@@ -62,6 +62,23 @@ COPY contracts/ ./contracts/
 #   只拷这一个文件，不拷整个 tools/（那里有 75 个 verifier 与一堆非运行时脚本）。
 COPY tools/bj_time.py ./tools/bj_time.py
 
+# ★ tools/redact.py 同样是**运行时依赖**，不是开发工具。
+#   `base/send_gateway.py:47` 有 `from tools.redact import redact`（回执脱敏）。
+#   第一次实测（2026-10-26）：按本文件逐条 COPY 重建文件系统后
+#   `python -c "import base.send_gateway"` →
+#       ModuleNotFoundError: No module named 'tools.redact'
+#       → ModuleNotFoundError: No module named 'send_gateway'
+#   也就是**容器在 import 期就死**，而 /healthz、/readyz 根本没机会起来。
+#
+#   ★ 为什么既有自证没抓到：verify_production_app.py 82/82 全程用仓内文件系统，
+#     从不模拟「只按 Dockerfile COPY 出来的那棵子树」；
+#     verify_deploy.py 的 D12 只查 4 个 .mjs，不看 Python import 图。
+#     这是「验证器的形状 ≠ 镜像的形状」。
+#   ★ 补完之后 `tools/` 下**没有别的 `from tools.*` 运行时依赖**了 ——
+#     全仓 `grep -rn "from tools\." base/ api/` 只有这一处（2026-10-26 实测）。
+#     将来再加必须同时改这里，否则同一个坑会以同样的方式再踩一次。
+COPY tools/redact.py ./tools/redact.py
+
 # 运行时数据（规则库 / 控制点 / 路由 / 外部标准库）。
 # 这些是**只读输入**，与 authority 那种可写数据分开：
 #   - research/ 打进镜像（发版即固化，规则变了必须重建镜像 —— 这是有意的）

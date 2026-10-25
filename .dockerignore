@@ -39,6 +39,8 @@ research/landing/_evidence
 #   .dockerignore 的 `!` 例外必须写在排除行之后才生效。
 tools
 !tools/bj_time.py
+# ★ redact.py 同上：send_gateway 在 import 期就要它。少了它容器起不来。
+!tools/redact.py
 tests
 .ua
 .vendor

@@ -11,7 +11,18 @@ import { csrfHeaders, parseCookie } from "./auth-headers";
  */
 
 export const apiBase = (
-  import.meta.env.VITE_REVIEW_API_BASE ?? "/review-api"
+  import.meta.env.VITE_REVIEW_API_BASE ??
+  // ★ 生产构建必须落到 `/api/v1`：服务端（`api/production_app.py`）只提供
+  //   `/api/v1/*`，而 `/review-api` 是 **Vite 开发服务器**的代理前缀
+  //   （`vite.config.ts:66-70` 把它 rewrite 成 `/api/v1`）。
+  //   生产里没有那层代理 —— 早先无条件默认 `/review-api`，于是打出去的每个
+  //   请求都落到 SPA 的 `/{full_path:path}` 兜底，**返回 index.html 且状态 200**。
+  //   前端把 HTML 当 JSON 解析，而 `/healthz`、`/readyz`、容器 healthcheck 全绿。
+  //   实测（2026-10-26，`web/dist` 里能直接读到 `nv="/review-api"`）：
+  //   `/review-api/cases` → 200 text/html。
+  //   ★ 判据用 `import.meta.env.PROD`（Vite 编译期常量，生产 bundle 里恒 true），
+  //     不用 `MODE` —— 后者可被 `--mode` 改，不是可靠的运行环境判据。
+  (import.meta.env.PROD ? "/api/v1" : "/review-api")
 ).replace(/\/$/, "");
 
 /** 同源开发端点的根；只由开发身份模块使用。 */
