@@ -58,6 +58,22 @@ PRODUCTION_WRITE_PATHS = {
     # T-313d：通知 read/ack（写自己的收件箱）。
     "/api/v1/notifications/{id}/read",
     "/api/v1/notifications/{id}/ack",
+    # T-401a：申诉三条（open / migrate / withdraw）。
+    #
+    # ★ 与 T-312b/T-402 同一个病：`IMPLEMENTED_WRITE_PATHS` 里一直有它们、
+    #   `ReviewCommandService` 也早已实现（T-311 done），**只有本表没有** ——
+    #   于是生产下 P-06 的每一个按钮都返 501。
+    #
+    # ★ 三条一起进，理由同 T-402：它们是同一个申诉状态机的三条命令。
+    #   只放 open 会让人开了申诉永远撤不掉 / 迁不掉。
+    #
+    # ★ 光加这三条**不够**（本票最花时间的地方）：`GET /api/v1/appeals`
+    #   改前只读 frozen `appeals.json`（盘上不存在），于是「POST 200、
+    #   列表永远空」。读侧改造在同一次提交里（`api/review_api.py` 的
+    #   `list_appeals` 分支），否则票面判据「重启后仍可读」永远绿不了。
+    "/api/v1/appeals",
+    "/api/v1/appeals/{id}/migrate",
+    "/api/v1/appeals/{id}/withdraw",
 }
 def build_allowlist_source(projection):
     """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。

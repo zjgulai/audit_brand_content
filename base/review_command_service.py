@@ -733,6 +733,54 @@ class ReviewCommandService:
             out.append(row)
         return out
 
+    def list_appeals(self, *, tenant=None):
+        """该租户的全部申诉（跨案件聚合，只读）。**不做 ACL。**
+
+        ## 为什么必须有这个方法（T-401a）
+
+        `GET /api/v1/appeals` 改前只读 frozen `appeals.json`，而那个文件
+        **盘上不存在** —— 于是它恒返 `[]`。后果不是「慢」，是**写完读不回**：
+        `POST /api/v1/appeals` 返回 200、权威里确实有那条，而前端 P-06
+        的列表永远是空的。这与 T-314c（名单）、T-316d（报告）是**同一个形状**，
+        那两处已经修好（`review_api.py:732` / `:915` 有注释），唯独申诉漏了。
+
+        ## 为什么按 aggregate 扫而不是按 appeal_id 索引
+
+        申诉存在案件 aggregate 的 `state["appeals"]` 里，没有独立表。
+        规模是「本租户案件数」，与 `list_published_reports` 同一个量级，
+        同样的线性扫；T-311c 已记「上千案件需要索引」，不在这里悄悄加缓存
+        （缓存会与权威不一致）。
+
+        ## 为什么 tenant 是可选参数
+
+        `None` = 不筛（服务层不认识 HTTP 身份）。**API 层必须显式传 tenant**
+        —— 不传就是「把全部租户的申诉发给任何登录用户」，而那正是 TS-30 禁止的。
+        这里不设默认为「全部」的便利写法：默认值本身就是一次授权决定。
+        """
+        out = []
+        for aggregate_id in self.authority.aggregate_ids():
+            current = self.authority.state(aggregate_id)
+            rows = current.get("appeals")
+            if not isinstance(rows, list):
+                continue
+            for item in rows:
+                if not isinstance(item, dict):
+                    continue
+                if tenant is not None and item.get("tenant") != tenant:
+                    continue
+                row = copy.deepcopy(item)
+                # 案件侧字段随行带出：前端申诉列表要显示「这条申诉是哪个案件」。
+                row.setdefault("case_id", current.get("case_id"))
+                row["_product_line"] = current.get("product_line")
+                row["_submitter_id"] = current.get("submitter_id")
+                row["_assignee"] = current.get("assignee")
+                out.append(row)
+        # 最近打开的在前 —— 与「先看到刚发生的事」一致；同刻用 appeal_id 定序，
+        # 避免 Python 排序在同一时间戳上给出不稳定顺序（翻页时会重复/漏项）。
+        out.sort(key=lambda r: (str(r.get("opened_at") or ""),
+                                str(r.get("appeal_id") or "")), reverse=True)
+        return out
+
     def read_your_write(self, reconcile_token, *, aggregate_id=None,
                         principal_id=None, tenant_id=None):
         if not isinstance(reconcile_token, str) or not reconcile_token:

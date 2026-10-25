@@ -850,6 +850,39 @@ def create_app(*, session_store=None, repository=None, principals=None,
     @app.get("/api/v1/appeals")
     def appeals(principal=Depends(principal_dep)):
         tenant = principal.get("tenant")
+        # T-401a：与 T-314c（名单）、T-316d（报告）同一个形状 ——
+        # 改前这里**只读 frozen `appeals.json`**，而那个文件盘上不存在，
+        # 于是 `POST /appeals` 返 200、权威里确实有那条，**列表却永远是 []**。
+        # 「写成功、读不回」比 501 更坏：501 至少会有人去查。
+        #
+        # ★ `None` 与 `[]` 必须分开：None = 这条数据源不存在（开发装配），
+        #   [] = 存在但一条都没有。混成一个，回落就永远走不到。
+        # ★ 取数在服务层（`list_appeals`），本函数只做租户过滤 —— API 不读 state（C5）。
+        if review_command_service is not None:
+            rows = review_command_service.list_appeals(tenant=tenant)
+            # 已结案案件的 assignee 会被清空，`_assignee` 只是随行带出的辅助字段；
+            # 申诉的可读性与案件一致（参与人），由「本人申诉 / 同租户统筹 / 案件可见」判。
+            out = []
+            for row in rows:
+                pseudo_case = {
+                    "tenant": row.get("tenant"),
+                    "product_line": row.get("_product_line"),
+                    "submitter_id": row.get("_submitter_id"),
+                    "assignee_id": row.get("_assignee"),
+                    "actionable": False,
+                }
+                # 申诉人本人一定看得到自己的申诉（即使案件已结案、ACL 已清空）；
+                # 其他人按案件可见性判 —— 与 GET /reports 的 `can_read_content` 同口径。
+                if row.get("appellant") == principal.get("id"):
+                    out.append(row)
+                    continue
+                if can_read_content(principal, pseudo_case):
+                    out.append(row)
+            for row in out:
+                row.pop("_product_line", None)
+                row.pop("_submitter_id", None)
+                row.pop("_assignee", None)
+            return out
         return [row for row in repo.appeals if row.get("tenant") == tenant]
 
     @app.get("/api/v1/release/pending")

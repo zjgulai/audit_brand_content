@@ -65,7 +65,9 @@ sys.path.insert(0, str(ROOT))
 try:
     from fastapi.testclient import TestClient
     from api.oauth import FakeOAuthProvider, OAuthIdentity
-    from api.production_app import ProductionSettings, SettingsError, create_production_app
+    from api.production_app import (
+        PRODUCTION_WRITE_PATHS, ProductionSettings, SettingsError,
+        create_production_app)
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: 无法导入生产装配: %s" % exc)
     sys.exit(2)
@@ -109,6 +111,24 @@ def settings(root):
         "roles": ["dp3"], "product_lines": ["pump"],
         "product_line": "pump", "capabilities": [], "status": "active",
         "authz_version": "reviewer2-v1",
+    }, {
+        # T-402：授权治理三主体（dp4 提案 / it 执行 / coordinator 审批）。
+        # ★ 三个人必须是**三个不同的人**：reducer 的 same_actor 与 rbac 的
+        #   validate_grant_actors 都要求 len(set(ids)) == 3。
+        "id": "proposer", "tenant_id": "t1", "open_id": "ou-proposer",
+        "roles": ["dp4"], "product_lines": ["pump"],
+        "product_line": "pump", "capabilities": [], "status": "active",
+        "authz_version": "proposer-v1",
+    }, {
+        "id": "itsvc", "tenant_id": "t1", "open_id": "ou-itsvc",
+        "roles": ["it"], "product_lines": ["pump"],
+        "product_line": "pump", "capabilities": [], "status": "active",
+        "authz_version": "itsvc-v1",
+    }, {
+        "id": "coord", "tenant_id": "t1", "open_id": "ou-coord",
+        "roles": ["coordinator"], "product_lines": ["pump"],
+        "product_line": "pump", "capabilities": [], "status": "active",
+        "authz_version": "coord-v1",
     }]}), encoding="utf-8")
     return ProductionSettings(
         authority_root=root / "authority",
@@ -484,9 +504,18 @@ def main():
                    "C13 同 key 重放旧结果", r.text)
 
             # 首批以外写能力必须关闭
+            #
+            # ★ T-401a 之后这三条已在生产能力表里，所以这里**不能再要求 501**。
+            #   但也不能直接对 case-prod 开一条申诉 —— 那会把它 version 从 3
+            #   推到 4，而下面 C19「重启后投影 v3」正是以此为锚（实测当场踩到：
+            #   两条与本段无关的断言因此变红）。
+            #   改用**不存在的案件**：`404 案件不存在` 证明请求通过了能力闸门
+            #   （501 会被拦在更前面），且没有写任何状态。
             r = client.post("/api/v1/appeals", headers=headers(client, "appeal-1"),
-                            json={"case_id": "case-prod", "reason": "x"})
-            report(r.status_code == 501, "C14 appeal capability 关闭", r.text)
+                            json={"case_id": "case-no-such", "reason": "x"})
+            report(r.status_code == 404 and "capability_not_enabled" not in r.text,
+                   "C14 ★ 申诉已接生产路径（T-401a 交付：通过能力闸门，落到案件校验）",
+                   r.text)
             r = client.post("/api/v1/cases/case-other/actions",
                             headers=headers(client, "confirm-1"),
                             json={"action": "confirm", "version": 0,
@@ -502,6 +531,162 @@ def main():
                    "C16 logout 成功", r.text)
             r = client.get("/api/v1/me")
             report(r.status_code == 401, "C17 logout 后 session 失效", r.text)
+
+        # ── T-401a：申诉三条 + 读侧（本票的核心，不是「加进集合」就完）───────
+        #
+        # ★ 为什么必须在**生产装配**里验，而不是 `verify_write_api`：
+        #   那条链路用 `AppealStore`（内存），读侧写侧是同一份数据，
+        #   所以「写完读不回」这个缺陷在它面前**不可能出现**。
+        #   缺陷只在 frozen 读 / authority 写的生产装配里成立。
+        appeal_root = tempfile.mkdtemp(prefix="production-appeals-")
+        try:
+            appeal_cfg = settings(appeal_root)
+            # 只用真实 submit 建案 —— 手造 frozen case 会漏 tenant 等字段，
+            # 那种夹具缺陷会伪装成「find_appeal_case 坏了」（本票踩过一次）。
+            (Path(appeal_root) / "frozen" / "cases.json").write_text(
+                "[]", encoding="utf-8")
+            appeal_app = create_production_app(appeal_cfg, oauth_provider=provider)
+            appeal_case = None
+            with TestClient(appeal_app, base_url="https://ca.example") as ac:
+                login = ac.get("/auth/login", follow_redirects=False)
+                state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
+                ac.get("/auth/callback",
+                       params={"code": "good-code", "state": state},
+                       follow_redirects=False)
+                r = ac.post("/api/v1/submissions", headers=headers(ac, "ap-sub"),
+                            json={"submission_id": "ap-sub-1",
+                                  "content_type": "文本",
+                                  "content_stage": "final_content",
+                                  "entry_channel": "群消息",
+                                  "source": {"kind": "ad_text"},
+                                  "text": "新品上市：售价 199 元。",
+                                  "product_line": "pump",
+                                  "fields": {"Primary Text":
+                                             "新品上市：售价 199 元，容量 240ml。"}})
+                appeal_case = (r.json() or {}).get("case_id")
+                report(r.status_code == 200 and isinstance(appeal_case, str),
+                       "T401-A0 真实 submit 建案（后续断言的前提）", r.text[:160])
+
+                # A1 ★ 改前这里 501
+                r = ac.post("/api/v1/appeals", headers=headers(ac, "ap-open"),
+                            json={"case_id": appeal_case,
+                                  "reason": "命中误判，申请复核"})
+                opened = r.json() or {}
+                appeal_id = opened.get("appeal_id")
+                report(r.status_code == 200
+                       and isinstance(appeal_id, str)
+                       and appeal_id.startswith("appeal-")
+                       and len(appeal_id) == len("appeal-") + 16,
+                       "T401-A1 ★ POST /appeals → 200 且 appeal_id 是内容派生 ID",
+                       "%s %r" % (r.status_code, str(opened.get("appeal_id"))))
+
+                # A2 ★ 本票的核心：写完**读得回**
+                listed = ac.get("/api/v1/appeals")
+                rows = listed.json() if listed.status_code == 200 else []
+                got = {x.get("appeal_id"): x.get("state")
+                       for x in rows if isinstance(x, dict)}
+                report(listed.status_code == 200 and got.get(appeal_id) == "open",
+                       "T401-A2 ★ GET /appeals 立刻读得到刚开的那条（改前恒为 []）",
+                       "%s %r" % (listed.status_code, repr(got)[:120]))
+
+                # A3 状态跟着走，不是「开了就一直 open」
+                r = ac.post(f"/api/v1/appeals/{appeal_id}/withdraw",
+                            headers=headers(ac, "ap-withdraw"),
+                            json={"reason": "不再申诉"})
+                listed = ac.get("/api/v1/appeals")
+                got = {x.get("appeal_id"): x.get("state")
+                       for x in listed.json() if isinstance(x, dict)}
+                report(r.status_code == 200 and got.get(appeal_id) == "withdrawn",
+                       "T401-A3 ★ withdraw → 200 且列表里的 state 变 withdrawn",
+                       "%s %r" % (r.status_code, repr(got)[:120]))
+
+                # A4 migrate：三条各验一次，不能只验 open。
+                #
+                # ★ 实测到一处**真实的能力缺口**，记在这里而不是绕过去：
+                #   migrate 的领域规则是「只有 paused 可迁移」，而 `appeal_pause`
+                #   在 reducer 里有（`review_reducer.py:409`），**全仓没有任何
+                #   HTTP 入口**能发出它。所以生产装配下 migrate **不可达**
+                #   （open → 409 not_paused，pause 又发不出去）。
+                #   本断言因此只能证明「路由通了 + 领域规则没被绕过」，
+                #   **不能**证明迁移成功 —— 后者要等 pause 入口存在。
+                #   这个限制已记入执行方案 §2.1 的 T-401b。
+                r = ac.post("/api/v1/appeals", headers=headers(ac, "ap-open-2"),
+                            json={"case_id": appeal_case, "reason": "第二条"})
+                second = (r.json() or {}).get("appeal_id")
+                r = ac.post(f"/api/v1/appeals/{second}/migrate",
+                            headers=headers(ac, "ap-migrate"), json={})
+                report(r.status_code == 409 and "not_paused" in r.text,
+                       "T401-A4 ★ migrate 通过能力闸门并落到领域规则（open → 409 not_paused）",
+                       "%s %r" % (r.status_code, (r.text or "")[:140]))
+
+                # A4b 反查链路：不存在的 appeal_id 必须是 404 appeal_not_found，
+                #     不是 501、也不是 500。它证明 `find_appeal_case` 真的被调用了
+                #     （这正是我用错夹具时最容易漏掉的一跳）。
+                r = ac.post("/api/v1/appeals/appeal-does-not-exist/withdraw",
+                            headers=headers(ac, "ap-404"),
+                            json={"reason": "x"})
+                report(r.status_code == 404 and "appeal_not_found" in r.text,
+                       "T401-A4b 未知 appeal_id → 404 appeal_not_found（反查链路真的在跑）",
+                       "%s %r" % (r.status_code, (r.text or "")[:140]))
+
+                # A5 反向对照：不在生产能力表时，三条必须各自 501。
+                #   证明 A1/A4 的 200 来自这次改动，不是本来就通。
+                removed_appeals = {
+                    "/api/v1/appeals",
+                    "/api/v1/appeals/{id}/migrate",
+                    "/api/v1/appeals/{id}/withdraw",
+                }
+                saved_appeals = set(PRODUCTION_WRITE_PATHS)
+                off_root2 = tempfile.mkdtemp(prefix="production-appeals-off-")
+                try:
+                    PRODUCTION_WRITE_PATHS.difference_update(removed_appeals)
+                    off_app2 = create_production_app(
+                        settings(off_root2), oauth_provider=provider)
+                    with TestClient(off_app2,
+                                    base_url="https://ca.example") as off2:
+                        lg = off2.get("/auth/login", follow_redirects=False)
+                        st2 = parse_qs(
+                            urlparse(lg.headers["location"]).query)["state"][0]
+                        off2.get("/auth/callback",
+                                 params={"code": "good-code", "state": st2},
+                                 follow_redirects=False)
+                        codes = [
+                            off2.post("/api/v1/appeals",
+                                      headers=headers(off2, "off-ap-open"),
+                                      json={"case_id": "c-x", "reason": "x"}
+                                      ).status_code,
+                            off2.post("/api/v1/appeals/a-x/migrate",
+                                      headers=headers(off2, "off-ap-mig"),
+                                      json={}).status_code,
+                            off2.post("/api/v1/appeals/a-x/withdraw",
+                                      headers=headers(off2, "off-ap-wd"),
+                                      json={"reason": "x"}).status_code,
+                        ]
+                        report(codes == [501, 501, 501],
+                               "T401-A5 ★ 反向对照：三条不在生产能力表时各返 501",
+                               repr(codes))
+                finally:
+                    PRODUCTION_WRITE_PATHS.clear()
+                    PRODUCTION_WRITE_PATHS.update(saved_appeals)
+                    shutil.rmtree(off_root2, ignore_errors=True)
+
+            # A6 ★ 票面判据「重启后仍可读」：新进程、同一数据根
+            appeal_app2 = create_production_app(appeal_cfg, oauth_provider=provider)
+            with TestClient(appeal_app2, base_url="https://ca.example") as ac2:
+                login = ac2.get("/auth/login", follow_redirects=False)
+                state = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
+                ac2.get("/auth/callback",
+                        params={"code": "good-code", "state": state},
+                        follow_redirects=False)
+                listed = ac2.get("/api/v1/appeals")
+                got = {x.get("appeal_id"): x.get("state")
+                       for x in listed.json() if isinstance(x, dict)}
+                report(listed.status_code == 200
+                       and got.get(appeal_id) == "withdrawn",
+                       "T401-A6 ★ 重启后 GET /appeals 仍返回同一条、同 state",
+                       "%s %r" % (listed.status_code, repr(got)[:120]))
+        finally:
+            shutil.rmtree(appeal_root, ignore_errors=True)
 
         # reassign 后 ACL 跟随权威 assignee；未知目标拒绝，冻结 assignee 不再承权。
         acl_root = tempfile.mkdtemp(prefix="production-reassign-acl-")
