@@ -91,6 +91,9 @@ PRODUCTION_WRITE_PATHS = {
     "/api/v1/appeals",
     "/api/v1/appeals/{id}/migrate",
     "/api/v1/appeals/{id}/withdraw",
+    # T-403：报告重签（ADR-0017）。它**不写权威状态**，只签发一条带时效的链接。
+    # 加进本表是因为生产闸门按「能力表」拦写请求 —— 不放行就永远 501。
+    "/api/v1/reports/{id}/resign",
 }
 def build_allowlist_source(projection):
     """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
@@ -153,6 +156,55 @@ class SettingsError(Exception):
     pass
 
 
+#: ADR-0017 §四：签名密钥的环境变量。`_PREV` 只用于**验**（轮换窗口），
+#: 绝不用于签 —— 若也用它签，轮换就永远「轮」不完。
+LINK_SECRET_ENV = "REVIEW_REPORT_LINK_SECRET"
+LINK_SECRET_PREV_ENV = "REVIEW_REPORT_LINK_SECRET_PREV"
+LINK_TTL_ENV = "REVIEW_REPORT_LINK_TTL"
+#: 密钥最短 32 字节。短于此直接**构造期拒**（不是运行时降级）：
+#: 一条弱密钥签出来的链接与强密钥长得一样，而危害只在被攻破时才显形。
+LINK_SECRET_MIN_BYTES = 32
+
+
+def _link_secrets_from_env(env, *, required=False):
+    """读签名密钥。返回 `(new, *prev)`；没配返回空元组。
+
+    ★ **不设默认值**：一条内置的默认密钥等于「所有人都知道密钥」。
+    ★ 长度不足 → `SettingsError`（构造期拒），不是静默忽略：
+      忽略会让部署方以为配好了，而 `resign` 一直返 503。
+    """
+    out = []
+    for name in (LINK_SECRET_ENV, LINK_SECRET_PREV_ENV):
+        raw = (env.get(name) or "").strip()
+        if not raw:
+            continue
+        if len(raw.encode("utf-8")) < LINK_SECRET_MIN_BYTES:
+            raise SettingsError("%s_too_short（至少 %d 字节）"
+                                % (name.lower(), LINK_SECRET_MIN_BYTES))
+        out.append(raw)
+    if required and not out:
+        raise SettingsError("report_link_secret_missing")
+    return tuple(out)
+
+
+def _link_ttl_from_env(env):
+    """读 TTL。缺省 1 小时；越界（<=0 或 >30 天）构造期拒。
+
+    ★ 上限必须有执行点，否则「过期签名」会退化成「永不过期」——
+      那样这个端点存在的唯一理由就没了（ADR-0017 §五）。
+    """
+    from base.report_store import LINK_TTL_DEFAULT_SECONDS, LINK_TTL_MAX_SECONDS
+    raw = (env.get(LINK_TTL_ENV) or "").strip()
+    if not raw:
+        return LINK_TTL_DEFAULT_SECONDS
+    if not raw.isdigit():
+        raise SettingsError("report_link_ttl_not_a_number")
+    value = int(raw)
+    if value <= 0 or value > LINK_TTL_MAX_SECONDS:
+        raise SettingsError("report_link_ttl_out_of_range")
+    return value
+
+
 @dataclass(frozen=True)
 class ProductionSettings:
     authority_root: Path
@@ -170,6 +222,12 @@ class ProductionSettings:
     oauth_reauth_redirect_uri: str | None = None
     oauth_scope: str = "auth:user.id:read"
     tenant_allowlist: frozenset[str] = frozenset()
+    #: ADR-0017：报告链接签名密钥，**新的在前**。空 = 本部署不签发带签名链接
+    #: （`resign` 返 503）。★ 刻意**没有默认值也不是必填**：报告读写在无密钥时
+    #: 必须照常工作 —— 让整个报告系统因为「没配签名密钥」起不来，
+    #: 代价远大于「重签不可用」。
+    report_link_secrets: tuple[str, ...] = ()
+    report_link_ttl: int = 3600
 
     def __post_init__(self):
         # ★ `report_root` 必须在这里，不能只加一个字段。
@@ -282,6 +340,8 @@ class ProductionSettings:
             oauth_reauth_redirect_uri=env["REVIEW_OAUTH_REAUTH_REDIRECT_URI"],
             oauth_scope=env.get("REVIEW_OAUTH_SCOPE", "auth:user.id:read"),
             tenant_allowlist=tenants,
+            report_link_secrets=_link_secrets_from_env(env),
+            report_link_ttl=_link_ttl_from_env(env),
         )
 
 
@@ -353,7 +413,12 @@ class ProductionRuntime:
             self.report_store = ReportStore(
                 str(self.settings.report_root),
                 self.settings.public_origin + "/static",
-                authorize=self._report_authorize)
+                authorize=self._report_authorize,
+                # ADR-0017：链接签名密钥（新的在前）。生产必须显式给；
+                # 没给时报告系统照常工作，只有 `resign` 返 503 ——
+                # **不许**降级成「发一个无签名的『新链接』」。
+                link_secrets=self.settings.report_link_secrets,
+                link_ttl=self.settings.report_link_ttl)
             self.report_bridge = ReportRenderBridge(
                 str(Path(__file__).resolve().parent.parent))
             # T-317c：重审执行体的两个注入点 —— 外部绑定采集（规则表 + KB
@@ -591,6 +656,68 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
 
     review_service_proxy = RuntimeProxy(runtime, "service")
     projection_proxy = RuntimeProxy(runtime, "projection")
+    # ── 报告重签（T-403 / ADR-0017）─────────────────────────────────
+    #
+    # 为什么单独一条路由而不是塞进 review_api 的通用写链：
+    #   `resign` 不写任何权威状态（正文与索引都不变），它只产出**一条链接**。
+    #   走 `ReviewCommandService.execute()` 会凭空产生一条 command batch，
+    #   而那会让「重签」在审计里看起来像一次状态变更 —— 它不是。
+    #
+    # ★ 审计仍然留：每次重签写一行 access-log（谁、什么时候、对哪条报告）。
+    #   链接是有时效的凭据，签发凭据这件事必须可追溯。
+    def resign_report(id: str, request: Request):
+        cookie = request.cookies.get(COOKIE_NAME)
+        session = session_or_503(cookie)
+        if not session:
+            raise HTTPException(401, "缺少或无效 session")
+        principal = runtime.directory.by_id(session["principal"],
+                                           session["tenant"])
+        if (principal is None or
+                (session.get("authz_version") is not None and
+                 session.get("authz_version") != principal.get("authz_version"))):
+            raise HTTPException(401, "主体授权已变化，请重新登录")
+        store = runtime.report_store
+        if store is None:
+            raise HTTPException(503, "report_store_unavailable")
+        # ★ 鉴权走**索引里的 acl**（`ReportStore.resign` 内部调 `authorize`），
+        #   不先反查 case —— 报告是内容寻址的独立对象，`case_id` 可能已结案
+        #   而 assignee 被清空；用 case 反查会让「结案后本人也重签不了」。
+        out = store.resign(id, principal)
+        if not out.get("ok"):
+            detail = str(out.get("detail") or "")
+            # ★ 密钥缺失 → 503，**不是** 200 也不是 500：
+            #   它是「这个部署没开启这项能力」，与「报告坏了」完全不同。
+            #   ADR-0017 §四：绝不许降级成「发一个无签名的『新链接』」。
+            if out.get("needs_secret"):
+                raise HTTPException(
+                    503, "report_link_signing_unavailable: 服务端未配置签名密钥")
+            if detail == "not_found":
+                raise HTTPException(404, "报告不存在")
+            if detail == "forbidden":
+                raise HTTPException(403, "无权为该报告申请重签")
+            raise HTTPException(500, "resign_failed: %s" % detail)
+        # ★ `AccessLog.write` 只有固定字段（不接 extra）。链接签发是「发凭据」
+        #   这一类动作，必须留痕；把 `exp`/`ttl` 写进 `reason` 而不是改日志
+        #   结构 —— 改结构会牵动所有既有读日志的脚本，而这是 T-403 不该付的代价。
+        # ★ `AccessLog` 挂在 `app.state.access_log`（`create_app` 建的），
+        #   **不在 runtime 上** —— 第一版写成 `runtime.access_log`，
+        #   实测 AttributeError 把整个请求打成 500。
+        #   审计写失败**不许**让重签失败：链接已经签出来了，
+        #   这里失败只丢一条日志，而回滚它会让用户以为没签成、再点一次。
+        try:
+            request.app.state.access_log.write(
+                principal=principal, method="POST", target=request.url.path,
+                reason="report_resign exp=%s ttl=%s" % (out.get("exp"),
+                                                        out.get("ttl")),
+                env="production")
+        except Exception:  # noqa: BLE001
+            pass
+        return {"report_id": id, "url": out["url"],
+                "exp": out["exp"], "ttl": out["ttl"],
+                # ★ 明确告诉调用方：正文没动。前端据此显示「旧报告保持不可变」。
+                "content_unchanged": True, "sha256": out.get("sha256")}
+
+
     app = create_app(
         session_store=RuntimeProxy(runtime, "session_store"),
         repository=frozen,
@@ -615,6 +742,9 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
         session_cookie_name=COOKIE_NAME,
         app_env="production",
         access_log_path=str(settings.access_log_path),
+        # T-403 / ADR-0017：报告重签的真实实现。注入而非事后 add_api_route ——
+        # 占位循环在 create_app 内部注册，事后追加会「先到先得」而占位先赢。
+        report_resign_handler=resign_report,
     )
     app.router.lifespan_context = lifespan
     app.state.production_runtime = runtime
@@ -966,9 +1096,29 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
         store = runtime.report_store
         if store is None:
             raise HTTPException(503, "report_store_unavailable")
-        out = store.read(report_id, principal)
+        # ADR-0017：把**请求者实际用的那个链接**交给 store 验签。
+        # ★ 传给 store 的是「不含 scheme/host 的部分也要能比」——
+        #   这里用完整 URL：`request.url` 在容器里是 http://127.0.0.1，
+        #   而 public_origin 是 https://ca.example，两者**不同**。
+        #   所以不拿 request.url 比前缀，改为把 path+query 拼回 static_base。
+        link_url = "%s%s" % (
+            store.static_base,
+            request.url.path[len("/static"):] + (
+                "?" + request.url.query if request.url.query else ""))
+        out = store.read(report_id, principal, link_url=link_url)
         # ★ 不区分「不存在」与「无权」：两者都返回 404。
         #   区分开会让这条路径变成一个 report_id 枚举器。
+        #
+        # ★ 但「链接过期/被篡改」必须**不同**（ADR-0017 §三）：
+        #   那是「链接失效」而不是「报告不存在」，用户要看到的是
+        #   「请申请重签」而不是「报告没了」—— 两者的下一步动作完全相反。
+        detail = str(out.get("detail") or "")
+        if not out.get("ok") and detail.startswith("link_expired"):
+            raise HTTPException(403, "链接已过期，请申请重签")
+        if not out.get("ok") and detail in (
+                "link_bad_signature", "link_bad_params", "link_bad_exp",
+                "link_bad_sig_shape", "link_wrong_report", "link_no_secret"):
+            raise HTTPException(403, "链接无效")
         if not out.get("ok"):
             raise HTTPException(404, "报告不存在")
         return Response(content=out["content"], media_type="text/markdown; charset=utf-8",

@@ -139,6 +139,10 @@ def settings(root):
         principal_directory=principal,
         # T-316d：报告落盘根。与其它数据路径一样必须在仓外且互不重叠。
         report_root=root / "reports",
+        # T-403 / ADR-0017：签名密钥与本文件其它节共用一份，
+        # 让「重签可用」这一条在真实生产装配下被验到（不是只验 ReportStore）。
+        report_link_secrets=("k" * 40,),
+        report_link_ttl=3600,
         public_origin="https://ca.example",
         oauth_client_id="cli_fake",
         oauth_client_secret="not-a-real-secret",
@@ -851,6 +855,142 @@ def main():
                 shutil.rmtree(off_root, ignore_errors=True)
         finally:
             shutil.rmtree(grant_root, ignore_errors=True)
+
+        # ── T-403：报告重签（ADR-0017）在**真实生产装配**下 ──────────────
+        #
+        # ★ 为什么要在生产装配里再验一遍（`verify_report_resign.py` 已验过
+        #   `ReportStore` 本身）：重签的失败面有三处**只在装配里**存在 ——
+        #   ① 路由注册（占位循环会不会先赢，让端点仍返 501）；
+        #   ② 密钥有没有从 settings 传到 store；
+        #   ③ `/static/reports/{id}.md` 会不会把 `?exp=&sig=` 丢掉。
+        #   这三处任何一处坏了，`ReportStore` 的单验都仍然是绿的。
+        #
+        # ★ 报告怎么造：直接用**生产装配里的那个 store** 发布一条。
+        #   「结案 → 渲染 → 发布」那条链由 `verify_report_publishing.py` 独立覆盖；
+        #   这里若也走它，需要夹具带 `report_snapshot`（判定阶段的产物），
+        #   而那是另一个子系统的输入 —— 混进来会让本票的失败面变模糊。
+        resign_root = tempfile.mkdtemp(prefix="production-resign-")
+        try:
+            resign_cfg = settings(resign_root)
+            resign_app = create_production_app(resign_cfg,
+                                               oauth_provider=provider)
+            with TestClient(resign_app, base_url="https://ca.example") as rc:
+                login = rc.get("/auth/login", follow_redirects=False)
+                st = parse_qs(urlparse(login.headers["location"]).query)["state"][0]
+                rc.get("/auth/callback",
+                       params={"code": "good-code", "state": st},
+                       follow_redirects=False)
+                store = resign_app.state.production_runtime.report_store
+                report(bool(store is not None and store.link_secrets),
+                       "T403-0 ★ 生产装配把签名密钥传到了 ReportStore",
+                       "secrets=%d" % (len(store.link_secrets) if store else 0))
+                pub = store.publish(
+                    ir(), lambda _ir: (
+                        "# 报告\n\n- 状态：REVIEW\n"
+                        "- source_ir_version: %s\n"
+                        "- source_ir_fingerprint: %s\n" % (
+                            _ir["source_ir_version"],
+                            __import__("hashlib").sha256(json.dumps(
+                                _ir, ensure_ascii=False, sort_keys=True,
+                                separators=(",", ":")).encode()).hexdigest())),
+                    # ★ `assigned` 必须含 reviewer：`can_read_report` 在
+                    #   dp3 分支要求「在 assigned 里」。空列表 = 审核人自己
+                    #   也读不到自己的报告，而那是**既有 ACL 语义**（结案时
+                    #   assignee 被清空）—— 夹具要按真实参与人写。
+                    {"tenant": "t1", "product_line": "pump",
+                     "submitter_id": "u-sub", "assigned": ["reviewer"]})
+                report_id = pub.get("report_id")
+                obj_path = os.path.join(store.root, pub.get("path", ""))
+                sha_before = (__import__("hashlib").sha256(
+                    open(obj_path, "rb").read()).hexdigest()
+                    if report_id and os.path.isfile(obj_path) else None)
+                report(bool(report_id),
+                       "T403-1 生产 store 发布了报告（后续断言的前提）",
+                       "report_id=%r" % (report_id,))
+
+                # R-1 ★ 改前这里是 501 占位
+                r = rc.post(f"/api/v1/reports/{report_id}/resign",
+                            headers=headers(rc, "resign-1"), json={})
+                body = r.json() if str(
+                    r.headers.get("content-type", "")).startswith(
+                        "application/json") else {}
+                signed_url = body.get("url")
+                report(r.status_code == 200 and isinstance(signed_url, str)
+                       and "?exp=" in signed_url and "&sig=" in signed_url,
+                       "T403-2 ★ 生产装配下 resign → 200 且 url 带签名（改前 501）",
+                       "%s %r" % (r.status_code, str(signed_url)[-40:]))
+                report(body.get("content_unchanged") is True,
+                       "T403-3 ★ 响应明确 content_unchanged=true",
+                       str(body)[:120])
+
+                sha_after = (__import__("hashlib").sha256(
+                    open(obj_path, "rb").read()).hexdigest()
+                    if sha_before else None)
+                report(sha_before is not None and sha_before == sha_after,
+                       "T403-4 ★ 重签后正文 sha256 未变", "%r" % (sha_before,))
+
+                # R-4 签名 URL **经静态路由**能打开（只有装配能验这一条）
+                path_q = str(signed_url).replace(resign_cfg.public_origin, "")
+                got = rc.get(path_q)
+                report(got.status_code == 200
+                       and "source_ir_version" in got.text,
+                       "T403-5 ★ 签名 URL 经 /static 路由读得到正文",
+                       "%s %r" % (got.status_code, got.text[:60]))
+
+                # R-5 过期后同一链接打不开（注入 now，不改 URL）
+                expired = store.read(
+                    report_id,
+                    {"id": "reviewer", "roles": ["dp3"], "tenant": "t1",
+                     "product_lines": ["pump"], "tenant_id": "t1",
+                     "open_id": "ou-reviewer"},
+                    link_url=signed_url, now=int(body.get("exp") or 0) + 1)
+                report(not expired.get("ok")
+                       and "link_expired" in str(expired.get("detail")),
+                       "T403-6 ★ 过期后（exp+1s）同一链接打不开",
+                       str(expired.get("detail")))
+
+                # R-9 无密钥 → 503（另开一个把密钥清空的装配）
+                no_secret_root = tempfile.mkdtemp(prefix="production-resign-ns-")
+                try:
+                    cfg2 = settings(no_secret_root)
+                    cfg2 = type(cfg2)(**{**cfg2.__dict__,
+                                         "report_link_secrets": ()})
+                    app2 = create_production_app(cfg2, oauth_provider=provider)
+                    with TestClient(app2, base_url="https://ca.example") as rc2:
+                        lg = rc2.get("/auth/login", follow_redirects=False)
+                        st2 = parse_qs(
+                            urlparse(lg.headers["location"]).query)["state"][0]
+                        rc2.get("/auth/callback",
+                                params={"code": "good-code", "state": st2},
+                                follow_redirects=False)
+                        store2 = app2.state.production_runtime.report_store
+                        pub2 = store2.publish(
+                            ir(), lambda _ir: (
+                                "# 报告\n\n- 状态：REVIEW\n"
+                                "- source_ir_version: %s\n"
+                                "- source_ir_fingerprint: %s\n" % (
+                                    _ir["source_ir_version"],
+                                    __import__("hashlib").sha256(json.dumps(
+                                        _ir, ensure_ascii=False,
+                                        sort_keys=True,
+                                        separators=(",", ":")).encode()
+                                    ).hexdigest())),
+                            {"tenant": "t1", "product_line": "pump",
+                             "submitter_id": "u-sub",
+                             "assigned": ["reviewer"]})
+                        rid2 = pub2.get("report_id")
+                        r2 = rc2.post(f"/api/v1/reports/{rid2}/resign",
+                                      headers=headers(rc2, "ns-resign"), json={})
+                        b2 = r2.json() if str(
+                            r2.headers.get("content-type", "")).startswith(
+                                "application/json") else {}
+                        report(r2.status_code == 503 and b2.get("url") is None,
+                               "T403-7 ★ 无密钥 → 503 且不返回 url（不降级成假成功）",
+                               "%s %r" % (r2.status_code, str(b2)[:110]))
+                finally:
+                    shutil.rmtree(no_secret_root, ignore_errors=True)
+        finally:
+            shutil.rmtree(resign_root, ignore_errors=True)
 
         # reassign 后 ACL 跟随权威 assignee；未知目标拒绝，冻结 assignee 不再承权。
         acl_root = tempfile.mkdtemp(prefix="production-reassign-acl-")

@@ -1004,6 +1004,13 @@
         "web/scripts/pairing_check.mjs",
         "web/scripts/dev-up.sh"
       ]
+    },
+    {
+      "verifier": "tools/verify_report_resign.py",
+      "asserts": "T-403 / ADR-0017 报告链接的过期签名：R-1 resign 返回带 exp+sig 的 url；R-2 ★ 重签不碰正文（sha256 前后一致）；R-3 重签不写索引（签名是链接属性不是报告属性）；R-4 有效签名 URL 能打开；R-5 ★ 过期 URL 打不开（参与人也不行 —— 过期不是装饰）；R-6 ★ 篡改 sig 一位即失效；R-7 ★ 签名不跨报告（换 report_id 复用即判 bad_signature）；R-8 无签名 URL 仍能读（存量报告没坏）；R-9 ★ 无密钥不返回 url（needs_secret，调用方回 503，不许降级成假成功）；R-9b 非参与人不能重签（签名不替代 ACL）；R-10 TTL 越界与弱密钥均拒；R-11 轮换窗口（旧密钥签的靠 _PREV 仍可验）；R-12 查询串键集合恒等（多一个键即形状非法）。--controls：摘掉 read() 的验签 → 过期/篡改/跨报告三条必红",
+      "subjects": [
+        "base/report_store.py"
+      ]
     }
   ],
   "exempt": [

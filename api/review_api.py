@@ -533,7 +533,8 @@ def create_app(*, session_store=None, repository=None, principals=None,
                session_cookie_name="session", finding_store=None, appeals=None,
                release_gate=None, app_env=None,
                grant_principal_provider=None,
-               allow_simulated_identity=None, access_log_path=None):
+               allow_simulated_identity=None, access_log_path=None,
+               report_resign_handler=None):
     store = session_store or SessionStore(
         os.environ.get("REVIEW_API_SESSION_DB", ":memory:"))
     repo = repository or FileProjectionRepository(
@@ -603,6 +604,9 @@ def create_app(*, session_store=None, repository=None, principals=None,
     # T-313d：通知收件箱的生产读法（投影 list_notifications）；
     # None = 开发装配，回落 frozen repo。
     app.state.notification_reader = notification_reader
+    #: T-403 / ADR-0017：报告重签的真实实现（生产装配注入）。
+    #: None = 开发装配，由下面的 501 占位接管 —— 与 admin_api 同一种模式。
+    app.state.report_resign_handler = report_resign_handler
     app.state.session_cookie_name = session_cookie_name
 
     @app.exception_handler(HTTPException)
@@ -1047,6 +1051,20 @@ def create_app(*, session_store=None, repository=None, principals=None,
         internal_dep=grant_dep,
         enabled_capabilities=enabled_write_capabilities,
         principal_provider=grant_principal_provider)
+
+    # T-403：报告重签。**只在生产装配（注入 handler）时注册**，
+    # 否则交给下面的 501 占位 —— 与 `register_admin_routes` 同一种模式。
+    #
+    # ★ 为什么用「注入 handler」而不是在这里实现：重签要 `ReportStore` 与
+    #   `AccessLog`，两者都只在生产装配里存在；在 API 层拿它们意味着
+    #   又要开一条「API 直接读装配内部」的口子（C5 禁的正是这个）。
+    if report_resign_handler is not None:
+        app.add_api_route(
+            "/api/v1/reports/{id}/resign", report_resign_handler,
+            methods=["POST"],
+            responses={503: {"description":
+                             "report_link_signing_unavailable：未配置签名密钥"}})
+        implemented.add("/api/v1/reports/{id}/resign")
 
     def placeholder(request: Request, _principal=Depends(principal_dep)):
         raise HTTPException(501, "写端点尚未实现")
