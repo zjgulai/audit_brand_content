@@ -798,6 +798,38 @@
       "criteria": "TS-20",
       "fixture": "{root}/tools/verify_grant_registry.py",
       "command": "{venv} {root}/tools/verify_grant_registry.py"
+    },
+    "109": {
+      "test_id": "acceptance-109",
+      "criteria": "TS-6",
+      "fixture": "{root}/web/scripts/verify_frontend_stack_contract.mjs",
+      "command": "node {root}/web/scripts/verify_frontend_stack_contract.mjs --row 109 && node {root}/web/scripts/verify_frontend_stack_contract.mjs --controls",
+      "timeout": 90,
+      "cpu_seconds": 60
+    },
+    "110": {
+      "test_id": "acceptance-110",
+      "criteria": "TS-7",
+      "fixture": "{root}/web/scripts/verify_frontend_stack_contract.mjs",
+      "command": "node {root}/web/scripts/verify_frontend_stack_contract.mjs --row 110 && node {root}/web/scripts/verify_frontend_stack_contract.mjs --controls",
+      "timeout": 90,
+      "cpu_seconds": 60
+    },
+    "111": {
+      "test_id": "acceptance-111",
+      "criteria": "TS-8",
+      "fixture": "{root}/web/scripts/verify_frontend_stack_contract.mjs",
+      "command": "node {root}/web/scripts/verify_frontend_stack_contract.mjs --row 111 && node {root}/web/scripts/verify_frontend_stack_contract.mjs --controls",
+      "timeout": 90,
+      "cpu_seconds": 60
+    },
+    "128": {
+      "test_id": "acceptance-128",
+      "criteria": "TS-25",
+      "fixture": "{root}/web/scripts/verify_frontend_stack_contract.mjs",
+      "command": "node {root}/web/scripts/verify_frontend_stack_contract.mjs --row 128 && node {root}/web/scripts/verify_frontend_stack_contract.mjs --controls",
+      "timeout": 90,
+      "cpu_seconds": 60
     }
   }
 }
