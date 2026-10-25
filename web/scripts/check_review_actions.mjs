@@ -132,6 +132,42 @@ try {
     }
     throw new Error(`等待超时：${label}`);
   };
+  /**
+   * 切换本地开发身份（AppShell 的 select）。
+   *
+   * ★ 为什么要有它：不同页面按**不同角色**断言 —— 下线台要 signer
+   *   （`_ROLE_CAPS` 里只有它有 takedown.execute），复核台要 dp3。
+   *   不切身份就会撞 403，而那个 403 长得像权限缺陷。
+   *
+   * ★ 切换会换一个 HttpOnly session cookie，所以切完之后
+   *   `currentSessionCookie()` 必须重新读 —— 它已经是每次现读的，
+   *   但 `activeCookie` 这个缓存变量要清掉，否则后续 fetch 用的还是旧 cookie
+   *   （症状是「切了身份但看到的是上一个人的数据」）。
+   */
+  const switchDevIdentity = async (principalId) => {
+    const changed = await ev(`(() => {
+      const sel = document.querySelector('select[aria-label="切换本地开发身份"]');
+      if (!sel) return 'NO_SELECT';
+      const opt = [...sel.options].find(o => o.value === ${JSON.stringify(principalId)});
+      if (!opt) return 'NO_OPTION';
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype, 'value').set;
+      setter.call(sel, ${JSON.stringify(principalId)});
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return 'SWITCHING';
+    })()`);
+    if (changed !== "SWITCHING") {
+      throw new Error(`切换开发身份失败：${changed}（目标 ${principalId}）`);
+    }
+    await waitEval(
+      `document.querySelector('select[aria-label="切换本地开发身份"]')?.value === ${JSON.stringify(principalId)}`,
+      `切到 ${principalId}`,
+    );
+    // 等身份生效（会换 session cookie）
+    await sleep(400);
+    activeCookie = "";
+  };
+
   const click = async (text) => {
     const ok = await ev(`(() => {
       const el=[...document.querySelectorAll('button')].find(x=>x.textContent?.trim()===${JSON.stringify(text)});
@@ -255,6 +291,7 @@ try {
   await fillInput("#appeal-reason", "CDP 浏览器真实提交申诉测试：请求复核上下文");
   await click("提交申诉");
   await waitText("已受理（状态：open，SLA：2 个工作日）");
+  let knownTakedownReadBack = null;
   const createdAppealId = await ev(`(() => {
     const m = document.body.innerText.match(/申诉\\s+(appeal-[\\w-]+|ap-[\\w-]+)\\s+已受理/);
     return m ? m[1] : null;
@@ -264,6 +301,17 @@ try {
   }
 
   // 2) P-08 下线任务台（/takedown）：真实点击 Start → 弹出回填框 Complete → GET /api/v1/takedown-tasks 回读
+  //
+  // ★ 必须先切到**签发人**身份。下线执行走的是「角色能力 + 人级名单」两道：
+  //   `_ROLE_CAPS` 里只有 signer 有 `takedown.execute`（dp3/dp4 只有
+  //   case.review / appeal.handle），所以 u_dp3 点 Start **必然** 403 ——
+  //   而那个 403 读起来像权限缺陷，实际是「夹具用错了身份」。
+  //   实测代价：`bash web/scripts/dev-up.sh` 在 [8/11] 恒失败 rc=1。
+  //
+  // ★ 不改成「把 takedown.execute 加给 dp3」：角色表是产品口径（UIUX §1.5
+  //   把下线执行放在签发人），为了跑通夹具去改它，等于让本地行为与生产不一致。
+  //   夹具该跟着产品走，不是反过来。
+  await switchDevIdentity("u_signer");
   await spaGoto("/takedown");
   await waitText("下线任务台（P-08）");
   await waitText("td-smoke-1");
@@ -278,13 +326,39 @@ try {
     headers: { Cookie: `session=${await currentSessionCookie()}` },
   });
   if (!tdResp.ok) throw new Error(`GET /takedown-tasks → HTTP ${tdResp.status}`);
-  const tdList = await tdResp.json();
-  const completedTd = Array.isArray(tdList)
-    ? tdList.find((t) => t.task_id === "td-smoke-1")
-    : null;
+  const tdBody = await tdResp.json();
+  // ★ `GET /api/v1/takedown-tasks` 返回的是 `{tasks, metrics}`（T-312d 起
+  //   任务年龄由后端 metrics_view 算），**不是数组**。
+  //   这里原先写的是 `Array.isArray(tdList) ? ... : null` —— 于是无论读写侧
+  //   是否正常，它都得到 null，报「回读不是 completed」。
+  //   也就是说这条断言**从来没有真正跑过**：它红的时候看起来像业务缺陷。
+  const tdList = Array.isArray(tdBody) ? tdBody : (tdBody?.tasks ?? []);
+  const completedTd = tdList.find((t) => t.task_id === "td-smoke-1") ?? null;
   if (!completedTd || completedTd.state !== "completed") {
-    throw new Error(`下线任务回读不是 completed：${JSON.stringify(completedTd)}`);
+    // ★ 读侧的另一处「写完读不回」（已登记 T-401b，本票不修）：
+    //   开发装配的写落在内存 repo，而 GET 读 frozen `takedown-tasks.json`，
+    //   于是 start/complete 都 200、读回仍是 pending。
+    //   这里区分「写失败」与「写成功但读不回」，因为两者的下一步完全不同。
+    if (completedTd && completedTd.state !== "completed") {
+      // ★ 已知缺陷（T-401b 登记）：开发装配的写落在内存 repo，而 GET 读
+      //   frozen `takedown-tasks.json` —— 于是「写 200、读回 pending」。
+      //   这里**不把它算成通过**（`ok:false` 会进最终汇总），也**不静默忽略**：
+      //   打一行显式告警，并把已知性写进返回体，让读的人分得清
+      //   「新坏了一个」与「还是那个已登记的」。
+      knownTakedownReadBack = {
+        state: completedTd.state,
+        known_issue: "T-401b: dev write goes to in-memory repo, GET reads frozen",
+      };
+      console.warn(
+        `⚠ 已知缺陷 T-401b：下线任务写后读不回（state=${completedTd.state}）` +
+          `—— 写落在内存 repo、读走 frozen。本步骤的写动作本身已成功。`,
+      );
+    }
+    throw new Error(`下线任务回读里找不到 td-smoke-1：${JSON.stringify(tdList).slice(0, 200)}`);
   }
+
+  // 切回 DP3：后面的提交/收件箱/授权治理按审核员口径断言（与步骤 1 同一身份）。
+  await switchDevIdentity("u_dp3");
 
   // 3) P-07 签发中心（/release/:caseId）：真实填写理由与 step_up_token 并点击确认签发放行
   await spaGoto(`/release/${encodeURIComponent(caseId)}`);
@@ -340,6 +414,7 @@ try {
 
   console.log(JSON.stringify({
     ok: true,
+    known_issues: knownTakedownReadBack ? [knownTakedownReadBack] : [],
     case_id: caseId,
     adjudicated_finding_id: confirmedFindingId,
     appeal_id: createdAppealId,

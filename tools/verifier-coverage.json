@@ -995,6 +995,15 @@
         "api/production_app.py",
         "api/write_api.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_browser_harness.py",
+      "asserts": "前后端接线联调驱动（web/scripts/lib/browser_harness.mjs）的三条硬约束：H1 ★ 无 Chrome 抛 HarnessUntested（调用方据此退 2 不是退 1）；H2 ★ 每个 CDP 调用有超时，且判据双向（elapsed 落在 [100,3000) —— 下界证明超时真触发、上界证明它没把页面里 5000ms 的 Promise 等完）；H3 ★ close 幂等且关闭后调用明确失败；H4 ★ CLI 三态退出码 0/1/2（未测 ≠ 红 ≠ 通过，在进程退出码上的执行点）；H5 goto 等 readyState=complete、页内 JS 抛错变 HarnessFailed；H6 ★ close 后临时 profile 真被删（从 _profileDir 读真实路径，不猜目录）。--controls 2 项：HarnessUntested 改名 → H1 必红；未测退 2 改成退 1 → H4 必红",
+      "subjects": [
+        "web/scripts/lib/browser_harness.mjs",
+        "web/scripts/pairing_check.mjs",
+        "web/scripts/dev-up.sh"
+      ]
     }
   ],
   "exempt": [

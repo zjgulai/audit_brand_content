@@ -42,6 +42,7 @@ from fastapi import Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 
 from api.review_api import FileProjectionRepository, create_app  # noqa: E402
+from base import rbac  # noqa: E402
 from base.auth_session import SessionStore  # noqa: E402
 from base.finding_store import FindingRejected, FindingStore  # noqa: E402
 
@@ -123,6 +124,36 @@ app = create_app(
     principals=PRINCIPALS,
     app_env="dev",
 )
+
+# ── 开发装配套上人级名单（否则 P-08 下线台全链路 403）───────────────
+#
+# ★ 为什么必须有这一条：`base/rbac.py` 把下线执行/豁免与 release.sign 定为
+#   **人级名单**，且「未注入名单源 → 回落空集 → 全拒」（fail closed）。
+#   生产装配会注入 `build_allowlist_source(projection)`；而本开发装配
+#   **此前没有注入**，于是 `POST /takedown-tasks/{id}/start` 恒 403。
+#
+#   实测代价：`bash web/scripts/dev-up.sh` 在阶段 [8/11]
+#   （`check_review_actions.mjs` 的真点击 Start）**必然失败**，
+#   而且失败信息是 `403 Forbidden` —— 读起来像权限缺陷，实际是
+#   「开发夹具少接了一根线」。`git stash` 掉本轮改动后复跑同样 rc=1，
+#   确认是既有问题、不是新增回归。
+#
+# ★ 只放**开发身份**，而且是逐条点名（不是「dev 环境全放行」）：
+#   写成全放行会让开发环境的行为与生产无可比性，本地能过的东西上线就 403 ——
+#   那正是 TS-1「本地能过就上线」要禁止的形状。
+# ★ `takedown.waive` 刻意不授给 u_dp3：豁免要求双人审批 + 独立钥匙，
+#   本地把它放开会让那条链在开发下**看起来**通过，而生产里没人能豁免。
+DEV_ALLOWLIST = {
+    # ★ 只能点名 **u_signer**：`rbac._ROLE_CAPS` 里只有 signer 有
+    #   `takedown.execute` 这个角色能力（dp3/dp4 只有 case.review / appeal.handle）。
+    #   第一版写成 {"u_dp3"}，实测仍然 403 —— 因为名单是**第二道**门，
+    #   角色能力是**第一道**门，两道都得过。写错的那一版看起来「名单已经配好了」，
+    #   而实际拦住它的是前一道，报的还是同一个 403 —— 无法从症状反推是哪一道。
+    "takedown.execute": frozenset({"u_signer"}),
+    "takedown.waive": frozenset(),
+    "release.sign": frozenset({"u_signer"}),
+}
+rbac.set_allowlist_source(lambda: DEV_ALLOWLIST)
 
 
 def _loopback_host(host: str) -> bool:

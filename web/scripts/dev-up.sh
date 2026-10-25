@@ -5,6 +5,29 @@
 # 失败退非零；成功打印 API/Web/队列/页面读数。
 set -euo pipefail
 
+# ── --keep：跑完**不清理**，把 API/WEB 进程与端口号留着 ────────────────
+#
+# 为什么需要它：`pairing_check.mjs`（前后端接线联调）要对着一个**已经在跑**的
+# 服务打请求。没有这个开关时，只有两种做法 —— 要么把联调塞进本脚本（于是
+# 「起服务」与「验接线」耦合在一起，改一处动全身），要么手写一段起服务的
+# 命令（于是又出现第二套启动口径，与这里必然漂移）。
+#
+# ★ 留着进程意味着**调用方必须自己收拾**：本脚本会把 API_PID / WEB_PID /
+#   RUN_DIR 写到 stdout 最后三行，联调结束后用 `kill` 收尾。
+#   不写这个提醒的话，`--keep` 跑几次就会堆一堆 Chrome/Vite/uvicorn。
+KEEP=0
+for _a in "$@"; do
+  case "${_a}" in
+    --keep) KEEP=1 ;;
+    -h|--help)
+      echo "用法：bash web/scripts/dev-up.sh [--keep]"
+      echo "  --keep  跑完不杀进程（联调用）；会打印 API_PID/WEB_PID/RUN_DIR"
+      exit 0
+      ;;
+    *) echo "未知参数：${_a}"; exit 2 ;;
+  esac
+done
+
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WEB="${ROOT}/web"
 PY="${ROOT}/.venv/bin/python"
@@ -35,6 +58,11 @@ WEB_PID=""
 
 cleanup() {
   rc=$?
+  # --keep：成功时**不杀**（联调要用），失败时照杀（失败留下的进程没有用处）。
+  if [ "${KEEP}" = "1" ] && [ "${rc}" -eq 0 ]; then
+    echo "⚠ --keep：API/WEB 仍在运行，收尾请 kill ${API_PID} ${WEB_PID}"
+    exit 0
+  fi
   if [ -n "${WEB_PID}" ]; then kill "${WEB_PID}" 2>/dev/null || true; fi
   if [ -n "${API_PID}" ]; then kill "${API_PID}" 2>/dev/null || true; fi
   wait "${WEB_PID}" 2>/dev/null || true
@@ -216,6 +244,8 @@ cat "${RUN_DIR}/identity-switch.json"
 
 echo "API_PORT=${API_PORT}"
 echo "WEB_PORT=${WEB_PORT}"
+echo "API_PID=${API_PID}"
+echo "WEB_PID=${WEB_PID}"
 echo "RUN_DIR=${RUN_DIR}"
 echo "curl_status=${HTTP_STATUS}"
 echo "queue_summary=$(head -c 400 "${RUN_DIR}/queue.json")"
