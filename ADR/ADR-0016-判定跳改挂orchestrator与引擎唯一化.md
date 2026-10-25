@@ -1,8 +1,13 @@
 # ADR-0016：判定那一跳改挂 orchestrator，且 rule_judge 为唯一判定引擎
 
-- 状态：`proposed`（§七 两项待 Owner 确认；§二/§三 是**已由委托方裁定**的两项，
-  本条只把它们落成可执行口径与可指出的执行点）
-- 日期：2026-10-20
+- 状态：`accepted` —— **2026-10-25 委托方裁定**：由 `proposed` 推进为 `accepted`，
+  **不另写一份方向相反的 ADR**。票清单 v2 原推荐的「B：保留双轨 + 版本标注」不作为反面决定，
+  改记为本文件 **§5.4 的事实陈述**（现状是「合并尚未完成」，不是「双轨是设计」）。
+  > 原状态行照留不删，逐字如下：`proposed`（§七 两项待 Owner 确认；§二/§三 是**已由委托方裁定**的两项，
+  > 本条只把它们落成可执行口径与可指出的执行点）。
+  > ★ 2026-10-25 核对发现：原句里的 **§七 应为 §九** —— 两道待确认的题在「§九、待 Owner 确认的问题」，
+  > §七 是「口径陷阱」。原句按 ADR/README 规则 5（不因决策已定而删异议/原文）保留，此处只加注。
+- 日期：2026-10-20（起草）· **2026-10-25（裁定 `accepted`，裁定人：委托方）**
 - 编号属主：`audit-multi-content-4b`。**本条最初取号 ADR-0015，与
   `production-backend-assembly` 的同号 ADR 撞车；2026-10-20 本会话整份让号到 0016，
   对方那份 0015 一个字未动。事故与教训记在
@@ -174,6 +179,260 @@ PASS 永远出不来（这一条当前**已经**成立，见 §五）。
   当前没有「合并后哪个对」的判据。
 - **不**顺手改 `web-write-isolation` 的五项后端装配。那是他的范围，本 ADR 只登记依赖。
 
+### 5.4 已知未完成：双轨仍然存在（**是现状，不是设计**）
+
+> 这一节是 2026-10-25 裁定 `accepted` 时补写的。它的作用正好与标题相反：
+> **它记录的是本 ADR 自己派下去的活还没做完**，不是给双轨找一个说法。
+>
+> ★ **读这一节时最容易犯的错**：「两条链路各自有回归读数，合并会引入未测风险」这句话
+> 读起来像一条**决策理由**，于是下一跳就变成「所以双轨是设计好的」。
+> **它不是。** 那句话在 §5.4.2 里被明确标注为**现状的成因描述**；
+> 授权只在 §三 —— `rule_judge` 是唯一判定引擎。**把风险当理由，等于用代价否掉决策。**
+
+#### 5.4.1 事实一：`judge_copy` 至今仍直接 `execFile judge.py`
+
+这不是推测，是当前盘上的读数。**A15-T2 未做。**
+
+```bash
+$ grep -n "JUDGE_PY" tools/agent/tools.mjs
+613:const JUDGE_PY = path.join(REPO_ROOT, 'research', 'governance', 'skeleton', 'judge.py');
+702:      const args = [JUDGE_PY, '--text-file', tmp, '--json', '--brief', '--receipt',
+
+$ grep -n "execFileP('python3', args" tools/agent/tools.mjs
+708:      const { stdout } = await execFileP('python3', args, {
+```
+
+三条读数各自说明一件事：
+
+| 读数 | 说明 |
+|---|---|
+| `JUDGE_PY` 指向 `research/governance/skeleton/judge.py` | 守衡调的是 **§三 已降级为分析工具** 的那个引擎，不是 `rule_judge` |
+| `execFileP('python3', args)` 的目标是 `JUDGE_PY` | 是**子进程直调**，中间没有 `ContentUnit`、没有 `Orchestrator`、没有回执五步 |
+| 全仓 `execFile.*judge\.py` 的**拦截面为 0** | §六 T2 要求的「调用点只允许出现在 `base/judge_entry.py` 以内」**没有任何代码在拦** —— 与 AGENTS.md §2.4「写进文档的约束必须能指出哪一行在拦它」同一条。取证见下（含正向对照） |
+
+第三行要单独核一次，因为它才是「未完成」与「未完成且有护栏」的区别：
+
+```bash
+$ grep -rn "execFile.*judge\.py" tools/ base/ api/ web/ --include='*.mjs' --include='*.py'
+（无输出，rc=1）
+```
+
+**这条「无输出」必须先证它不是恒真，否则它什么都说明不了。** 正向对照：
+
+```bash
+$ cat > /tmp/ctl-sample.mjs <<'EOF'
+await execFileP('python3', ['research/governance/skeleton/judge.py', '--json']);
+EOF
+$ grep -rn "execFile.*judge\.py" /tmp/ctl-sample.mjs
+/tmp/ctl-sample.mjs:1:await execFileP('python3', ['research/governance/skeleton/judge.py', '--json']);
+（rc=0 —— 命中，说明扫描器活着）
+```
+
+两个读数合起来才是结论：**扫描器会命中（正对照 rc=0）+ 仓内零命中（rc=1）→ 全仓没有一行在拦这件事。**
+
+> ⚠️ 这里的「零命中」**不能**直接推出「守衡没在直调 `judge.py`」——
+> `tools.mjs` 那行的参数是**变量** `JUDGE_PY`，行内没有字面量 `judge.py`，所以这条 grep
+> 按设计就扫不到它。两件事分开记：**调用确实存在**（上面第一条 grep 证明）
+> 与**没有任何守卫**（这条 grep + 正对照证明）。
+> 把两者混成「全仓 grep 零命中」就会得出相反的错误结论。
+>
+> ★ 写这一段时踩了一个坑，记下来因为它长得像通过：初稿写的是
+> `grep -rn "execFile.*judge\\\\.py"`（四个反斜杠）。在单引号里它变成正则
+> `execFile.*judge\\.py`（= 一个反斜杠 + 任意字符 + `py`），**在正样本上也不命中**（实测 rc=1）。
+> 于是它恒真，而恒真的判据打印出来与「没找到违规」一模一样（AGENTS.md §2.4.4 同一个病）。
+> **凡是写进文档的 grep，都要连同它的正向对照一起写。**
+
+> ⚠️ 行号随时会漂（改一个函数就会整体移动）。
+> **判据是 greps 的输出内容，不是行号。** 复现时带命令，不要当校对基准（AGENTS.md §2.2 第 1 条）。
+
+#### 5.4.2 事实二：工作台侧走的是另一条链
+
+| | 守衡（群） | 工作台 |
+|---|---|---|
+| 入口 | `ws_daemon.mjs` → `agent.mjs` 工具循环 → `judge_copy` | `api/production_app.py` → `base/submission_service.py` → `base/judge_entry.judge_unit` |
+| 判定 | `research/governance/skeleton/judge.py`（**降级后的分析引擎**） | `base/judge_entry.py` → `Orchestrator` + `base/rule_judge.py` |
+| 产出 | `judge.py` 的 `verdict.disposition`（`auto_pass` / `auto_reject` / …） | `decision_table` 的 `state`（`PASS`/`REVIEW`/`BLOCK`/`未审查`/`待自决`）+ `release_status` |
+| 自证 | `tools/agent/judge_evidence_wiring.test.mjs` | `tools/verify_judge_entry.py` |
+
+工作台侧那条链的 import 就是它自己说的：
+
+```bash
+$ grep -n "^from base.orchestrator\|^from base.rule_judge" base/judge_entry.py
+23:from base.orchestrator import Orchestrator  # noqa: E402
+24:from base.rule_judge import RuleJudge  # noqa: E402
+```
+
+**「两条链路各自有回归读数」这句话是事实**，两个读数当场都能跑出来：
+
+```bash
+$ python3 tools/verify_judge_entry.py | tail -1     # 工作台侧
+✅ 12/12 全过
+
+$ node tools/agent/judge_evidence_wiring.test.mjs | tail -2   # 守衡侧
+✅ judge_evidence 接线自证 22/22 项通过
+```
+
+引用的两个文件数（口径写在命令里，别记数）：
+
+```bash
+$ grep -rl "judge_entry" tools/*.py | wc -l        # 工作台链的消费者
+13
+$ grep -rl "judge_copy" tools/agent/ | wc -l       # 守衡链的消费者
+5
+```
+
+> ★ **这两句话的关系必须分清，否则下一个人会把它读成「双轨是设计」：**
+>
+> | 这是 | 不是 |
+> |---|---|
+> | **合并尚未完成的成因**：两条链各有自己的回归读数，任何一次合并都会让「原本绿的那一堆」变成未测 | **保留双轨的决定**：本 ADR 从未授权两条链并存 |
+>
+> 换句话说：「合并有代价」解释的是 **为什么 T2 到今天还没做**，
+> 它**不构成「所以不做也行」的理由**。§三 的授权只有一条 ——
+> `rule_judge` 是唯一判定引擎。**代价是决策的约束，不是决策的反面。**
+> （这条如果读反了，就等于用 §五 的代价表把 §三 的决策撤销了，而没有任何一份 ADR 说过这样的话。）
+
+#### 5.4.3 事实三：A15-T1…T7 七张票全部仍然有效
+
+`accepted` **不取消任何一张票**。状态从 `proposed` 变 `accepted` 只意味着「方向定了」，
+不意味着「活干完了」—— 这正是 `ADR/README.md` 规则 4 写的那句话。
+
+```bash
+$ grep -o "A15-T[0-9]" ADR/ADR-0016-判定跳改挂orchestrator与引擎唯一化.md | sort -u | wc -l
+7
+```
+
+> ⚠️ 别用 `grep -c "^| \*\*A15-T"` 数：**下面这张状态表与 §六 的票表格式相同**，
+> 它会被一起数进去（实测这条命令现在返回 `14`）。
+> **一个把自己也数进去的计数，会随文档变长而变大。** 用 `sort -u` 数**票号去重**，
+> 才不会把「同一张票写了两遍」当成两张票。
+
+| 票 | 状态（2026-10-25 逐条核） | 判据 / 复现 |
+|---|---|---|
+| **A15-T1** `base/judge_entry.py` | ✅ **已落地** <br>`wc -l < base/judge_entry.py` → `197`<br>`python3 tools/verify_judge_entry.py` → `✅ 12/12 全过` | 存在 + 自证全绿 |
+| **A15-T2** `judge_copy` 改调 T1 入口 | ❌ **未做**（见 §5.4.1） | `grep -n "JUDGE_PY" tools/agent/tools.mjs` 仍指向 `skeleton/judge.py` |
+| **A15-T3** 五标签映射 | ⚠️ **工作台侧已落，守衡侧未落**<br>`base/judge_entry.py:146` 取 `result["decision"]["state"]`；守衡侧返回的仍是 `verdict.disposition` 的 `auto_pass/auto_reject/…` | 两侧返回字段的**取值域不同**，见 §5.5 |
+| **A15-T4** persona 与代码对齐 | ⚠️ **半做**：`evidence_chain` 已真接线（`judge_evidence.mjs`，自证 22/22）；`kb_search` 仍未注册（`grep -c "register('kb_search'" tools/agent/tools.mjs` → `0`） | 工具名对齐只做了一半 |
+| **A15-T5** 契约裂缝三条 | ⚠️ **修了两条，第三条仍在**：<br>· ✅ `content_unit_ref.kind` 已含 `ad_text`/`structured_json`（`base/content-unit-v1.schema.json:32`）<br>· ✅ `receipt.steps` 字段名已统一为 `input_summary`/`output_summary`/`duration_ms`（`base/orchestrator.py` 产出 ≡ `contracts/receipt-v1.schema.json`），并有反向对照 `tools/verify_contracts.py:354`「旧字段名 `input_digest`/`elapsed_ms` 必须拒绝」<br>· ❌ **`source_ir_version` 仍指向 ContentUnit**：实测 `judge_unit` 产出 `ir.source_ir_version = "content-unit-v1"`，而 `contracts/review-ir-v1.schema.json` 的 `source_ir_version.description` 逐字写着「**只指向 ReviewIR，不指向 ContentUnit** —— 这是 S-3 的核心裁定」 | 复现见本节末「T5 第三条的取证」 |
+| **A15-T6** 四维落盘 | ❌ **未做**：`content_type`/`content_stage`/`entry_channel` 三个字段在 `base/content-unit-v1.schema.json` 的 `properties` 里**一个都没有** | `python3 -c "import json;s=json.load(open('base/content-unit-v1.schema.json'));print([k for k in ('content_type','content_stage','entry_channel') if k not in s['properties']])"` → `['content_type', 'content_stage', 'entry_channel']` |
+| **A15-T7** 判定层基线 | ❌ **未做**：`PMO/implement/` 下没有判定层/检测层读数文档 | `ls PMO/implement/ \| grep -i "判定层\|检测层"` → 无输出，rc=1 |
+
+> **怎么读上表**：✅ / ⚠️ / ❌ 标的是「这张票要的东西在不在盘上」，判据是右列那条命令**当天**的输出。
+> **它不是验收** —— 「在盘上」与「够不够用、有没有反向对照」是两件事，
+> 后者要跑各自的 `verify_*`，而本 ADR 没有为七张票逐张跑。
+> 也就是说：右列命令的输出我可以背书；「够不够用」那一层**本表未测**。
+> 引用时请重跑右列命令，不要抄我的结论（AGENTS.md §2.2 第 1 条）。
+
+**T5 第三条的取证**（这一段单独放，因为它是我在写这一节时**才发现仍未修**的那一条）：
+
+```bash
+$ python3 - <<'EOF'
+from base import contract as C
+from base.judge_entry import judge_unit
+u = C.from_text('测试', uri='inline:t5'); u['parse_status'] = 'ok'
+r = judge_unit(u, clock=lambda: 1000.0)
+print('source_ir_version =', r['ir'].get('source_ir_version'))
+print('ir_version        =', r['ir'].get('ir_version'))
+print('steps[0] keys     =', sorted(r['receipt']['steps'][0].keys()))
+EOF
+source_ir_version = content-unit-v1
+ir_version        = review-ir-v1
+steps[0] keys     = ['duration_ms', 'input_summary', 'name', 'output_summary']
+```
+
+第一行是缺陷，第二三行是已修好的对照：同一份回执里，`ir_version` 已经正确地是 `review-ir-v1`，
+而 `source_ir_version` 还指着 `content-unit-v1`。**「已经改对了两个、剩下一个还是旧的」
+是这里最危险的形状** —— 第三行全对会让人以为整块都改完了。
+
+> 这一条与本文件 §七 表格第二行（#15）说的是同一件事的两个阶段：
+> §七 记的是 2026-10-20 的现场（`input_summary`/`duration_ms` 对 `input_digest`/`elapsed_ms`），
+> 那个已经修好了；`source_ir_version` 是在同一张票里、但**没跟着一起修完**的那一条。
+
+### 5.5 「两条链路结论不同」什么时候允许 —— **当前：不允许**
+
+这一节是**判据**，不是原则。拿它当一个检查项用：出现不一致时，按下表判定，不要凭印象。
+
+#### 5.5.1 判据
+
+| 情形 | 允许？ | 动作 |
+|---|---|---|
+| 同一段文本，两条链给出**相同**结论 | — | 正常。**但不构成证据说明双轨没问题** —— 一致可能只是这段文本恰好不触发差异 |
+| 同一段文本，两条链给出**不同**结论 | **不允许** | **记为缺陷**，见 §5.5.3 |
+| 一条链给出结论、另一条链**不可用**（引擎报错 / 未测） | 允许（但不是「一致」） | 必须在对外回复里说清是哪一侧、哪种不可用。**不许读成「另一侧也认为没问题」** |
+| 两条链的结论**表述不同但语义等价**（如 `auto_pass` 与「未发现拦截理由」） | 允许 | 但必须能写出**一对一**的映射表；写不出来就是上一条 |
+
+**根子是 §三 的授权，不是我的偏好**：`rule_judge` 是唯一判定引擎（委托方 2026-10-20 定，
+2026-10-25 推进为 `accepted`）。所以「两条链路都算数」这个状态**在决策层面从来没有被授权过** ——
+双轨存在的原因是 §5.4.2 说的「合并尚未完成」，不是「两个答案都对」。
+
+> ★ 最常见的错读：把「两个引擎算法不同，没有『合并后哪个对』的判据」（§5.3 第一条）
+> 读成「所以两个答案都可以」。**那句话说的事实是「合并这件事还没定口径」，
+> 不是「两个口径都成立」。** 前者是待办，后者是授权 —— 而 §三 没有给过这个授权。
+
+#### 5.5.2 当前差异是**真实存在**的，不是理论风险
+
+2026-10-25 实测，同一段文案：
+
+```bash
+$ python3 - <<'EOF'
+import json, subprocess, tempfile
+text = '这款吸奶器静音模式很好用'
+p = tempfile.mktemp(suffix='.txt'); open(p,'w').write(text)
+o = subprocess.run(['python3','research/governance/skeleton/judge.py',
+                    '--text-file', p, '--json', '--brief'], capture_output=True, text=True)
+print('守衡侧 disposition =', json.loads(o.stdout)['verdict']['disposition'])
+
+from base import contract as C
+from base.judge_entry import judge_unit
+u = C.from_text(text, uri='inline:probe'); u['parse_status'] = 'ok'
+r = judge_unit(u, clock=lambda: 1000.0)
+print('工作台侧 label =', r['label'], '| layer =', r['layer'])
+EOF
+守衡侧 disposition = auto_pass
+工作台侧 label = REVIEW | layer = DP3
+```
+
+**两条链对同一句话给出了不同的结论**：守衡说「机器未发现拦截理由」（`auto_pass` → DP1 业务自审），
+工作台说 REVIEW（DP3）。
+
+这不是「谁算错了」。两边各自的自证都是绿的（§5.4.2 的两个读数），各自的逻辑在**自己的口径里**
+都成立。它们不一致，是因为**它们回答的不是同一个问题**：
+
+| | 守衡 `skeleton/judge.py` | 工作台 `rule_judge` + `decision_table` |
+|---|---|---|
+| 回答的问题 | 「规则库有没有命中拦截理由」 | 「这份内容能不能放行」 |
+| 底数 | score/vocab/severity 打分 | 7 字段 P0 字面命中 + 控制点覆盖 |
+| 无命中时 | `auto_pass`（**带有**「机器未发现拦截理由，不是判定通过」的对外话术） | `REVIEW` —— 覆盖不全就不许 PASS（`partial` 永不 PASS） |
+| 对「静音模式」这类词的处置 | 命中 → 降级/放行带 | 命中 P0 → 走 `decision_table` 链序 |
+
+所以**「方向相反」这个说法不准**，要改：不是两个引擎互相矛盾，
+是**一个回答「有没有拦的理由」，一个回答「能不能放」**。这正是 AGENTS.md §2.4.1 那个形状 ——
+**两个读数各自都对，合起来是两件事**。
+
+> 但**这不是给它开脱**。对群里等结论的人来说，「未发现拦截理由」与「REVIEW」
+> 是两个不同的处境，而他只看得到一条。**差异真实存在，且用户在意的正是差异本身。**
+> 这就是 T2 必须做完的理由，不是可以商量的偏好。
+
+#### 5.5.3 出现不一致时怎么办（可执行，不是口号）
+
+在 T2 完成之前，凡是发现两处结论不一致：
+
+1. **记为缺陷，不是记为「设计如此」。** 登记处用现有的事故/误答登记
+   （`PMO/守衡-误答登记-*.md` / `PMO/audit/故障登记-*.md`），一条一个样本，
+   **必须带那段文本原文与两侧的原始返回值**。
+2. **不许在对外回复里出现「两个引擎都这么说」或「以其中之一为准」。** 后者尤其危险：
+   在本 ADR 下，**权威侧是 `rule_judge`**，但守衡今天**根本没调它** ——
+   所以「以 rule_judge 为准」这句话在守衡链上是一句**没有执行点的承诺**
+   （AGENTS.md §2.4.2 同一个形状）。
+3. **它不阻塞别的票，但它决定 T2 的优先级**：每一个这样的样本，
+   都说明守衡正在对外给出一份与工作台不同的判定。样本越多，T2 越不该往后排。
+4. **一致不算通过。** 上面 §5.5.1 第一行已经写了 —— 两条链对同一段文本给同一个答案，
+   可能只是这段文本刚好不触发差异。**「没红过」不等于「不会红」**（AGENTS.md §2.4.1）。
+
+**这条判据自身的执行点在哪**：目前**没有**。这是必须写明的 ——
+§5.5 现在只是一份**人工判据**，没有任何代码在跑它。T7（判定层基线）做完之后，
+它才会变成一个能自动比对的读数。**在那之前，谁读到一份不一致，谁就是执行点。**
+
 ## 六、口子（tickets）：每一张都必须指得出执行点
 
 > 编号沿用本仓习惯：`A15-Tn`。每张票的「执行点」一栏若为空，**这张票就不许被记成做完了** ——
@@ -209,6 +468,13 @@ PASS 永远出不来（这一条当前**已经**成立，见 §五）。
 所以 runner 的 110 passed 读作「**命令退 0**」，不读作「判据成立」。
 这条本身就是 AGENTS.md §2.4.1 的同一个形状：**读通了接口，但口径读错，安静地产出假绿。**
 
+> ★ **2026-10-25 现状更新（不改上表，只加注）**：上表 #15 那两对字段名，
+> `receipt.steps` 那一对**已经修好**（`input_summary`/`duration_ms` 已是现行字段名，
+> 并有反向对照拒绝旧名）；但**同一张票里的第三条 `source_ir_version` 仍未修** ——
+> 实测仍指向 `content-unit-v1`。详见 §5.4.3 的「T5 第三条的取证」。
+> **A15-T5 因此不能记成完成**：三条改完两条。上表的原始记载保留，
+> 因为它是 2026-10-20 的现场读数，删掉就无处可查「当时差在哪」。
+
 ## 八、反向对照：这个 ADR 自己也要能被证伪
 
 本 ADR 的核心断言是「判定这一跳将走 orchestrator」。如果将来没人能指出
@@ -220,6 +486,12 @@ PASS 永远出不来（这一条当前**已经**成立，见 §五）。
   应当**新增**断言把「生产构造点」与「测试构造点」分开计数，而不是删掉 smoke。
 
 ## 九、待 Owner 确认的问题
+
+> ★ **2026-10-25 之后这两问仍然开着**（状态推进为 `accepted` 没有回答它们）：
+> 两问都是**实现口径**（T3 怎么映射、T4 补实现还是改文案），不是决策方向。
+> `accepted` 定的是方向 —— **这两问不因它关闭，也不会因为它而变得不重要**。
+> 按 `ADR/README.md` 规则 4：「ADR 被接受只代表设计决策已定，不代表已实现」。
+> 谁在 T3/T4 上动手，谁就要先把这两问的答案要出来；**不要自己替它们定**。
 
 1. **T3 的五标签映射口径**：`rule_judge` 的 finding 经 `decision_table` 得出的 state
    是否就是群里回复的标签，不再另做一层？当前 `decision_table` 已经产出五标签，
@@ -247,7 +519,8 @@ PASS 永远出不来（这一条当前**已经**成立，见 §五）。
 
 | 读数 | 值 | 复现 |
 |---|---|---|
-| `Orchestrator` 构造点 | 3 处，全在测试；`api/base/web/tools/agent` 里 0 处 | `grep -rn "O\.Orchestrator(" --include='*.py' api tools web base`（**必须限定这四个目录** —— 加 `.` 会命中枢外 vendored 仓库的无关同名类） |
+| `Orchestrator` 构造点 | **11 处，其中 1 处是生产**（`base/judge_entry.py:136`） | `grep -rn "Orchestrator(" --include='*.py' base api tools web` → 11 |
+| ~~同上，别名口径~~ | ~~3 处，全在测试~~ **← 这个口径是错的，2026-10-26 更正** | `grep -rn "O\.Orchestrator(" …` → 3。**它靠 `O.` 别名把 `base/judge_entry.py:136` 的 `Orchestrator(` 筛掉了**，于是读起来像「连生产也没有」，与 §5.4.2 的事实（工作台确实在跑 orchestrator）直接冲突。★ 这正是本项目反复记的那个形状：**口径比输入大**。改口径时不要删旧读数，让它与被更正的原因并存 |
 | 生产工具数 | 25 | `grep -c "^register(" tools/agent/tools.mjs` |
 | 控制点 | 20 个，全部 `literal`，族 14/3/3，四族空 | `base/control_points.py` / `control-points-v1.json` |
 | 验收 runner | mapped=110 / passed=110 / untested=26，**rc=2** | `python3 tools/verify_acceptance_run.py` |
