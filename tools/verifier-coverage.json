@@ -986,6 +986,15 @@
         "base/report_store.py",
         "api/production_app.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_openapi_spec.py",
+      "asserts": "T-408 / TS-10 OpenAPI 3.1 装配层：两个 spec 入口（/openapi.json 与 /api/openapi.json）逐字节恒等；实现表（定义在 api/write_api.py）/生产表/声明表三个方向都 ⊆ spec；★ 占位端点只许声明 501、只读守卫的写方法只许声明 403 —— spec 不得对它们说 200（改前实测五个占位端点 + 三个只读入口全部声明 200，而它们永远返 501/403）；spec 无自指条目；生产 spec 无无人认领的写端点；API 层不得调用判定引擎。--controls 5 项：占位声明 200 / 只读声明 200 / 实现端点从 spec 消失 / 版本 3.0 四个坏样本各自红，好样本绿",
+      "subjects": [
+        "api/review_api.py",
+        "api/production_app.py",
+        "api/write_api.py"
+      ]
     }
   ],
   "exempt": [

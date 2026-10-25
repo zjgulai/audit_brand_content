@@ -567,6 +567,19 @@ def create_app(*, session_store=None, repository=None, principals=None,
     app = FastAPI(title="Content Review API", version="1.0",
                   openapi_version=openapi_version)
     app.openapi_version = openapi_version
+
+    # T-408（TS-10）：spec 有两个入口 —— FastAPI 默认的 `/openapi.json`
+    # 与票面/前端约定的 `/api/openapi.json`。
+    #
+    # ★ 为什么要有别名而不是改 `openapi_url`：改掉会让 `/openapi.json`
+    #   消失，而 `tools/verify_review_api.py` 的 C0 段与若干脚本用它。
+    #   两条并存、返回**同一份对象**（同一 app、同一缓存），不是复制一份。
+    # ★ 别名只用 GET，并且 `include_in_schema=False` —— 否则 spec 里会出现
+    #   「/api/openapi.json 返回一个 OpenAPI 文档」这种自指条目。
+    @app.get("/api/openapi.json", include_in_schema=False)
+    def openapi_alias():
+        return JSONResponse(content=app.openapi())
+
     from base.reviews_ledger import ReviewsLedger
     from base.finding_store import FindingStore
     from base.release_gate import ReleaseGate
@@ -1038,10 +1051,28 @@ def create_app(*, session_store=None, repository=None, principals=None,
     def placeholder(request: Request, _principal=Depends(principal_dep)):
         raise HTTPException(501, "写端点尚未实现")
 
+    # T-408：占位端点必须在 spec 里**声明 501**，不是 200。
+    #
+    # ★ 改前这里只有 `response_model=ErrorResponse`，FastAPI 于是给它声明
+    #   「200 Successful Response」。而它**永远**返回 501 —— 也就是 spec
+    #   对一个端点说了假话，而这个谎**没有任何东西会红**：
+    #   读 spec 生成客户端的人会拿到一个「成功」的签名，
+    #   然后在运行时收到 501（T-408 施工前实测：resign 声明 200，实际 501）。
+    #
+    # ★ `status_code=501` 让 FastAPI 把默认响应码写成 501，spec 与行为一致。
+    #   副作用是 200 不再出现在 responses 里 —— 这是**对的**：
+    #   这个 handler 现在唯一的返回就是 501。「将来实现了会返回 200」
+    #   不是 spec 该预言的事；实现落地时这行会被删掉，spec 自动变。
+    #
+    # ★ 故意不写 `responses={200: ...}`：那会把「还没实现」写成「两个都可能」，
+    #   而读 spec 的人只该得到一个答案。
     for path in WRITE_PATHS:
         if path in implemented:
             continue
         app.add_api_route(path, placeholder, methods=["POST"],
+                          status_code=501,
+                          responses={501: {"description":
+                                           "capability_not_enabled：写端点尚未实现"}},
                           response_model=ErrorResponse)
 
     def _make_readonly_guard(path, method):
@@ -1059,6 +1090,13 @@ def create_app(*, session_store=None, repository=None, principals=None,
             app.add_api_route(
                 path, _make_readonly_guard(path, method),
                 methods=[method],
+                # T-408：与 placeholder 同一个病 —— 改前这里声明 `200`，
+                # 而守卫**永远**返回 403。只读入口的写请求没有任何成功可能，
+                # spec 里出现 200 就是一句假话（T-408 实测：这三条各声明 200）。
+                status_code=403,
+                responses={403: {"description":
+                                 "只读入口不接受写请求（read_only_entry）"}},
+                response_model=ErrorResponse,
                 operation_id="readonly_%s_%s" % (
                     path.strip("/").replace("/", "_").replace("-", "_"),
                     method.lower()))
