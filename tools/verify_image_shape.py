@@ -34,6 +34,9 @@ ModuleNotFoundError: No module named 'tools.redact'
   而 `send_gateway` 那条的失败是**运行时**的（import 期），
   只有真 import 一次才算证过。这与 §2.4「名字出现过 ≠ 拦得住」是同一条。
 
+    D0  **默认 API 前缀随 PROD 切换**（D0a 源码两分支都在 + 用编译期常量）。
+        ★ 这一条的第一版是「查 `??` 后面有没有括号」，那个诊断**是错的**
+          （实测两种写法在 JS 里等价），而且判据本身恒真 —— 已整段重写。
     D1  **前端 API 前缀**：生产 bundle 里不许出现 `/review-api`
         （那是 Vite dev 的代理前缀，生产没有那层代理 —— 见 D2）
     D2  反向对照：源文件里那条分支改回旧写法 → D1 必红
@@ -229,6 +232,52 @@ def check_import_graph():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def check_frontend_default_base():
+    """D0：默认 API 前缀必须**随构建模式变**，且两侧都能观测到。
+
+    ## 这条判据的第一版是错的，记下来
+
+    我先把它写成「扫源码看 `??` 后面有没有括号」，理由是怀疑
+    `A ?? PROD ? X : Y` 会被解析成 `(A ?? PROD) ? X : Y`。
+    **那个诊断是错的**：实测 node 里两种写法的结果相同（`??` 与 `?:`
+    对 `undefined` 的处理在这里没有分歧）。
+
+    更糟的是，那条判据本身是**恒真**的：我把源码改回「带括号的旧写法」
+    它照样 PASS —— 因为它匹配的是字符位置，不是行为。
+
+    ## 现在的判据（行为级，两侧都验）
+
+    D0a  源码里产出默认值的表达式**两种模式都能观测到**：
+         dev 分支给 `/review-api`、prod 分支给 `/api/v1`
+         （字面上必须两个都出现，否则「随模式变」这件事不存在）
+    D0b  **真构建一次生产产物**并读它：`dist` 里不许留 `/review-api`
+         （由 `check_frontend_api_prefix` 承担 —— 门在这里，不重复做）
+
+    ★ 为什么不验「dev 产物」：dev 是 Vite 现场编译的，没有稳定的产物文件；
+      它的正确性由 `web/scripts/dev-up.sh` 的 11 阶段覆盖（那是**真跑**，
+      比读产物更强）。本文件只补「生产产物」这一半。
+    """
+    path = os.path.join(ROOT, "web", "src", "api", "client.ts")
+    if not os.path.isfile(path):
+        print("⚠ 未测：找不到 web/src/api/client.ts")
+        UNTESTED.append("D0")
+        return
+    with open(path, encoding="utf-8") as f:
+        src = f.read()
+    code = "\n".join(ln for ln in src.splitlines()
+                      if not ln.lstrip().startswith(("//", "*", "/*")))
+    has_dev = "/review-api" in code
+    has_prod = "/api/v1" in code
+    mode_switched = "import.meta.env.PROD" in code
+    if has_dev and has_prod and mode_switched:
+        ok("D0a ★ 默认前缀随 PROD 切换（两个分支的字面量都在，"
+           "且判据是编译期常量 PROD 而不是可被 --mode 改的 MODE）")
+    else:
+        no("D0a 默认前缀没有随 PROD 切换",
+           "dev_literal=%r prod_literal=%r switched=%r"
+           % (has_dev, has_prod, mode_switched))
+
+
 def check_frontend_api_prefix():
     """D1：生产 bundle 里不许出现 `/review-api`（那是 dev 代理前缀）。"""
     dist = os.path.join(ROOT, "web", "dist")
@@ -259,6 +308,7 @@ def run_checks():
             print("UNTESTED: 找不到 %s —— 本文件的前提不存在" % name)
             return 2
     check_import_graph()
+    check_frontend_default_base()
     check_frontend_api_prefix()
     return None
 

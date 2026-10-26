@@ -202,7 +202,17 @@ async function main() {
         console.log(`   · 404 归因探针：OPTIONS ${apiPath} → ${probe}`);
       }
       if (code === 501) {
-        console.log(`❌ ${expectWrite} → 501 capability_not_enabled（白名单没放开）`);
+        // ★ 501 有两种含义，必须分开说 —— 第一版只写「白名单没放开」，
+        //   而实测里最常见的那种是「dev 装配根本没注册这个 handler」：
+        //   `review_api.create_app()` 在 `review_command_service is None` 时
+        //   只注册 501 占位（T-403 的 resign、T-402 的名单四条都是这样）。
+        //   两种下一步完全不同：前者改 `PRODUCTION_WRITE_PATHS`，
+        //   后者要把探针打到**生产装配**上（或改 dev 装配）。
+        console.log(`❌ ${expectWrite} → 501 capability_not_enabled`);
+        console.log(`     可能是：① 生产白名单未放开；` +
+                    `② dev 装配没注册这个 handler（它只在生产装配里实现）。`);
+        console.log(`     判据：dev-up 起的服务是 review_api_dev 的**开发装配** —— ` +
+                    `需要生产装配的端点必须另起 create_production_app 验。`);
         failures += 1;
       } else if (code >= 500) {
         console.log(`❌ ${expectWrite} → ${code}（服务端错误）`);
