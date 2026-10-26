@@ -1578,16 +1578,22 @@ code {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-  /* ★ 2026-10-26：原来是 align-items:center —— 二维码居中没问题，
-     但说明文字跟着居中 + 限宽 10rem，于是每行只剩 3–5 个字。
-     改成 stretch，文字左对齐、按 12rem 自然换行。 */
   align-items: stretch;
-  width: 8.25rem;
+  /* ★ 2026-10-26 事故：上一版写死 `width: 8.25rem`，
+     而二维码画布的实际渲染宽度大于它 → 溢出到右列，
+     按钮和说明文字**叠在二维码上**（截图可见）。
+     ★ 修法：容器宽度由**内容**决定（max-content），不写死；
+       画布自己给上限与自适应。宽高写在两处必然漂移，只留一处。 */
+  width: max-content;
+  max-width: 100%;
 }
 
 .login__qr-canvas {
+  /* 唯一的尺寸来源：画布自己定宽高，容器跟着它走（不再反过来） */
   width: 8.25rem;
   height: 8.25rem;
+  max-width: 100%;
+  display: block;
   align-self: center;
 }
 
@@ -1633,7 +1639,7 @@ code {
 
   .login__qr {
     align-items: stretch;
-    width: auto;
+    width: 100%;
   }
 
   .login__qr-note {
