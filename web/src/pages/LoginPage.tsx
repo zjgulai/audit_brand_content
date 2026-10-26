@@ -11,14 +11,17 @@ import LoginQr from "../components/LoginQr";
  * 开发：身份来自 `/dev/session`（只在 dev wrapper 存在），本页直接回队列，
  *       **不把任何 dev 身份逻辑带进这里**。
  *
- * ★ 2026-10-23 视觉校验重做：此前本页只有 `<h1>登录</h1>` + 三行字，是全站唯一
- *   一个不带任何产品标识、没有卡片、也没有失败兜底的页面 —— 生产 500 时整页只剩
- *   一行红字，读起来像「没做」。现在补齐：
- *   1. 产品标识与一句话说明（这是什么系统、登录后能做什么）；
- *   2. 一张登录卡（主行动 = 飞书 SSO，明确写出会跳转外部）；
- *   3. 三种态各有自己的视觉：检查中 / 未登录 / 读取失败（失败**不**提供假的登录按钮，
- *      而是说明「当前无法确认登录状态」，避免把网络故障当成「请重新登录」）；
- *   4. 页脚保留五标签铁律与浏览器支持范围。
+ * ★ 2026-10-26 第二次重做：**这一页此前与登录后的工作台完全不像同一个产品。**
+ *
+ *   委托方的原话是「ca.luteos.com 没有任何变化，我要的侧边栏什么都没有」——
+ *   他打开的就是这一页（未登录时 /queue 会回落到 /login），而前两轮改的都是
+ *   登录**之后**的 AppShell。于是「改了但看不到」= 改了等于没改。
+ *
+ *   现在这一页与 AppShell 共用同一套骨架：
+ *     · 左侧品牌栏（同款 M 徽标 + Momcozy / 内容审核工作台），窄屏收起；
+ *     · 右侧暖底内容区，卡片同款圆角与描边；
+ *     · 页面标题、副标题、行动按钮的层级与登录后一致。
+ *   这样「登录前」与「登录后」是同一个产品的两个状态，而不是两个网站。
  */
 
 type LoginState = "checking" | "anon" | "authed" | "error";
@@ -54,35 +57,33 @@ export default function LoginPage() {
   if (state === "authed") return <Navigate to="/queue" replace />;
 
   return (
-    <main id="main" className="login">
-      {/* 封面装饰层：纯 CSS 绘制，无位图、无外链、不阻塞首屏。
-          与 lute-tlz-dddd.top 的封面同构（点阵 + 斜向信号线 + 光扫过），
-          但配色改用本项目的 L1 token，不引入第二个品牌色板。 */}
-      <div className="login__cover" aria-hidden="true">
-        <span className="login__cover-grid" />
-        <span className="login__cover-sweep" />
-        <span className="login__cover-line login__cover-line--1" />
-        <span className="login__cover-line login__cover-line--2" />
-        <span className="login__cover-line login__cover-line--3" />
-      </div>
-
-      <div className="login__shell">
-        <header className="login__masthead">
-          <div className="login__brand">
-            <span className="login__mark" aria-hidden="true" />
-            <div>
-              <p className="login__product">内容审核工作台</p>
-              <p className="login__tagline">
-                机器先判、人来复核。登录后可处理复核队列、审阅证据链并提交正式复核结论。
-              </p>
-            </div>
+    <div className="login">
+      {/* 左侧品牌栏：与工作台侧边栏同宽同色，让「登录前/后」是同一个产品 */}
+      <aside className="login__rail" aria-hidden="true">
+        <div className="login__rail-brand">
+          <span className="shell__brand-badge">M</span>
+          <div className="login__rail-text">
+            <span className="login__rail-name">Momcozy</span>
+            <span className="login__rail-sub">内容审核工作台</span>
           </div>
-          <span className="login__kicker font-data">CONTENT REVIEW · DP3/DP4</span>
+        </div>
+        <p className="login__rail-note">
+          品牌内容在对外发布之前，
+          <br />
+          在这里过一遍合规。
+        </p>
+      </aside>
+
+      <div className="login__body">
+        <header className="login__head">
+          <p className="login__kicker">待登录</p>
+          <h1 className="login__title">登录内容审核工作台</h1>
+          <p className="login__subtitle">
+            机器先判、人来复核。登录后可以处理待复核内容、查看判定依据、提交正式结论。
+          </p>
         </header>
 
         <div className="login__card">
-          <div className="login__divider" role="presentation" />
-
           {state === "checking" && (
             <p className="login__status" role="status">
               正在确认登录状态…
@@ -100,12 +101,15 @@ export default function LoginPage() {
               <div className="login__signin">
                 <LoginQr target={`${appOrigin}/auth/login`} />
                 <div className="login__signin-actions">
-                  <a className="btn btn--primary login__sso" href={`${appOrigin}/auth/login`}>
+                  <a
+                    className="btn btn--primary login__sso"
+                    href={`${appOrigin}/auth/login`}
+                  >
                     使用飞书账号登录
                   </a>
                   <p className="login__note">
-                    将跳转到飞书完成授权，返回后自动进入复核队列。授权范围仅包含读取你的
-                    飞书身份与所在租户，不读取聊天内容。
+                    点击后会跳到飞书完成授权，同意之后自动回到工作台。
+                    我们只读取你的飞书身份和所在租户，<strong>不读聊天内容</strong>。
                   </p>
                 </div>
               </div>
@@ -115,17 +119,17 @@ export default function LoginPage() {
           {state === "error" && (
             <div className="login__action">
               <p className="login__lead login__lead--error" role="alert">
-                当前无法确认登录状态：{detail}
+                现在无法确认你的登录状态：{detail}
               </p>
               <p className="login__note">
-                这通常说明工作台后端暂时不可达，<strong>不是账号问题</strong>，
-                重新登录也不会恢复。请稍后刷新；若持续失败，请联系项目统筹并提供上面的错误信息。
+                这通常说明工作台后端暂时连不上，<strong>不是你的账号有问题</strong>，
+                重新登录也不会好。请稍后刷新；如果一直这样，把上面这行错误发给项目统筹。
               </p>
             </div>
           )}
         </div>
 
-        <footer className="login__footer">
+        <footer className="login__foot">
           <BrowserSupportNotice />
           <p className="login__note">
             机器判定与人工意见分开记账：人工意见不改变机器标签，也不等于放行；
@@ -133,6 +137,6 @@ export default function LoginPage() {
           </p>
         </footer>
       </div>
-    </main>
+    </div>
   );
 }
