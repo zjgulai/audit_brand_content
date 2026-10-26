@@ -106,6 +106,105 @@ disposition = {
 }
 
 
+C16_TITLES = {
+    "C16a": "unit.textification 的 does_not_cover 逐字进 IR（不是丢了）",
+    "C16b": "coverage 自带的 does_not_cover 也要搬进 IR",
+    "C16c": "两侧合并去重、unit 的声明不许被 coverage 收窄",
+    "C16d": "端到端：Orchestrator 跑完 IR.coverage 里逐字可查",
+    "C16e": "顶层 coverage 与 IR 同源（透传不是摆设）",
+    "C16f": "无声明时键不省略、值为 []（不是缺字段）",
+    "C16g": "does_not_cover 非空 → coverage_state 不许是 full",
+}
+
+
+def _c16_probe(mod):
+    """对给定的 orchestrator 模块跑 T-430 那组断言，返回 {编号: (是否绿, 读数)}。
+
+    ★ 为什么抽成函数：`--controls` 必须能对**坏副本**跑**同一组**判据。
+      判据只写在 main() 里，反向对照就只能把判断逻辑再抄一遍 ——
+      那等于两套判据各自漂移（AGENTS §2.4.2 的第二层：判据与触发者要分开落地，
+      而这里是把判据做成可复用对象，让坏副本真的走进去）。
+
+    每个子项各自 try/except：坏副本可能直接 NameError（删掉整个函数），
+    那必须落成**红**，不许把整个对照打死。
+    """
+    dnc = ["画面语义", "音轨"]
+    img_textif = {"covers": ["图内文字"], "does_not_cover": list(dnc)}
+    base_unit = unit()
+    img_unit = dict(base_unit, textification=img_textif,
+                    source={"kind": "image"})
+    stem_cov = {"coverage_state": "partial", "modalities_evaluated": ["image"],
+                "rules_version": {"version": "rs-1"},
+                "control_points_applied": ["H01"]}
+    out = {}
+
+    def run(key, fn):
+        try:
+            out[key] = fn()
+        except Exception as exc:  # noqa: BLE001
+            out[key] = (False, "坏副本跑不起来：%r" % (exc,))
+
+    # a) 只有 unit 声明 → 靠合并那一步补回来
+    run("C16a", lambda: (
+        mod._coverage_ir({"coverage": dict(stem_cov)},
+                         {"control_points": ["H01"]}, img_unit)
+        .get("does_not_cover") == dnc,
+        repr(mod._coverage_ir({"coverage": dict(stem_cov)},
+                              {"control_points": ["H01"]}, img_unit)
+             .get("does_not_cover"))))
+    # b) 只有 coverage 声明 → 靠分支白名单条目搬过来
+    run("C16b", lambda: (
+        mod._coverage_ir({"coverage": dict(stem_cov, does_not_cover=list(dnc))},
+                         {"control_points": ["H01"]},
+                         dict(base_unit, textification={"covers": ["图内文字"],
+                                                        "does_not_cover": []}))
+        .get("does_not_cover") == dnc,
+        "见 C16b 读数"))
+    # c) 两侧都有 → 合并去重，只许多不许少
+    run("C16c", lambda: (
+        mod._coverage_ir({"coverage": dict(stem_cov,
+                                           does_not_cover=["画面语义"])},
+                         {"control_points": ["H01"]}, img_unit)
+        .get("does_not_cover") == dnc,
+        "见 C16c 读数"))
+
+    def _e2e():
+        o = mod.Orchestrator(
+            normalizer=img_unit, rule_judge=[finding], semantic_judge=[],
+            coverage=dict(stem_cov), decision=decision,
+            disposition=disposition, renderer={"rendered": True},
+            store={"stored": True}, gateway={"sent": True},
+            evaluator={"ok": True})
+        return o.run(request(unit=img_unit))
+
+    # d/e) 端到端：IR 与顶层 coverage 都要读得到
+    run("C16d", lambda: (
+        _e2e()["ir"]["coverage"].get("does_not_cover") == dnc,
+        repr(_e2e()["ir"]["coverage"].get("does_not_cover"))))
+    run("C16e", lambda: (
+        _e2e()["coverage"].get("does_not_cover") == dnc,
+        repr(_e2e()["coverage"].get("does_not_cover"))))
+
+    # f) 两侧都空 → 键必须在，值为 []（不许省略成缺字段）
+    def _empty_key():
+        o = mod.Orchestrator(
+            normalizer=base_unit, rule_judge=[finding], semantic_judge=[],
+            coverage=dict(stem_cov), decision=decision,
+            disposition=disposition, renderer={"rendered": True},
+            store={"stored": True}, gateway={"sent": True},
+            evaluator={"ok": True})
+        cov = o.run(request(unit=base_unit))["ir"]["coverage"]
+        return ("does_not_cover" in cov and cov["does_not_cover"] == [],
+                repr(cov.get("does_not_cover")))
+    run("C16f", _empty_key)
+
+    # g) 非空时 state 不许是 full
+    run("C16g", lambda: (
+        _e2e()["ir"]["coverage"].get("coverage_state") != "full",
+        repr(_e2e()["ir"]["coverage"].get("coverage_state"))))
+    return out
+
+
 def main():
     passed = 0
     failed = 0
@@ -487,6 +586,22 @@ def main():
            "U3 evidence 声明 untested → findings 归零（不沿用判定结果）",
            repr(u_run3.get("findings")))
 
+    # ── C16 组（T-430）：does_not_cover 不许在最后一跳被丢掉 ──────────
+    # 为什么这一条必须有：`contract.from_media()` 刻意**不给** covers/does_not_cover
+    # 默认值（默认值会让「只做了 OCR」看起来像「图片已审」）。而 `_coverage_ir()`
+    # 用白名单重建 coverage，漏了这个键 —— 声明在最后一跳被静默取消。
+    # 文本上无害（文本该字段本来就空），**一开媒体就等于把没审的部分伪装成审过**。
+    #
+    # ★ 刻意分成 a/b 两条独立的断言，因为它们是**两个不同的来源**：
+    #   a) coverage 里没有、unit.textification 里有 → 靠合并那一步补回来
+    #   b) unit 里没有、coverage 里有     → 靠分支里的白名单条目搬过来
+    #   删掉其中任何一处，只会让对应那一条红。只写一条（两个来源都填满）会让
+    #   「另一处删掉」也照旧绿 —— 那是本项目 §2.4 点名的「名字出现过≠拦得住」。
+    #
+    # ★ 判据体在 _c16_probe()，因为 --controls 要对**坏副本**跑同一组判据。
+    for name, (is_ok, detail) in _c16_probe(O).items():
+        report(is_ok, "%s %s" % (name, C16_TITLES[name]), detail)
+
     print("----------------------------------------")
     if failed == 0:
         print("✅ %d/%d 全过" % (passed, passed + failed))
@@ -512,6 +627,32 @@ def _exec_orc(text, tag):
           "__file__": os.path.join(REPO_ROOT, "base", "orchestrator.py")}
     exec(compile(text, "orchestrator_%s.py" % tag, "exec"), ns)
     return ns["Orchestrator"]
+
+
+class _Ns:
+    """把 `exec` 出来的命名空间 dict 包成可属性访问的对象。
+
+    ★ 为什么要包：`_c16_probe(mod)` 里写 `mod._coverage_ir` / `mod.Orchestrator`。
+      直接把 dict 传进去会 AttributeError，而那会被当成「坏副本跑不起来 = 红」——
+      于是**好副本也被判红**，全部对照恒红。这正是 AGENTS §2.1.1 那个病：
+      一个恒红的检查器比没有更糟，人会开始不看报告。
+    """
+
+    def __init__(self, ns):
+        self.__dict__.update(ns)
+
+
+def _exec_mod(text, tag):
+    """exec 一份源码变体，返回**整个命名空间**（包成可属性访问）。
+
+    ★ 与 `_exec_orc` 的区别：`_c16_probe()` 要用 `_coverage_ir`（模块级函数），
+      只拿 Orchestrator 类就问不到它 —— 那样反向对照只能测到端到端那一半，
+      「分支白名单删掉」这类只影响直接调用的变异就测不出来。
+    """
+    ns = {"__name__": "orchestrator_%s" % tag,
+          "__file__": os.path.join(REPO_ROOT, "base", "orchestrator.py")}
+    exec(compile(text, "orchestrator_%s.py" % tag, "exec"), ns)
+    return _Ns(ns)
 
 
 def _plain_orc(cls, *, dispo=None):
@@ -637,6 +778,65 @@ def run_controls():
               "好副本被误伤：%r" % (rg2.get("findings"),))
         except Exception as e:  # noqa: BLE001
             C("CU2 好副本跑不起来", False, str(e))
+
+    # ── C16 组（T-430）的反向面 ───────────────────────────────────
+    # ★ 票面要求的变异是「删掉那一行 → 必须红」。这里把它拆成三处**互不重叠**
+    #   的打断，因为 T-430 的修法本身有两条路（分支白名单搬 + unit 兜底合并），
+    #   外加「哪条断言在守哪一处」：
+    #     D1 删掉合并那一步（cov["does_not_cover"] = _merge_...(cov, unit) 整行）
+    #        → 只走 unit 的那半 source 就丢了 → C16a / C16d / C16e 红
+    #     D2 删掉分支里的白名单条目（"does_not_cover": list(src.get(...))）
+    #        → 只走 coverage 的那半丢了 → C16b 红
+    #     D3 把合并写成「只读 coverage、不读 unit」
+    #        → 看似有合并、实际收窄 → C16a / C16c 红
+    #   三处各只让「对应那几条」红，这正是「一处断言守一处成分」的证明。
+    #   若三处都只让同一条红，说明这些断言在守同一件事，就该合并。
+    c16_bad = (
+        ("CD1 删掉「合并进 cov」那一行 → C16a/C16c/C16d/C16e/C16f 必须红（票面变异）",
+         src.replace(
+             '    cov["does_not_cover"] = _merge_does_not_cover(cov, unit)\n', ''),
+         # 没有这一行，键只在「branch b 恰好搬了」时才在。a/c 读不到声明；
+         # d/e 端到端同样读不到；f 要的「空声明时键仍在」直接缺字段。
+         # b 仍绿 —— 它走的是分支白名单那条路，与这一行无关。这正是分工的证据。
+         {"C16a", "C16c", "C16d", "C16e", "C16f"}),
+        ("CD2 删掉分支白名单里的 does_not_cover 条目 → C16b 必须红",
+         src.replace(
+             '            "does_not_cover": list(src.get("does_not_cover") or []),\n',
+             ''),
+         # 只有 b 走「coverage 自带」那条路；其它几条的输入里 unit 有声明，
+         # 由合并那一步兜住，所以它们必须仍然绿。
+         {"C16b"}),
+        ("CD3 合并只读 coverage、不读 unit → C16a/C16c/C16d/C16e 必须红（收窄形状）",
+         src.replace(
+             '    for src in ((unit or {}).get("textification") or {},\n'
+             '                cov if isinstance(cov, dict) else {}):',
+             '    for src in ((cov if isinstance(cov, dict) else {}),):'),
+         # 这一版「看起来有合并」，实际收窄：unit 的声明被吞掉 → a/c 红，
+         # 端到端 d/e 一起红。f 仍绿（键照样写、值为空），符合预期 ——
+         # 它守的是「键不许缺」，不是「值来自哪一侧」。
+         {"C16a", "C16c", "C16d", "C16e"}),
+    )
+    for name, bad, must_red in c16_bad:
+        if bad == src:
+            C(name, False, "找不到替换原文（生产代码变了，对照过期）")
+            continue
+        try:
+            bad_mod = _exec_mod(bad, "c16bad")
+            got = _c16_probe(bad_mod)
+        except Exception as e:  # noqa: BLE001
+            C(name, False, "坏副本跑不起来：%s" % e)
+            continue
+        reds = {k for k, (okv, _d) in got.items() if not okv}
+        C(name, reds == must_red,
+          "红的集合是 %r，应当是 %r" % (sorted(reds), sorted(must_red)))
+    # 反向对照的另一半：好副本必须一条都不红，否则上面全是误报
+    try:
+        good = _c16_probe(_exec_mod(src, "c16good"))
+        C("CD4 好副本同输入必须全绿（否则上面三条是误报）",
+          all(okv for okv, _d in good.values()),
+          "好副本被误伤：%r" % (sorted(k for k, (o2, _d) in good.items() if not o2),))
+    except Exception as e:  # noqa: BLE001
+        C("CD4 好副本跑不起来", False, str(e))
 
     print("\n%s --controls %d 过 · %d 红 · 0 未测"
           % ("✅" if fail == 0 else "❌", ok, fail))

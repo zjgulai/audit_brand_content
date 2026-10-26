@@ -156,6 +156,11 @@
               }
             }
           }
+        },
+        "does_not_cover": {
+          "type": "array",
+          "description": "本次载体**明确不覆盖**的范围，逐字来自 content_unit.textification.does_not_cover。★ 2026-10-26 T-430：此前 IR 里没有这个字段，而 contract.from_media() 刻意不给它默认值（默认值会让「只做了 OCR」看起来像「图片已审」），于是那份声明在最后一跳被静默丢弃 —— 一开媒体就等于把没审的部分伪装成审过。非空即 coverage_state=partial，不得被读成通过。",
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },

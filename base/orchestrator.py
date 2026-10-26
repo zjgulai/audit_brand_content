@@ -69,6 +69,27 @@ def _as_findings(value):
     return []
 
 
+def _merge_does_not_cover(cov, unit):
+    """`does_not_cover` 的两条来源合并：unit 的声明在前，coverage 自带的补在后面。
+
+    ★ 2026-10-26 T-430：此前这个字段在 `_coverage_ir` 里被整块丢掉，而
+      `contract.from_media()` 刻意不给它默认值（默认值会让「只做了 OCR」
+      看起来像「图片已审」）。于是那份声明在最后一跳被静默取消 ——
+      文本上无害（文本的该字段本来就空），**一开媒体就等于把没审的部分伪装成审过**。
+
+    方向是**只许变多、不许变少**：coverage 想收窄 unit 的声明，在这里收窄不了。
+    两个来源都查，是因为它们会各自单独出现：composer 的输出可能只带到自己那半，
+    而 `unit.textification` 才是调用方逐字写下的那份原始声明。
+    """
+    out = []
+    for src in ((unit or {}).get("textification") or {},
+                cov if isinstance(cov, dict) else {}):
+        for item in (src.get("does_not_cover") or []):
+            if isinstance(item, str) and item.strip() and item not in out:
+                out.append(item)
+    return out
+
+
 def _coverage_ir(value, request, unit):
     """把 composer 输出 / 直接 coverage 统一成 ReviewIR 的 coverage 形状。"""
     req_cps = list(request.get("control_points") or [])
@@ -84,6 +105,7 @@ def _coverage_ir(value, request, unit):
             "control_points_applied": list(src.get("control_points_applied") or req_cps),
             "not_evaluated_reason": list(src.get("not_evaluated_reason")
                                           or src.get("not_run_reasons") or []),
+            "does_not_cover": list(src.get("does_not_cover") or []),
         }
     else:
         cov = {"coverage_state": "missing", "modalities_evaluated": [],
@@ -114,6 +136,10 @@ def _coverage_ir(value, request, unit):
     cov["coverage_state"] = cov.get("coverage_state") or "missing"
     cov["modalities_evaluated"] = list(cov.get("modalities_evaluated") or [])
     cov["control_points_applied"] = list(cov.get("control_points_applied") or req_cps)
+    # ★ T-430：两条路都要兜 —— 上面各分支负责「搬过来」，这里负责
+    #   「coverage 里没有时从 unit.textification 补回来」。少任何一条，
+    #   只走其中一条路的调用方就会被静默丢掉声明。
+    cov["does_not_cover"] = _merge_does_not_cover(cov, unit)
     rv = cov.get("rules_version")
     if not isinstance(rv, str):
         rv = json.dumps(rv, ensure_ascii=False, sort_keys=True) if rv is not None else "unknown"

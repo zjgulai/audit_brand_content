@@ -517,7 +517,7 @@
     },
     {
       "verifier": "tools/verify_orchestrator.py",
-      "asserts": "orchestrator：五步固定顺序各一次 / ReviewIR 必填字段 / 回执 / 部件可注入且各调用一次 / 无提前停",
+      "asserts": "orchestrator：五步固定顺序各一次 / ReviewIR 必填字段 / 回执 / 部件可注入且各调用一次 / 无提前停 / does_not_cover 两条来源都进 IR 且不许被收窄（T-430）",
       "subjects": [
         "base/orchestrator.py"
       ]
