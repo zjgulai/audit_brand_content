@@ -1,0 +1,51 @@
+{
+  "layer": "L2",
+  "layer_name": "业务口径",
+  "unit_type": "fact",
+  "importance": 0.9,
+  "when": "timeless",
+  "space": "audit-multi-content",
+  "agent": "content-guardian",
+  "note": "第二层：业务统计与策略的唯一判定标准。★ 本层所有数字都是「某时某刻的读数」，不是常量 —— 引用时必须带复现方式。",
+  "items": [
+    {
+      "id": "l2-01-judge-eats-26-rules",
+      "title": "判定只吃 26 条规则，而分类基准有 638 条 —— 其余四套库一条判决都影响不了",
+      "labels": ["caliber", "kb", "engine"],
+      "content": "这是本项目最反直觉的一条事实，动知识库那一侧之前必须先知道。\n\n- 判定路径实际消费：26 条规则。\n- 分类基准总量：638 条。\n- 其余四套知识库：一条判决都影响不了。\n\n含义：往那四套库里加料，不会改变任何一条判定结果。要改判定，只改那 26 条所在的链路。\n\n★ 数字口径：这两个数是 2026-10-21 深度分析那一轮的读数，不是常量。复现方式写在该文档里；引用前重跑一遍（AGENTS.md §2.2 第 1 条：文档里的数字要算出来，不能写进去）。",
+      "source_pointers": [
+        {"file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md", "anchor": "26 条规则", "note": "六个存疑点之一"},
+        {"file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md", "anchor": "638", "note": "分类基准总量"}
+      ]
+    },
+    {
+      "id": "l2-02-brand-words-are-prompt-constraint",
+      "title": "品牌禁用词是「AIGC 提示词约束」，直接接进引擎实测 6–10% 误报（KB-GAP-21）",
+      "labels": ["caliber", "kb", "brand"],
+      "content": "品牌禁用词的**来源用途**是约束 AIGC 生成提示词，不是判定真人写的文案。\n\n直接把它接进判定引擎，实测误报率 6–10%。\n\n含义：这一套词表要接进判定，必须先做误报治理（排除语境、分级），不能原样接。它是已知缺口，编号 KB-GAP-21。\n\n★ 这是「一个部件在它被设计的地方是对的，搬到另一个地方必然撞车」的实例（AGENTS.md §2.4.5 那个形状）。",
+      "source_pointers": [
+        {"file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md", "anchor": "KB-GAP-21", "note": "品牌一致性存疑点"}
+      ]
+    },
+    {
+      "id": "l2-03-media-layered-reality",
+      "title": "媒体分层的真实状态：图片实现完整但进件门关着，视频只有一个状态函数",
+      "labels": ["caliber", "media", "status"],
+      "content": "不许把「代码写完了」读成「功能可用了」。真实分层：\n\n- 图片：实现完整（OCR + 三指标），但**进件门在代码里确实是关的** —— 素材进不来。\n- 视频：只有一个状态函数，没有实现。\n- 容器内 OCR/ASR：选型已定（ADR-0018，OCR=rapidocr 3.10.0 / ASR=faster-whisper 1.2.1），但注册 ≠ 接线，默认引擎仍是 host_vision。\n- 行 118 的状态是 vacuous_true（空真），不是 passed。改成 passed 需要四件事齐备。\n\n★ 为什么这条要单独记：交付执行计划 v1 全文 0 处提图片/视频 —— 一份失职。媒体审核落地执行方案是补这一份的。",
+      "source_pointers": [
+        {"file": "PMO/implement/媒体审核落地执行方案-v1-20261026.md", "anchor": "进件", "note": "真实分层状态"},
+        {"file": "ADR/ADR-0018-容器内OCR与ASR选型.md", "anchor": "vacuous_true", "note": "行 118 只能落 vacuous_true 的四件事"}
+      ]
+    },
+    {
+      "id": "l2-04-launch-scope-precise-to-route",
+      "title": "上线能上/不能上精确到路由；两个待决策挂在明处",
+      "labels": ["caliber", "release", "status"],
+      "content": "上线前的唯一该读的一份是 PMO/implement/上线交付说明-20261024.md。它的结构本身就是口径：\n\n- §三 能上 / 不能上 —— 精确到路由，不是「基本可用」。\n- §四 决定一：报告要不要装 Node。\n- §五 决定二：结案无报告能不能接受。\n- §一 上线前必须跑的六条命令（含环境清理、验收棘轮 passed/failed、覆盖登记、文档可达性）。\n- §六 合入顺序：先 base 层 → 重跑全部命令 → 确认棘轮 failed=0 → 才允许部署。\n\n★ 引用上线状态时必须带日期。「能上」是一个有时效的读数，不是属性。",
+      "source_pointers": [
+        {"file": "PMO/implement/上线交付说明-20261024.md", "anchor": "能上", "note": "§三 精确到路由"},
+        {"file": "PMO/implement/上线交付说明-20261024.md", "anchor": "决定一", "note": "§四 §五 两个待决策"}
+      ]
+    }
+  ]
+}

@@ -119,6 +119,17 @@ def _combine(left, right):
     return out
 
 
+def _name_marks_download(symbol):
+    """这个调用点所在的函数名（含外层）里，有没有一个明说「在下载」。
+
+    ★ 与 `download_scan_js.py` 的 `func:` marker 同一条读法，**逐段**认：
+      `qualname` 是 `Outer.download_image` 这种点分串，真正发请求的常是最内层
+      （`download_image` 里那个 `urlopen`），所以整串任一段带 `download` 就算。
+      只在 URL **完全动态**时才允许用它 —— 它是最后一根拐杖，不是第一判据。
+    """
+    return any("download" in part.lower() for part in str(symbol or "").split("."))
+
+
 def _only_structural(candidate):
     if not candidate:
         return False
@@ -705,9 +716,38 @@ class _Walker(object):
         if self.emit:
             hit = _pick_marker(candidates)
             if hit is None:
+                # ★ 2026-10-27 修：URL **完全动态**时，用「包含该 sink 的函数名」
+                #   当最后一条可指认证据 —— 这条规则 JS 端早就有
+                #   （`download_scan_js.py` 的 `func:` marker，注释写着
+                #   「URL 完全动态时，函数名是最后一根拐杖」），Python 端一直缺。
+                #
+                #   漏的是什么：`def download(url, target): urlopen(Request(url))`
+                #   —— `tools/media_samples_fetch.py` 就长这样，而它是**真的往盘上写文件**
+                #   的那个函数。DG-1 因此报「3 个调用点 / 登记 3 项」全绿，
+                #   第 4 个（唯一在落盘的那个）从来没人要求登记。
+                #
+                #   ★ 只认「完全动态」（整串只有结构字符与未知占位），**不认**
+                #     「常量段无特征」的中间态。试过放宽到任何时候都看函数名，
+                #     结果 `request.cookies.get(COOKIE_NAME)` 这类被判成下载，
+                #     全仓多出 50 个假调用点 —— 一个会误报的检查器比没有更糟
+                #     （§2.1.1），它会让 DG-1 从闸门变成需要绕过的噪音。
+                fully_dynamic = any(_only_structural(c) for c in candidates)
+                if not (fully_dynamic and _name_marks_download(self.symbol)):
+                    return
+                candidate, marker = "<expr>", "(func-name)"
+                shape = "kwarg" if from_keyword else "param"
+                # 归族只在**这一条分支**上显式给出：URL 全动态时静态推断不出
+                # 目标端点，能确定的只有「这是一次普通 HTTP 取字节」。
+                # 不给会让 ordinal 分组为空（`kind_calls` 0 个），登记项对不上任何调用点。
+                self.findings.append(self._finding(
+                    call, sink="http", shape=shape,
+                    api=_display(candidate), marker=marker,
+                    api_kind="external_http",
+                ))
                 return
-            candidate, marker = hit
-            shape = "kwarg" if from_keyword else _shape_of(expr, self.env)
+            else:
+                candidate, marker = hit
+                shape = "kwarg" if from_keyword else _shape_of(expr, self.env)
             self.findings.append(self._finding(
                 call, sink="http", shape=shape,
                 api=_display(candidate), marker=marker,
@@ -716,8 +756,8 @@ class _Walker(object):
             if _download_capable(candidates):
                 self.url_params |= (params & self.keep_params)
 
-    def _finding(self, call, sink, shape, api, marker):
-        return {
+    def _finding(self, call, sink, shape, api, marker, api_kind=None):
+        record = {
             "path": self.rel,
             "symbol": self.symbol,
             "lineno": getattr(call, "lineno", 0),
@@ -727,6 +767,11 @@ class _Walker(object):
             "api": api,
             "marker": marker,
         }
+        # 只在静态判得出族时带上；不带 = 让 registry 自己推断，
+        # 而不是在这里给一个「大概是吧」的猜测。
+        if api_kind:
+            record["api_kind"] = api_kind
+        return record
 
 
 def _http_url_expr(call):
@@ -1083,6 +1128,50 @@ def _extra_controls():
     results.append((
         "带常量前缀的 wrapper 转发也要能认出",
         count == 1,
+        "命中 {} 条".format(count),
+    ))
+
+    # ── 2026-10-27 新增：URL 完全动态时用函数名当证据（与 JS 端 `func:` 同一条读法）
+    #    这三条成对，缺一条另一个方向就恒真：
+    #    ① 函数名带 download 且 URL 全动态 → **必须认出**
+    #       （`tools/media_samples_fetch.py::download` 就是这形状，此前一直是 0 命中）
+    count = len(scan_python_source(_fx('''
+        def download(url, target):
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                target.write_bytes(resp.read())
+    ''')))
+    results.append((
+        "函数名带 download + URL 全动态 → 必须认出",
+        count == 1,
+        "命中 {} 条".format(count),
+    ))
+
+    #    ② 同样形状但函数名不下载 → **必须闭嘴**
+    #       （`tools/lark_http.py` 里十几条 JSON 客户端就是这个形状；
+    #        第一版放宽后它们全被认成下载，全仓多出 50 个假调用点）
+    count = len(scan_python_source(_fx('''
+        def _get(url, token):
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read())
+    ''')))
+    results.append((
+        "函数名不下载 + URL 全动态 → 必须闭嘴（防误报）",
+        count == 0,
+        "命中 {} 条".format(count),
+    ))
+
+    #    ③ 函数名带 download 但 URL **不是全动态**（常量段里已能看出不是下载端点）
+    #       → 仍按常量判，不许被函数名救回来。否则「函数名叫 download」就成了免死金牌。
+    #       ★ 这条是②的反面：光有②，把函数名判据删掉它也会绿。
+    count = len(scan_python_source(_fx('''
+        def download_meta(token):
+            return _get("https://open.feishu.cn/open-apis/drive/v1/metas/" + token, TOK)
+    ''')))
+    results.append((
+        "函数名带 download 但 URL 有非下载常量段 → 不许放行",
+        count == 0,
         "命中 {} 条".format(count),
     ))
 

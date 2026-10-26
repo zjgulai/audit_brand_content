@@ -1115,6 +1115,21 @@
         ".github/workflows/acceptance.yml",
         "PMO/audit/waiver-v1.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_nmem.py",
+      "asserts": "记忆与知识图谱：space/strict · 身份 · 两条 Space Rules · 四层条数与 SOP 层级映射 · 每条记忆的依据可解析 · Library 全部 indexed · 本体 9+8 且只在本 space 范围 · 来源文件在库且未填充（N0–N9）；nmem 不可达退 2",
+      "subjects": [
+        "tools/mem/corpus/L1.json",
+        "tools/mem/corpus/L2.json",
+        "tools/mem/corpus/L3.json",
+        "tools/mem/corpus/L4.json",
+        "tools/mem/rules/core_persona.md",
+        "tools/mem/rules/repo_boundary.md",
+        "artifacts/audit_content_ontology_patch.json",
+        "tools/mem/distill_to_nmem.py",
+        "tools/mem/ingest_library.py"
+      ]
     }
   ],
   "exempt": [

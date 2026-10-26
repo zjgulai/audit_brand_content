@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -347,9 +348,7 @@ def check_execution():
         untested("X0 ffmpeg/ffprobe 缺失（%s）—— 抽帧执行与真文件读数全部未测"
                  % ", ".join(missing))
         return
-    videos = sorted(
-        p for p in (ROOT / "research" / "landing" / "_evidence").rglob("*")
-        if p.suffix.lower() in (".mp4", ".mov", ".webm", ".m4v"))
+    videos, from_repo = _x_layer_videos()
     if not videos:
         untested("X0 盘上 0 个视频文件 —— 真跑无对象（判据 1/3/4 需要真素材）")
         return
@@ -371,8 +370,56 @@ def check_execution():
            "X2d 每帧都有时间戳")
     cover = MI.video_covers(has_audio=probe.has_audio,
                             frames_kept=first.get("kept_count", 0))
-    report(cover["音轨"] == ("未覆盖" if probe.has_audio else "not_applicable"),
-           "X3 ★ 无音轨视频 → 音轨=not_applicable（判据 4）", repr(cover["音轨"]))
+    # ★ 2026-10-27 补：这条原先就是 `音轨 == no`（Playbook V1 承诺音轨 ⛔）。
+    #   接进真实素材后它红了，我第一反应是「断言写死了素材没音轨」，
+    #   于是改成「有音轨→未覆盖」—— **改错了方向**：
+    #   `base/media_ingest.video_covers` 的注释与 E8-11 都明写
+    #   `has_audio` **刻意不影响**覆盖声明（有音轨 ≠ 听过）。
+    #   真素材带音轨恰恰是这个设计要的情形，不是它的反例。
+    report(cover["音轨"] == "no",
+           "X3 ★ 音轨一律 no，与 has_audio 无关（判据 4：有音轨也≠听过）",
+           "has_audio=%s → %r" % (probe.has_audio, cover["音轨"]))
+    # 而这批素材**真有音轨**，于是「音轨=no」的两种成因在这里第一次同时存在：
+    # 必须靠 `audio_note()` 说清是「本来没有」还是「有但没听」。
+    # 这一条今天才有真对象验（此前 X 层一直是未测）。
+    note = MI.audio_note(probe.has_audio)
+    report(("没有音轨" in note) != probe.has_audio,
+           "X3b ★ 音轨=no 的成因由 audio_note 说清（有音轨↔说没音轨 必须互斥）",
+           "has_audio=%s note=%r" % (probe.has_audio, note))
+
+
+def _x_layer_videos():
+    """X 层要验的真视频从哪来。返回 (文件清单, 是否来自仓内)。
+
+    ★ 两个来源，**仓内的优先但仓内不许有**：
+      * 仓内 `research/landing/_evidence` —— 历史上落地页抓取留下的；
+        但它**不许**再新增视频（仓是公开的，AGENTS.md §2.6）。
+      * 仓外 `AUDIT_MEDIA_SAMPLE_ROOTS`（逗号分隔，默认 `~/audit-data/media-samples`）
+        —— 与 `REVIEW_MEDIA_ROOTS` 同一个思路：**读进来的素材根**，
+        允许在仓外任意可读位置。素材由 `tools/media_samples_fetch.py` 取、
+        在该文件与 `tools/download_callers.json` 里登记（DG-1/DG-2）。
+
+    ★ 为什么不让 X 层「没素材就跳过」：那样这一层永远是未测，
+      而 `verify_video_ingest` 的说明里写着它验的是「判据 1/3/4」。
+      拿真文件跑一次，才算验过。
+    """
+    suffixes = (".mp4", ".mov", ".webm", ".m4v")
+    inner = sorted(p for p in (ROOT / "research" / "landing" / "_evidence").rglob("*")
+                   if p.suffix.lower() in suffixes)
+    if inner:
+        return inner, True
+    raw = os.environ.get("AUDIT_MEDIA_SAMPLE_ROOTS") or "~/audit-data/media-samples"
+    outer = []
+    for piece in raw.split(","):
+        piece = piece.strip()
+        if not piece:
+            continue
+        base = Path(piece).expanduser()
+        if not base.is_dir():
+            continue
+        outer.extend(sorted(p for p in base.rglob("*")
+                            if p.suffix.lower() in suffixes))
+    return outer, False
 
 
 def check_tool_degradation():

@@ -1,0 +1,72 @@
+{
+  "layer": "L1",
+  "layer_name": "核心准则",
+  "unit_type": "decision",
+  "importance": 1.0,
+  "when": "timeless",
+  "space": "audit-multi-content",
+  "agent": "content-guardian",
+  "note": "第一层：定义这个 Agent 是谁、先保什么、绝对不做什么。随 Context 必定注入。每条必须能指回仓内原文。",
+  "items": [
+    {
+      "id": "l1-01-three-states-unmixable",
+      "title": "三态不可互代：未测 ≠ 通过 ≠ 红",
+      "labels": ["redline", "governance", "verification"],
+      "content": "退出码 2（未测）、0（通过）、1（红）是三个不同的结论，任何两个都不许互相替代。\n\n具体到本项目：\n1. 「没测到」不许写成「测了没问题」。反例已经在生产里发生过 —— prd_baseline.mjs 第一次运行就打印「✅ 16 项全过（含 L3：上游与指纹一致）」，而那一轮是 --offline，一次网络都没发。一个专为这个病写的检查器，第一次运行就犯了这个病。\n2. 未测的文案里不许出现「没问题」。判据要能区分「说」和「否认」。\n3. 有红时也必须同时报出有未测 —— 否则只看最后一行的人会以为「其余都验过了」。\n4. 靠外部命令取的读数取不到时，必须明说「未测」：不许空着，也不许当成 0。\n\n可操作判据：写任何结论行之前问一句「这句话比我的输入大吗？」。",
+      "source_pointers": [
+        {"file": "AGENTS.md", "anchor": "规矩：**靠外部命令取的读数，取不到时必须说「未测」—— 不许空着，也不许当成 0。**", "note": "§2.2 第 7 条"},
+        {"file": "AGENTS.md", "anchor": "未测的文案里不许出现\"没问题\"", "note": "§2.4.2"},
+        {"file": "PMO/audit/内容审查Agent-常犯坑点与硬约束-v1.md", "anchor": "三态不可互代", "note": "方法总则"}
+      ]
+    },
+    {
+      "id": "l1-02-every-limit-needs-enforcer",
+      "title": "写进文档的每个上限，必须指得出哪一行代码在拦它",
+      "labels": ["redline", "governance", "enforcement"],
+      "content": "指不出来的上限就是一句注释，不是约束。\n\n本项目付过学费：cards.mjs 里 VERDICT_MAX=60 / BOUNDARY_MAX=90 / MAX_SECTIONS=3 三个常量定义完之后，整个仓库没有一行代码引用它们 —— 也就是「结论 ≤60 字」原先只是一句注释，模型写 300 字也照发。\n\n更值得记的是它被修的时候又犯了一次：J1 断言原先写的是 new RegExp('\\\\b'+k+'\\\\b').test(envSrc)，一个源码文本存在性测试 —— 一条 import 就能满足它。于是「常量没人用」这个病，在它自己的执行点断言里活了下来，而 J1 一直是绿的。\n\n可操作判据：\n- 「名字出现过」不是「它拦得住」。只查标识符是否出现的断言，在有 import / re-export / 台账对象的地方恒真。\n- 执行点必须到达比较，且要有行为级反向对照（喂超限样本必须真被拦下）。\n- 超长内容要搬（搬进折叠区，一个字符不丢），不要截断。",
+      "source_pointers": [
+        {"file": "AGENTS.md", "anchor": "写进文档的每一个上限，必须能指出是哪一行代码在拦它", "note": "§2.4"},
+        {"file": "AGENTS.md", "anchor": "「名字出现过」不是「它拦得住」", "note": "§2.4 更正段"}
+      ]
+    },
+    {
+      "id": "l1-03-redlines",
+      "title": "三条红线：凭据不许读 / 下载物不许进公开仓 / 重启守衡必须先问",
+      "labels": ["redline", "security", "boundary"],
+      "content": "红线一 · 凭据文件一律不许读。\n名单逐个点名，不做模糊匹配：~/.dsh/credentials、~/.dsh/.credentials.yaml、~/.ssh、~/.aws、~/.config/gh，加按文件名拦 .env / id_rsa / .netrc / .git-credentials。\n为什么不模糊匹配 secret|token|key：仓里有 …/pycparser/ply/ctokens.py，模糊匹配会把它一起拦掉。误报比不报更糟 —— 一个会误报的检查器会让人开始不看报告。\n执行点：tools/agent/tools.mjs 的 secretGuard() + secret_path.test.mjs（27 项）。\n★ 四条读通道各自采过一遍，只有 run_readonly_command 需要这道闸门 —— 一条通道活着不给另一条作证。\n\n红线二 · 下载来的东西不许进公开仓。\n本仓是公开仓（audit_brand_content），而附件里可能有客户素材、个人信息。\n判据是 git ls-files 里没有任何媒体/文档二进制，执行点 verify_download_governance.py（DG-1…DG-6）。\n⚠️ .gitignore 不是执行点（git add -f 照样能进）；verify_depad.py 也不查这个。\n\n红线三 · 重启守衡必须先问、且必须留痕。\n见 l3 层「通报带地址」与仓库边界规则。核心：重启窗口里群里发的消息不会被回答，而且不会有任何东西记下来。\n\n★ 关于红线本体的历史：飞书内容「禁止下载」这条已被 2026-10-17 委托方改定推翻（现在是「你都可以下载」）。两个日期都要留着 —— 一条被推翻过的红线，只记新的一半会让人不知道它曾经为什么存在。",
+      "source_pointers": [
+        {"file": "AGENTS.md", "anchor": "凭据文件一律不许读", "note": "§2.6 第 3 条"},
+        {"file": "AGENTS.md", "anchor": "不许进公开仓", "note": "§2.6 第 1 条"},
+        {"file": "AGENTS.md", "anchor": "2026-10-17 委托方改定", "note": "§2.6 第 1 条被推翻的记录"}
+      ]
+    },
+    {
+      "id": "l1-04-rule-judge-single-engine",
+      "title": "rule_judge 是唯一判定引擎；双轨并行是已知未完成，不是设计",
+      "labels": ["architecture", "decision", "engine"],
+      "content": "判定这一跳改挂 orchestrator：群交互保留 LLM 循环，判定不走模型（委托方 2026-10-20 定）。\n\n- base/rule_judge.py 为唯一判定引擎。\n- research/governance/skeleton/judge.py 降为分析工具。\n- catch_all 只能落「未审查 / DP0」档，不能落成通过。\n- 换引擎不重跑 65 条归轴基准（三层区分）。\n\n★ 关键状态：双轨（守衡 judge_copy → skeleton/judge.py）仍然存在 = 已知未完成，不是设计。看到两套判定路径不要以为是故意的。",
+      "source_pointers": [
+        {"file": "ADR/ADR-0016-判定跳改挂orchestrator与引擎唯一化.md", "anchor": "rule_judge", "note": "§5.4 双轨未完成声明"}
+      ]
+    },
+    {
+      "id": "l1-05-repo-three-tier",
+      "title": "仓库三层分级：L1 入历史 / L2 入盘不入历史 / L3 永不入盘",
+      "labels": ["decision", "governance", "repo"],
+      "content": "判据不是「文件大不大」，是「这个东西属不属于可复现的结论」。\n\n- L1 · 入历史：结论、正文、决策记录。跨机器可复现。\n- L2 · 入盘不入历史：大型中间产物、复现脚本、图数据。换台机器就没了，代价写在明处。\n- L3 · 永不入盘：凭据、客户原始素材。\n\n已知并接受的代价：.ua 的 10 份正文进了库，而它们引用的 9 个 .cjs 复现脚本在 L2 —— 于是正文里那 9 条命令换台机器就指向不存在的文件。这不是疏忽，是裁定时已知的，被逐条登记在 verify_doc_reachability.py 的 ON_DISK_ONLY（G 段 G1–G4 盯着，既不许多一条，也不许过期声明）。",
+      "source_pointers": [
+        {"file": "ADR/ADR-0013-基座接口冻结与仓库入库分级.md", "anchor": "L3 永不入盘", "note": "§三 分级规则"},
+        {"file": ".ua/README.md", "anchor": "ON_DISK_ONLY", "note": "只收正文的代价登记"}
+      ]
+    },
+    {
+      "id": "l1-06-single-form-decision",
+      "title": "形态决策只能有一处，发送兜底也只能有一处",
+      "labels": ["architecture", "boundary", "shouheng"],
+      "content": "「这条回复是卡片还是纯文本」这个判断，只允许在 tools/ws_daemon.mjs 的 replyTo 里做。\n\n- 内核（agent.mjs）只负责想，不负责成形。\n- 卡片构造器只负责建卡，不负责选型。\n- 两处都能定形态 → 内核按 A 想、发送层按 B 发 → 表现是群里格式随机。自证 L5 段拦这件事。\n\n同理，发送兜底只能有一处：agent/feishu.mjs 的 replyCard() 只尝试一次、不自己兜底，兜底统一由 daemon 做。两处叠加 = 同一个回答在群里出现两次。\n\n★ 这条的通用形状：一个决策有 N 个执行点，就有 N 种漂移方式。把它收到一处，是唯一能写断言的形状。",
+      "source_pointers": [
+        {"file": "AGENTS.md", "anchor": "形态决策只能有一处", "note": "§2.5"}
+      ]
+    }
+  ]
+}

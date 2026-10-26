@@ -45,6 +45,30 @@
    "retention": "run-scoped",
    "data_class": "confidential",
    "never_tracked": true
+  },
+  {
+   "path": "tools/gold_pilot_fetch.py",
+   "symbol": "download_one.opener",
+   "api": "https://<飞书 medias 签发的临时下载 URL>",
+   "api_kind": "external_http",
+   "ordinal": 1,
+   "consumer": "tools/gold_pilot_fetch.py（gold pilot 标定集取图，落盘后交 build_gold 比对）",
+   "landing_root": "~/audit-data/gold/pilot",
+   "retention": "run-scoped",
+   "data_class": "internal",
+   "never_tracked": true
+  },
+  {
+   "path": "tools/media_samples_fetch.py",
+   "symbol": "download",
+   "api": "https://<表内【图片】/【视频】素材直链>",
+   "api_kind": "external_http",
+   "ordinal": 1,
+   "consumer": "tools/media_samples_fetch.py（媒体线取真实载体；供 verify_video_ingest / verify_image_ingest 的 X 层）",
+   "landing_root": "~/audit-data/media-samples",
+   "retention": "run-scoped",
+   "data_class": "public",
+   "never_tracked": true
   }
  ]
 }

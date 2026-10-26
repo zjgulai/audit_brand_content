@@ -20,6 +20,7 @@ import { TOOL_SCHEMAS, executeTool, runtimeContext, toolNames } from './tools.mj
 import { detectTruncation, annotateTruncation, tailOf } from './truncate.mjs';
 import { parentIdOf, alreadyInHistory, buildQuoteBlock } from './thread.mjs';
 import { foldInto } from './outbound.mjs';
+import { recall as recallMemories } from './nmem_recall.mjs';
 
 /* ─────────────────── 去重：见过的事件不再处理 ─────────────────── */
 // 惰性求值：测试需要把状态目录指到不可写路径来验证失败分支，
@@ -393,10 +394,28 @@ export async function handleMessage(event, { force = false } = {}) {
     }
 
     // ── 6. 工具循环
+    //
+    // ★ 持久记忆检索（nmem_recall）。接线方式与取舍：
+    //   · 只调**一次**，在工具循环之前 —— 循环里每轮都查会把延迟乘上迭代数。
+    //   · 3 秒硬超时 + 任何失败返回空串（见 nmem_recall.mjs）。记忆绝不阻塞主链路。
+    //   · 空串时**一个字都不拼**，systemPrompt 与接线前逐字相同 —— 于是
+    //     「nmem 挂了」等价于「这个功能不存在」，而不是「守衡变慢或答不上来」。
+    //   · 关掉它：NMEM_RECALL=off。
+    let recallBlock = '';
+    if (process.env.NMEM_RECALL !== 'off') {
+      try {
+        recallBlock = await recallMemories(question);
+      } catch {
+        recallBlock = '';           // recall 自己已吞掉一切；这层是双保险
+      }
+    }
     const systemPrompt = buildSystemPrompt(
-      chatType === 'group'
-        ? `\n# 当前场景\n你在群聊「${sess.title ?? chatId}」里，正在回复 ${senderName}。群里其他人也会看到你的回答，所以不要输出私密信息，也不要假设只有一个人在听。`
-        : `\n# 当前场景\n你在与 ${senderName} 私聊。`
+      [
+        chatType === 'group'
+          ? `\n# 当前场景\n你在群聊「${sess.title ?? chatId}」里，正在回复 ${senderName}。群里其他人也会看到你的回答，所以不要输出私密信息，也不要假设只有一个人在听。`
+          : `\n# 当前场景\n你在与 ${senderName} 私聊。`,
+        recallBlock ? `\n${recallBlock}` : '',
+      ].join('')
     );
 
     const toolTrace = [];

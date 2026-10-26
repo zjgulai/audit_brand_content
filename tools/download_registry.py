@@ -87,8 +87,17 @@ _RE_IM_RESOURCE_API = re.compile(
 #   ★ 不扩这一族会怎样：momcozy 一旦入库，DG-1 会报「调用点没被任何登记项覆盖」，
 #     而登记表里**无族可归** —— 那是一条无法消除的红。上一个扩族（im_message_resource）
 #     的注释已经记过这件事。
+#   ★ 2026-10-27 补一条边界：这一族**必须排除飞书自己的域名**。
+#     原正则 `^(https?://|...)` 会把**任何** URL 归成 external_http，于是
+#     `https://open.feishu.cn/open-apis/drive/v1/metas/batch_query`（元数据查询，
+#     根本不下载字节）也「属于已知族」，DG-2 那句「不是已知飞书下载接口」
+#     对任何带 https:// 的串**永不触发** —— 一条恒不成立的断言。
+#     自证里的 `bad-api-unknown` 一直是红的，红的正是这件事，而它被当成
+#     「fixture 文案过期」放了很久。判据归判据，别把红的当成笔误。
+#     飞书端点的判法因此变成：**先按三个具名族认，认不出就不是下载**。
 _RE_EXTERNAL_HTTP_API = re.compile(
-    r"^(?:https?://|https?\.request\s+path=)", re.I)
+    r"^(?:(?!https?://[^/\s]*\b(?:feishu\.cn|larksuite\.com|feishu-boe\.cn))"
+    r"https?://|https?\.request\s+path=)", re.I)
 
 KNOWN_API_KINDS = ("drive_file", "media_tmp_url", "im_message_resource",
                    "external_http")

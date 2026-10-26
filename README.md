@@ -277,6 +277,17 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > 后 6 份是**执行规格**（回答「接下来按什么顺序做、做到什么算完」）。
 > 两类不许混读：前者是证据，后者是计划；计划里的数字若与证据冲突，以证据为准。
 
+**记忆与知识图谱（nmem）· 2026-10-26**
+
+> 入口是 `tools/mem/`（语料 → 落库 → 自证）与 `python3 tools/verify_nmem.py`。
+> 这两份是**注入 nmem 的规则正文本身**，不是说明文档 —— 它们会被原样拼进
+> 每次会话的 Context Bundle，所以改它们等于改所有读到这份记忆的 Agent 的行为。
+
+- [`tools/mem/rules/core_persona.md`](./tools/mem/rules/core_persona.md) —— 人格内核与决策优先级
+  （`事实 > 可复核 > 边界诚实 > 覆盖完整 > 速度`）；**三态不可互代**的原文在此。
+- [`tools/mem/rules/repo_boundary.md`](./tools/mem/rules/repo_boundary.md) —— 仓库物理边界与读写纪律
+  （公开仓的三条后果 / 凭据红线 / 写盘纪律 / 并行会话 / 重启边界）。
+
 **Playbook / PRD**
 
 - `Playbook/内容审查Agent-产品Playbook-v0.md`

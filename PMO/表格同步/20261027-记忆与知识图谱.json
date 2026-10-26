@@ -1,0 +1,19 @@
+[
+  {
+    "事项名称": "内容审查 Agent 持久记忆与知识图谱（nmem 四层蒸馏 + 本体 + 运行时接线）",
+    "关联执行票": "T-500",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "规则/模型",
+    "功能三级分类": "只读投影",
+    "工作类型": ["后端", "部署运维", "测试验收"],
+    "完成状态": "已完成",
+    "验收结论": "通过",
+    "上线状态": "已上线",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "按《智能体记忆系统与知识图谱构建标准操作规程 v2.0》为 audit_multi_content 建专属记忆底座。①隔离：nmem 全局 spaces 开关由关转开，新建 audit-multi-content（retrieval-mode=strict）+ 注册身份 content-guardian（repo_guardian）；default space 里既有的 25 条（deepcode/opencode/momcozy 等其它项目）不受影响。②注入 2 条 Space Rules：core_persona（priority 100，人格内核+决策优先级+三态不可互代）与 repo_boundary（priority 90，公开仓三条后果/凭据红线/写盘纪律/并行会话/重启边界）。③四层蒸馏 25 条：L1 核心准则 6 条 decision@1.0、L2 业务口径 4 条 fact@0.9、L3 避坑实证 12 条 learning@0.85（AGENTS.md §2.4 九变体 + 三条环境级）、L4 沉淀纪要 3 条 context@0.7；每条带 source_pointer，落库前逐条校验锚点字面量真出现在仓内已跟踪文件里。④Library 归档 8 份真源（AGENTS.md/ADR README/base README/坑点全表/上线交付说明/知识库深度分析/填充态实测史/两口径实测史），全部 lifecycle_state=indexed。⑤知识图谱本体：9 个 objectTypes（DecisionRecord/Verifier/FailurePattern/Subsystem/Contract/ReleaseGate/Ticket/Redline/Incident）+ 8 个 linkTypes（GOVERNS/VERIFIES/SUPERSEDES/EXHIBITS/ENFORCES/BLOCKS/PART_OF/CONTRADICTS），只写 space 范围、global 未污染。⑥运行时接线：新增 tools/agent/nmem_recall.mjs（3s 硬超时、任何失败返回空串、只读、永不阻塞主链路），接进 agent.mjs 工具循环之前只查一次；空串时 systemPrompt 与接线前逐字相同，NMEM_RECALL=off 可关。",
+    "验收标准": "python3 tools/verify_nmem.py 全过（N0–N9，25 条记忆 / 8 份真源 / 本体已生效）；--controls 5/5（层级映射错→N5 红、importance<0.7→N6 红、缺依据尾注→N7 红、依据指向不存在文件→N7 红、好样本必须闭嘴）；nmem 不可达退 2 而非 0。node --test tools/agent/nmem_recall.test.mjs 13/13（四条失败路径：二进制不存在 / 超时 / 退出码非 0 / 输出非 JSON，全部返回空串且不抛）。python3 tools/verify_coverage.py 661 项全过、--controls 669 项全过。tools/agent/ 12 个测试文件逐个 rc=0。真变异：把 recall 的 bin 改成从环境重推（第一版就是这样）→ 注入的 /nonexistent/a 竟调到了真 nmem，测试当场红，证明降级路径原先根本没被测到。",
+    "状态依据": "verify_nmem 退出码 0；verify_coverage 0 红；verify_shouheng_ops 全过（含 H3「没在跑就退 2」）。真实检索实测：三个典型问题耗时 97–204ms（预算 3s），Top1 匹配度 0.99，返回内容正确命中所问的主题。守衡经闸门 rescue 救活（PID 39401，launchctl bootstrap，服务自 2026-09-30 停机未加载），长连接 ready，补发队列不回溯积压消息（已核实）。",
+    "下一步行动": "① 观察一周守衡真实会话下的 recall 命中率与延迟，若 Top1 偏离主题则调 minScore/limit；② 三处既有可达性红（ADR-0019 未进 ADR 索引、协作告知未进 README 索引）属其它会话产出，待其自行登记；③ 记忆条目随决策演进要 update 而非新增（distill_to_nmem.py 用稳定 id 保证幂等）"
+  }
+]

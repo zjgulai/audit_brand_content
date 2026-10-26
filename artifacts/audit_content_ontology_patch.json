@@ -1,0 +1,85 @@
+{
+  "ontology": {
+    "objectTypes": [
+      {
+        "key": "DecisionRecord",
+        "displayName": "决策记录",
+        "description": "ADR：一个影响后续工作的决定。带状态 proposed/accepted/superseded/rejected 与日期。"
+      },
+      {
+        "key": "Verifier",
+        "displayName": "验证器",
+        "description": "tools/ 下的 verify_* 入口，每一条负责断言一个子系统。带退出码语义：0 通过 / 1 红 / 2 未测。"
+      },
+      {
+        "key": "FailurePattern",
+        "displayName": "失败形状",
+        "description": "本项目记过的「同一个病」变体，如「常量没人用」「接口读通但字段名错」「承诺没有执行点」。每条带真实事故日期。"
+      },
+      {
+        "key": "Subsystem",
+        "displayName": "子系统",
+        "description": "被独立验证的一块能力：判定引擎、知识库、基座、Web 工作台、守衡机器人、下载治理。"
+      },
+      {
+        "key": "Contract",
+        "displayName": "契约",
+        "description": "冻结的接口或数据形状：ContentUnit、judge(unit)、JSON Schema、回复卡片白名单。"
+      },
+      {
+        "key": "ReleaseGate",
+        "displayName": "上线闸门",
+        "description": "上线前必须满足的判据与必须跑的六条命令；含「能上/不能上精确到路由」的状态。"
+      },
+      {
+        "key": "Ticket",
+        "displayName": "执行票",
+        "description": "可派工粒度的工作单元，如 T-310、T-420。带依赖、可执行判据、执行记录。"
+      },
+      {
+        "key": "Redline",
+        "displayName": "红线",
+        "description": "绝对不许跨越的边界：凭据不读、下载物不进公开仓、重启守衡必须先问。每条必须指得出执行点。"
+      },
+      {
+        "key": "Incident",
+        "displayName": "事故",
+        "description": "真实发生过的故障，带日期与现场读数。它是「断言验过它自己」的唯一证据来源。"
+      }
+    ],
+    "linkTypes": [
+      {
+        "key": "GOVERNS",
+        "displayName": "管辖"
+      },
+      {
+        "key": "VERIFIES",
+        "displayName": "验证"
+      },
+      {
+        "key": "SUPERSEDES",
+        "displayName": "取代"
+      },
+      {
+        "key": "EXHIBITS",
+        "displayName": "属于某形状"
+      },
+      {
+        "key": "ENFORCES",
+        "displayName": "执行"
+      },
+      {
+        "key": "BLOCKS",
+        "displayName": "阻塞"
+      },
+      {
+        "key": "PART_OF",
+        "displayName": "属于"
+      },
+      {
+        "key": "CONTRADICTS",
+        "displayName": "与…冲突"
+      }
+    ]
+  }
+}

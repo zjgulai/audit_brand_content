@@ -1,0 +1,79 @@
+[
+ {
+  "事项名称": "T-444 下载治理判据修复：URL 全动态的下载函数此前从未被要求登记（DG-1 假绿）",
+  "关联执行票": "T-444",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "修一个真实的假绿：`tools/download_scan_py.py` 在 URL 完全动态时（`def download(url): urlopen(Request(url))` 这种形状）直接 return，于是**真正往盘上写文件的那个函数从来没有出现在调用点清单里**，DG-1 报「3 个调用点 / 登记 3 项」全绿。改法与 JS 端早就存在的 `func:` marker 对齐：URL 全动态时用「包含该 sink 的函数名带 download」当最后一条可指认证据。★ 中间两次改错都记在注释里：放宽到所有 HTTP helper → 全仓多出 50 个假调用点（`request.cookies.get(COOKIE_NAME)` 被认成下载）；要求 wrapper 表证据 → 回到 3 个、真函数又漏掉。",
+  "验收标准": "download_scan_py 自证 12 fixture + 16 反向对照全过（新增 3 条成对对照：函数名带 download + URL 全动态→必须认出 / 函数名不下载 + URL 全动态→必须闭嘴 / 函数名带 download 但 URL 有非下载常量段→不许放行）。两条真变异：删掉函数名判据 → 第 1 条红；放宽到「函数名单独就够」→ 第 3 条 + good-01 双双红（`download_report` 这个文档读取函数会被误报）。DG-1…DG-6 全绿（调用点 5 / 登记 5）。",
+  "状态依据": "verify_download_governance 6/6 全绿；download_scan_py --selftest 28 项全过；download_registry 19 fixture 全过。新登记两条真落盘调用点：`gold_pilot_fetch.py::download_one.opener`（此前同样漏登记）与 `media_samples_fetch.py::download`，落盘根都在仓外、0700、never_tracked。",
+  "下一步行动": "无"
+ },
+ {
+  "事项名称": "T-445 DG-2 判据修复：任何 https:// 串都被当成 external_http，导致「不是已知飞书下载接口」永不触发",
+  "关联执行票": "T-445",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "`download_registry.py` 的 `_RE_EXTERNAL_HTTP_API` 原本是 `^(https?://|...)`，于是**任何** URL 都被归成 external_http —— 包括 `https://open.feishu.cn/open-apis/drive/v1/metas/batch_query`（元数据查询，根本不下载字节）。后果是 DG-2 那句「api 不是已知飞书下载接口」对任何带 https:// 的串永不触发，是一条恒不成立的断言。收紧为：飞书域名下的 URL 必须落在 drive_file / media_tmp_url / im_message_resource 三个具名族之一，否则判为「不是下载」。★ 这个红在自证里已经红了很久（`bad-api-unknown`），一直被当成「fixture 文案过期」—— 判据归判据，别把红的当成笔误。",
+  "验收标准": "download_registry 19 fixture 全过（此前 18/19，唯一那条红的就是本条）。五条边界逐条核对：飞书元数据接口→None / 飞书 drive 下载→drive_file / 飞书 medias→media_tmp_url / Shopify CDN→external_http / momcozy 视频→external_http。DG-1…DG-6 全绿；verify_feishu_index M 组 7 项（DG 的下游消费者）全绿。",
+  "状态依据": "download_registry --selftest 19/19；verify_download_governance 6/6；verify_feishu_index M 组 7/7；verify_coverage --controls 669 项全过（改 verify_* 的强制项）。",
+  "下一步行动": "无"
+ },
+ {
+  "事项名称": "T-446 ffmpeg 接入 + 真实视频素材落地，verify_video_ingest 的 X 层从「未测」转为真读数",
+  "关联执行票": "T-446",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端",
+   "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "两件盘上缺件都补齐：① `brew install ffmpeg` 装上（9.0.2，GPL 构建，仅作本机命令行工具，不随仓分发）；② 真实视频素材取自「内容治理问题描述」base 的「守衡测试-源」表（`RY2UbCRjXaeeWwscUPScVN5AnQc` / `tblTPsjiyOHYfUc0`），该表 111 条里有 15 条【视频】直链，实测 HEAD 返回 video/mp4、26.5MB，遂用 `tools/media_samples_fetch.py` 下 3 段到仓外 `~/audit-data/media-samples`（0700）。X 层此前只认仓内 `research/landing/_evidence`，那里 0 个视频，所以永远报未测；现加 `AUDIT_MEDIA_SAMPLE_ROOTS`（默认 `~/audit-data/media-samples`），与 `REVIEW_MEDIA_ROOTS` 同一个思路：素材是读进来的，允许在仓外。仓内仍不许新增任何二进制。",
+  "验收标准": "verify_video_ingest 53/53 全过、退 0（此前 46 过 + 1 未测、退 2）。X 层真读数：ffprobe 读到 5.97s / 1920x720 / 25fps / has_audio=true；抽帧两次指纹相等（7d5994b7a32f，判据 1 同输入同输出）；4 帧 ≤ 上限 100；每帧带时间戳。★ 修断言时先改错了一次方向，记在注释里：X3 原本断言「音轨=no」，我以为是「写死素材没音轨」，改成「有音轨→未覆盖」—— 真因是 `video_covers` 的设计就是 has_audio 刻意不影响覆盖声明（有音轨 ≠ 听过），E8-11 就守着这条。恢复原断言，另补 X3b 验「音轨=no 的两种成因必须靠 audio_note 分开」。",
+  "状态依据": "verify_video_ingest 53/53 rc=0；X3b 真变异（让 audio_note 有音轨也说没音轨）→ 4 条红（E8-3b / E8-12 / E8-13 / X3b），恢复后全绿。av_alignment 前提在三段素材上实测成立（全部带音轨，6.0s / 73.1s / 28.9s）。",
+  "下一步行动": "用带音轨的真实素材跑一次 av_alignment 端到端（需网关侧授权）"
+ },
+ {
+  "事项名称": "T-447 音画对齐前提在真实素材上成立（av_alignment_ready 首次有真对象）",
+  "关联执行票": "T-447",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "模型与解析"
+  ],
+  "完成状态": "待验收",
+  "验收结论": "部分通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "`av_alignment` 需要的「音调/节奏」在音轨里，只拿视频抽帧只能谈「字幕与画面的关系」，所以缺音轨必须说缺、不许降级成静图分析。此前盘上一段视频都没有，这条前提只在打桩样本上验过。今天三段真实素材（取自守衡测试-源表的 Shopify CDN 直链）全部带音轨，`av_alignment_ready` 在真对象上首次返回 True。★ 仍要说清的边界：前提成立 ≠ 对齐做过 —— `video_covers` 的「音轨」一档仍是 no（Playbook V1 承诺音轨 ⛔，第一阶段不做 ASR），报告里由 `audio_note()` 写成「有音轨，未做 ASR，音轨内容未看」。",
+  "验收标准": "三段素材各跑 probe_video + av_alignment_ready：SPU000209 6.0s 1920x720 has_audio=True → True；SPU000714 73.1s 1920x1080 → True；SPU009456 28.9s 606x1080 → True。audio_note 三条都输出「有音轨，未做 ASR」。",
+  "状态依据": "verify_video_ingest X1/X3/X3b 全绿（真 ffprobe 读数）；E8-12 反向对照守住「has_audio 必须影响 audio_note」。结论写「部分通过」而不是「通过」：前提验过了，端到端对齐没做。",
+  "下一步行动": "取 vod 侧授权后跑真实 av_alignment 调用"
+ }
+]

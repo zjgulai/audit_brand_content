@@ -52,6 +52,7 @@
 | **L1 里那件 418KB 产物能不能重建** | `python3 tools/verify_browser_ext_artifact.py` | 跑一遍构建配方（`.vendor/dsh-browser-main/extensions/dsh-browser` 的 `scripts/build.mjs`）再**逐文件 sha256** 对回 `dsh-browser-ext/`：16 个文件多一个少一个、内容差一个字节都红；**`.vendor/` 不在盘上 → 退 2（未测），不是绿**（见 §2.4）。★ 它是 `Q39` 选项 A 的落地：**配方与校验合在一个文件里** |
 | **守衡自己还活着吗** | `python3 tools/verify_shouheng_ops.py` | 重启闸门默认必须拒绝、**拒绝时不许记账**、全仓不许有人绕过闸门动守护进程、`KeepAlive` 必须仍能自愈、**没有任何检查器会自动执行 AGENTS.md 里的命令**、它现在在跑且日志还在写（**没在跑 / 或有读数未测 → 退 2**，是未测不是通过；**H1–H7 断言这句话本身不许撒谎**）（见 §2.7） |
 | **工作区指令预算（本文件自己）** | `python3 tools/verify_agents_budget.py` | 本文件超 **65536** 就红 —— 注入版会被**截掉尾部**（尾部 = §2.6 红线 + §2.7 重启闸门；2026-09-22 实测过一次）；**余量不足一条教训（实测 3288 字节）同样红**（再写一节 §2.4.x 就会越线，而越线是静默的）。★ 另断言搬走的那段**逐字还在** `PMO/填充态-环境特性-实测史.md`、**且本文件里 0 残留** —— 两条成对，缺一条另一个方向就恒真。反向对照 7 项：`--controls` |
+| **记忆与知识图谱（nmem）** | `python3 tools/verify_nmem.py`（加 `--controls` 跑反向对照） | N0–N9：space 必须 `strict` · 身份默认 space 正确 · 两条 Space Rules active 且优先级对 · 四层条数下限（6/4/10/3）· **unit_type 与 importance 必须符合 SOP 层级映射**（1.0↔decision / 0.9↔fact / 0.85↔learning / 0.7↔context）· 每条记忆的「依据：」尾注必须解析得到仓内已跟踪文件 · Library 全部 `indexed` 且 `chunk_count>0` · 本体 9 对象 + 8 关系且**只写 space 范围**（global 不许被污染）。**nmem 不可达 → 退 2（未测）**。反向对照 5 项（层级映射错 / 重要性低于 0.7 / 缺依据 / 依据指向不存在文件 / **好样本必须闭嘴**）。写入口径见 `tools/mem/`（`distill_to_nmem.py` 默认 dry-run、`ingest_library.py` 入库前逐份两口径读，被填充的文件不许进） |
 
 > **本节原先还有一大段：填充态 +4096 的实测矩阵、两次更正、以及「落盘配方」——
 > 已搬到 `PMO/填充态-环境特性-实测史.md`**（2026-09-22 搬，搬前逐字节比对过，**一个字符没删**）。

@@ -1,0 +1,96 @@
+{
+  "layer": "L3",
+  "layer_name": "避坑实证",
+  "unit_type": "learning",
+  "importance": 0.85,
+  "when": "timeless",
+  "space": "audit-multi-content",
+  "agent": "content-guardian",
+  "note": "第三层：来自实战的血泪教训。每条都带真实事故的日期或当次读数。这些不是「建议」，是「已经付过学费的判据」。",
+  "items": [
+    {
+      "id": "l3-01-constant-without-consumer",
+      "title": "变体一 · 上限定义了没人用：一句注释被当成约束",
+      "labels": ["pitfall", "enforcement"],
+      "content": "形状：文档里写着「≤60 字」，代码里也有 VERDICT_MAX = 60，但没有任何一行拿它做比较。\n\n2026-09-22 实测：cards.mjs 的 MAX_SECTIONS 只出现在 import 行与 ENFORCED 台账里；而 J1 断言写的是 new RegExp('\\\\b'+k+'\\\\b').test(envSrc) —— 一个源码文本存在性测试，一条 import 就能满足。于是这个病在它自己的执行点断言里活了下来，J1 一直是绿的。\n\n判据：「名字出现过」不是「它拦得住」。只查标识符是否出现的断言，在有 import / re-export / 台账对象的地方恒真。\n\n修法三层：源码级（必须到达比较）+ 行为级（喂超限样本必须真被拦下且内容不丢）+ 相容级（现有模版不许超限）。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "常量定义了没人用", "note": "§2.4 与 2026-09-22 更正"}]
+    },
+    {
+      "id": "l3-02-interface-field-misread",
+      "title": "变体二 · 接口调通了但字段名读错：假数据长得和真数据一样",
+      "labels": ["pitfall", "feishu", "api"],
+      "content": "形状：code=0、没报错、不红 —— 但我把字段名/口径读错了，于是安静地产出假数据。\n\n2026-09-18 一轮连撞三次：\n1. core 层多维表格全部报「0 张表」→ 表在 data.items，我读了 data.tables。\n2. 报「49 条没测可达性」→ 我以为这三个形态没有元数据接口，实际 drive/v1/metas/batch_query 一条覆盖全部。\n3. 报「455 条可达资源」→ 其中 430 条根本不在我们租户（飞书官方模板）。\n\n第 4 行更严重：lark_people.py --find 某人 打印「本应用结构性看不见人」，还附一句「不含此人」—— 而那句没有任何代码查过，她一直在机器人自己的测试群里。\n\n★ 判据：「这句话比我的输入大吗？」否定结论的输入不是「我采的那条通道里没有」，而是「所有通道都采过，且每一条都自证活着」。一条通道活着，不给另一条通道作证。\n\n三条做法：① 键名不确定时两种都试，并在空结果里把 data 的实际 keys 打出来（「真的没有」和「我读错了」必须长得不一样）；② 读完之后加恒等式断言（分项之和 = 总数）；③ 拿真实数据跑一遍看回了几条 —— 开关是声明，条数是证据。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "接口读通了", "note": "§2.4.1 五次实例表"}]
+    },
+    {
+      "id": "l3-03-promise-without-executor",
+      "title": "变体三 · 承诺没有执行点：对别人说过的话没有任何东西在跑",
+      "labels": ["pitfall", "commitment"],
+      "content": "形状：一句写下来 —— 尤其是对别人说出去 —— 的承诺，没有任何东西在执行它。\n\n2026-09-21 实例：11:52 守衡在群里对上游说「改版后得重新拉一次基线并记新指纹」。当时仓库里：拉正文有命令，记指纹有文件，但没有任何东西会在它改版时变红。判据是硬的 —— 那两个 sha256 在 tools/ PRD/ research/ PMO/ ADR/ 下 grep 只命中它自己，零消费者。\n\n★ 兑现分两层，缺一层就还是没兑现：\n- 判据层（哪条命令、验什么）—— verify_prd_baseline.py\n- 触发者层（谁在跑它）—— prd_baseline.mjs 挂在 ws_daemon.mjs\n\n只做第一层，等于把「承诺没有执行点」这个病往上搬了一层，还自认为修好了。\n\n三条做法：① 承诺里出现的每个名词都要指得出哪一行命令在做它；② 未测必须与通过与红都长得不一样；③ 对外说过的话优先 —— 对方会照着它安排自己的事。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "承诺没有执行点", "note": "§2.4.2"}]
+    },
+    {
+      "id": "l3-04-report-exceeds-evidence",
+      "title": "变体四 · 「欠」：把「我方要问的」说成「对方欠的」",
+      "labels": ["pitfall", "reporting"],
+      "content": "形状：汇报这一跳说出去的话比手上的依据大。\n\n2026-09-21 实例：我在汇报里写「她那边两件仍然欠着」，委托方只问一句「你说的是谁欠你？」—— 对账后三句没有一句站得住。她原话是条件句（「如果需要明确，我计划维护到一个统一入口」），我把「承诺」升级成了「欠」；另一件她从未提过，是我方顺带问了一句她没回，而一个没被回答的提问不是一笔债。\n\n★ 错在哪一层要说清：我在群里对她说的其实是对的（「等你给」是「我等」，不是「她欠」）。膨胀全部发生在回来汇报的那一跳 —— 越是二手转述越容易比依据大，因为它离原话远、离结论近。\n\n判据（说「欠」之前先分清三样）：\n- 对方的承诺 → 指得出原话（消息 id 或文档 + 逐字引用）。\n- 我方的提问 → 对方从未说过它，不许写成对方的承诺。\n- 我方的覆盖 → 指得出哪一行代码在跑它；指不出就不是覆盖，只是愿望。\n\n前两样现在是机器判据：verify_pending.py 的 C2/C3 断言二者互为反面。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "说出去的话比依据大", "note": "§2.4.3"}]
+    },
+    {
+      "id": "l3-05-selfcheck-has-side-effect",
+      "title": "变体五 · 自证有副作用：跑一次自证，改掉了它要保护的东西",
+      "labels": ["pitfall", "verification"],
+      "content": "形状：它一边证明「告警会响」，一边把告警关掉。\n\n2026-09-22 实测：prd_baseline.mjs --selftest 里两个用例走 checkNow({force:true, run:打桩})，而 runCheckNow 无条件 saveState(state)。后果两条都对外：lastRunAt 被顶到现在 → 30 分钟冷却被一次自证用掉，这半小时真出现漂移会被 skipped，群里什么都不会收到；lastState 被抹成 ok → 真恢复时那句「✅ 已恢复」也不会发。\n\n★ 为什么特别该记：AGENTS.md §2.1 那张表正把 --selftest 列为应该常跑的自证命令 —— 照着文档做，就会把告警静音半小时。\n\n修法两层：① runCheckNow 加 dryRun（不落状态）与可注入 stateFile；② 三条执行点，含「不带 dryRun 时必须落盘」的反向对照。\n\n★ 写这三条判据时连错三版，比这条规矩本身更值得记：第一版比「两个字面量出现次数」，删掉一处 dryRun 照样全绿；第二版要求每个调用点都带 dryRun，而反向对照本来就是故意不带的，于是真身直接变红；第三版被自己的解释注释绊倒。修法是给扫描器统一一条读法：注释不算代码。\n\n可操作结论：每一个写进自证表的命令，都要能回答「它跑完之后，盘上有什么变了？」答不出来，就不许写成「随时可跑」。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "自证有副作用", "note": "§2.4.4"}]
+    },
+    {
+      "id": "l3-06-seam-collision",
+      "title": "变体六 · 接缝撞车：两个各自都对的部件，合起来必然失败",
+      "labels": ["pitfall", "seam"],
+      "content": "形状：单个部件各自自证全绿，合起来 100% 失败。\n\n2026-09-22：兜底话术把工具名拼进正文，而 internalLeak 正好判这个形状 → 兜底话术 100% 被自己的检测器降级成拒答。\n\n判据：凡是「A 的产出进入 B 的判据」，就要有一条断言跑的是 A→B 这条完整路径，而不是各自单测。\n\n修法：内核的产出过信封那把尺（verify_cards.mjs L6 + 反向对照）；tool_exhausted 让兜底话术不算真回答。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "两个各自都对的部件", "note": "§2.4.5"}]
+    },
+    {
+      "id": "l3-07-skip-treated-as-reorder",
+      "title": "变体七 · 「跳过」被当成「重排」：冷却期过后没人补跑",
+      "labels": ["pitfall", "scheduling"],
+      "content": "形状：一次被冷却挡下的检查，没有任何东西在冷却过期后把它补回来。\n\n2026-09-22 实测：16:59:32 基线检查跑了 → 退 1，发现上游改版，群里已告警；17:17 和 17:22 两次重启都被冷却跳过；17:29:32 冷却到期 —— 而这一时刻没有任何一行代码在看它；次日 00:00 换日兜底才会跑。\n\n冷却只回答「现在能不能跑」，没有回答「不能跑的话什么时候跑」。\n\n★ 最容易做错的方向：把「冷却过期」本身当触发条件 —— 那会让三处触发悄悄变成每天 48 次，发现窗口的问题解决了，换来一个抓取风暴，而没人会看出来。所以「没有 staleSince 就永远不许补」是一条独立的反向断言，不是备注。\n\n判据与触发者两半缺一不可：recheckDue(state,t) 纯函数（判据）+ 心跳 setInterval 里叫一次 …Watch('deferred')（触发者）。纯函数断言只证明判据写对了，不证明跳过时真的落了盘 —— 所以另有四条行为级。",
+      "source_pointers": [{"file": "PMO/同一个量两个口径与跳过重排-实测史.md", "anchor": "跳过", "note": "§2.4.6 全文（已搬出 AGENTS.md）"}]
+    },
+    {
+      "id": "l3-08-alert-address-close-address",
+      "title": "变体八 · 通报带地址、收尾不带地址：同一件事在两个群各收到一半",
+      "labels": ["pitfall", "shouheng", "addressing"],
+      "content": "形状：一次告警「说给了谁」和它的收尾「说给了谁」是两个独立的判断。\n\n2026-09-22 生产运行里露出来的（不是构造的用例）：16:59:32 [link] 退 1 → 告警发到 oc_49a7…（链接所在的那个群）；17:55:32 [startup] 退 0 → 「✅ 上游基线检查恢复了」发到 oc_7775…（另一个群）。\n\n两个后果方向相反且同时发生：① 收到过告警的群永远收不到收尾 —— 那边至今挂着一条已解决的异常；② 从没收到告警的群却收到「恢复了」—— 同一句话在那边是凭空出现的噪音。\n\n根因一句话：状态机记住了说过什么（saidDriftFp），没记住对谁说的。触发源不同 → 目标群不同，而收尾与告警无关。\n\n规矺：凡是分支里产出了对外通报，就把通报去的那个群记进状态；凡是产出了收尾，就回到那个群。优先级只判一次：收尾地址 > 触发群 > 默认群。\n\n★ 方法上的教训比 bug 本身更值得记：这条优先级原先只活在 ws_daemon.mjs 的一行表达式里，所以状态机那侧的 75 条断言全绿，事故照样发生 —— 判据没盖住的那一跳，就是事故所在的那一跳。",
+      "source_pointers": [{"file": "PMO/同一个量两个口径与跳过重排-实测史.md", "anchor": "通报", "note": "§2.4.7 全文"}]
+    },
+    {
+      "id": "l3-09-one-quantity-two-readings",
+      "title": "变体九 · 同一个量有两个口径，而只有一个被看见",
+      "labels": ["pitfall", "measurement"],
+      "content": "2026-10-21 撞见四次，症状不同、根因相同：\n\n| 表面 | 两个口径 | 被看见的是 |\n| verify_kb 结论行写死「2 条」 | 字面量 vs 实际 12 条 | 字面量（一直 ✅）|\n| _MEDIA_HINTS 召回 100% | 整串子串 vs MIME 主类型 | 前者（audio/mp4 认成音视频双全）|\n| 预算余量 | getsize（逻辑视图）vs stat（+4096）| 前者（差 4096 = 一条教训）|\n| village-naming 的 require_context | 「正确名称在场」vs「这句是否违规」| 前者（真违规全挡掉）|\n\n规矺：同一个量能算出两个数时，结论行必须两个都报，并写明判定用哪个、为什么。\n\n执行点：verify_agents_budget.py 的 B1（max(real, stat)，stat 读不到退 2）。它第一次在真实编辑里就响了 —— 改完一节后 real 62235 / stat 66331，B1 当场红。",
+      "source_pointers": [{"file": "PMO/同一个量两个口径与跳过重排-实测史.md", "anchor": "同一个量有两个口径", "note": "§2.4.8 全文"}]
+    },
+    {
+      "id": "l3-10-padding-4096",
+      "title": "环境级 · +4096 填充：stat 与 getsize 差 4096，read 工具打不开文件",
+      "labels": ["pitfall", "environment", "write"],
+      "content": "本机环境的固定特性：某些写盘方式会让文件的 stat 比真实内容多 4096 字节。\n\n2026-10-22 定论 —— 触发者是 Write 工具，不是 Edit：\n\n| 写入方式 | .md | .ts | .txt | .json |\n| Write 工具 | +4096 ❌ | +4096 ❌ | +4096 ❌ | 0 ✅ |\n| Edit 工具（原本干净）| 0 ✅ | 0 ✅ | 0 ✅ | 0 ✅ |\n| shell printf / cp | 0 ✅ | 0 ✅ | 0 ✅ | 0 ✅ |\n| Python open().write | +4096 ❌ | 0 ✅ | 0 ✅ | 0 ✅ |\n\n与文件大小无关：20 字节就触发。\n\n后果：read 工具报 binary、tail 会 seek 到填充区打出乱码、外部工具（如 nmem 读 --body-file）会报 UTF-8 错误。而 sha256 一切正常 —— 因为比的是内容。\n\n★ 三种写法的代价必须分清：stat -f %z 报填充后大小；os.path.getsize 报真实内容；wc -c 走前者。\n\n落盘配方（三步都要）：\n① 落盘 → ② python3 tools/verify_depad.py --fix（cp 往返 + sha256 前后比对）→ ③ verify_depad.py 复验必须「被填充 0 个」。",
+      "source_pointers": [{"file": "PMO/填充态-环境特性-实测史.md", "anchor": "+4096", "note": "2026-10-22 定论与落盘配方"}]
+    },
+    {
+      "id": "l3-11-stale-pyc",
+      "title": "环境级 · 陈旧字节码：验收器会验一份已经不存在的代码",
+      "labels": ["pitfall", "environment", "python"],
+      "content": "本机 sys.pycache_prefix 指向 /Users/lute/Library/Caches/com.apple.python，不是仓库里的 __pycache__。所以「删掉 __pycache__」什么也没删，全仓 find . -name '*.pyc' 也一个都找不到。\n\n怎么出事的：改一个日期常量，跑一遍，再 cp 恢复。size 相同、mtime 落在同一秒 —— pyc 的失效判据就是 (mtime, size) 这一对，两个都撞上，于是 Python 认定缓存有效，继续执行旧字节码。源码里搜新值 0 次，运行时却算出旧值，而报出来的错指向一个无关的方向（实测报的是「登记表已过期」，读起来完全像「忘了重跑脚本」）。\n\n★ 为什么比 +4096 更阴：+4096 让 read 打不开文件，你看得见；这一条什么都不破坏，只是把旧代码的结果当成今天的。\n\n修法（首选，代价近乎零）：\nrm -rf ~/Library/Caches/com.apple.python/Users/lute/Project/audit_multi_content\n\n★ python3 -B 不解决：-B 只禁止写字节码，不禁止读。\n\n判据：挑一个本次改动独有的字面量当探针，查 pyc 里有没有它 —— 「源码有、pyc 没有」＝陈旧。不要用 (mtime,size) 当判据，那两个数正是骗过 Python 的东西。\n\n★ 这条判据自己也误报过一版：比 co_consts 逐项，把最新文件判成陈旧（py_compile 与 import 两条编译路径的常量表可以有合法差异）。最终落在「特征串在不在」这个最粗但最不会骗人的读法上。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "陈旧字节码", "note": "§2.1.1"}]
+    },
+    {
+      "id": "l3-12-bash32-chinese-var",
+      "title": "环境级 · macOS bash 3.2 会把紧跟变量的中文首字节吃进变量名",
+      "labels": ["pitfall", "environment", "shell"],
+      "content": "2026-09-21 实测，写 restart_shouheng.sh 时撞上。\n\n$ bash -c 'set -u; P=1; echo \"值 $P，后面有中文\"'\nbash: P?: unbound variable          # 变量名被当成 P\\xef\n\n$ bash -c 'set -u; P=1; echo \"值 ${P}，后面有中文\"'\n值 1，后面有中文                     # ✅ 加花括号就好\n\n★ 报错信息里那个变量名根本不存在于源码中，所以顺藤摸瓜会一直摸不到。凡变量后面直接跟中文，一律写 ${VAR}；$? 和 $1 也一样（${?}）。\n\n★ 同批记下的两个相邻陷阱：\n- macOS 没有 timeout 命令（GNU coreutils 的东西）。它不在时输出是空的、rc=127 —— 和「扫完了没命中」长得一模一样。\n- $? 在管道后面取的是最后一个命令的状态：false | head -1; echo $? 得 0。取真值别用管道，或 set -o pipefail。\n- ps 在受限环境里会被拒（pgrep 不拦），依赖它的读数会静默退化 —— 取不到时必须说「未测」。",
+      "source_pointers": [{"file": "AGENTS.md", "anchor": "bash 3.2", "note": "§2.2 第 4–7 条"}]
+    }
+  ]
+}
