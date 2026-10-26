@@ -133,9 +133,7 @@ export default function SubmitPage({
       <div className="cases-page__head">
         <div>
           <HeadingTag id="submit-page-title">提交内容审查</HeadingTag>
-          <p className="hint">
-            一次提交 = 一张提交单。「内容阶段 / 产品线 / 入口渠道」三项必填，机器只补证据、不强猜归属。
-          </p>
+          <p className="hint">内容阶段、产品线、入口渠道为必填。</p>
         </div>
         {embeddedInDrawer && onCloseDrawer && (
           <Button variant="secondary" onClick={onCloseDrawer}>
@@ -299,11 +297,7 @@ export default function SubmitPage({
           </h2>
           <p>{submitErr.message}</p>
           {submitErr.status === 501 && (
-            <p className="hint">
-              说明：本地只读联调入口（<code>review_api_dev.py</code>）默认未挂载持久写 authority，
-              因此返回 501 <code>capability_not_enabled</code>；生产装配（<code>production_app.py</code>）已完整接通{" "}
-              <code>SubmissionIngestor</code>。
-            </p>
+            <p className="hint">当前环境未开放提交写入。</p>
           )}
         </div>
       )}

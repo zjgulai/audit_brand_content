@@ -394,7 +394,9 @@ try {
   //   「全量可读案件视图」→「支持检索已归档与处理中的全部送审内容」。
   //   ★ 同时把下面按钮文案的 'REVIEW' 换成「待人工复核」：五标签已经
   //     显示成业务名，再按英文匹配会找不到按钮（实测 0 个匹配）。
-  await waitText("支持检索已归档与处理中的全部送审内容");
+  // ★ 2026-10-27 审计：解释句删除（50 字说明不回答审核员的问题），
+  //   等待信号改为页面 h1 —— 同一个「页面就绪」语义。
+  await waitText("全部送审内容");
   const filterClicked = await ev(`(() => {
     const btn = [...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes(${JSON.stringify("待人工复核")}));
     if (!btn) return false;

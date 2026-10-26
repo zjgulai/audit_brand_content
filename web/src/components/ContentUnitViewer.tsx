@@ -18,6 +18,16 @@ import Icon from "../ui/icon";
  *   3. 当右栏选中 activeFindingId 时，对应原文高亮块呈现 600ms 琥珀色闪底/聚焦边框。
  */
 
+/** 载体枚举 → 界面词。未知值原样显示（后端加了新载体不至于空白）。 */
+const KIND_LABELS: Record<string, string> = {
+  free_text: "自由文本",
+  product_listing: "商品页",
+  image: "图片",
+  video: "视频",
+};
+
+const kindLabel = (k: string) => KIND_LABELS[k] ?? k;
+
 interface Props {
   unit: ContentUnitData | null | undefined;
   unitRef?: {
@@ -135,7 +145,7 @@ export default function ContentUnitViewer({
           </strong>
           <div className="unit-pane__meta font-data">
             <span>{unitId}</span>
-            <span>形态 {kind}</span>
+            <span>载体 {kindLabel(kind)}</span>
             <span>解析 {parseStatus}</span>
             {failureKind && <span>失败原因 {failureKind}</span>}
           </div>

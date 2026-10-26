@@ -112,10 +112,7 @@ export default function CasesPage() {
     <section className="cases-page" aria-labelledby="cases-page-title">
       <div className="cases-page__head">
         <div>
-          <h1 id="cases-page-title">内容审核全景</h1>
-          <p className="hint">
-            支持检索已归档与处理中的全部送审内容（含违规拦截、审核通过与待检测等全部状态；如需处理待办，请前往「待人工复核」）。
-          </p>
+          <h1 id="cases-page-title">全部送审内容</h1>
         </div>
         <span className="font-data hint">
           共 {filtered.length} / {(rows ?? []).length} 条案件
@@ -134,6 +131,8 @@ export default function CasesPage() {
           </button>
           {FIVE_LABELS.map((lbl) => {
             const cnt = (rows ?? []).filter((r) => r.state === lbl).length;
+            // 空分组不渲染（同 /queue）：0 计数的 chip 只会让用户停下来想为什么
+            if (cnt === 0) return null;
             const friendlyName: Record<string, string> = {
               BLOCK: "违规拦截",
               REVIEW: "待人工复核",

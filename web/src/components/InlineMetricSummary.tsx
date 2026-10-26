@@ -159,21 +159,21 @@ export default function InlineMetricSummary({
 }: InlineMetricSummaryProps) {
   return (
     <div
-      className="sample-banner"
+      className="sample-banner metric-strip"
       data-inline-metrics={scope}
       role="region"
       aria-label={`${scope} 必要计数与未测摘要`}
     >
       <span data-metric-counts="">
-        <strong>必要计数：</strong>
+        <span className="metric-strip__label">必要计数</span>
         <span className="font-data">{countsLabel}</span>
       </span>
       <span data-metric-trend="">
-        <strong>趋势摘要：</strong>
+        <span className="metric-strip__label">趋势摘要</span>
         <span>{trendLabel && trendLabel.trim() ? trendLabel : "未测（待周期基线）"}</span>
       </span>
       <span data-metric-untested="">
-        <strong>未测 / 样本状态：</strong>
+        <span className="metric-strip__label">样本状态</span>
         <StatusBadge
           axis="coverage"
           value={untestedLabel && untestedLabel.trim() ? untestedLabel : "未测"}

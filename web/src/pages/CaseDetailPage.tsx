@@ -51,17 +51,8 @@ function SpecSeamNote({ disputeCount }: { disputeCount: number }) {
   if (disputeCount === 0) return null;
   return (
     <div className="state state--warn" role="note">
-      <strong>规范有 {disputeCount} 条已登记欠定边界，本页无法逐条关联</strong>
-      <p>
-        <code>Finding.control_code</code>（形如 H02）与{" "}
-        <code>欠定条目的 rule_id</code>（形如 r-724b26ec…）不是同一个键，
-        而欠定条目描述里的条款号（DSC12 / FCT5 / FCT2）同样对不上，
-        所以无法判断某条 finding 是否落在其中。
-      </p>
-      <p>
-        <b>这只说明关联做不到，不说明本案件不落在其中任何一条。</b>
-        欠定条目本身见「分类规范」页。
-      </p>
+      有 {disputeCount} 条规则条目尚在修订中，暂时无法与本案的发现逐条对应；
+      条目详情见「分类规范」。这不影响本页已给出的判定。
     </div>
   );
 }
@@ -524,15 +515,12 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
             <dt>放行状态</dt>
             <dd>
               {dec.release_status}
-              <span className="hint">
-                {" "}
-                —— 机器和前端都改不了，只有人在"合规签发"里正式确认才会变{" "}
-              </span>
+              <span className="hint">由人在合规签发里确认，机器不改</span>
               <Link
                 to={`/release/${encodeURIComponent(detail.case_id)}`}
                 className="btn"
               >
-                前往签发台 G-1 <Icon name="arrow-up-right" size={11} />
+                前往合规签发 <Icon name="arrow-up-right" size={11} />
               </Link>
             </dd>
             <dt>并行义务</dt>
@@ -553,7 +541,22 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
               {(cov.control_points_applied ?? []).join("、") || "无"}
             </dd>
             <dt>规则版本</dt>
-            <dd className="font-data">{cov.rules_version ?? "未测"}</dd>
+            <dd className="font-data">
+              {cov.rules_version ? (
+                cov.rules_version.length > 24 ? (
+                  // rules_version 可能是完整 JSON（指纹 + 版本）：界面只表态「已登记」，
+                  // 完整值收进展开区供对账 —— 一长串哈希不是审核员要读的信息。
+                  <details className="facts__detail">
+                    <summary>已登记</summary>
+                    <code>{cov.rules_version}</code>
+                  </details>
+                ) : (
+                  cov.rules_version
+                )
+              ) : (
+                "未测"
+              )}
+            </dd>
             <dt>分类规范</dt>
             <dd className="spec-version">
               {/* ★ 断言 A9：spec_version 与 spec_fingerprint 必须同时出现 */}
@@ -562,7 +565,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
             </dd>
           </dl>
 
-          <h2>未评估（不是 0，是没跑）</h2>
+          <h2>未评估的部分</h2>
           <NotEvaluatedList items={notEvaluated} />
 
           <h2>证据链</h2>

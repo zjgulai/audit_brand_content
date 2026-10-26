@@ -129,16 +129,11 @@
   --blue-11: #0d74ce;
   --blue-12: #113264;
 
-  /* purple：未测（独立状态，不与上面四个混用） */
-  --purple-3: #f4f2ff;
-  --purple-9: #8e4ec6;
-  --purple-11: #8145b5;
-
   /* ── 语义别名：业务 CSS 只许引用这些 ───────────────────────────────── */
 
   /* 背景（Radix 用途：1 应用底 / 2 次级面 / 3 组件底） */
   --bg: var(--sand-2);
-  --surface: var(--sand-1);
+  --surface: #ffffff;   /* 纯白卡面：sand-1 色相偏黄，被判奶油底（2026-10-27 审计） */
   --surface-muted: var(--sand-3);
   --surface-hover: var(--sand-4);
   --surface-active: var(--sand-5);
@@ -185,8 +180,8 @@
   --info-text: var(--blue-11);
   --info-surface: var(--blue-3);
 
-  --untested-text: var(--purple-11);
-  --untested-surface: var(--purple-3);
+  --untested-text: var(--sand-11);
+  --untested-surface: var(--sand-3);   /* 未测是中性状态：灰底深字 + 虚线边，见 .badge--untested */
 
   /* 焦点环 */
   --ring: var(--brandc-8);
@@ -200,16 +195,18 @@
 
   /* ── 圆角：只有两档，且嵌套同心 ───────────────────────────────────── */
   /* 面板 6px，面板内的控件 4px = 6 - 2（内边距 2px 时同心） */
-  --radius-panel: 6px;
-  --radius-control: 4px;
+  --radius-panel: 8px;
+  --radius-control: 6px;
+  --radius-chip: 4px;   /* 徽标专用 */
 
   /* ── 字号：只有三档（委托方要求 ≤4，最好三种；最小 12px）──────────── */
-  --text-sm: 12px;
-  --text-base: 14px;
-  --text-title: 18px;
+  --text-sm: 12px;   /* 仅徽标 / 表头 / 时间戳三处，正文禁用 */
+  --text-base: 14px; /* 一切正文 */
+  --text-section: 16px; /* 区块与卡片标题 */
+  --text-title: 20px;   /* 每页唯一 h1 */
 
   /* 行高：正文 1.6，标题 1.3 */
-  --leading-base: 1.6;
+  --leading-base: 1.43; /* 14px → 20px */
   --leading-title: 1.3;
 
   /* ── 间距阶梯（4 的倍数，光学对齐的基础）──────────────────────────── */
@@ -219,7 +216,6 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
-  --space-7: 48px;
 
   /* ── 动效：只有一个时长、一条缓动（委托方要求减少动画）────────────── */
   --motion: 250ms;
@@ -237,7 +233,7 @@
   --sidebar-w: 15rem;
   --sidebar-w-collapsed: 4rem;
   --sidebar-w-narrow: 2.75rem;
-  --topbar-h: 4rem;
+  --topbar-h: 3rem;
 
   /* ── 字体族 ───────────────────────────────────────────────────────── */
   --ui-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",

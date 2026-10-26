@@ -225,6 +225,8 @@ export default function QueuePage() {
           {FILTERS.map((f) => {
             const n =
               f.key === "all" ? queued.length : counts.get(f.key) ?? 0;
+            // 空分组不渲染：一枚「待人工复核（0）」只会让用户停下来想为什么是 0
+            if (n === 0 && f.key !== "all") return null;
             return (
               <button
                 key={f.key}
@@ -238,23 +240,31 @@ export default function QueuePage() {
               </button>
             );
           })}
-          {SORTS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className="queue__filter"
-              aria-pressed={sortBy === s.key}
-              onClick={() => setSortBy(s.key)}
-            >
-              {s.label}
-            </button>
-          ))}
+          <span className="queue__sorts">
+            {SORTS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className="queue__filter queue__filter--sort"
+                aria-pressed={sortBy === s.key}
+                onClick={() => setSortBy(s.key)}
+              >
+                {s.label}
+              </button>
+            ))}
+          </span>
         </div>
 
         {/* ★ 本页只有一个 h1，在右侧主栏。左栏列表不再放 h1 ——
             两个 h1 会触发 a11y 的 h1-unique 断言（计数 2）。 */}
 
-        {rows === null && <p className="hint">加载中…</p>}
+        {rows === null && (
+          <div className="queue__skeleton" aria-busy="true">
+            <span className="queue__skeleton-row" />
+            <span className="queue__skeleton-row" />
+            <span className="queue__skeleton-row" />
+          </div>
+        )}
 
         {rows !== null && queued.length === 0 && (
           <p className="hint">
@@ -278,20 +288,12 @@ export default function QueuePage() {
                 data-sample={c.sample === true ? "true" : undefined}
                 aria-current={isSelected ? "true" : undefined}
               >
+                {/* 双行制：主行 = 标题 + 严重度（至多一枚）；
+                    副行 = 案件号与元信息。layer / assignee 是研发概念，不出列表。 */}
                 <span className="queue__row-top">
-                  <span className="queue__row-id font-data">{c.case_id}</span>
-                  <StatusBadge axis="decision" value={c.state} />
-                </span>
-                {c.title_or_excerpt && (
                   <span className="queue__row-excerpt">
-                    {c.title_or_excerpt}
+                    {c.title_or_excerpt || c.case_id}
                   </span>
-                )}
-                <span className="queue__row-meta">
-                  <span className="font-data">{c.layer ?? "未测"}</span>
-                  <span>{c.product_line ?? "未测"}</span>
-                  {c.entry_channel && <span>{c.entry_channel}</span>}
-                  <span className="font-data">{c.assignee_id ?? "未指派"}</span>
                   {(c.high_severity_count ?? 0) > 0 && (
                     <span
                       className="badge badge--severity-high"
@@ -300,6 +302,12 @@ export default function QueuePage() {
                       高危×{c.high_severity_count}
                     </span>
                   )}
+                </span>
+                <span className="queue__row-meta">
+                  <span className="queue__row-id font-data">{c.case_id}</span>
+                  {c.product_line && <span>{c.product_line}</span>}
+                  {c.entry_channel && <span>{c.entry_channel}</span>}
+                  <StatusBadge axis="decision" value={c.state} />
                   {c.sample === true && (
                     <span className="badge badge--sample" data-status-badge="">
                       样例
@@ -353,9 +361,10 @@ export default function QueuePage() {
         {activeCaseId ? (
           <CaseDetailPage embeddedCaseId={activeCaseId} />
         ) : (
-          <div className="case">
+          <div className="case queue__detail-empty">
+            <p className="queue__detail-empty-title">从左侧选择一条案件</p>
             <p className="hint">
-              从左侧选择一条案件开始复核。
+              选中后这里会展开原文、查出的问题和可做的处置。
             </p>
           </div>
         )}

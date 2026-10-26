@@ -33,6 +33,28 @@ const outFile = arg("out", "");
 const debugPort = Number(arg("debug-port", "9337"));
 const enableDevIdentity = arg("enable-dev-identity", "0") === "1";
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+
+// ★ 品牌色权威值：从 tokens.css 提取 --brandc-11（--brand 链的最终解析）。
+//   不能用 getComputedStyle(--brand)：链式 var() 返回未解析的 "var(--brandc-11)"，
+//   probe 拼色失败会回退到继承的文字色（sand-12, hue 48°），于是 hue 比对
+//   拿着假品牌色工作 —— 旧版徽标无背景时侥幸全绿，淡底一上就误报 37 处。
+function brandHexFromTokens() {
+  const css = fs.readFileSync(path.join(repoRoot, "web/src/styles/tokens.css"), "utf8");
+  const m = css.match(/--brandc-11:\s*(#[0-9a-fA-F]{6})/);
+  if (!m) throw new Error("tokens.css 里找不到 --brandc-11（品牌色权威源）");
+  return m[1];
+}
+const BRAND_HEX = brandHexFromTokens();
+const BRAND_HUE = (() => {
+  const h = BRAND_HEX.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return null;
+  let hue = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  hue *= 60;
+  return hue < 0 ? hue + 360 : hue;
+})();
 const chrome =
   process.env.CHROME_BIN ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -492,14 +514,11 @@ async function main() {
         h *= 60;
         return h < 0 ? h + 360 : h;
       };
-      const probe = document.createElement("span");
-      probe.style.color = "hsl(" +
-        getComputedStyle(document.documentElement).getPropertyValue("--brand").trim() + ")";
-      document.body.appendChild(probe);
-      const brandRaw = getComputedStyle(document.documentElement).getPropertyValue("--brand").trim();
-      const probeColor = getComputedStyle(probe).color;
-      const brandHue = hueOf(probeColor);
-      probe.remove();
+      // 品牌色与 hue 从 tokens.css 权威提取（BRAND_HEX/BRAND_HUE，见文件头），
+      // 不再用 CSS 变量链 —— 链式 var() 不解析，旧探针回退到文字色（hue 48°）。
+      const brandRaw = ${JSON.stringify(BRAND_HEX)};
+      const probeColor = ${JSON.stringify(BRAND_HEX)};
+      const brandHue = ${JSON.stringify(BRAND_HUE)};
       const scan = () => {
         const nodes = [...document.querySelectorAll("[data-status-badge], .badge")];
         const bad = [];
@@ -525,7 +544,7 @@ async function main() {
       //   于是 A6b 变红。但它红的原因不是「检测坏了」，而是「对照样本过期了」。
       //   判据应当注入**当前**的品牌色：读到什么就注入什么，
       //   这样无论色板怎么换，它测的都是「检测器能不能认出品牌色」这件事本身。
-      injected.style.color = probeColor;
+      injected.style.color = ${JSON.stringify(BRAND_HEX)};
       injected.textContent = "反向对照";
       document.body.appendChild(injected);
       const after = scan();

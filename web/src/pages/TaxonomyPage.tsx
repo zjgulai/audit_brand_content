@@ -78,7 +78,7 @@ function ListOrPending({ items, empty = PENDING }: { items: string[]; empty?: st
   return (
     <ul className="taxonomy-list">
       {items.map((item) => (
-        <li key={item}>{item}</li>
+        <li key={item}>{item.replace(/^[#*\s]+/, "")}</li>
       ))}
     </ul>
   );
@@ -234,12 +234,9 @@ export default function TaxonomyPage() {
       </div>
 
       <p className="hint">
-        只读浏览页（RL-15 / C-103：Web 端严禁直接修改规则、控制点或路由，任何写请求将被服务端 403 拦截并写入 <code>access-log</code>）。
-        数据源：<code>web/src/data/taxonomy.json</code>（
-        {taxonomy.meta.spec_version ?? taxonomy.meta.version}，{taxonomy.meta.status}），
-        由 <code>tools/gen_taxonomy_json.py</code> 从规范正文生成，<strong>不得手改</strong>。
+        本页只读。规则修订在规范正文进行，生成发布后这里同步更新
+        （版本 {taxonomy.meta.spec_version ?? taxonomy.meta.version}，{taxonomy.meta.status}）。
       </p>
-      <p className="hint">{taxonomy.meta.note}</p>
 
       {activeTab === "taxonomy" && (
         <>
@@ -286,38 +283,42 @@ export default function TaxonomyPage() {
                 <h3 id={`axis-${axis.code}`}>
                   <code>{axis.code}</code> {axis.name}
                 </h3>
-                <dl className="taxonomy-fields">
-                  <dt>一句话定义</dt>
-                  <dd>{textOrPending(axis.one_line)}</dd>
-                  <dt>判定条件</dt>
-                  <dd>
-                    <ListOrPending items={axis.criteria} />
-                  </dd>
-                  <dt>复核人</dt>
-                  <dd>{textOrPending(axis.reviewer)}</dd>
-                  <dt>证据要求</dt>
-                  <dd>
-                    <ListOrPending items={axis.evidence_required} />
-                  </dd>
-                  <dt>边界反例</dt>
-                  <dd>
-                    {axis.boundary_counterexample === null ? (
-                      <span className="taxonomy-placeholder">
-                        该轴暂无边界反例（规范未给出）
-                      </span>
-                    ) : axis.boundary_counterexample.rule_id ? (
-                      <>
-                        <code>{axis.boundary_counterexample.rule_id}</code>
-                        {" — "}
-                        {textOrPending(axis.boundary_counterexample.why)}
-                      </>
-                    ) : (
-                      <span className="taxonomy-placeholder">
-                        {PENDING}（需给真实 rule_id）
-                      </span>
-                    )}
-                  </dd>
-                </dl>
+                <p className="taxonomy-card__one-line">
+                  {textOrPending(axis.one_line)}
+                </p>
+                {/* 主从结构：卡面只留「是什么」，判定条件与证据按需展开 ——
+                    七卡全展开是一屏放不下的文字海（审计 hero-void/below-fold 主因）。 */}
+                <details className="taxonomy-card__more">
+                  <summary>判定条件与证据</summary>
+                  <dl className="taxonomy-fields">
+                    <dt>判定条件</dt>
+                    <dd>
+                      <ListOrPending items={axis.criteria} />
+                    </dd>
+                    <dt>复核人</dt>
+                    <dd>{textOrPending(axis.reviewer)}</dd>
+                    <dt>证据要求</dt>
+                    <dd>
+                      <ListOrPending items={axis.evidence_required} />
+                    </dd>
+                    <dt>边界反例</dt>
+                    <dd>
+                      {axis.boundary_counterexample === null ? (
+                        <span className="taxonomy-placeholder">
+                          规范暂未给出
+                        </span>
+                      ) : axis.boundary_counterexample.rule_id ? (
+                        <>
+                          <code>{axis.boundary_counterexample.rule_id}</code>
+                          {" — "}
+                          {textOrPending(axis.boundary_counterexample.why)}
+                        </>
+                      ) : (
+                        <span className="taxonomy-placeholder">{PENDING}</span>
+                      )}
+                    </dd>
+                  </dl>
+                </details>
               </article>
             ))}
           </div>
