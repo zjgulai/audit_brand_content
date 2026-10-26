@@ -59,9 +59,13 @@ export default function LoginPage() {
       <div className="login__panel">
         <div className="login__head">
           <div className="login__brand">
-            <span className="login__mark" aria-hidden="true">
-              M
-            </span>
+            {/* ★ 真实 Momcozy logo（momcozy.com 实测抓取）。不做 CSS 变形。 */}
+            <img
+              className="login__logo"
+              src="/brand/logo.svg"
+              alt="Momcozy"
+              width="120"
+            />
             <h1 className="login__name">内容审核工作台</h1>
           </div>
           <p className="login__lede">登录后处理待复核内容并提交结论。</p>

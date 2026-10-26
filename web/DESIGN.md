@@ -119,6 +119,15 @@
 | `--sand-10` | #82827c |  |
 | `--sand-11` | #63635e |  |
 | `--sand-12` | #21201c |  |
+| `--brandc-1` | #fdfafa | Momcozy 酒红 step 1（logo 实测 #6A2B3A 同源色板） |
+| `--brandc-2` | #faf3f4 | Momcozy 酒红 step 2 |
+| `--brandc-3` | #f5e6e9 | Momcozy 酒红 step 3（淡底） |
+| `--brandc-4` | #eed9dd | Momcozy 酒红 step 4 |
+| `--brandc-6` | #dfb9c0 | Momcozy 酒红 step 6（细边框） |
+| `--brandc-8` | #c98492 | Momcozy 酒红 step 8（focus 环） |
+| `--brandc-9` | #a94159 | Momcozy 酒红 step 9（纯图形） |
+| `--brandc-11` | #6a2b3a | Momcozy 酒红 #6A2B3A（logo 主色） |
+| `--brandc-12` | #38121c | Momcozy 酒红 step 12（高对比） |
 | `--tomato-1` | #fffcfc |  |
 | `--tomato-2` | #fff8f7 |  |
 | `--tomato-3` | #feebe7 |  |
@@ -191,13 +200,13 @@
 | `--text-muted` | var(--sand-11) | 次要文字（sand-11） |
 | `--border` | var(--sand-6) | 非交互细线（sand-6，仅装饰） |
 | `--border-strong` | var(--sand-9) | 控件边框（sand-9，3.28:1） |
-| `--brand` | var(--tomato-11) | 带文字的实心底（tomato-11，白字 4.98:1） |
-| `--brand-hover` | var(--tomato-12) | 品牌 hover（tomato-12） |
-| `--brand-graphic` | var(--tomato-9) | 纯图形品牌色（tomato-9，不承载文字） |
-| `--brand-text` | var(--tomato-11) | 品牌文字（tomato-11） |
-| `--brand-text-on-surface` | var(--tomato-12) | 品牌淡底上的文字（tomato-12，10.34:1） |
-| `--brand-surface` | var(--tomato-3) | 品牌淡底（tomato-3） |
-| `--brand-ring` | var(--tomato-8) | 焦点环（tomato-8） |
+| `--brand` | var(--brandc-11) | 品牌实心底（brandc-11 #6A2B3A，白字 10.4:1） |
+| `--brand-hover` | var(--brandc-12) | 品牌 hover（brandc-12） |
+| `--brand-graphic` | var(--brandc-9) | 纯图形品牌色（brandc-9，不承载文字） |
+| `--brand-text` | var(--brandc-11) | 品牌文字（brandc-11） |
+| `--brand-text-on-surface` | var(--brandc-12) | 品牌淡底上的文字（brandc-12） |
+| `--brand-surface` | var(--brandc-3) | 品牌淡底（brandc-3） |
+| `--brand-ring` | var(--brandc-8) | 焦点环（brandc-8） |
 | `--ok` | var(--green-11) | 通过实心底（green-11） |
 | `--ok-graphic` | var(--green-9) | 通过图形色（green-9） |
 | `--ok-text` | var(--green-11) | 通过文字（green-11） |
@@ -216,7 +225,7 @@
 | `--info-surface` | var(--blue-3) | 待检测淡底（blue-3） |
 | `--untested-text` | var(--purple-11) | 未测文字（purple-11） |
 | `--untested-surface` | var(--purple-3) | 未测淡底（purple-3） |
-| `--ring` | var(--brand-ring) | 焦点环 |
+| `--ring` | var(--brandc-8) | 焦点环（brandc-8） |
 | `--hairline` | 0.5px | 边框宽度 0.5px |
 | `--radius-panel` | 6px | 面板圆角 6px |
 | `--radius-control` | 4px | 控件圆角 4px |
@@ -245,9 +254,9 @@
 | `--sidebar-w-narrow` | 2.75rem | 侧边栏极窄档 |
 | `--topbar-h` | 4rem | 顶栏高度 |
 | `--ui-font-sans` | -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif |  |
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif | 界面无衬线字体族 |
 | `--ui-font-mono` | ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace |  |
+    "Liberation Mono", "Courier New", monospace | 等宽字体族 |
 <!-- TOKENS:END -->
 
 ---

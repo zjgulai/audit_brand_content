@@ -92,10 +92,19 @@ class TableError(RuntimeError):
 # ──────────────────────────────────────────────────────────────────────
 
 def _req(url: str, token: Optional[str] = None,
-         payload: Any = None) -> Dict[str, Any]:
+         payload: Any = None, *, method: Optional[str] = None) -> Dict[str, Any]:
+    """发一个请求。`method` 不给时：有 payload 就 POST，没有就 GET。
+
+    ★ 2026-10-27 修：原先**只**按「有没有 payload」决定方法，于是「更新一条记录」
+      永远发成 POST —— 而飞书那条路要 PUT。后果是一次 404 `page not found`，
+      而 CLI 外层只打 dry-run 的预览，读起来像写成功了。
+      这个缺陷从工具诞生起就在（新增走 POST 是对的，所以一直没暴露）。
+      调用方必须显式说清更新用 PUT —— 不给就仍是 POST，行为不变。
+    """
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(
-        url, data=data, method="POST" if data else "GET")
+    if method is None:
+        method = "POST" if data else "GET"
+    req = urllib.request.Request(url, data=data, method=method)
     if token:
         req.add_header("Authorization", "Bearer " + token)
     if data:
@@ -277,7 +286,7 @@ def upsert(tok: str, item: Dict[str, Any], *,
                     "record_id": existing.get("record_id")}
         got = _req("%s/bitable/v1/apps/%s/tables/%s/records/%s"
                    % (BASE_URL, APP_TOKEN, TABLE_ID, existing["record_id"]),
-                   tok, {"fields": item})
+                   tok, {"fields": item}, method="PUT")
         if got.get("code") != 0:
             raise TableError("更新失败：%r" % (got,))
         return {"action": "updated", "number": number,
@@ -440,6 +449,38 @@ def _selftest() -> int:
     # ★ 反向对照：这条判据真的会红 —— 去掉名称就不能作为幂等键
     C("S22 ★★ 反证：名称是空串时不匹配任何记录（空名不能当键）",
       find_by_name(dup, "") is None)
+
+    # ── HTTP 方法：更新必须 PUT、新增必须 POST（2026-10-27 实测事故）──────
+    # ★ 事故：`_req` 只按「有没有 payload」定方法，于是**更新也发成 POST**，
+    #   飞书回 404 page not found；而 CLI 外层只打 dry-run 的预览，
+    #   读起来像写成功了。工具从诞生起就带着这个缺陷 —— 新增走 POST 是对的，
+    #   所以它一直没暴露。
+    # ★ 这两条必须**行为级**：真跑 upsert（token 给一个假串，_req 被替换成
+    #   记录调用），检查它发出去的方法。只查源码里有没有 "PUT" 是恒真的。
+    sent = []
+
+    def fake_req(url, token=None, payload=None, *, method=None):
+        resolved = method if method is not None else ("POST" if payload is not None else "GET")
+        sent.append({"url": url, "method": resolved})
+        return {"code": 0, "data": {"record": {"record_id": "rec-new"}}}
+
+    real_req = globals()["_req"]
+    globals()["_req"] = fake_req
+    try:
+        sent.clear()
+        upsert("tok", dict(base), records=existing, dry_run=False)
+        upd_method = sent[-1]["method"] if sent else None
+        sent.clear()
+        upsert("tok", dict(base, 事项编号="WBPM-9999"),
+               records=existing, dry_run=False)
+        new_method = sent[-1]["method"] if sent else None
+    finally:
+        globals()["_req"] = real_req
+
+    C("S23 ★★★ 更新已有记录必须发 PUT（不是 POST —— 发 POST 会 404）",
+      upd_method == "PUT", "实际发出 %r" % (upd_method,))
+    C("S24 ★★ 新增记录仍是 POST（反向对照：别把这条一起改成 PUT）",
+      new_method == "POST", "实际发出 %r" % (new_method,))
 
     print("-" * 74)
     if bad:

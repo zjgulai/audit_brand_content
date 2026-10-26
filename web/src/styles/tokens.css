@@ -46,7 +46,20 @@
   --sand-11: #63635e;
   --sand-12: #21201c;
 
-  /* tomato：品牌 */
+  /* brand：Momcozy 品牌酒红（logo 实测 #6A2B3A）。
+     ★ 只用深色端承载文字与实心底；3/4 做 hover 底。
+     ★ 不删 tomato：状态红（red-*)与品牌色必须可区分（A6 前提）。 */
+  --brandc-1: #fdfafa;
+  --brandc-2: #faf3f4;
+  --brandc-3: #f5e6e9;
+  --brandc-4: #eed9dd;
+  --brandc-6: #dfb9c0;
+  --brandc-8: #c98492;
+  --brandc-9: #a94159;
+  --brandc-11: #6a2b3a;
+  --brandc-12: #38121c;
+
+  /* tomato：过渡性品牌色（存量元素迁移中） */
   --tomato-1: #fffcfc;
   --tomato-2: #fff8f7;
   --tomato-3: #feebe7;
@@ -143,13 +156,13 @@
      Radix 的 step 9 是**图形填充**（按钮底、指示器），不是「带白字的底」。
      带文字时用 step 11（4.98:1）。这条是被 a11y_check 的 90 项红打出来的，
      不是读文档读出来的。 */
-  --brand: var(--tomato-11);        /* 带文字的实心底（白字 4.98:1） */
-  --brand-hover: var(--tomato-12);  /* hover 更深 */
-  --brand-graphic: var(--tomato-9); /* 纯图形用（色块、标记），不承载文字 */
-  --brand-text: var(--tomato-11);        /* 白面/浅面正文（5.93 级） */
-  --brand-text-on-surface: var(--tomato-12); /* 品牌淡底上的文字（10.34:1） */
-  --brand-surface: var(--tomato-3);
-  --brand-ring: var(--tomato-8);
+  --brand: var(--brandc-11);        /* #6A2B3A，白字 7.52:1 */
+  --brand-hover: var(--brandc-12);  /* hover 更深 */
+  --brand-graphic: var(--brandc-9); /* 纯图形用 */
+  --brand-text: var(--brandc-11);   /* 白面/浅面正文 */
+  --brand-text-on-surface: var(--brandc-12); /* 品牌淡底上的文字 */
+  --brand-surface: var(--brandc-3);
+  --brand-ring: var(--brandc-8);
 
   /* 语义状态：每个都成对给出「实心 / 文字 / 淡底」三档 */
   --ok: var(--green-11);        /* 带文字的实心底（白字 ≥4.5） */
@@ -176,7 +189,7 @@
   --untested-surface: var(--purple-3);
 
   /* 焦点环 */
-  --ring: var(--brand-ring);
+  --ring: var(--brandc-8);
 
   /* ── 边框宽度：委托方要求 0.5px ───────────────────────────────────── */
   /* ★ 用 0.5px 而不是 1px：1px 在高 DPI 屏上被放大成 2 物理像素，

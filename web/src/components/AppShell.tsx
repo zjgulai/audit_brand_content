@@ -230,14 +230,18 @@ export default function AppShell() {
 
       {/* ── 侧边栏 ─────────────────────────────────────────────────── */}
       <aside className="shell__sidebar" aria-label="工作台导航">
+        {/* ★ 2026-10-26：真实 Momcozy logo（momcozy.com 实测抓取，344×36，
+           心形 + 文字标，主色 #6A2B3A）。
+           ★ logo 不做任何 CSS 变形（不加阴影、不改长宽比、不缩放不可读）；
+             只放原生尺寸，与「内容审核工作台」几个字同行。 */}
         <div className="shell__brand-wrap">
-          <span className="shell__brand-badge" aria-hidden="true">
-            M
-          </span>
-          <div className="shell__brand-text">
-            <span className="shell__brand">Momcozy</span>
-            <span className="shell__brand-sub">内容审核工作台</span>
-          </div>
+          <img
+            className="shell__brand-logo"
+            src="/brand/logo.svg"
+            alt="Momcozy"
+            width="120"
+          />
+          <span className="shell__brand-sub">内容审核工作台</span>
           <button
             type="button"
             className="shell__collapse"
