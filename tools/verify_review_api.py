@@ -122,6 +122,41 @@ def _summary_keys_from_src(src=None):
     return None
 
 
+def _case_detail_keys_from_src(src=None):
+    """AST 解析 `get_case()` 里 return 的 dict 键集合。
+
+    ★ 为什么需要它：`CaseDetail` 此前**没有任何双向对拍** —— C5e 只守
+      `_summary ↔ CaseSummary`。于是「给 CaseDetail 加了一个字段但实现没填」
+      与「实现填了但模型没声明」两种漂移都不会红，而它们的效果一样：
+      工作台拿不到那个字段，且没人知道。
+      T-439 往 CaseDetail 加了 L1 观察，顺手把这条口子堵上。
+    """
+    import ast as _ast
+    if src is None:
+        try:
+            src = open(os.path.join(REPO_ROOT, "api", "review_api.py"),
+                       encoding="utf-8").read()
+        except OSError:
+            return None
+    try:
+        tree = _ast.parse(src)
+    except SyntaxError:
+        return None
+    for node in _ast.walk(tree):
+        if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)) \
+                and node.name == "get_case":
+            for sub in _ast.walk(node):
+                if isinstance(sub, _ast.Return) and isinstance(sub.value, _ast.Dict):
+                    keys = set()
+                    for k in sub.value.keys:
+                        if isinstance(k, _ast.Constant) and isinstance(k.value, str):
+                            keys.add(k.value)
+                        elif isinstance(k, _ast.Starred):
+                            return None
+                    return keys
+    return None
+
+
 def probe_cases():
     """TS-10 三档探针案件：decision.state/layer 离线对齐 decision_table 期望
     （落盘 IR 本来就是判定表的输出，夹具照抄它的 state/layer）。"""
@@ -492,6 +527,24 @@ def _run_main():
            "extra=%r missing=%r" % (
                sorted((summary_keys or set()) - declared_summary),
                sorted(declared_summary - (summary_keys or set()))))
+    # ── C5f T-439：CaseDetail 也要双向对拍 ────────────────────────────
+    # 与 C5e 同一个理由，只是对象换成案件详情：那边此前只有 `_summary` 有尺，
+    # CaseDetail 加字段/漏字段都无人管。
+    detail_keys = _case_detail_keys_from_src()
+    declared_detail = set(CaseDetail.model_fields)
+    report(detail_keys is not None and detail_keys == declared_detail,
+           "C5f ★ CaseDetail.get_case 键集合 == CaseDetail 声明字段（双向恒等）",
+           "extra=%r missing=%r" % (
+               sorted((detail_keys or set()) - declared_detail),
+               sorted(declared_detail - (detail_keys or set()))))
+    # ★ L1 观察必须真的出现在案件详情里（不是「模型声明了但没人填」）
+    st, body = call(app, "GET", "/api/v1/cases/case-own", cookie=coord)
+    report(st == 200 and "multimodal_observations" in body
+           and isinstance(body.get("multimodal_observations"), list),
+           "C5f ★★ 案件详情真的带上 multimodal_observations（列表，不是缺字段）",
+           "%s %r" % (st, sorted(body) if isinstance(body, dict) else body))
+    report(st == 200 and "multimodal_note" in body,
+           "C5f ★ 案件详情带 multimodal_note（三态里的「没看，原因是 X」）")
     # 反向半边的独立断言：实现键必须落进声明模型 ——
     # 只比「实现 ⊆ 声明」会和上一条（恒等）重叠，但多出的这一条让
     # 「声明缺字段」在两把尺下都红（上一条看键集合，这一条看模型本身）。

@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
-import type { ContentUnitData, Finding } from "../api/client";
+import type {
+  ContentUnitData,
+  Finding,
+  MultimodalObservation,
+} from "../api/client";
 import StatusBadge from "./StatusBadge";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
@@ -25,6 +29,10 @@ interface Props {
   findings: Finding[];
   activeFindingId: string | null;
   onSelectFinding: (findingId: string) => void;
+  /** T-439：L1 多模态观察。★ 与报告「画面语义（候选 · 待人工确认）」同源。 */
+  observations?: MultimodalObservation[];
+  /** 没有任何观察时「为什么没看」。有三态才说得清，见组件内注释。 */
+  observationNote?: string | null;
 }
 
 interface TextSegment {
@@ -87,8 +95,12 @@ export default function ContentUnitViewer({
   findings,
   activeFindingId,
   onSelectFinding,
+  observations,
+  observationNote,
 }: Props) {
-  const [tab, setTab] = useState<"text" | "fields" | "boundary">("text");
+  const [tab, setTab] = useState<"text" | "fields" | "boundary" | "semantics">(
+    "text",
+  );
 
   const unitId = unit?.unit_id ?? unitRef?.unit_id ?? "未登记";
   const kind = unit?.kind ?? unitRef?.kind ?? "未测";
@@ -100,6 +112,14 @@ export default function ContentUnitViewer({
   const fields = unit?.fields ?? null;
   const rawSha = unit?.fingerprint?.raw_sha256 ?? null;
   const textSha = unit?.fingerprint?.text_sha256 ?? null;
+
+  // ★ T-439：三态必须分开。空数组 + note 才是「没看，原因是 note」；
+  //   空数组 + 空 note 是「这条数据源没有观察」（旧案件）。
+  //   两种都不许渲染成「画面没问题」—— 与报告那一节同一口径。
+  const obs = observations ?? [];
+  const okObs = obs.filter((o) => o.status === "ok");
+  const badObs = obs.filter((o) => o.status !== "ok");
+  const noteText = (observationNote ?? "").trim();
 
   const segments = useMemo(() => {
     if (typeof fullText !== "string" || !fullText) return [];
@@ -147,6 +167,15 @@ export default function ContentUnitViewer({
             onClick={() => setTab("boundary")}
           >
             覆盖与双指纹
+          </Button>
+          <Button
+            variant="secondary"
+            role="tab"
+            aria-selected={tab === "semantics"}
+            className={tab === "semantics" ? "unit-tab--active" : ""}
+            onClick={() => setTab("semantics")}
+          >
+            画面语义
           </Button>
         </div>
       </div>
@@ -238,6 +267,73 @@ export default function ContentUnitViewer({
             <dt>正文指纹 text_sha256</dt>
             <dd className="font-data">{textSha ?? "未测"}</dd>
           </dl>
+        </div>
+      )}
+
+      {tab === "semantics" && (
+        <div className="unit-pane__body" data-multimodal-observations="">
+          {/* ★ 措辞与报告那一节逐字一致：「候选 · 待人工确认」。
+              观察不是 finding —— 它没有 control_code 与 authority_ref，
+              所以界面上不许渲染成已确认的违规，否则复核时无法对照规则。 */}
+          <p className="hint">
+            <strong>候选 · 待人工确认</strong>
+            ：以下为机器对画面的观察，不是规则命中，须人工判断。
+          </p>
+          {okObs.length === 0 && badObs.length === 0 ? (
+            <div className="state state--warn">
+              <strong>本项未评</strong>
+              <p className="hint">
+                {noteText || "未提供原因（按未评处理）"}
+              </p>
+              <p className="hint">不得据此放行，须人工复核画面。</p>
+            </div>
+          ) : (
+            <>
+              {okObs.length > 0 ? (
+                <ul className="facts">
+                  {okObs.map((o, i) => (
+                    <li key={`ok-${i}`}>
+                      <span className="font-data">[{o.task}]</span>{" "}
+                      {o.statement}
+                      {typeof o.confidence === "number" ? (
+                        <span className="hint font-data">
+                          {" "}
+                          置信 {o.confidence.toFixed(2)}
+                        </span>
+                      ) : null}
+                      {o.bbox ? (
+                        <span className="hint"> 位置：{o.bbox}</span>
+                      ) : null}
+                      {o.ts ? <span className="hint"> 时间：{o.ts}</span> : null}
+                      {o.model ? (
+                        <span className="hint font-data"> 模型：{o.model}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="hint">无有效观察（下面逐条说明为什么）。</p>
+              )}
+              {badObs.length > 0 ? (
+                <>
+                  <p className="hint">
+                    未评部分（{badObs.length} 条，原因如下）—— 未评不是没问题：
+                  </p>
+                  <ul className="facts">
+                    {badObs.map((o, i) => (
+                      <li key={`bad-${i}`}>
+                        <span className="font-data">[{o.task}]</span> {o.status}：
+                        {o.reason ?? "未说明"}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              <p className="hint">
+                覆盖状态：部分覆盖 —— 画面语义为候选观察，须人工确认。
+              </p>
+            </>
+          )}
         </div>
       )}
     </aside>

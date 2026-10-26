@@ -228,6 +228,18 @@ class ProductionSettings:
     #: 代价远大于「重签不可用」。
     report_link_secrets: tuple[str, ...] = ()
     report_link_ttl: int = 3600
+    #: T-431/T-437：图片进件允许的位图根目录（`REVIEW_MEDIA_ROOTS`，逗号分隔）。
+    #:
+    #: ★ 默认**空**，且空 = 不收图（`SubmissionIngestor` 会在 `_build_image_unit`
+    #:   里返 503 `media_root_not_configured`）。这不是保守，是安全边界：
+    #:   没有根约束时那个端点会变成「对机器上任意文件做 OCR 并回显正文」的读取器。
+    #:
+    #: ★ 与 `report_root` 那批路径**不同**：它们是「写出去的」数据根，
+    #:   必须彼此不重叠；这里是「读进来的」素材根，只要求存在且是目录，
+    #:   **允许**放在仓外任意可读位置，也**允许**与写路径重叠（比如素材就放在
+    #:   authority_root 旁边）。把它塞进 `path_names` 会让「素材目录与数据目录
+    #:   同处一个父目录」变成构造期失败，而那是一个完全正常的部署。
+    media_roots: tuple[str, ...] = ()
 
     def __post_init__(self):
         # ★ `report_root` 必须在这里，不能只加一个字段。
@@ -276,6 +288,28 @@ class ProductionSettings:
             raise SettingsError("oauth_scope_missing_user_id")
         if not self.tenant_allowlist:
             raise SettingsError("tenant_allowlist_empty")
+        # ★ 素材根：与上面那批「写路径」用**不同**的规矩。
+        #
+        #   写路径：不许在仓内、不许彼此重叠（理由见上）。
+        #   素材根：允许在仓外任何可读目录，**也允许**与写路径重叠。
+        #   但两条必须有：
+        #     ① 必须是**存在的目录** —— 配了一个不存在的根，等于配了一道永远 404 的门，
+        #        而运维会以为「已经允许这个目录了」。
+        #     ② 不许是 `:memory:` 之类的空值（那是把「没配」写成「配了」）。
+        #   ★ 刻意**不**在这里校验「在仓内就拒」：素材可能是仓内的测试夹具目录。
+        #     真上线时若要收窄，那是另一条策略，不该在构造期悄悄决定。
+        roots = []
+        for index, raw in enumerate(self.media_roots):
+            text = str(raw or "").strip()
+            if not text:
+                raise SettingsError("media_roots[%d]_empty" % index)
+            path = Path(text).expanduser().resolve()
+            if not path.is_dir():
+                raise SettingsError("media_roots[%d]_not_a_directory" % index)
+            if path in roots:
+                raise SettingsError("media_roots[%d]_duplicate" % index)
+            roots.append(path)
+        object.__setattr__(self, "media_roots", tuple(str(p) for p in roots))
 
     @staticmethod
     def from_env(env=None):
@@ -314,6 +348,13 @@ class ProductionSettings:
                             env["REVIEW_TENANT_ALLOWLIST"].split(",") if x.strip())
         if not tenants:
             raise SettingsError("tenant_allowlist_empty")
+        # ★ `REVIEW_MEDIA_ROOTS` **不是必填**：不配 = 不收图（这是默认且安全的）。
+        #   但一旦配了，每一项都要能过 `__post_init__` 的存在性检查 ——
+        #   「配了个不存在的目录」与「没配」必须长得不一样，否则运维会以为
+        #   门已经开了。逗号分隔，允许前后空白。
+        media_roots = tuple(
+            x.strip() for x in (env.get("REVIEW_MEDIA_ROOTS") or "").split(",")
+            if x.strip())
         authority_root = external("REVIEW_AUTHORITY_ROOT", directory=True)
         frozen_root = external("REVIEW_FROZEN_PROJECTION_ROOT", directory=True)
         projection_db = external("REVIEW_PROJECTION_DB")
@@ -342,6 +383,7 @@ class ProductionSettings:
             tenant_allowlist=tenants,
             report_link_secrets=_link_secrets_from_env(env),
             report_link_ttl=_link_ttl_from_env(env),
+            media_roots=media_roots,
         )
 
 
@@ -743,7 +785,11 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
         review_assignee_validator=lambda principal_id, case: bool(
             runtime.directory and runtime.directory.eligible_assignee(principal_id, case)),
         case_source=AuthorityCaseSource(RuntimeProxy(runtime, "authority")),
-        submission_ingestor=SubmissionIngestor(),
+        # T-437：素材根从 settings 读。不配 = 不收图（`_build_image_unit` 返 503）。
+        # ★ 为什么不在这里发明默认值：默认值会让「没配」显示成「配了」，
+        #   而这个端点的安全性完全取决于根目录约束。
+        submission_ingestor=SubmissionIngestor(
+            media_roots=getattr(runtime.settings, "media_roots", ()) or ()),
         # T-314b：approve 那一步要用它取提案人与执行人的 principal
         grant_principal_provider=principal_provider,
         session_cookie_name=COOKIE_NAME,

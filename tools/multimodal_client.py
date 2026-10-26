@@ -410,34 +410,45 @@ class GatewayClient:
 # 与 provider 闸门对接：注册用的五件套
 # ──────────────────────────────────────────────────────────────────────
 
-#: 每个网关的**出境清单**（送什么、送给谁）。
-#: ★ 这份清单是本票要交付的产物之一（T-432 判据 4），不是注释。
+#: 每个网关的**出境清单**（送什么、送给谁、送给哪些任务）。
+#:
+#: ★ 2026-10-26 修（T-438 抓到的）：第一版**没有写 `tasks`**。而 `EgressItem.tasks`
+#:   为空 = 「适用于全部任务」—— 于是「只做画面语义」的部署，审计清单里也会列出
+#:   音轨与整段视频。审计读到的出境面比实际大，与「少报了」是同一类错：
+#:   一份看起来更严格的清单会让复核者跳过真正该看的项。
+#:   每一项现在**逐个点名**它属于哪些任务，收窄才有执行点。
 EGRESS_ITEMS = {
     "tokenhub": (
         {"item_id": "frame_image_b64",
          "description": "抽帧/原图的 base64 字节（含画面中的文字、人脸、场景）",
          # ★ 画面里可能有人脸与屏上文字，按 confidential 登记，不按 public。
          #   分级偏保守的代价只是审批严一点；偏松的代价是「以为送出去的是公开素材」。
-         "data_class": "confidential"},
+         "data_class": "confidential",
+         "tasks": ("scene_semantics", "mark_symbol")},
         {"item_id": "task_prompt_text",
          "description": "本文件写死的任务指令文本（不含任何客户数据）",
-         "data_class": "internal"},
+         "data_class": "internal",
+         # 指令文本对每个任务都要送，所以列出全部 —— 但仍是**点名**，
+         # 不是留空当「全都要」。留空会让新增任务时自动扩大出境面。
+         "tasks": ("scene_semantics", "mark_symbol", "av_alignment")},
     ),
     "vod": (
         {"item_id": "frame_image_b64",
          "description": "抽帧/原图的 base64 字节（含画面中的文字、人脸、场景）",
-         # ★ 画面里可能有人脸与屏上文字，按 confidential 登记，不按 public。
-         #   分级偏保守的代价只是审批严一点；偏松的代价是「以为送出去的是公开素材」。
-         "data_class": "confidential"},
+         "data_class": "confidential",
+         "tasks": ("scene_semantics", "mark_symbol")},
         {"item_id": "video_bytes_b64",
          "description": "整段视频字节（av_alignment 的 engine=direct 路径）",
-         "data_class": "confidential"},
+         "data_class": "confidential",
+         "tasks": ("av_alignment",)},
         {"item_id": "audio_bytes_b64",
          "description": "音轨字节（可能含人声，属 PII）",
-         "data_class": "pii"},
+         "data_class": "pii",
+         "tasks": ("av_alignment",)},
         {"item_id": "task_prompt_text",
          "description": "本文件写死的任务指令文本（不含任何客户数据）",
-         "data_class": "internal"},
+         "data_class": "internal",
+         "tasks": ("scene_semantics", "mark_symbol", "av_alignment")},
     ),
 }
 

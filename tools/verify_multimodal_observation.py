@@ -40,6 +40,7 @@ finding 的三要素是**合取**：`control_code` / `authority_ref` / `location
 from __future__ import annotations
 
 import copy
+import re
 import sys
 from pathlib import Path
 
@@ -285,6 +286,88 @@ def check_finding_table_untouched():
            "L6-2 准入三要素未变（本票不去放宽它）", repr(FS.ADMISSION_KEYS))
 
 
+# ── L7：报告与工作台两处措辞必须同口径 ────────────────────────────────
+
+def check_two_surfaces():
+    """同一件事在两处渲染：报告（Node）与工作台（TSX）。
+
+    ★ 为什么要有这一条：这两处是**两个独立实现**（渲染器不许 import Python，
+      前端不 import Node），所以「候选 · 待人工确认」这句话会被各写一遍。
+      两处各写一遍必然各自漂移 —— 而漂移的后果是群里收到的报告说「候选」、
+      工作台上看到的是「已确认」，同一份观察两种定性。
+      本项目已经因为「同一个量两个口径」栽过多次（§2.4.8）。
+    """
+    def _string_literals(source: str) -> str:
+        """去掉整行注释与 `//` 之后的内容，只留**代码**。
+
+        ★ 为什么需要它：L7-3/L7-4 会被注释里的解释文字喂饱（实测过）。
+        """
+        out = []
+        for raw in source.splitlines():
+            line = raw
+            stripped = line.lstrip()
+            if stripped.startswith("//") or stripped.startswith("*") \
+                    or stripped.startswith("/*"):
+                continue
+            if "//" in line:
+                line = line.split("//", 1)[0]
+            out.append(line)
+        return "\n".join(out)
+
+    report_mjs = (ROOT / "tools" / "audit" / "report_render.mjs").read_text(encoding="utf-8")
+    viewer_tsx = (ROOT / "web" / "src" / "components"
+                  / "ContentUnitViewer.tsx").read_text(encoding="utf-8")
+    phrase_report = "候选 · 待人工确认"
+    report(phrase_report in _string_literals(report_mjs),
+           "L7-1 报告的**代码**里有固定措辞「候选 · 待人工确认」")
+    # ★ L7-2 必须只看**渲染出来的那一处**，不能看整份文件。
+    #
+    #   第一版写成 `phrase in viewer_tsx` —— 于是把 `<strong>候选 · 待人工确认</strong>`
+    #   改成 `<strong>已确认</strong>` 之后它**仍然绿**：因为文件头注释里还有那句
+    #   「与报告『画面语义（候选 · 待人工确认）』同源」。真变异实测过。
+    #   判据要精确到「JSX 元素里含该短语」，注释不算。
+    jsx_render = re.compile(
+        r"<strong>\s*候选 · 待人工确认\s*</strong>")
+    report(bool(jsx_render.search(viewer_tsx)),
+           "L7-2 ★★ 工作台**渲染的 JSX 元素**含逐字相同的措辞（注释不算）")
+    # ★ 反向对照：把那一处改掉必须能红 —— 用同一份正则试一个坏样本
+    bad_sample = viewer_tsx.replace("<strong>候选 · 待人工确认</strong>",
+                                    "<strong>已确认</strong>")
+    report(bad_sample != viewer_tsx and not jsx_render.search(bad_sample),
+           "L7-2b ★ 反证：改掉渲染处的措辞会红（判据不是被注释喂饱的）")
+    # ★ 两处都不许出现冒充表述 —— **只查源码里的字符串字面量，不查注释**。
+    #
+    #   这一条我自己踩过一次：第一版直接 `w in text`，于是命中了渲染器注释里那句
+    #   「这里的措辞不许出现『已通过』/『画面正常』」。一句**解释这条规则为什么存在**
+    #   的注释被判成违规 —— 与 T-432 的 N2 完全同一个形状。
+    #   修法不是改注释，是让判据只读字面量（去掉整行注释与 `//` 之后的内容）。
+    for name, text, label in (
+            ("L7-3", report_mjs, "报告渲染器"),
+            ("L7-4", viewer_tsx, "工作台组件")):
+        body = _string_literals(text)
+        bad = [w for w in ("已通过", "画面语义正常", "画面正常") if w in body]
+        report(bad == [], "%s ★ %s 的**代码**里不含冒充表述 %r" % (name, label, bad),
+               repr(bad))
+    # ★ 反向对照：扫描器必须能抓到真的写进代码的冒充表述（否则 L7-3/4 恒真）
+    report(bool([w for w in ("已通过",) if w in _string_literals('x = "已通过"')]),
+           "L7-4b ★ 反证：真写进代码的冒充表述会被抓到（判据不是恒真）")
+    report([w for w in ("已通过",) if w in _string_literals("// 不许写「已通过」")] == [],
+           "L7-4c ★ 反证：只出现在注释里的不算违规")
+    # ★ 空观察时的「未评」措辞也必须两处都有
+    report("未评" in report_mjs and "未评" in viewer_tsx,
+           "L7-5 ★ 两处都用「未评」表达空观察（不许一处写「无」一处写「未评」）")
+    # ★ 前端类型必须真的声明了观察字段（否则 UI 拿不到数据）
+    client_ts = (ROOT / "web" / "src" / "api" / "client.ts").read_text(encoding="utf-8")
+    report("multimodal_observations" in client_ts
+           and "MultimodalObservation" in client_ts,
+           "L7-6 ★ 前端 CaseDetail 类型声明了观察字段")
+    # ★ 页面必须真的把值传下去（声明了但没传 = 幽灵字段）
+    page_tsx = (ROOT / "web" / "src" / "pages" / "CaseDetailPage.tsx").read_text(encoding="utf-8")
+    report("observations={detail.multimodal_observations}" in page_tsx
+           or "detail.multimodal_observations" in page_tsx,
+           "L7-7 ★★ 案件详情页真的把观察传给查看器（声明≠传值）")
+
+
 def main():
     print("=" * 78)
     print("T-433 · L1 观察落地 + 报告成节")
@@ -295,6 +378,7 @@ def main():
     check_judge_entry()
     check_snapshot()
     check_finding_table_untouched()
+    check_two_surfaces()
     print("-" * 78)
     if FAILED:
         print("❌ %d passed, %d failed" % (PASSED, FAILED))

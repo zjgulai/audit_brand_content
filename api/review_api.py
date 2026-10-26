@@ -142,6 +142,17 @@ class CaseDetail(BaseModel):
     ir: ReviewIR
     review: Optional[Dict[str, Any]] = None
     content_unit: Optional[Dict[str, Any]] = None
+    #: T-433/T-439：L1 多模态观察。
+    #:
+    #: ★ 必须是**独立字段**，不能只塞进 `content_unit.context`：
+    #:   观察存在 case state 上（与 ir 并列），而 content_unit 是判定时的 unit。
+    #:   混进去会让「工作台看到的观察」与「报告里的观察」来自两个不同的取数点。
+    #:
+    #: ★ 三态必须能分开（与报告的「未评」措辞同一口径）：
+    #:   有观察（status=ok）/ 没测成（untested）/ 出错（error）。
+    #:   `note` 只在**没有观察**时非空，说明为什么没看。
+    multimodal_observations: List[Dict[str, Any]] = Field(default_factory=list)
+    multimodal_note: Optional[str] = None
 
 
 class ReportSummary(BaseModel):
@@ -724,11 +735,23 @@ def create_app(*, session_store=None, repository=None, principals=None,
         require_read(principal, case)
         require_review_fresh()
         unit = case.get("content_unit") or case.get("content")
+        # ★ T-439：观察从 case 顶层读（不是从 unit 里挖）。
+        #   取不到时给 [] 且 note=None —— 与「有 note 但没观察」区分开：
+        #   前者是「这条数据源没有这个字段」（旧案件），后者是「有字段但没看成」。
+        observations = case.get("multimodal_observations")
+        note = None
+        if isinstance(case.get("report_snapshot"), dict):
+            # 判定时冻结的那份 note 比现算更可信：它解释了「当时为什么没看」
+            maybe = case["report_snapshot"].get("multimodal_note")
+            if isinstance(maybe, str) and maybe.strip():
+                note = maybe
         return {
             "case_id": id,
             "ir": case["ir"],
             "review": _review_summary(repo_ledger.get_case(id), store=repo_ledger, case_id=id),
             "content_unit": unit if isinstance(unit, dict) else None,
+            "multimodal_observations": observations if isinstance(observations, list) else [],
+            "multimodal_note": note,
         }
 
     @app.get("/api/v1/queue", response_model=List[CaseSummary])

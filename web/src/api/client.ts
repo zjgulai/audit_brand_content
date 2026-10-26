@@ -188,6 +188,27 @@ export interface CaseDetail {
   };
   review?: ReviewSummary | null;
   content_unit?: ContentUnitData | null;
+  // T-439：L1 多模态观察（与报告里「画面语义（候选 · 待人工确认）」同源）。
+  // ★ 三态必须能分开：ok=看到了 / untested=没测成 / error=测了但失败。
+  //   空数组 + note 才是「没看，原因是 note」。
+  multimodal_observations?: MultimodalObservation[];
+  multimodal_note?: string | null;
+}
+
+/** T-439：一条 L1 观察。★ 它不是 finding —— 没有 control_code / authority_ref，
+ *  所以界面上一律标「候选 · 待人工确认」，不许渲染成已确认的违规。 */
+export interface MultimodalObservation {
+  status: "ok" | "untested" | "error";
+  task: string;
+  statement?: string;
+  reason?: string;
+  model?: string | null;
+  model_version?: string | null;
+  ts?: string | null;
+  bbox?: string | null;
+  confidence?: number | null;
+  egress_status?: string;
+  created_at?: string;
 }
 
 export interface LedgerMutation {

@@ -508,6 +508,8 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           findings={ir.findings ?? []}
           activeFindingId={activeFindingId}
           onSelectFinding={handleSelectFromUnit}
+          observations={detail.multimodal_observations}
+          observationNote={detail.multimodal_note}
         />
 
         {/* 右栏：判定、覆盖证明、证据链就地裁决与复核动作台账 */}
