@@ -22,6 +22,7 @@
 | D5 compose 有独立 project name 与独立网络 | 「不要干扰其他应用」的可核对形式 |
 | D6 `.env.production` 被 gitignore、`.example` 不被忽略 | 凭据不入库 |
 | D7 `.example` 里 13 个必填键齐全 | 与 `ProductionSettings.from_env` 的 required 逐项一致 |
+| D14 ★ **真实的生产 env 是否齐全** | `$AUDIT_PROD_ENV`（默认 `/opt/momcozy-audit-platform/.env.production`）存在时：**每个 required 键都必须有非空值**；不存在 → **未测**（不是通过） |
 | D8 `.example` 不含任何凭据形态的值 | 模板不该有真值 |
 | D9 七个数据路径互不重叠且不在 /app 下 | `ProductionSettings.__post_init__` 会校验；这里提前拦 |
 | D10 镜像里**不带** `web/dist` 之外的构建缓存 | 产物臃肿 / 泄露源映射 |
@@ -240,6 +241,35 @@ def main():
               "七个数据路径互不重叠、且不在 /app 下（生产启动不会拒）"
               if not problems else "路径问题：%s" % problems)
 
+
+    # ── D14 ★ 真实的生产 env 是否齐全（2026-10-26 事故的直接产物）───────
+    #
+    # 事故：把线上从 6ad7a34 升到 346d57b 后容器反复 Restarting，日志是
+    #     api.production_app.SettingsError: missing_config:REVIEW_REPORT_ROOT
+    # 根因：新版把 REPORT_ROOT 列进 required，而线上 .env.production 是 10-22 建的、
+    #       只有 12 个键。`.env.production.example` 里**有**这一项 ——
+    #       所以 D7（example ≡ 源码）一直是绿的，它证明不了生产那份 env 齐不齐。
+    # ★ 这就是「同一个量有两个口径，只有一个被看见」（AGENTS.md §2.4.8）：
+    #   模板齐 ≠ 生产齐。两条必须各有一条断言。
+    prod_env = os.environ.get("AUDIT_PROD_ENV") or \
+        "/opt/momcozy-audit-platform/.env.production"
+    prod_path = Path(prod_env)
+    if not prod_path.is_file():
+        # 未测不是通过 —— 本机通常没有这个文件
+        print("  ⚠ D14  未测：%s 不在盘上（生产 env 不在本机，这是正常状态）"
+              % prod_env)
+        results.append(("D14", None, "未测：生产 env 不存在"))
+    else:
+        body = read(prod_path) or ""
+        have_prod = set(re.findall(r"^(REVIEW_[A-Z_]+)=(\S+)", body, re.M))
+        have_prod = {k for k, v in have_prod if v.strip()}
+        src_keys2 = required_env_from_source() or set(REQUIRED_ENV)
+        lack = sorted(set(src_keys2) - have_prod)
+        check("D14", not lack,
+              "生产 env 的 %d 个必填键都有非空值" % len(src_keys2)
+              if not lack else
+              "生产 env 缺 %s —— 容器会 missing_config 反复重启" % lack)
+
     # ── D12 报告渲染器在运行阶段可用 ─────────────────────────────────────
     #
     # ★ 为什么需要这条：T-316c/d 落地后，「结案 → 报告」是生产链路的一环，
@@ -290,12 +320,21 @@ def main():
               if not missing else ".dockerignore 缺：%s" % missing)
 
     print("-" * 72)
-    passed = sum(1 for _, ok, _ in results if ok)
-    failed = len(results) - passed
-    print("  共 %d 项 · 通过 %d · 失败 %d" % (len(results), passed, failed))
+    # ★ 三态，不是两态（AGENTS.md §2.4「未测 ≠ 通过 ≠ 红」）：
+    #   第一版把 `None`（未测）算进 failed，于是 D14 在「生产 env 不在本机」
+    #   这种**完全正常**的状态下让整个自证退 1 —— 一个恒红的检查器，
+    #   等价于没有检查器（§2.1.1：会误报的检查比没有检查更糟）。
+    passed = sum(1 for _, ok, _ in results if ok is True)
+    untested = sum(1 for _, ok, _ in results if ok is None)
+    failed = sum(1 for _, ok, _ in results if ok is False)
+    print("  共 %d 项 · 通过 %d · 失败 %d · 未测 %d"
+          % (len(results), passed, failed, untested))
     if failed:
         print("  ❌ 退 1（有红）")
         return 1
+    if untested:
+        print("  ⚠ 退 2（有 %d 项未测）—— 未测不是通过" % untested)
+        return 2
     print("  ✅ 全过（注意：这只证明**工件写对了**，不证明镜像能构建、容器能起来）")
     return 0
 
