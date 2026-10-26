@@ -223,6 +223,20 @@
    "heading": "评估方式"
   },
   {
+   "file": "PMO/表格同步/20261027-PRD基线重登记.json",
+   "section": "5.3.1",
+   "kind": "current",
+   "heading": "问题分类枚举"
+  },
+  {
+   "file": "PMO/表格同步/20261027-PRD基线重登记.json",
+   "section": "5.4",
+   "kind": "history",
+   "from_version": "v1.0",
+   "maps_to": "10.1",
+   "why": "该 payload 描述的是「§5.4 在 v1.2 里已被删除」这件事"
+  },
+  {
    "file": "PRD/feishu/章节引用-v1.json",
    "section": "7.2",
    "kind": "history",
