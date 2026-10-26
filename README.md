@@ -247,6 +247,10 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > （图片实现完整但进件门关着、视频只有一个状态函数）、M0–M5 六层目标、
 > `T-420`–`T-425` 六张带变异判据的票、三个待委托方定的事；并附一个真缺陷
 > （`_coverage_ir` 丢 `does_not_cover`）。
+> [`PMO/implement/媒体审核-外部API落地方案-v2-20261026.md`](./PMO/implement/媒体审核-外部API落地方案-v2-20261026.md)
+> —— **v1 的替代版**（委托方已定：外部 API + magpie + Gemini、参考 claude-video、先打通功能）。
+> 含一个结构性矛盾的处置（finding 三要素含知识库产物 → L1 观察 / L2 候选两级）、
+> claude-video 的适配取舍、balanced 帧策略、`T-430`–`T-436` 七张票。
 > [`PMO/implement/T-316-施工单-报告生产落盘-20261024.md`](./PMO/implement/T-316-施工单-报告生产落盘-20261024.md)
 > —— 第五张（D5 阶段门最后一环）：**运行时镜像里没有 Node**，而唯一的报告渲染器是 Node 实现；
 > 报告的 ACL 判据读 `principal["role"]`（单数大写），真实身份是 `roles`（复数小写）→
