@@ -46,6 +46,7 @@ import base64
 import json
 import os
 import socket
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -77,16 +78,33 @@ GATEWAY_MEDIA_NOTE = {
     ),
 }
 
-#: 2026-10-26 实测读数（真调，1×1 纯色 PNG 探针，不是真实素材）：
-#: 这一份是**某时某刻的读数**，不是常量 —— 模型上下线会变，
-#: 复现命令见 verify_multimodal_client 的 --live 说明与 PMO 记录。
-LIVE_PROBE_20261026 = {
+#: 2026-10-26 实测读数（真调，1×1 纯色 PNG 探针，不是真实素材）。
+#:
+#: ★★ 这份读数**被更正过一次，两个版本都留着** —— 因为它自己就是 §2.4.1 第 5 行
+#:    那个病的活样本：「一个会过期的读数，没有任何东西在它过期时变红」。
+#:
+#:   早上的读数把 `vod:gemini-3.8-flash` 记成 `error(429 rate_limited)`，
+#:   并据此写下「T-435 的音画对齐默认落 gemini-3.1-flash-lite，不是 3.8」。
+#:   **那句话把「某时某刻的一次 429」写成了「这个模型不能用」** —— 而 429 是
+#:   **限流**（重试就好），不是**不可用**（要换模型）。两者完全不同。
+#:
+#:   下午复测：`gemini-3.8-flash` **返回 ok**；此刻仍 429 的是 `gemini-4-argon`。
+#:   所以真正稳定的形态是「多模型回落 + 429 重试」（`FALLBACK_CHAINS`），
+#:   而不是把一个固定的备胎写成主选。
+#:
+#: ★ 本条读数的判据不在这个 dict 上，而在三段代码里：
+#:   ① `RETRYABLE_STATUS` 含 429（重试同一模型）；
+#:   ② `analyze_task` 对 429 置 `retryable=True`，对 401/403/404 置 False；
+#:   ③ `analyze_with_fallback` 整条链失败落 `error` 而非 `untested`。
+PROBED_AT = "2026-10-26T22:40+08:00"
+LIVE_PROBE = {
     "tokenhub:glm-5.3-flash": "ok",
-    "vod:gemini-3.1-flash-lite": "ok",
+    "vod:gemini-3.8-flash": "ok",          # ← 早上记的是 error(429)，已复测更正
+    "vod:gemini-3.7-flash": "ok",
+    "vod:gemini-3.6-flash": "ok",
     "vod:gemini-3.5-flash": "ok",
-    # ★ gemini-3.8-flash 当天返回 HTTP 429（request is limited）。
-    #   所以 T-435 的音画对齐默认落 gemini-3.1-flash-lite，不是 3.8。
-    "vod:gemini-3.8-flash": "error(429 rate_limited)",
+    "vod:gemini-3.1-flash-lite": "ok",
+    "vod:gemini-4-argon": "error(429 rate_limited, retryable)",
 }
 
 #: 任务 → 需要送到模型的介质。与 base.multimodal_provider._REQUIRED_MEDIA 同一口径，
@@ -275,6 +293,16 @@ def _openai_messages(task: str, parts: Sequence[Mapping[str, Any]]) -> list:
 # 实现方：MultimodalProvider
 # ──────────────────────────────────────────────────────────────────────
 
+#: 哪些 HTTP 状态该**重试同一模型**（而不是立刻落到下一个）。
+#: ★ 429 是限流 —— 重试就好；401/403 是鉴权问题，重试一百次也一样，必须立刻落下一项
+#:   （且要在 reason 里点名，否则会被读成「模型坏了」）。
+RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+
+#: 退避基数（秒）。三次重试 = base, base*2, base*4 → 1s/2s/4s。
+RETRY_BACKOFF_SECONDS = 1.0
+RETRY_ATTEMPTS = 3
+
+
 @dataclass
 class GatewayClient:
     """一个网关连接。凭据只在**构造时**从环境读一次。"""
@@ -286,12 +314,18 @@ class GatewayClient:
     timeout: float = 60.0
     transport: Transport = urllib_transport
     max_media_bytes: int = 24 * 1024 * 1024
+    #: 同一模型最多试几次（含首次）。★ 可配，因为测试要能把它压到 1。
+    retry_attempts: int = RETRY_ATTEMPTS
+    #: 退避基数（秒）。测试里设为 0 免得真等。
+    retry_backoff: float = RETRY_BACKOFF_SECONDS
 
     @classmethod
     def from_env(cls, gateway: str = DEFAULT_GATEWAY, *, model: str,
                  env: Optional[Mapping[str, str]] = None,
                  transport: Optional[Transport] = None,
-                 timeout: float = 60.0) -> "GatewayClient":
+                 timeout: float = 60.0,
+                 retry_attempts: int = RETRY_ATTEMPTS,
+                 retry_backoff: float = RETRY_BACKOFF_SECONDS) -> "GatewayClient":
         env = os.environ if env is None else env
         if gateway not in GATEWAY_ENV:
             raise ClientNotConfigured(
@@ -306,15 +340,34 @@ class GatewayClient:
                 % (gateway, ", ".join(missing)))
         return cls(gateway=gateway, base_url=base.rstrip("/"), api_key=key,
                    model=model, timeout=timeout,
-                   transport=transport or urllib_transport)
+                   transport=transport or urllib_transport,
+                   retry_attempts=retry_attempts,
+                   retry_backoff=retry_backoff)
 
     def endpoint(self) -> str:
         return self.base_url + "/chat/completions"
 
     # ---- 单任务 -----------------------------------------------------
 
+    def _post_once(self, task: str, parts: Sequence[Mapping[str, Any]]) -> HttpResult:
+        payload = json.dumps({
+            "model": self.model,
+            "messages": _openai_messages(task, parts),
+            "temperature": 0,
+        }, ensure_ascii=False).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + self.api_key,
+        }
+        return self.transport(self.endpoint(), headers, payload, self.timeout)
+
     def analyze_task(self, task: str, media: Mapping[str, Path]) -> Dict[str, Any]:
-        """跑一个任务。返回该任务的 status 字典（与 provider 契约同形）。"""
+        """跑一个任务。返回该任务的 status 字典（与 provider 契约同形）。
+
+        ★ 单模型 + 重试。**回落由 `analyze_with_fallback` 负责**，
+          这一层只管「同一个模型最多试几次」——两层分开是为了让「重试」与
+          「换模型」各自可单独验（它们失败的成因完全不同）。
+        """
         need = TASK_MEDIA.get(task)
         if need is None:
             return {"status": "untested", "reason": "未知任务 %r" % (task,),
@@ -332,17 +385,31 @@ class GatewayClient:
         except Exception as exc:  # noqa: BLE001
             return {"status": "error", "reason": "读媒体失败：%s" % exc,
                     "observations": []}
-        payload = json.dumps({
-            "model": self.model,
-            "messages": _openai_messages(task, parts),
-            "temperature": 0,
-        }, ensure_ascii=False).encode("utf-8")
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + self.api_key,
-        }
-        result = self.transport(self.endpoint(), headers, payload, self.timeout)
-        return self._interpret(task, result)
+        attempts = []
+        result = HttpResult(status=0, error="not_attempted")
+        for attempt in range(self.retry_attempts):
+            result = self._post_once(task, parts)
+            attempts.append({"attempt": attempt + 1, "status": result.status,
+                             "error": result.error})
+            if result.status not in RETRYABLE_STATUS:
+                break
+            if attempt + 1 < self.retry_attempts:
+                time.sleep(self.retry_backoff * (2 ** attempt))
+        out = self._interpret(task, result)
+        out["attempts"] = attempts
+        # ★ 429 是 retryable，**不是** unavailable。这条字段让调用方与报告
+        #   能分清「这个模型此刻被限流」与「这个模型不存在/无权限」——
+        #   两者都表现为「没拿到结果」，但处置完全不同。
+        if result.status == 429:
+            out["retryable"] = True
+        elif result.status in (401, 403, 404):
+            out["retryable"] = False
+            out["reason"] = "鉴权/寻址问题（%d），重试无意义：%s" % (
+                result.status, (result.body or "")[:200])
+        out["model_used"] = self.model
+        out["gateway_used"] = self.gateway
+        return out
+
 
     def _interpret(self, task: str, result: HttpResult) -> Dict[str, Any]:
         """HTTP 结果 → provider 契约的 status 字典。
@@ -406,6 +473,96 @@ class GatewayClient:
                 "因此结果只能落 L1 观察，不能自行成为 finding。")
 
 
+def analyze_with_fallback(task: str, media: Mapping[str, Path], *,
+                          env: Optional[Mapping[str, str]] = None,
+                          transport: Optional[Transport] = None,
+                          client_factory=None,
+                          chain: Optional[Sequence[Tuple[str, str]]] = None,
+                          **client_kwargs) -> Dict[str, Any]:
+    """按 `FALLBACK_CHAINS` 的顺序试，第一个拿到 `ok` 的胜出。
+
+    ★ 为什么要回落：ADR-0019 §1.3 —— 429 是**模型级轮转**的限流。实测同一时刻
+      `gemini-3.8-flash` 通、`gemini-4-argon` 429；早上反过来。把可用性押在单个
+      模型上，媒体线会周期性停摆。
+
+    返回形状与 `analyze_task` 同，另加三个字段：
+      `model_used` / `gateway_used` / `fallback_from`
+    ★ `fallback_from` 必须留下：否则「这次结论是哪一版模型给的」在报告里查不出来，
+      而排查一次误判时要的正是这个。
+
+    ★ 整条链都失败时 status 一律 `error`（测了但失败），**不是** `untested`
+      —— 「我试了 5 个模型都 429」与「我没测」是两件事，混了就没人会去查限流。
+    """
+    chain = tuple(chain) if chain else chain_for(task)
+    if not chain:
+        return {"status": "untested",
+                "reason": "任务 %r 没有可用回落链（gateway_supports 全拒）" % (task,),
+                "observations": []}
+    factory = client_factory or GatewayClient.from_env
+    tried: List[Dict[str, Any]] = []
+    primary = chain[0]
+    for index, (gateway, model) in enumerate(chain):
+        try:
+            client = factory(gateway, model=model, env=env, transport=transport,
+                             **client_kwargs)
+        except ClientNotConfigured as exc:
+            # ★ 未配凭据 ≠ 这个模型坏了。记下来继续试下一个网关，
+            #   但**不许**把它当成「试过了不行」——它是「没试」。
+            tried.append({"gateway": gateway, "model": model,
+                          "status": "not_configured", "reason": str(exc)[:160]})
+            continue
+        out = client.analyze_task(task, media)
+        tried.append({"gateway": gateway, "model": model,
+                      "status": out.get("status"),
+                      "reason": (out.get("reason") or "")[:160]})
+        if out.get("status") == "ok":
+            out["model_used"] = model
+            out["gateway_used"] = gateway
+            out["fallback_from"] = (
+                None if index == 0
+                else ["%s/%s" % pair for pair in chain[:index]])
+            out["chain_tried"] = tried
+            return out
+        # ★★ 缺介质是**任务级的「没测」**，与模型的健康无关 —— 换多少个模型都一样。
+        #   所以立刻返回 untested，不许继续把剩下 4 个模型也试一遍再落 error。
+        #   实测踩到过：只有 video 没有 audio 时，整条链跑完落成
+        #   「error 整条回落链都失败」，读起来像「5 个模型都坏了」——
+        #   而真相是「这次调用一个模型都不该被叫」。
+        if out.get("missing_media"):
+            out["model_used"] = model
+            out["gateway_used"] = gateway
+            out["chain_tried"] = tried
+            out["reason"] = "%s（与模型无关：换多少个模型都一样）" % (
+                out.get("reason") or "缺介质")
+            return out
+        # 鉴权/寻址错（retryable=False）说明这条路本身不通，继续下一个
+        # —— 继续试不是因为可能成功，是因为**换网关可能真的能通**。
+    # ★ 对照一下「试过几种不同的失败」：如果每一次都是同一个任务级原因
+    #   （例如全部 not_configured），那整体仍该说清是「没测成」而不是「都坏了」。
+    statuses = {t.get("status") for t in tried}
+    if statuses and statuses <= {"not_configured"}:
+        return {
+            "status": "untested",
+            "reason": "整条链上没有一个网关配好凭据（%d 个都 not_configured）"
+                      "—— 这是没测，不是失败" % len(tried),
+            "observations": [],
+            "chain_tried": tried,
+            "model_used": None,
+            "gateway_used": None,
+            "fallback_from": ["%s/%s" % pair for pair in chain],
+        }
+    return {
+        "status": "error",
+        "reason": "整条回落链都失败（%d 个）：%s" % (
+            len(tried),
+            "；".join("%s/%s=%s" % (t["gateway"], t["model"], t["status"])
+                     for t in tried)),
+        "observations": [],
+        "chain_tried": tried,
+        "model_used": None,
+        "gateway_used": None,
+        "fallback_from": ["%s/%s" % pair for pair in chain],
+    }
 # ──────────────────────────────────────────────────────────────────────
 # 与 provider 闸门对接：注册用的五件套
 # ──────────────────────────────────────────────────────────────────────
@@ -458,6 +615,41 @@ RECIPIENTS = {
 }
 
 
+#: 每个任务的**回落链**：按序是 (gateway, model)，第一个是主选。
+#:
+#: ★ 2026-10-26 ADR-0019 §二：把可用性押在单个模型上会被周期性 429 打死。
+#:   实测证据：早上 `vod/gemini-3.8-flash` 返 429，同日下午返 ok，而
+#:   `gemini-4-argon` 此刻仍 429 —— **429 是模型级轮转的限流，不是不可用**。
+#:
+#: ★ `av_alignment` 链里**只有 vod**：tokenhub 的 glm 家族 `audio` 为 0 家，
+#:   拿它做音画对齐会返回一个「看起来分析过了」的结果而根本没看音轨。
+#:   这条由 `base/multimodal_provider.required_media` 在调用前拒，本表是第二道。
+FALLBACK_CHAINS = {
+    "scene_semantics": (
+        ("tokenhub", "glm-5.3-flash"),
+        ("vod", "gemini-3.8-flash"),
+        ("vod", "gemini-3.7-flash"),
+        ("vod", "gemini-3.5-flash"),
+        ("vod", "gemini-3.1-flash-lite"),
+    ),
+    "mark_symbol": (
+        ("tokenhub", "glm-5.3-flash"),
+        ("vod", "gemini-3.8-flash"),
+        ("vod", "gemini-3.7-flash"),
+        ("vod", "gemini-3.5-flash"),
+        ("vod", "gemini-3.1-flash-lite"),
+    ),
+    "av_alignment": (
+        ("vod", "gemini-3.8-flash"),
+        ("vod", "gemini-3.7-flash"),
+        ("vod", "gemini-3.6-flash"),
+        ("vod", "gemini-3.5-flash"),
+        ("vod", "gemini-3.1-flash-lite"),
+    ),
+}
+
+
+
 def gateway_supports(gateway: str, task: str) -> bool:
     """该网关在**今天**能不能做这个任务。
 
@@ -471,6 +663,13 @@ def gateway_supports(gateway: str, task: str) -> bool:
     if gateway == "vod":
         return task in ("scene_semantics", "mark_symbol", "av_alignment")
     return False
+
+
+def chain_for(task: str) -> Tuple[Tuple[str, str], ...]:
+    """某任务的回落链（已按 `gateway_supports` 过滤掉不允许的网关）。"""
+    return tuple((gw, model) for gw, model in FALLBACK_CHAINS.get(task, ())
+                 if gateway_supports(gw, task))
+
 
 
 def egress_items_for(gateway: str, tasks: Sequence[str]) -> Tuple[Dict[str, Any], ...]:
@@ -529,8 +728,78 @@ def registration_for(gateway: str, *, model: str, tasks: Sequence[str],
     )
 
 
+def _list_models(argv: Sequence[str]) -> int:
+    """列出两个网关的**实时**模型清单，并核对回落链上的每个模型是否还在。
+
+    ★ 为什么需要它：ADR-0019 §一 就是靠这个命令判出来的 —— 委托方以为
+      tokenhub 有 gemini-3.8-flash，实测 **0 个**。模型清单会变，
+      所以判据必须是「随时能重查」，不是文档里的一句话。
+
+    ★ 只读 `GET /models`，**不烧 token**（不调用推理）。
+    """
+    env = os.environ
+    print("=" * 78)
+    print("网关模型清单（实时，只读 /models）")
+    print("=" * 78)
+    live: Dict[str, List[str]] = {}
+    for gw in sorted(GATEWAY_ENV):
+        base_env, key_env = GATEWAY_ENV[gw]
+        base = (env.get(base_env) or "").strip()
+        key = (env.get(key_env) or "").strip()
+        if not base or not key:
+            print("  %-9s 未配（%s / %s）" % (gw, base_env, key_env))
+            continue
+        req = urllib.request.Request(base.rstrip("/") + "/models")
+        req.add_header("Authorization", "Bearer " + key)
+        try:
+            with urllib.request.urlopen(req, timeout=40) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as exc:
+            print("  %-9s HTTP %s" % (gw, exc.code))
+            continue
+        except Exception as exc:  # noqa: BLE001
+            print("  %-9s 错误 %s" % (gw, exc))
+            continue
+        ids = [m.get("id") for m in (data.get("data") or []) if m.get("id")]
+        live[gw] = ids
+        gem = [i for i in ids if "gemini" in i.lower()]
+        print("  %-9s 共 %d 个 · gemini %d 个" % (gw, len(ids), len(gem)))
+        if gem:
+            print("            %s" % ", ".join(gem))
+
+    if not live:
+        print("\n⚠️ 未测：两个网关都没读到清单（凭据或网络）")
+        return 2
+
+    print("\n" + "-" * 78)
+    print("回落链核对（ADR-0019 §二）")
+    print("-" * 78)
+    missing = 0
+    for task, chain in FALLBACK_CHAINS.items():
+        print("  %s：" % task)
+        for gw, model in chain:
+            has = "?" if gw not in live else ("✅" if model in live[gw] else "❌ 不在清单里")
+            if has.startswith("❌"):
+                missing += 1
+            print("    %-9s %-22s %s" % (gw, model, has))
+        if not gateway_supports("tokenhub", task):
+            print("    （按 §2.1，tokenhub 不参与本任务）")
+    print("-" * 78)
+    if missing:
+        print("❌ %d 个回落链上的模型已不在网关清单里 —— 该改 FALLBACK_CHAINS"
+              "（模型下线是正常的，链子必须跟得上）" % missing)
+        return 1
+    print("✅ 回落链上的模型都在当前清单里")
+    return 0
+
+
 def _usage():
     print("用法：")
+    print("  python3 tools/multimodal_client.py --selftest     # 离线自证（不联网）")
+    print("  python3 tools/multimodal_client.py --whoami       # 只报配置齐不齐（不打印密钥）")
+    print("  python3 tools/multimodal_client.py --models       # 实时列出网关模型 + 核对回落链")
+    print("  python3 tools/multimodal_client.py --probe <image> # 真调一次 scene_semantics")
+    print("  ★ --probe / --models 会联网；--selftest / --whoami 不会。")
     print("  python3 tools/multimodal_client.py --whoami        # 只报配置是否齐（不打印密钥）")
     print("  python3 tools/multimodal_client.py --probe <image>  # 真调一次 scene_semantics")
     print("  ★ --probe 会真的把图片发出去。默认不做，必须显式点名文件。")
@@ -553,6 +822,8 @@ def main(argv: Sequence[str]) -> int:
                   % ", ".join(t for t in TASK_MEDIA if gateway_supports(gw, t)))
         _usage()
         return 0
+    if "--models" in argv:
+        return _list_models(argv)
     if "--probe" in argv:
         idx = argv.index("--probe")
         if idx + 1 >= len(argv):

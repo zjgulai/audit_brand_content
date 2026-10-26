@@ -318,23 +318,44 @@ def check_two_surfaces():
     viewer_tsx = (ROOT / "web" / "src" / "components"
                   / "ContentUnitViewer.tsx").read_text(encoding="utf-8")
     phrase_report = "候选 · 待人工确认"
-    report(phrase_report in _string_literals(report_mjs),
-           "L7-1 报告的**代码**里有固定措辞「候选 · 待人工确认」")
+    # ★★ 2026-10-27 更正：这条判据原先写死「两处都必须含『候选 · 待人工确认』」。
+    #   另一个会话做文案返工时把工作台那处改成了「候选，待人工确认」（顿号换成逗号），
+    #   于是 L7-2 变红 —— **它红得对**：判据本来就是为了防两处漂移而写的。
+    #   但「红」本身不说明该改哪一边。真实含义是：
+    #   **L7 要守的是「两处一致」，不是「必须用间隔号」。** 把标点写死进判据，
+    #   等于替产品做了一个它没做的决定，还把一次文案返工误报成缺陷。
+    #   所以改为：各自抽出这句话，断言**两边抽出来的完全相同**。
+    PHRASE_RE = re.compile(r"候选\s*[·，,、]\s*待人工确认")
+
+    def _phrase_in(text):
+        found = PHRASE_RE.findall(text)
+        return found[0] if found else None
+
+    report(_phrase_in(_string_literals(report_mjs)) is not None,
+           "L7-1 报告的**代码**里有「候选 · 待人工确认」这句话",
+           repr(_phrase_in(_string_literals(report_mjs))))
     # ★ L7-2 必须只看**渲染出来的那一处**，不能看整份文件。
-    #
-    #   第一版写成 `phrase in viewer_tsx` —— 于是把 `<strong>候选 · 待人工确认</strong>`
-    #   改成 `<strong>已确认</strong>` 之后它**仍然绿**：因为文件头注释里还有那句
-    #   「与报告『画面语义（候选 · 待人工确认）』同源」。真变异实测过。
-    #   判据要精确到「JSX 元素里含该短语」，注释不算。
+    #   第一版写成 `phrase in viewer_tsx` —— 于是把渲染处改掉之后它仍然绿，
+    #   因为文件头注释里还有那句。真变异实测过。判据要精确到 JSX 元素。
     jsx_render = re.compile(
-        r"<strong>\s*候选 · 待人工确认\s*</strong>")
+        r"<strong>\s*候选\s*[·，,、]\s*待人工确认\s*</strong>")
     report(bool(jsx_render.search(viewer_tsx)),
-           "L7-2 ★★ 工作台**渲染的 JSX 元素**含逐字相同的措辞（注释不算）")
-    # ★ 反向对照：把那一处改掉必须能红 —— 用同一份正则试一个坏样本
-    bad_sample = viewer_tsx.replace("<strong>候选 · 待人工确认</strong>",
-                                    "<strong>已确认</strong>")
+           "L7-2 ★★ 工作台**渲染的 JSX 元素**含同一句话（注释不算）")
+    # ★★ 新加的核心判据：两处**必须一致**（这才是 L7 的立意）。
+    report(_phrase_in(_string_literals(report_mjs)) == _phrase_in(viewer_tsx),
+           "L7-2c ★★★ 报告与工作台用的是**逐字相同**的那句话"
+           "（漂移就是这条判据要拦的东西）",
+           "report=%r viewer=%r" % (_phrase_in(_string_literals(report_mjs)),
+                                    _phrase_in(viewer_tsx)))
+    # ★ 反向对照：改掉渲染处的措辞必须能红
+    bad_sample = viewer_tsx.replace("<strong>候选，待人工确认</strong>",
+                                    "<strong>已确认</strong>").replace(
+        "<strong>候选 · 待人工确认</strong>", "<strong>已确认</strong>")
     report(bad_sample != viewer_tsx and not jsx_render.search(bad_sample),
            "L7-2b ★ 反证：改掉渲染处的措辞会红（判据不是被注释喂饱的）")
+    # ★ 反向对照：两处用**不同**标点时，L7-2c 必须红（否则它恒真）
+    report(_phrase_in("x = \"候选 · 待人工确认\"") != _phrase_in("x = \"候选，待人工确认\""),
+           "L7-2d ★ 反证：两种标点抽出来不相等（L7-2c 不是恒真）")
     # ★ 两处都不许出现冒充表述 —— **只查源码里的字符串字面量，不查注释**。
     #
     #   这一条我自己踩过一次：第一版直接 `w in text`，于是命中了渲染器注释里那句

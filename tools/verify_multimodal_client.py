@@ -298,6 +298,253 @@ def check_authorization():
 
 # ── S：状态映射（每种失败都不许落 ok） ───────────────────────────────
 
+# ── F：回落链与重试（ADR-0019 §二） ─────────────────────────────────
+
+def check_fallback(tmpdir):
+    """回落链 + 429 重试 + 「不静默换模型」。
+
+    ★ 这一组验的是 ADR-0019 §二 的三条硬规矩：
+      ① 429 必须**重试同一模型**（retryable），不许直接判死；
+      ② 主选失败要**落到下一个**，并留下 `fallback_from`；
+      ③ 整条链失败落 **error**（测了但失败），不是 `untested`（没测）。
+    """
+    img = Path(tmpdir) / "t.png"
+    _tiny_png(img)
+    media = {"image": img}
+    env = {"MULTIMODAL_TOKENHUB_BASE_URL": "https://a.test/v1",
+           "MULTIMODAL_TOKENHUB_API_KEY": "k1",
+           "MULTIMODAL_VOD_BASE_URL": "https://v.test/v1",
+           "MULTIMODAL_VOD_API_TOKEN": "k2"}
+
+    def ok_t(url, headers, payload, timeout):
+        return MC.HttpResult(200, json.dumps({"choices": [{"message": {"content":
+            json.dumps({"observations": [{"statement": "看到 X"}]})}}]}))
+
+    # F1 每个任务都有回落链，且 av_alignment 链里**没有 tokenhub**
+    for task in ("scene_semantics", "mark_symbol", "av_alignment"):
+        chain = MC.chain_for(task)
+        report(len(chain) >= 2,
+               "F1 %s 的回落链 ≥2 项（单点等于把可用性押在一处）" % task,
+               str(len(chain)))
+    av_gw = {gw for gw, _ in MC.chain_for("av_alignment")}
+    report(av_gw == {"vod"},
+           "F1b ★★ av_alignment 链里只有 vod（tokenhub 的 glm 家族 audio 为 0 家）",
+           repr(sorted(av_gw)))
+    # ★★ 光查 `chain_for()` 不够 —— 它会把不允许的网关**过滤掉**，
+    #   于是「原始表里写了 tokenhub」这件事永远查不到（真变异实测：往
+    #   FALLBACK_CHAINS 的 av 链里插 tokenhub，F1b 仍然绿）。
+    #   所以要**直接查原始表**：写下来的东西和过滤后的东西是两件事。
+    raw_av = {gw for gw, _ in MC.FALLBACK_CHAINS["av_alignment"]}
+    report(raw_av == {"vod"},
+           "F1b2 ★★ FALLBACK_CHAINS 的 av 链**原始表**里也只有 vod"
+           "（chain_for 的过滤会掩盖写错）", repr(sorted(raw_av)))
+    # ★ 反向：真的把 tokenhub 塞进 av 链时，chain_for 必须把它过滤掉
+    report(not MC.gateway_supports("tokenhub", "av_alignment"),
+           "F1c ★ 反证：gateway_supports 对 tokenhub+av_alignment 为 False")
+
+    # F2 主选成功 → fallback_from 为 None（不是空列表）
+    got = MC.analyze_with_fallback("scene_semantics", media, env=env,
+                                   transport=ok_t)
+    report(got["status"] == "ok" and got["fallback_from"] is None,
+           "F2 ★ 主选就成功时 fallback_from=None（不是 []）",
+           repr(got.get("fallback_from")))
+    report(got.get("model_used") == MC.chain_for("scene_semantics")[0][1],
+           "F2b 主选成功时 model_used 是主选那个", repr(got.get("model_used")))
+
+    # F3 主选 429 → 落下一个，且 fallback_from 记下走过的路
+    def first_429(url, headers, payload, timeout):
+        if "a.test" in url:
+            return MC.HttpResult(429, "limited")
+        return ok_t(url, headers, payload, timeout)
+
+    got3 = MC.analyze_with_fallback("scene_semantics", media, env=env,
+                                    transport=first_429,
+                                    retry_attempts=1, retry_backoff=0)
+    report(got3["status"] == "ok"
+           and got3["fallback_from"] == ["tokenhub/glm-5.3-flash"],
+           "F3 ★★ 主选 429 → 回落，且 fallback_from 记下走过的那一项",
+           repr(got3.get("fallback_from")))
+    report(got3.get("gateway_used") == "vod",
+           "F3b 回落成功时 gateway_used 是实际用的那个", repr(got3.get("gateway_used")))
+
+    # F4 整条链都 429 → error，不是 untested
+    def all_429(url, headers, payload, timeout):
+        return MC.HttpResult(429, "limited")
+
+    got4 = MC.analyze_with_fallback("scene_semantics", media, env=env,
+                                    transport=all_429,
+                                    retry_attempts=1, retry_backoff=0)
+    report(got4["status"] == "error",
+           "F4 ★★ 整条链失败 → error（测了但失败），不是 untested",
+           repr(got4.get("status")))
+    report(len(got4.get("chain_tried") or []) == len(MC.chain_for("scene_semantics")),
+           "F4b 每次尝试都记进 chain_tried（能追到哪一步死的）",
+           str(len(got4.get("chain_tried") or [])))
+    report("整条回落链都失败" in (got4.get("reason") or ""),
+           "F4c reason 明说「整条链都失败」")
+    report(got4.get("model_used") is None,
+           "F4d 全失败时 model_used 是 None（不许编一个）", repr(got4.get("model_used")))
+
+    # F5 429 必须在 RETRYABLE 里；401/403/404 不在
+    report(429 in MC.RETRYABLE_STATUS,
+           "F5 ★★ 429 是 retryable（限流可重试）")
+    for code in (401, 403, 404):
+        report(code not in MC.RETRYABLE_STATUS,
+               "F5b ★ %d 不是 retryable（鉴权/寻址错，重试无意义）" % code)
+
+    # F6 重试次数真的生效：一个永远 429 的 transport，调用次数 = retry_attempts
+    calls = {"n": 0}
+
+    def counting_429(url, headers, payload, timeout):
+        calls["n"] += 1
+        return MC.HttpResult(429, "limited")
+
+    client = MC.GatewayClient.from_env("tokenhub", model="m", env=env,
+                                       transport=counting_429,
+                                       retry_attempts=3, retry_backoff=0)
+    client.analyze_task("scene_semantics", media)
+    report(calls["n"] == 3,
+           "F6 ★★ 同一模型重试次数 = retry_attempts（3 次），不是 1 次",
+           str(calls["n"]))
+    report(client.analyze_task("scene_semantics", media).get("retryable") is True,
+           "F6b 429 结果带 retryable=True（与「不可用」分开）")
+
+    # F7 401 必须立刻放弃重试（重试一百次也一样）
+    calls2 = {"n": 0}
+
+    def counting_401(url, headers, payload, timeout):
+        calls2["n"] += 1
+        return MC.HttpResult(401, "bad key")
+
+    client2 = MC.GatewayClient.from_env("tokenhub", model="m", env=env,
+                                        transport=counting_401,
+                                        retry_attempts=3, retry_backoff=0)
+    out401 = client2.analyze_task("scene_semantics", media)
+    report(calls2["n"] == 1,
+           "F7 ★★ 401 只试 1 次（不是 3 次）—— 鉴权错重试无意义", str(calls2["n"]))
+    report(out401.get("retryable") is False,
+           "F7b 401 结果带 retryable=False")
+    report("鉴权" in (out401.get("reason") or ""),
+           "F7c ★ 401 的 reason 点名「鉴权」，不许被读成「模型坏了」",
+           (out401.get("reason") or "")[:40])
+
+    # F8 未配凭据 ≠ 试过了不行：链上某网关未配时，应记 not_configured 并继续
+    only_tokenhub = {"MULTIMODAL_TOKENHUB_BASE_URL": "https://a.test/v1",
+                     "MULTIMODAL_TOKENHUB_API_KEY": "k1"}
+    calls3 = {"n": 0}
+
+    def tok_429(url, headers, payload, timeout):
+        calls3["n"] += 1
+        return MC.HttpResult(429, "limited")
+
+    got8 = MC.analyze_with_fallback("scene_semantics", media, env=only_tokenhub,
+                                    transport=tok_429, retry_attempts=1,
+                                    retry_backoff=0)
+    tried = got8.get("chain_tried") or []
+    report(any(t.get("status") == "not_configured" for t in tried),
+           "F8 ★★ vod 未配凭据时记 not_configured（不是「试过了不行」）",
+           repr([t.get("status") for t in tried]))
+    report(got8["status"] == "error",
+           "F8b 但整体仍是 error（一个都没成功）", repr(got8.get("status")))
+
+    # F10 ★★★ 缺介质必须是 untested 且**不许**把整条链跑完
+    #   —— 实测踩到过：只有 video 没有 audio 时落成「error 整条回落链都失败」，
+    #      读起来像「5 个模型都坏了」，而真相是「这次一个模型都不该被叫」。
+    calls10 = {"n": 0}
+
+    def counting_ok(url, headers, payload, timeout):
+        calls10["n"] += 1
+        return ok_t(url, headers, payload, timeout)
+
+    got10 = MC.analyze_with_fallback("av_alignment", {"video": img}, env=env,
+                                     transport=counting_ok, retry_attempts=1,
+                                     retry_backoff=0)
+    report(got10["status"] == "untested",
+           "F10 ★★★ 缺音轨 → untested（不是 error、更不是 ok）",
+           repr(got10.get("status")))
+    report(calls10["n"] == 0,
+           "F10b ★★★ 缺介质时**一个模型都没被调用**（0 次请求）",
+           str(calls10["n"]))
+    report(len(got10.get("chain_tried") or []) <= 1,
+           "F10c ★★ 缺介质时不许把整条链跑完（≤1 次尝试）",
+           str(len(got10.get("chain_tried") or [])))
+    report("与模型无关" in (got10.get("reason") or ""),
+           "F10d reason 明说「与模型无关」（不让人去查模型）",
+           (got10.get("reason") or "")[:50])
+
+    # F11 全部 not_configured → untested（没测），不是 error（失败）
+    got11 = MC.analyze_with_fallback("scene_semantics", media, env={},
+                                     transport=ok_t, retry_attempts=1,
+                                     retry_backoff=0)
+    report(got11["status"] == "untested",
+           "F11 ★★ 全部未配凭据 → untested（没测 ≠ 失败）",
+           repr(got11.get("status")))
+    report("没测" in (got11.get("reason") or ""),
+           "F11b reason 明说「这是没测，不是失败」", (got11.get("reason") or "")[:50])
+
+    # F9 读数的字面量不许再写「3.8-flash 不能用」
+    src = (ROOT / "tools" / "multimodal_client.py").read_text(encoding="utf-8")
+    report("gemini-3.8-flash" in src,
+           "F9 3.8-flash 在回落链里（主选之一）")
+    # ★ 判据要查的是「这句话还被当成**现行结论**」，不是「这句话有没有作为
+    #   历史被引用」。我自己的更正说明里就引用了它（引号里那句），
+    #   所以裸查子串会误报 —— 与 §2.4.1 记过的「判据被文档喂饱」同一个形状。
+    #   判法：查**非注释行**里有没有这句。
+    code_lines = []
+    in_doc = False
+    for raw in src.splitlines():
+        stripped = raw.strip()
+        if '"""' in stripped:
+            if stripped.count('"""') == 1:
+                in_doc = not in_doc
+            continue
+        if in_doc or stripped.startswith("#"):
+            continue
+        code_lines.append(raw)
+    code_only = "\n".join(code_lines)
+    report("默认落 gemini-3.1-flash-lite，不是 3.8" not in code_only,
+           "F9b ★★ 那句把 429 写成「不能用」的过期判语**不在代码里**"
+           "（注释里作为历史引用保留是允许的）")
+    report("不是 3.8" in src,
+           "F9c ★ 反证：那句话确实还作为**历史**在注释里（证明 F9b 查的是代码不是全文）")
+
+
+def check_adr_alignment():
+    """ADR-0019 与代码**必须一致**。
+
+    ★ 为什么这条要在这份验收器里：ADR-0019 定的是「网关策略」（谁是主选、
+      回落链长什么样、429 怎么处置）。它如果只写在文档里，代码改了没人知道 ——
+      而这份 ADR 的 §一 本身就是「文档与事实不一致」的产物
+      （委托方以为 tokenhub 有 gemini，实测 0 个）。所以必须双向钉住。
+    """
+    adr_path = ROOT / "ADR" / "ADR-0019-媒体审核网关策略与盘上缺件处置.md"
+    if not adr_path.is_file():
+        report(False, "F12 ADR-0019 存在")
+        return
+    adr = adr_path.read_text(encoding="utf-8")
+    report("accepted" in adr and "2026-10-26" in adr,
+           "F12 ADR-0019 状态 accepted、日期 2026-10-26")
+    # ★ 回落链上每个模型都必须在 ADR 的 §2.1 表里出现
+    missing = []
+    for task, chain in MC.FALLBACK_CHAINS.items():
+        for gateway, model in chain:
+            if model not in adr:
+                missing.append("%s/%s" % (gateway, model))
+    report(missing == [],
+           "F12b ★★ 回落链上每个模型都在 ADR §2.1 里（代码与决策不许脱钩）",
+           repr(missing))
+    # ★ 反向：代码里有的任务，ADR 里也有那一行
+    report(all(task in adr for task in MC.FALLBACK_CHAINS),
+           "F12c ★ 三个任务都在 ADR 里点名",
+           repr([t for t in MC.FALLBACK_CHAINS if t not in adr]))
+    # ★★ 关键那条：ADR 明确写着「tokenhub 里没有 gemini」
+    report("gemini 0 个" in adr or "tokenhub 里没有 gemini" in adr,
+           "F12d ★★ ADR 记下了「tokenhub 无 gemini」这个实测结论")
+    # ★ 且不许反过来把 tokenhub 写成有 gemini
+    report("tokenhub 的 gemini" not in adr,
+           "F12e ★ 反证：ADR 里没有把 gemini 说成 tokenhub 的资产")
+
+
 def check_status_mapping(tmpdir):
     img = Path(tmpdir) / "t.png"
     _tiny_png(img)
@@ -479,7 +726,9 @@ def main(argv):
         check_status_mapping(td)
         check_happy_path(td)
         check_aggregation(td)
+        check_fallback(td)
     check_no_secrets()
+    check_adr_alignment()
     print("-" * 78)
     if FAILED:
         print("❌ %d passed, %d failed" % (PASSED, FAILED))

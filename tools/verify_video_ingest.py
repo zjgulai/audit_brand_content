@@ -375,6 +375,74 @@ def check_execution():
            "X3 ★ 无音轨视频 → 音轨=not_applicable（判据 4）", repr(cover["音轨"]))
 
 
+def check_tool_degradation():
+    """P3：工具缺失时的降级路径必须是「未测」，不是空读数、不是静默绿。
+
+    ★ 这一组能在**没有 ffmpeg 的机器上**验：它喂的是打桩 runner，
+      验的是「外部命令失败时这一层怎么落」，不是「ffmpeg 装没装」。
+      两件事分开，所以本条今天能真跑（而 X 层不能）。
+
+    ★ 需要一个**真实存在的假文件**：`probe_video` 先判 `is_file()`，
+      喂不存在的路径会在到达 runner 之前就返回 `file_not_found` ——
+      那样测的是「文件不存在」而不是「工具失败」，判据会红得毫无意义。
+      （第一版就是这么写的，四条全红。）
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as td:
+        fake = Path(td) / "fake.mp4"
+        fake.write_bytes(b"not a real video")
+        _degradation_cases(fake)
+
+
+def _degradation_cases(fake):
+    def missing_runner(args):
+        return 127, b"", "command_not_found"
+
+    probe = MI.probe_video(fake, runner=missing_runner)
+    report(probe.ok is False and probe.reason.startswith("ffprobe_failed"),
+           "D1 ★★ ffprobe 缺失/失败 → ok=False 且 reason 点名（不是静默 0 时长）",
+           repr(probe.reason))
+    report(probe.duration_s == 0.0 and probe.width == 0,
+           "D1b 失败时不编造时长/尺寸（都是 0，且 ok=False 说明它们无意义）")
+
+    out = MI.extract_frames(fake, runner=missing_runner)
+    report(out["ok"] is False,
+           "D2 ★★ 抽帧失败 → ok=False（不是空清单冒充成功）", repr(out["ok"]))
+    report(out["frames"] == [] and out["kept_count"] == 0,
+           "D2b 失败时帧清单为空且计数为 0")
+    report(out["reason"] != "",
+           "D2c ★ 失败必须带 reason（空 reason 等于没说）", repr(out["reason"]))
+
+    # ★ 反向对照：不是视频流 → 也必须是 ok=False，且 reason 说得清
+    def audio_only_runner(args):
+        payload = {"format": {"duration": "10.0"},
+                   "streams": [{"codec_type": "audio"}]}
+        return 0, json.dumps(payload).encode(), ""
+
+    probe2 = MI.probe_video(fake, runner=audio_only_runner)
+    report(probe2.ok is False and probe2.reason == "no_video_stream",
+           "D3 ★★ 没有视频流 → no_video_stream（不是「零帧的合法视频」）",
+           repr(probe2.reason))
+    report(probe2.has_audio is True,
+           "D3b 但 has_audio 如实为 True（识别出它是音频）")
+
+    # ★ 反向对照：工具在的情况下不许误判成失败
+    def good_runner(args):
+        if any("ffprobe" in str(a) for a in args):
+            payload = {"format": {"duration": "5.0"},
+                       "streams": [{"codec_type": "video", "width": 640,
+                                    "height": 480, "avg_frame_rate": "30/1"},
+                                   {"codec_type": "audio"}]}
+            return 0, json.dumps(payload).encode(), ""
+        return 0, b"", ""
+
+    probe3 = MI.probe_video(fake, runner=good_runner)
+    report(probe3.ok and probe3.duration_s == 5.0 and probe3.has_audio,
+           "D4 ★ 反证：正常的 ffprobe 输出必须 ok（否则 D1/D2 恒红）",
+           repr(probe3.to_dict()))
+
+
 def main():
     print("=" * 78)
     print("T-435 · 视频抽帧（balanced）+ 音画对齐前提")
@@ -384,6 +452,8 @@ def main():
     check_budget()
     check_covers()
     check_contract_alignment()
+    print("  D 层：工具缺失时的降级（打桩 runner，今天就能跑）")
+    check_tool_degradation()
     print("  X 层：执行（真 ffmpeg/真文件）")
     check_execution()
     print("-" * 78)

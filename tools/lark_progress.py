@@ -228,6 +228,29 @@ def find_by_number(records: List[Dict[str, Any]],
     return None
 
 
+def find_by_name(records: List[Dict[str, Any]],
+                 name: str) -> Optional[Dict[str, Any]]:
+    """按**事项名称**找。★ 自动编号下这是唯一的幂等依据。
+
+    2026-10-27 实测事故：我给一批 4 条都没写 `事项编号`，工具按「现有最大号 +1」
+    逐条分配，于是**跑第二次就整批又插了一遍**（WBPM-0105…0107 与 0108…0110
+    内容完全相同，只是编号不同）。upsert 的「幂等」当场失效 ——
+    而失效的形态是「表里多出几条看着正常的重复行」，没有任何东西会红。
+
+    根因：`事项编号` 在**没给**的时候是**每次新生成的**，它不可能成为幂等键。
+    修法两条，缺一条都还会重犯：
+      ① 不给编号时，先按 `事项名称` 找 —— 找到就用它的编号（真 upsert）；
+      ② 报告里明说「按名称命中，沿用编号 XXXXX」，让人看得见这次是更新不是新增。
+    """
+    target = (name or "").strip()
+    if not target:
+        return None
+    for rec in records:
+        if ((rec.get("fields") or {}).get("事项名称") or "").strip() == target:
+            return rec
+    return None
+
+
 def next_number(records: List[Dict[str, Any]]) -> str:
     """下一个 WBPM-xxxx。★ 从**现有最大号 +1**，不数条数 ——
     删过一条之后按条数算会撞号。"""
@@ -404,6 +427,20 @@ def _selftest() -> int:
     C("S18 ★★ dry-run 不发请求（token=None 也不炸，证明真的没发）",
       plan["action"].startswith("would_"))
 
+    # ── 幂等：不给编号时按名称命中（2026-10-27 实测事故的执行点）─────────
+    dup = [{"record_id": "rec-9", "fields": {"事项编号": "WBPM-0007",
+                                            "事项名称": "同一件事"}}]
+    same = find_by_name(dup, "同一件事")
+    C("S19 ★★★ 不给编号时按**名称**能找到已有记录（幂等的前提）",
+      same is not None and same["record_id"] == "rec-9", repr(same))
+    C("S20 ★★ 名称不同 → 找不到（不许乱匹配）",
+      find_by_name(dup, "另一件事") is None)
+    C("S21 ★ 名称带前后空白也能命中（手写 JSON 常有）",
+      find_by_name(dup, "  同一件事  ") is not None)
+    # ★ 反向对照：这条判据真的会红 —— 去掉名称就不能作为幂等键
+    C("S22 ★★ 反证：名称是空串时不匹配任何记录（空名不能当键）",
+      find_by_name(dup, "") is None)
+
     print("-" * 74)
     if bad:
         print("❌ %d 过 · %d 红" % (ok, bad))
@@ -486,13 +523,23 @@ def main(argv: Sequence[str]) -> int:
 
     problems_all: List[str] = []
     planned: List[Tuple[Dict[str, Any], str]] = []
+    notes: List[str] = []
     for item in items:
         item = dict(item)
         if not item.get("事项编号"):
-            # ★ 自动编号只在本批**第一条**没有编号时发生；多条时逐条递增，
-            #   避免同批撞号（先按现有最大号分配，再在内存里递增记下已分配）。
-            item["事项编号"] = next_number(
-                records + [{"fields": {"事项编号": n}} for _, n in planned])
+            # ★★ 幂等的第一道：**先按名称找**。找到就沿用它的编号（真 upsert）。
+            #   不给编号时它是每次新生成的，不可能当幂等键 —— 2026-10-27 实测过：
+            #   一批 4 条都没写编号，跑第二次整批又插了一遍（内容相同、编号不同），
+            #   而 upsert 的「幂等」当场失效且没有任何东西会红。
+            same = find_by_name(records, item.get("事项名称"))
+            if same is not None:
+                inherited = (same.get("fields") or {}).get("事项编号")
+                item["事项编号"] = inherited
+                notes.append("按名称命中已有记录 → 沿用编号 %s（这是更新，不是新增）"
+                             % inherited)
+            else:
+                item["事项编号"] = next_number(
+                    records + [{"fields": {"事项编号": n}} for _, n in planned])
         issues = validate(item, fields)
         problems_all.extend(issues)
         planned.append((item, item["事项编号"]))
@@ -501,6 +548,11 @@ def main(argv: Sequence[str]) -> int:
         if issues:
             for issue in issues:
                 print("    ❌ %s" % issue)
+
+    if notes:
+        print("\n" + "-" * 74)
+        for note in notes:
+            print("  ★ 幂等：%s" % note)
 
     if problems_all:
         print("\n❌ 有 %d 项校验问题 —— 一条都不写" % len(problems_all))
