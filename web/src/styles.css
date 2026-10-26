@@ -1431,17 +1431,29 @@ code {
   background: var(--bg);
 }
 
+/* 面板：宽度按「二维码 + 按钮」并排的舒适值定，不是按整行文字定。
+   ★ 竖直堆叠会在二维码与按钮之间留一道空洞，读起来像两个不相干的块；
+     并排之后视线从二维码直接落到按钮上，中间没有跳跃。 */
 .login__panel {
   width: 100%;
-  max-width: 22rem;
+  max-width: 26rem;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-5);
+  gap: var(--space-4);
+  padding: var(--space-6);
   box-sizing: border-box;
   background: var(--surface);
   border: var(--border-subtle);
   border-radius: var(--radius-panel);
+}
+
+/* 头部与动作区之间一条 0.5px 分隔线 —— 用它代替留白，界面不靠空旷显得高级 */
+.login__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-subtle);
 }
 
 .login__brand {
@@ -1483,16 +1495,29 @@ code {
 }
 
 .login__signin {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-1);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
 }
 
 .login__sso {
-  align-self: stretch;
-  min-height: 2.25rem;
+  align-self: center;
+  min-height: 2.5rem;
   font-size: var(--text-base);
+  font-weight: 500;
+}
+
+/* 窄屏回到单列（并排在 320px 下会挤成一团） */
+@media (max-width: 30rem) {
+  .login__signin {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .login__sso {
+    width: 100%;
+  }
 }
 
 .login__status {
