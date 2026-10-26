@@ -176,7 +176,7 @@ export default function AppealsPage() {
     if (state === "open") {
       return (
         <span className="badge badge--pending" data-status-badge="">
-          open（受理中 · 2工作日 SLA）
+          open（受理中，2 个工作日）
         </span>
       );
     }
@@ -190,7 +190,7 @@ export default function AppealsPage() {
     if (state === "stale") {
       return (
         <span className="badge badge--sample" data-status-badge="">
-          stale（超30天未确认 · 长期保留）
+          stale（超 30 天未确认，长期保留）
         </span>
       );
     }
@@ -217,7 +217,7 @@ export default function AppealsPage() {
       <div className="cases-page__head">
         <div>
           <h1 id="appeals-page-title">
-            {appealId ? `申诉详情 · ${appealId}` : "申诉中心（P-06）"}
+            {appealId ? `申诉详情 ${appealId}` : "申诉中心"}
           </h1>
           <p className="hint">
             案件号即回执号；DP3 受理 SLA 为 2 个工作日；争议指向规则本身时升级法务（DP4）。

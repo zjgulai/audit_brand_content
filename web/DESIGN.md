@@ -1,197 +1,283 @@
-# DESIGN · 内容审核工作台（Web 复核面）
+# DESIGN · 内容审核工作台
 
-> 依据 `turn-into-app` 的 design-record 格式。配套 `web/docs/brief.md`。
-> 品牌色取自 `www.momcozy.com` 首页 CSS 实测（不是目测）。
-> 本文记录设计目标，已有原型实现；设计草图不是当前页面或生产验收结果。
-> 最新部署门与实现偏差见 [部署准备方案 v1](docs/deployment-plan-v1.md)。原型的队列只列 REVIEW/待自决，
-> 不按下面历史草图把 BLOCK/PASS 塞进待办；紧迫度排序、同屏详情与字体等目标未全验收。
+> 本文件是**设计语言的唯一说明**。§8 有一段机器可读的 token 台账
+> （以 TOKENS 的 BEGIN/END 注释标记围起来），由
+> `node web/scripts/check_design_tokens.mjs --check` 与
+> `src/styles/tokens.css` 逐项比对（DT-5）。
+>
+> ★ 正文里**不要**写出那对标记的字面量：解析器用的是正则找第一对标记，
+> 说明文字里出现一次就会把机器块的起点提前，于是「DESIGN 有 ---，tokens.css 没有」。
 
 ---
 
-## 1. 原型（Archetype）
+## 1. 原型
 
-**A1 Triage queue，选中项以 A7 Research brief 打开。**
+**A1 分诊队列，选中项以 A7 证据文件的形式打开。**
 
-完成那句话：「审核员看着**一张按紧迫度排序的案件队列**，对**其中一条案件的判定**动手。」
+完成那句话：「审核员看着**一张按紧迫度排序的案件队列**，对**其中一条的判定**动手。」
 
-- 主原型 **A1**：进件、由人分派/回复/批准——正是复核队列的形态。
-- 副原型 **A7**：选中一条后，右侧展开的是一份**结构化证据文件**（不是表单），每段带可追溯的引用。A7 只借组件与阅读栏宽，不接管主导航。
-- **为什么不是 A12 表单**：工作流是 `S8a（机器已出版结果）→ 人看 → S7`。结论**已经存在**，人是在审视与追加，不是在填表。`turn-into-app` 把「表单 + 步骤条」列为头号失败形态，与此一致。
-- **为什么不是 A2 看板**：队列不按阶段流转给人看——BLOCK 是终态、REVIEW 才转人。看板会暗示一条不存在的流水线。
+- **A1**：进件、分派、回复、批准 —— 就是复核队列的形态。
+- **A7**：选中一条后，右侧展开的是一份**结构化证据文件**（不是表单），每段带可追溯引用。
+- **不是 A12 表单**：工作流是「机器已出结果 → 人看 → 定性」。结论**已经存在**，
+  人是在审视与追加，不是填表。
+- **不是 A2 看板**：BLOCK 是终态、REVIEW 才转人。看板会暗示一条不存在的流水线。
 
-## 2. 视觉方向（Direction）
+## 2. 颜色：Radix Colors（2026-10-26 起）
 
-**control-room**（Fits A8 A1 A9 A10；domain: engineering/ops/security）。
-选它而不是 paper-desk 的理由：复核台的首要任务是**在异常里发现该动手的那一条**，需要高密度与克制的状态色，不是阅读体验。
+**所有颜色来自 [Radix Colors](https://www.radix-ui.com/colors)，不再有自定义 HSL。**
 
-按 `ui-direction.md` §4 的规则，品牌在源里出现时**品牌优先**：`--primary` 与 `--ring` 用 Momcozy 的酒红，中性色保留 control-room 的冷灰，方向块与 shared 块照常追加。
+色板与理由：
 
-### 品牌 token（实测换算，非估计）
-
-| 用途 | 值 | HSL | 对白底对比度 | 用途裁定 |
-|---|---|---|---|---|
-| **primary**（主色 / 选中 / 签字动作） | `#6A2C3A` 酒红 | `346.5 41.3% 29.4%` | **10.32:1** | ✅ 文字与按钮均可用 |
-| **primary 深一档**（hover） | `#55222D` | `347 43% 23%` | 13.9:1 | ✅ |
-| **accent**（次级强调 / 选中底） | `#f6eeed` 浅暖粉 | `6.7 33.3% 94.7%` | — | 只做底，不承载文字 |
-| **secondary**（次级标记 / 边框强调） | `#9c5455` 陶土 | `359.2 30% 47.1%` | **5.51:1** | ✅ 小字与描边可用 |
-| **border 暖档** | `#D7C0B3` 沙 | `21.7 31% 77.3%` | 1.66:1 | ⚠️ **只能当边框/分隔**，不得承载文字 |
-| **border 冷档** | `#C3B4AE` 石 | `17.1 14.9% 72.4%` | **2.01:1** | ⚠️ **同上，且已低于 3:1 非文本对比门槛 —— 不作为控件边框** |
-
-**刻意不采用的**：`#ff4e00` / `#ffb100`（电商 CTA 红点与促销黄）。它们在独立站上是转化色，放进审核台会让每条 BLOCK 的红色与品牌红互相冲淡，且促销黄与 `--warn` 语义混淆。
-
-### 状态色（与品牌色分工）
-
-状态色**不借用**品牌红。理由：品牌红一旦承担「BLOCK」，整个界面会被读成「满屏告警」，而大多数案件最终是 REVIEW 或待自决。
-
-| token | 亮色 | 依据 |
+| 色板 | 角色 | 为什么是它 |
 |---|---|---|
-| `--ok` | `141 64% 26.8%` | control-room 原值（绿，与品牌红无冲突） |
-| `--warn` | `35 99% 27.9%` | 同上（深琥珀，**不用促销黄**） |
-| `--bad` | `356 77% 40.6%` | 同上（红），与 `#6A2C3A` 的色相差 9.5°——实测可区分，但**不同时用于同一元素** |
+| **sand** | 中性（背景 / 面 / 文字 / 边框） | 暖灰，与品牌色同属暖区；界面不会一半暖一半冷 |
+| **tomato** | 品牌（登录、主行动、选中） | hue≈12°，与 red（hue≈0°）距离够远，**状态红不会与品牌色混读** |
+| **green** | 通过 / 合规 | — |
+| **amber** | 待人工复核 / 部分覆盖 | — |
+| **red** | 违规拦截 / 错误 | — |
+| **blue** | 待检测 / 信息 | — |
+| **purple** | 未测（独立状态） | 不与上面四个混用，避免「未测」被读成某种结论 |
 
-> ⚠️ `--bad` 与品牌 `--primary` 色相太近（356 vs 346.5）。**规则：品牌红只出现在「人要做的高风险动作」（submit / release-decision 入口），绝不出现在状态徽标上。** 状态徽标一律用 `--bad`/`--warn`/`--ok`。这条要写进断言。
+### 2.1 十二步的固定用途（这是 Radix 的核心，不是色号排列）
 
-### 排版与密度
-
-- 字体：`Inter Tight Variable`（正文）、`JetBrains Mono Variable`（id / 时间戳 / 规则号 / 指纹）
-- 字号：body 13/18，labels 12/16 @500，pane title 14/20 @600
-- 密度：行高 28px，控件 28–32px，面板间隙 8px，1px 细线
-- 圆角：`--radius: 0.25rem`
-- 动效：120ms ease-out；状态变化行闪一次底色并在 600ms 内淡出；**无入场动画**；`prefers-reduced-motion` 下全部关闭
-
-## 3. 外壳（Shell）
-
-```
-+----+------------------+--------------------------------------------------+
-|nav | 队列 · 18 待处理  | 案件 case-7f3a-…            BLOCK · DP2 · 待放行 |
-|    | 全待处理(18)      |--------------------------------------------------|
-|复核| o 案例A  BLOCK 2m | 判定结论                                         |
-|队列| o 案例B  REVIEW 9m|   BLOCK（DP2 工具预审）                           |
-|    | * 案例C  未审查 1h|   release_status 待放行 —— 机器不得放行            |
-|规范| o 案例D  待自决 3h|   ⚠ 覆盖 partial：仅已覆盖部分可判                 |
-|    | ...               |--------------------------------------------------|
-|    |                  | 证据链（智能体时刻 · 本屏唯一）                    |
-|    |                  |  1. 命中 H01 · L4 · 来源 rule                      |
-|    |                  |     原文「治疗」@6-8                              |
-|    |                  |     依据 EXT-021 · authority_state=ok             |
-|    |                  |  2. …                                             |
-|    |                  |--------------------------------------------------|
-|    |                  | 未评估（不是 0，是没跑）                           |
-|    |                  |   场景控制 · not_wired  权利控制 · not_wired       |
-|    |                  |--------------------------------------------------|
-|    |                  | [认领] [存草稿] [提交结论]        人动手，需理由   |
-+----+------------------+--------------------------------------------------+
-```
-
-- 导航：复核队列 / 分类规范（沿用现有）；登录态切换器在最右。
-- 页面标题只在 header 出现一次；无 eyebrow、副标题、统计条。
-- 首屏非数据文字 < 40 词。
-
-## 4. 智能体时刻（本屏唯一）
-
-**「解释判定」**——作用在**单条 finding** 与**整案的 coverage** 上。
-
-| 项 | 内容 |
+| 步 | 用途 |
 |---|---|
-| 触发 | 详情页加载即渲染；点某条 finding 时展开该条 |
-| 确定性部分 | 读取 `control_code / quote / location / authority_ref / authority_state / rule_conflict / coverage.not_evaluated_reason` |
-| 判断性部分 | **本期无**。纯本地渲染，不接模型 |
-| 展示的动词 | 来源用规范自己的词：「命中」「依据」「共同构成」 |
-| 工作态 | 无（本地渲染，瞬时）——因此**不出现 shimmer**，否则是在编造一个不存在的等待 |
-| 结果落在哪 | 详情页的「证据链」段落，逐条可核对；不是对话气泡 |
+| 1 | 应用背景 |
+| 2 | 次级背景（含槽位） |
+| 3 | 组件背景（默认态） |
+| 4 | 组件 hover 背景 |
+| 5 | 组件 active / 选中背景 |
+| 6 | 非交互细边框 |
+| 7 | 边框 hover / 强分隔 |
+| 8 | 边框 focus / 填充的强前景 |
+| 9 | 实心填充（需要 3:1 对比的地方） |
+| 10 | 实心 hover |
+| 11 | 低对比文字（对第 2 步 ≥ 4.5:1） |
+| 12 | 高对比文字 |
 
-**为什么不做「追问」**：`api/` 与 `base/` 目前零 LLM 依赖，这是一个要保住的性质。做一个看着能用、实际未接的输入框，等于把「未测」伪装成「能用」。
+★ **业务 CSS 只许引用语义别名**（`--surface` / `--text-muted` / `--brand-surface`），
+不许直接写 `--sand-7`。换色板只改 `tokens.css` 一处。
 
-## 5. 样例数据计划
+## 3. 字号：只有三档
 
-| 项 | 决定 |
-|---|---|
-| 来源 | **确定性夹具生成器**（固定种子、固定输入），全部走真实 schema |
-| 数量 | 18–24 条，覆盖五标签 + partial + 未测 + 冲突 + 一条超长原文 |
-| 标记 | 每条带 `sample: true`；页面顶部一行「样例数据」；菜单可一键清空 |
-| 为什么不用手写 JSON | 手写会与 schema 漂移且没人发现；生成器本身要有断言（生成物必须过契约校验） |
-| 为什么不是现在这条 `case-smoke` | smoke 只造 **1 条**（实测 `proposal/cases.json` 长度 = 1），铺不满首屏，看不出队列形态对不对 |
+字号只有三档，**值以 §8 台账为准**：
 
-## 6. 拒绝的默认长相（Refuses）
+- **12px**（`text-sm`）：次要信息、表头、徽标、辅助说明。**最小可用尺寸。**
+- **14px**（`text-base`）：正文、表单、列表、按钮。
+- **18px**（`text-title`）：页面与区块标题。
 
-| 这个领域通常会变成 | 这里替换成 |
-|---|---|
-| 五张 KPI 卡片 + 一张大表 | 一个高密度队列 + 一个证据文件 |
-| 「通过 / 拒绝」两个大按钮 | 三个具名动作（认领 / 存草稿 / 提交结论），都需理由 |
-| 未测显示为 `—` 或 0 | 独立徽标「未测」+ 原因，**不许折叠成空值** |
-| 状态用颜色块 | 8px 实心点 + 文字，颜色只做辅证 |
-| 表单 + 步骤条 | 已出版的结果 + 追加记录 |
+**不足时不再加字号** —— 用**字重**（400 / 500 / 600）、**颜色**（`--text` vs `--text-muted`）
+与**间距**建立层级。多一档字号就多一个「这个该用哪个」的判断。
 
-## 7. 品牌纪律（写进断言）
+## 4. 边框：0.5px
 
-1. `#6A2C3A` 只允许出现在：主按钮、焦点环、当前选中项、`release-decision` 入口。**不得**用于状态徽标。
-2. `#C3B4AE`（2.01:1）**不得**用作任何控件边框或文字；只能做非交互分隔线。
-3. `#ff4e00` / `#ffb100` **禁止**进入本工作台。
-4. 任何新增颜色必须给出对白底对比度；< 4.5:1 的不得承载文字。
+`--hairline: 0.5px`。1px 在 DPR≥2 的屏上会被放大成 2 物理像素，全部分隔都显得过重；
+0.5px 才是一条线。
+
+★ **已知取舍**：DPR=1 的老屏上 0.5px 可能被舍入为 0（边框不可见）。
+本工作台的浏览器支持范围（桌面 Chrome 155+）实测 DPR≥2，所以按 0.5px 出图；
+若将来要支持 DPR=1，应在 `@media (resolution: 1dppx)` 里回退到 1px，而不是改全局。
+
+## 5. 圆角：两档，且嵌套同心
+
+圆角只有两档，**值以 §8 台账为准**：
+
+- **6px**（`radius-panel`）：面板 / 卡片 / 侧边栏。
+- **4px**（`radius-control`）：面板内的控件（按钮 / 输入 / 徽标底）。
+
+嵌套规则：**内层圆角 = 外层圆角 − 内边距**。面板 6px + 内边距 2px → 内层 4px，视觉同心。
+药丸形（`999px`）只用于状态徽标与计数气泡，那是几何上「全圆」，与上面两档不冲突。
+
+## 6. 阴影与色条：不使用
+
+- **不使用阴影**：界面的层级由「面 + 0.5px 边框」表达，不靠投影。
+  投影在亮色界面上会发灰，且每加一处就要判断「多深」——那是一处没有标准的判断。
+- **不使用卡片左侧色条**：委托方 2026-10-26 明确要求移除。
+  选中/状态一律用**背景色 + 字重**表达。
+
+## 7. 动效
+
+只有**一个时长**（`--motion: 250ms`）与**一条缓动**（`--ease: ease-out`），
+且**只作用于颜色与边框**。不动的属性：`width` / `height` / `top` / `left`（会触发布局抖动）。
+
+`prefers-reduced-motion: reduce` 下全部关闭。
 
 ## 8. 机器可读 Token 台账（DT-5 等式权威源）
 
 <!-- TOKENS:BEGIN -->
 | Token | Value | 用途说明 |
 | :--- | :--- | :--- |
-| `--brand` | 346.5 41.3% 29.4% | 品牌酒红 #6A2C3A（10.32:1） |
-| `--brand-hover` | 347 43% 23% | 品牌酒红悬停态 #54212C（12.84:1） |
-| `--brand-foreground` | 0 0% 100% | 品牌主按钮文字 |
-| `--blush` | 6.7 33.3% 94.7% | 浅暖粉选中底 #F6EEED |
-| `--terracotta` | 359.2 30% 47.1% | 陶土次级标记 #9C5455（5.51:1） |
-| `--sand` | 21.7 31% 77.3% | 暖档沙分隔线 #D7C0B3（1.74:1） |
-| `--stone` | 17.1 14.9% 72.4% | 冷档石非交互分隔 #C3B4AE（2.01:1） |
-| `--background` | 36 33.3% 97.1% | 页面背景色（对齐 Reddit 暖调 #faf8f5） |
-| `--foreground` | 30 7.4% 10.6% | 主正文色（人文炭黑 #1d1b19，16.2:1） |
-| `--card` | 0 0% 100% | 卡片表面色 |
-| `--card-foreground` | 30 7.4% 10.6% | 卡片文字色（人文炭黑 #1d1b19） |
-| `--popover` | 0 0% 100% | 浮层表面色 |
-| `--popover-foreground` | 30 7.4% 10.6% | 浮层文字色（人文炭黑 #1d1b19） |
-| `--primary` | 346.5 41.3% 29.4% | 主高风险动作色（同 --brand） |
-| `--primary-foreground` | 0 0% 100% | 主动作前景白字 |
-| `--secondary` | 34.3 30.4% 95.5% | 次级中性表面色（暖灰 #f7f4f0） |
-| `--secondary-foreground` | 30 7.4% 10.6% | 次级按钮文字色 |
-| `--muted` | 34.3 30.4% 95.5% | 弱化表面色（暖灰 #f7f4f0） |
-| `--muted-foreground` | 30 5.3% 40% | 弱化辅助文字色（次级棕灰；在 --muted 底上 5.18:1 ≥ 4.5:1） |
-| `--accent` | 6.7 33.3% 94.7% | 强调底色（同 --blush） |
-| `--accent-foreground` | 30 7.4% 10.6% | 强调底前景字 |
-| `--ok` | 141 64% 26.8% | 语义安全/通过绿（6.15:1） |
-| `--warn` | 35 99% 27.9% | 语义复核/部分覆盖琥珀（6.22:1） |
-| `--bad` | 356 77% 40.6% | 语义拦截/错误红（6.62:1） |
-| `--info` | 211 60% 34% | 语义待自决蓝 |
-| `--violet` | 270 45% 42% | 语义未审查/未评估紫 |
-| `--destructive` | 356 77% 40.6% | 破坏性动作色（同 --bad） |
-| `--destructive-foreground` | 0 0% 100% | 破坏性动作白字 |
-| `--border` | 30 22.6% 87.8% | 柔和微暖分隔线（对齐 Reddit #e7e0d9） |
-| `--input` | 28 16.5% 55% | 交互控件边框（对白 ≥ 3:1） |
-| `--ring` | 346.5 41.3% 29.4% | 键盘焦点环（同 --brand） |
-| `--radius` | 0.25rem | 全局圆角 |
-| `--text-xs` | 11px | 极小字号 |
-| `--text-sm` | 12px | 常规表单/列表字号 |
-| `--text-base` | 13px | 基准正文字号 |
-| `--text-lg` | 14px | 栏标题字号 |
-| `--text-xl` | 17px | 页标题字号 |
-| `--space-1` | 4px | 间距阶梯 1 |
-| `--space-2` | 8px | 间距阶梯 2 |
-| `--space-3` | 12px | 间距阶梯 3 |
-| `--space-4` | 16px | 间距阶梯 4 |
-| `--space-5` | 24px | 间距阶梯 5 |
-| `--space-6` | 32px | 间距阶梯 6 |
-| `--motion-fast` | 120ms | 快速微交互过渡 |
-| `--motion-flash` | 600ms | 定位高亮闪底时长 |
-| `--surface-card` | hsl(var(--card)) | 卡片表面合成变量 |
-| `--surface-muted` | hsl(var(--muted)) | 弱化表面合成变量（表头 / 空态底） |
-| `--text-default` | hsl(var(--foreground)) | 主正文色合成变量 |
-| `--text-muted` | hsl(var(--muted-foreground)) | 弱化文字色合成变量（5.94:1） |
-| `--border-subtle` | 1px solid hsl(var(--border)) | 非交互细线合成变量 |
-| `--border-dashed` | 1px dashed hsl(var(--border)) | 空态虚线框合成变量 |
-| `--border-control` | 1px solid hsl(var(--input)) | 交互控件 3:1 边框合成变量 |
-| `--outline-active` | 0.125rem solid currentColor | 激活态轮廓合成变量 |
-| `--page-max` | 96rem | 工作台版心最大宽度 |
-| `--panel-radius` | 0.5rem | 面板圆角（大于控件圆角，形成层级） |
+| `--sand-1` | #fdfdfc |  |
+| `--sand-2` | #f9f9f8 |  |
+| `--sand-3` | #f1f0ef |  |
+| `--sand-4` | #e9e8e6 |  |
+| `--sand-5` | #e2e1de |  |
+| `--sand-6` | #dad9d6 |  |
+| `--sand-7` | #cfceca |  |
+| `--sand-8` | #bcbbb5 |  |
+| `--sand-9` | #8d8d86 |  |
+| `--sand-10` | #82827c |  |
+| `--sand-11` | #63635e |  |
+| `--sand-12` | #21201c |  |
+| `--tomato-1` | #fffcfc |  |
+| `--tomato-2` | #fff8f7 |  |
+| `--tomato-3` | #feebe7 |  |
+| `--tomato-4` | #ffdcd3 |  |
+| `--tomato-5` | #ffcdc2 |  |
+| `--tomato-6` | #fdbdaf |  |
+| `--tomato-7` | #f5a898 |  |
+| `--tomato-8` | #ec8e7b |  |
+| `--tomato-9` | #e54d2e |  |
+| `--tomato-10` | #dd4425 |  |
+| `--tomato-11` | #d13415 |  |
+| `--tomato-12` | #5c271f |  |
+| `--green-1` | #fbfefc |  |
+| `--green-2` | #f4fbf6 |  |
+| `--green-3` | #e6f6eb |  |
+| `--green-4` | #d6f1df |  |
+| `--green-5` | #c4e8d1 |  |
+| `--green-6` | #adddc0 |  |
+| `--green-7` | #8eceaa |  |
+| `--green-8` | #5bb98b |  |
+| `--green-9` | #30a46c |  |
+| `--green-10` | #2b9a66 |  |
+| `--green-11` | #218358 |  |
+| `--green-12` | #193b2d |  |
+| `--amber-1` | #fefdfb |  |
+| `--amber-2` | #fefbe9 |  |
+| `--amber-3` | #fff7c2 |  |
+| `--amber-4` | #ffee9c |  |
+| `--amber-5` | #fbe577 |  |
+| `--amber-6` | #f3d673 |  |
+| `--amber-7` | #e9c162 |  |
+| `--amber-8` | #f2a600 |  |
+| `--amber-9` | #ffc53d |  |
+| `--amber-10` | #ffba18 |  |
+| `--amber-11` | #ab6400 |  |
+| `--amber-12` | #4f3422 |  |
+| `--red-1` | #fffcfc |  |
+| `--red-2` | #fff0f0 |  |
+| `--red-3` | #feebec |  |
+| `--red-4` | #ffdbdc |  |
+| `--red-5` | #ffcdce |  |
+| `--red-6` | #fdbdbe |  |
+| `--red-7` | #f4a9aa |  |
+| `--red-8` | #eb8e90 |  |
+| `--red-9` | #e5484d |  |
+| `--red-10` | #dc3e42 |  |
+| `--red-11` | #ce2c31 |  |
+| `--red-12` | #641723 |  |
+| `--blue-1` | #fbfdff |  |
+| `--blue-2` | #f4faff |  |
+| `--blue-3` | #e6f4fe |  |
+| `--blue-4` | #d5efff |  |
+| `--blue-5` | #c2e5ff |  |
+| `--blue-6` | #acd8fc |  |
+| `--blue-7` | #8ec8f6 |  |
+| `--blue-8` | #5eb1ef |  |
+| `--blue-9` | #0090ff |  |
+| `--blue-10` | #0588f0 |  |
+| `--blue-11` | #0d74ce |  |
+| `--blue-12` | #113264 |  |
+| `--purple-3` | #f4f2ff |  |
+| `--purple-9` | #8e4ec6 |  |
+| `--purple-11` | #8145b5 |  |
+| `--bg` | var(--sand-2) | 应用背景（sand-2） |
+| `--surface` | var(--sand-1) | 卡片与面板表面（sand-1） |
+| `--surface-muted` | var(--sand-3) | 次级面与表头（sand-3） |
+| `--surface-hover` | var(--sand-4) | 组件 hover（sand-4） |
+| `--surface-active` | var(--sand-5) | 组件 active（sand-5） |
+| `--text` | var(--sand-12) | 主文字（sand-12） |
+| `--text-muted` | var(--sand-11) | 次要文字（sand-11） |
+| `--border` | var(--sand-6) | 非交互细线（sand-6，仅装饰） |
+| `--border-strong` | var(--sand-9) | 控件边框（sand-9，3.28:1） |
+| `--brand` | var(--tomato-11) | 带文字的实心底（tomato-11，白字 4.98:1） |
+| `--brand-hover` | var(--tomato-12) | 品牌 hover（tomato-12） |
+| `--brand-graphic` | var(--tomato-9) | 纯图形品牌色（tomato-9，不承载文字） |
+| `--brand-text` | var(--tomato-11) | 品牌文字（tomato-11） |
+| `--brand-text-on-surface` | var(--tomato-12) | 品牌淡底上的文字（tomato-12，10.34:1） |
+| `--brand-surface` | var(--tomato-3) | 品牌淡底（tomato-3） |
+| `--brand-ring` | var(--tomato-8) | 焦点环（tomato-8） |
+| `--ok` | var(--green-11) | 通过实心底（green-11） |
+| `--ok-graphic` | var(--green-9) | 通过图形色（green-9） |
+| `--ok-text` | var(--green-11) | 通过文字（green-11） |
+| `--ok-surface` | var(--green-3) | 通过淡底（green-3） |
+| `--warn` | var(--amber-11) | 待复核实心底（amber-11） |
+| `--warn-graphic` | var(--amber-9) | 待复核图形色（amber-9） |
+| `--warn-text` | var(--amber-11) | 待复核文字（amber-11） |
+| `--warn-surface` | var(--amber-3) | 待复核淡底（amber-3） |
+| `--bad` | var(--red-11) | 拦截实心底（red-11） |
+| `--bad-graphic` | var(--red-9) | 拦截图形色（red-9） |
+| `--bad-text` | var(--red-11) | 拦截文字（red-11） |
+| `--bad-surface` | var(--red-3) | 拦截淡底（red-3） |
+| `--info` | var(--blue-11) | 待检测实心底（blue-11） |
+| `--info-graphic` | var(--blue-9) | 待检测图形色（blue-9） |
+| `--info-text` | var(--blue-11) | 待检测文字（blue-11） |
+| `--info-surface` | var(--blue-3) | 待检测淡底（blue-3） |
+| `--untested-text` | var(--purple-11) | 未测文字（purple-11） |
+| `--untested-surface` | var(--purple-3) | 未测淡底（purple-3） |
+| `--ring` | var(--brand-ring) | 焦点环 |
+| `--hairline` | 0.5px | 边框宽度 0.5px |
+| `--radius-panel` | 6px | 面板圆角 6px |
+| `--radius-control` | 4px | 控件圆角 4px |
+| `--text-sm` | 12px | 最小字号 12px |
+| `--text-base` | 14px | 正文字号 14px |
+| `--text-title` | 18px | 标题字号 18px |
+| `--leading-base` | 1.6 | 正文行高 |
+| `--leading-title` | 1.3 | 标题行高 |
+| `--space-1` | 4px |  |
+| `--space-2` | 8px |  |
+| `--space-3` | 12px |  |
+| `--space-4` | 16px |  |
+| `--space-5` | 24px |  |
+| `--space-6` | 32px |  |
+| `--space-7` | 48px |  |
+| `--motion` | 250ms | 唯一过渡时长 250ms |
+| `--ease` | ease-out | 唯一缓动 ease-out |
+| `--on-brand` | #ffffff | 品牌实心底上的白字 |
+| `--border-subtle` | var(--hairline) solid var(--border) | 0.5px 细边框 |
+| `--border-dashed` | var(--hairline) dashed var(--border) | 0.5px 虚线边框 |
+| `--border-control` | var(--hairline) solid var(--border-strong) | 0.5px 控件边框 |
+| `--outline-active` | 2px solid var(--brand) | 激活轮廓 |
+| `--page-max` | 96rem | 版心最大宽度 |
 | `--sidebar-w` | 15rem | 侧边栏展开宽度 |
-| `--sidebar-w-collapsed` | 4rem | 侧边栏收起宽度（只留图标） |
-| `--sidebar-w-narrow` | 2.75rem | 侧边栏极窄档（≤480px，保 320px reflow） |
+| `--sidebar-w-collapsed` | 4rem | 侧边栏收起宽度 |
+| `--sidebar-w-narrow` | 2.75rem | 侧边栏极窄档 |
 | `--topbar-h` | 4rem | 顶栏高度 |
+| `--ui-font-sans` | -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif |  |
+| `--ui-font-mono` | ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace |  |
 <!-- TOKENS:END -->
 
+---
+
+## 9. 文案规则（委托方 2026-10-26 第 1–3 条）
+
+1. **不用中点「·」作分隔符。** 需要分隔时用逗号、换行，或直接分成两个元素。
+2. **不加解释性描述。** 界面上的每一句话都要回答一个用户会问的问题；
+   回答不了的话就不写。装饰性文案（「品牌内容在对外发布之前…」）一律删。
+3. **文案面向审核员与业务方**：容易理解，但不过度口语化；长度与功能场景匹配；
+   不自造词。术语对照见 §10。
+
+## 10. 术语对照（界面用词，不是研发词）
+
+| 系统内部 | 界面用词 |
+|---|---|
+| BLOCK | 违规拦截 |
+| REVIEW | 待人工复核 |
+| PASS | 审核通过 |
+| 待自决 | 品牌自决 |
+| 未审查 | 待检测 |
+| ContentUnit | 原文内容 |
+| coverage full / partial | 全规则覆盖 / 部分规则覆盖 |
+| severity L4 / L5 | 极高危 |
+
+## 11. 执行点
+
+| 检查 | 命令 | 它验什么 |
+|---|---|---|
+| 设计 token | `node web/scripts/check_design_tokens.mjs --check` | 无裸值、tokens.css ≡ DESIGN 台账、无直接 lucide import、无 Unicode 图标、Button variant 合规 |
+| 几何与布局 | `bash web/scripts/dev-up.sh` | 侧边栏一列不折行、主内容不被挤压、SPA 深链、44px 触控底线、320px reflow |
+| 无障碍 | 同上（`a11y_check.mjs`） | 15 条路由 × 2 视口：对比度、h1 唯一、控件名称、焦点可见 |
+| 视觉 | `node web/scripts/check_visual.mjs` | 截图基线比对 |

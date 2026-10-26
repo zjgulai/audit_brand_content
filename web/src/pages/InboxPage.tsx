@@ -100,7 +100,7 @@ export default function InboxPage() {
     <section className="cases-page" aria-labelledby="inbox-page-title">
       <div className="cases-page__head">
         <div>
-          <h1 id="inbox-page-title">收件箱与我的内容（P-02）</h1>
+          <h1 id="inbox-page-title">待办收件箱</h1>
           <p className="hint">
             失效与自动重审仅产生工作台内（In-App）通知记录，不代表飞书或个人外部消息已送达（UJ-7）。
           </p>
@@ -148,7 +148,7 @@ export default function InboxPage() {
                 </span>
                 <span className="hint">
                   {n.unread === false ? "已读" : "未读"}
-                  {n.acked_at ? ` · 已确认 (${n.acked_at})` : ""}
+                  {n.acked_at ? `，已确认 (${n.acked_at})` : ""}
                 </span>
               </div>
               {n.payload && (
@@ -178,7 +178,7 @@ export default function InboxPage() {
       )}
 
       <h2>
-        <Icon name="inbox" size={13} /> 待自决专区（DP1 业务自审 ·{" "}
+        <Icon name="inbox" size={13} /> 待自决专区（业务自审，{" "}
         {cases === null ? "尚未读取" : `${pendingSelfCases.length} 条`}）
       </h2>
       <p className="hint">
@@ -222,7 +222,7 @@ export default function InboxPage() {
                   </td>
                   <td>
                     {c.product_line ?? "未测"}
-                    {c.entry_channel ? ` · ${c.entry_channel}` : ""}
+                    {c.entry_channel ? ` ${c.entry_channel}` : ""}
                   </td>
                   <td>{c.release_status ?? "待放行"}</td>
                   <td>

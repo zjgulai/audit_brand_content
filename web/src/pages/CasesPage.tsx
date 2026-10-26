@@ -97,9 +97,9 @@ export default function CasesPage() {
         >
           <h2>
             {error.status === 401
-              ? "401 · 需要登录"
+              ? "需要登录"
               : error.status === 403
-                ? "403 · 无权读取案件列表"
+                ? "无权读取案件列表"
                 : "读取失败"}
           </h2>
           <p>{error.message}</p>
@@ -241,7 +241,7 @@ export default function CasesPage() {
                   <td>
                     <span>{c.product_line ?? "未测"}</span>
                     {c.entry_channel && (
-                      <span className="hint"> · {c.entry_channel}</span>
+                      <span className="hint">{c.entry_channel}</span>
                     )}
                   </td>
                   <td className="font-data">{c.assignee_id ?? "未指派"}</td>

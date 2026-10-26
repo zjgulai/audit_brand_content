@@ -233,8 +233,8 @@ export default function ReviewActions({ detail, refresh }: Props) {
               {primaryDraft && (
                 <>
                   {" "}
-                  · 当前主草稿 <code>{primaryDraft.draft_id}</code>（#
-                  {primaryDraft.snapshot_seq} · 作者{" "}
+                  当前主草稿 <code>{primaryDraft.draft_id}</code>（#
+                  {primaryDraft.snapshot_seq}，作者{" "}
                   <code>{primaryDraft.author ?? "未知"}</code>）
                 </>
               )}
@@ -262,10 +262,10 @@ export default function ReviewActions({ detail, refresh }: Props) {
                 <li key={d.draft_id} className="handoff-card">
                   <div className="handoff-card__head">
                     <span className="font-data">
-                      <strong>#{d.snapshot_seq}</strong> · {d.draft_id}
+                      <strong>#{d.snapshot_seq}</strong> {d.draft_id}
                     </span>
                     <span className="hint">
-                      作者 <code>{d.author ?? "システム"}</code> · {d.snapshot_at}
+                      作者 <code>{d.author ?? "システム"}</code>，{d.snapshot_at}
                     </span>
                     {isPrimary && (
                       <span className="badge badge--pending" data-status-badge="">
@@ -375,7 +375,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
 
       <label htmlFor="review-note">
         复核理由 / 备注 / 裁决理由
-        {autoSaveInfo && <span className="hint"> · {autoSaveInfo}</span>}
+        {autoSaveInfo && <span className="hint">{autoSaveInfo}</span>}
       </label>
       <textarea
         id="review-note"

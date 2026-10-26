@@ -17,6 +17,7 @@
     "verify:auth": "node --experimental-strip-types scripts/check_auth_headers.mjs"
   },
   "dependencies": {
+    "@radix-ui/colors": "^3.0.0",
     "qrcode": "1.5.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",

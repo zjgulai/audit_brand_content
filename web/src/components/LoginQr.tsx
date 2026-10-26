@@ -84,11 +84,10 @@ export default function LoginQr({ target, size = 132 }: LoginQrProps) {
         // 而这里的输入是**我们自己给的常量 URL**，不是用户输入。
         dangerouslySetInnerHTML={{ __html: markup }}
       />
-      <p className="login__qr-note hint">
-        用飞书扫一扫完成授权。
-        <br />
-        扫码在<b>手机</b>上完成；桌面仍需点一次按钮登录。
-      </p>
+      {/* ★ 2026-10-26：原来三句（扫一扫 / 手机上完成 / 桌面仍需点按钮）。
+          前两句是重复的，第三句是「按钮就在旁边」这件事的要说明 —— 都删。
+          只留「手机扫码」这个用户真正需要知道的信息。 */}
+      <p className="login__qr-note">手机飞书扫码</p>
     </div>
   );
 }

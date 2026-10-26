@@ -34,7 +34,7 @@ const WHY_TEXT: Record<string, string> = {
   not_wired: "未接线（根本没跑，不是跑了没问题）",
   no_rule: "无适用规则",
   no_capability: "无该能力",
-  no_control_points: "未做·无控制点（这一族还没有定控制点）",
+  no_control_points: "未做，这一族还没有定控制点",
 };
 
 interface SpecMeta {
@@ -195,13 +195,13 @@ function EvidenceItem({
       <div className="evidence__why">
         {f.location && f.location.start !== undefined ? (
           <span className="evidence__loc font-data">
-            位置 {f.location.type ?? "text"} · {f.location.start}–{f.location.end}
+            位置 {f.location.type ?? "text"} {f.location.start}–{f.location.end}
             {"　"}
           </span>
         ) : null}
         <span>
           依据：{(f.authority_ref ?? []).map((r) => r.ref_id).join("、") || "未登记"}
-          {" · "}
+          {"， "}
           <span className={authInfo.cls} data-status-badge="">
             {authInfo.text}
           </span>
@@ -413,9 +413,9 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
   if (error) {
     const head =
       error.status === 403
-        ? "403 · 无权读取该案件"
+        ? "无权读取该案件"
         : error.status === 404
-          ? "404 · 案件不存在"
+          ? "案件不存在"
           : "读取失败";
     return (
       <section className="case">
@@ -475,7 +475,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
     <section className={isEmbedded ? "case case--embedded" : "case case--dual"}>
       <div className="case__top-bar">
         <div className="case__head">
-          <TitleTag>{isEmbedded ? `正在查看 · ${detail.case_id}` : "案件详情"}</TitleTag>
+          <TitleTag>{isEmbedded ? `正在查看 ${detail.case_id}` : "案件详情"}</TitleTag>
           <StatusBadge axis="decision" value={dec.state} />
           <span className="font-data">{detail.case_id}</span>
           {isEmbedded && (
@@ -488,13 +488,13 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           )}
         </div>
         <p className="case__sub">
-          <span className="font-data">{ir.ir_id}</span>（{ir.ir_version}） · 回执{" "}
+          <span className="font-data">{ir.ir_id}</span>（{ir.ir_version}），回执{" "}
           <span className="font-data">{ir.receipt_ref ?? "未测"}</span>
-          {ir.created_at && <> · {ir.created_at}</>}
+          {ir.created_at && <>，{ir.created_at}</>}
         </p>
         <InlineMetricSummary
           scope="case"
-          countsLabel={`查出问题 ${(ir.findings ?? []).length} 处 · 这边没查 ${notEvaluated.length} 项`}
+          countsLabel={`查出问题 ${(ir.findings ?? []).length} 处，未查 ${notEvaluated.length} 项`}
           trendLabel={null}
           untestedLabel={notEvaluated.length > 0 ? "partial" : cov.coverage_state}
         />
@@ -519,7 +519,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
             <dt>对外标签</dt>
             <dd>
               <StatusBadge axis="decision" value={dec.state} />{" "}
-              <span className="hint">（{dec.layer} · 唯一判定由后端产出）</span>
+              <span className="hint">（{dec.layer}，判定由后端产出）</span>
             </dd>
             <dt>放行状态</dt>
             <dd>
@@ -565,7 +565,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           <h2>未评估（不是 0，是没跑）</h2>
           <NotEvaluatedList items={notEvaluated} />
 
-          <h2>证据链（智能体时刻 · 本地渲染，不接模型）</h2>
+          <h2>证据链</h2>
           <SpecSeamNote disputeCount={disputeCount} />
           {(ir.findings ?? []).length === 0 ? (
             <p className="hint">无 finding。</p>
@@ -604,7 +604,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
                   <Link to={`/reports/${encodeURIComponent(r.report_id)}`}>
                     {r.report_id}
                   </Link>
-                  {r.published_at ? ` · ${r.published_at}` : ""}
+                  {r.published_at ? `，${r.published_at}` : ""}
                 </li>
               ))}
             </ul>

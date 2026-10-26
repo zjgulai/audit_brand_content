@@ -132,7 +132,7 @@ export default function SubmitPage({
     >
       <div className="cases-page__head">
         <div>
-          <HeadingTag id="submit-page-title">提交内容审查（P-01）</HeadingTag>
+          <HeadingTag id="submit-page-title">提交内容审查</HeadingTag>
           <p className="hint">
             一次提交 = 一张提交单。「内容阶段 / 产品线 / 入口渠道」三项必填，机器只补证据、不强猜归属。
           </p>

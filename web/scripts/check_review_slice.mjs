@@ -520,7 +520,12 @@ async function main() {
       const injected = document.createElement("span");
       injected.className = "badge";
       injected.setAttribute("data-status-badge", "");
-      injected.style.color = "#6A2C3A";
+      // ★ 2026-10-26：原来写死 #6A2C3A（旧品牌酒红）。品牌色换成 Radix tomato 之后，
+      //   这条反向对照注入的是一个**界面上已经不存在的颜色** —— 检测器当然抓不到，
+      //   于是 A6b 变红。但它红的原因不是「检测坏了」，而是「对照样本过期了」。
+      //   判据应当注入**当前**的品牌色：读到什么就注入什么，
+      //   这样无论色板怎么换，它测的都是「检测器能不能认出品牌色」这件事本身。
+      injected.style.color = probeColor;
       injected.textContent = "反向对照";
       document.body.appendChild(injected);
       const after = scan();
@@ -546,7 +551,7 @@ async function main() {
     a6 ? `四页 [${a6.pages.join(", ")}] 共 ${a6.count} 个徽标 · 品牌红命中 ${a6.bad.length} · brandHue=${a6.brandHue} ` +
          `· 注入后 ${a6.afterBad}（${a6.injectedColor}）${JSON.stringify(a6.bad.slice(0, 2))}`
        : "取不到 DOM");
-  record("A6b", "反向对照：注入 style=color:#6A2C3A 的 .badge 必须被抓到",
+  record("A6b", "反向对照：注入「当前品牌色」的 .badge 必须被抓到",
     Boolean(a6?.controlCaught),
     a6 ? `brandRaw=${JSON.stringify(a6.brandRaw)} probeColor=${JSON.stringify(a6.probeColor)} ` +
          `brandHue=${a6.brandHue} afterBad=${a6.afterBad} afterCount=${a6.afterCount}`
@@ -554,7 +559,12 @@ async function main() {
   // A6s 源码补充（Stage 5 删除 `.badge--*` 后这条会变成 vacuous，主判据仍是 A6）
   const css = fs.readFileSync(path.join(repoRoot, "web/src/styles.css"), "utf8");
   const badgeBlock = css.match(/\.badge--[a-z]+\s*\{[^}]*\}/g) ?? [];
-  const brandInBadge = badgeBlock.filter((b) => /#6A2C3A|--brand/i.test(b));
+  // ★ 2026-10-26：原判据 grep 字面量 #6A2C3A。品牌色换成 Radix 之后，
+  //   那个字面量在仓里**一处都没有**，于是这条永远绿 —— 一条恒真的断言。
+  //   改成 grep `--brand`（语义名前缀）与任何六位色值：只要徽标规则里
+  //   出现品牌语义名或裸色值就红。
+  const brandInBadge = badgeBlock.filter(
+    (b) => /--brand/i.test(b) || /#[0-9a-fA-F]{6}\b/.test(b));
   record("A6s", "（补充）品牌红 / --brand 不出现在 .badge--* 规则里",
     brandInBadge.length === 0, brandInBadge.join(" "));
 

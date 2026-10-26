@@ -236,7 +236,7 @@ export default function TaxonomyPage() {
       <p className="hint">
         只读浏览页（RL-15 / C-103：Web 端严禁直接修改规则、控制点或路由，任何写请求将被服务端 403 拦截并写入 <code>access-log</code>）。
         数据源：<code>web/src/data/taxonomy.json</code>（
-        {taxonomy.meta.spec_version ?? taxonomy.meta.version} · {taxonomy.meta.status}），
+        {taxonomy.meta.spec_version ?? taxonomy.meta.version}，{taxonomy.meta.status}），
         由 <code>tools/gen_taxonomy_json.py</code> 从规范正文生成，<strong>不得手改</strong>。
       </p>
       <p className="hint">{taxonomy.meta.note}</p>
@@ -263,7 +263,7 @@ export default function TaxonomyPage() {
                     <span className="font-data">{d.section}</span>
                     <span>
                       {d.dispute}
-                      {d.axis_code === null && <b> · 多轴争议</b>}
+                      {d.axis_code === null && <b>多轴争议</b>}
                     </span>
                     <span className="notrun__why">
                       {d.status}
@@ -284,7 +284,7 @@ export default function TaxonomyPage() {
                 aria-labelledby={`axis-${axis.code}`}
               >
                 <h3 id={`axis-${axis.code}`}>
-                  <code>{axis.code}</code> · {axis.name}
+                  <code>{axis.code}</code> {axis.name}
                 </h3>
                 <dl className="taxonomy-fields">
                   <dt>一句话定义</dt>
@@ -361,7 +361,7 @@ export default function TaxonomyPage() {
                           items={field.values}
                           empty={
                             field.expected_count
-                              ? `${field.expected_count} 个值 · ${PENDING}`
+                              ? `${field.expected_count} 个值，${PENDING}`
                               : PENDING
                           }
                         />

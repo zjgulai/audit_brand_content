@@ -135,9 +135,9 @@ export default function ContentUnitViewer({
           </strong>
           <div className="unit-pane__meta font-data">
             <span>{unitId}</span>
-            <span> · 形态 {kind}</span>
-            <span> · 解析 {parseStatus}</span>
-            {failureKind && <span> · 失败原因 {failureKind}</span>}
+            <span>形态 {kind}</span>
+            <span>解析 {parseStatus}</span>
+            {failureKind && <span>失败原因 {failureKind}</span>}
           </div>
         </div>
         <div className="unit-pane__tabs" role="tablist" aria-label="原件视图切换">
@@ -276,7 +276,7 @@ export default function ContentUnitViewer({
               观察不是 finding —— 它没有 control_code 与 authority_ref，
               所以界面上不许渲染成已确认的违规，否则复核时无法对照规则。 */}
           <p className="hint">
-            <strong>候选 · 待人工确认</strong>
+            <strong>候选，待人工确认</strong>
             ：以下为机器对画面的观察，不是规则命中，须人工判断。
           </p>
           {okObs.length === 0 && badObs.length === 0 ? (

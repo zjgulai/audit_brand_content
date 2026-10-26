@@ -77,7 +77,7 @@ export function Pager({
   return (
     <nav className="pager" aria-label="分页">
       <p className="pager__summary">
-        共 {total} {noun} · 当前显示第 {from}–{to} {noun}
+        共 {total} {noun}，当前第 {from}–{to} {noun}
       </p>
 
       {totalPages > 1 && (

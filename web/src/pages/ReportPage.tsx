@@ -102,9 +102,9 @@ export default function ReportPage() {
         >
           <h2>
             {error.status === 404
-              ? "404 · 报告不存在"
+              ? "报告不存在"
               : error.status === 403
-                ? "403 · 无权读取该报告"
+                ? "无权读取该报告"
                 : "读取失败"}
           </h2>
           <p>{error.status === 404 ? "该报告编号没有对应的存档。" : error.message}</p>
@@ -158,7 +158,7 @@ export default function ReportPage() {
 
       <InlineMetricSummary
         scope="report"
-        countsLabel={`finding ${findings.length} 项 · 未评估 ${notEvaluated.length} 项`}
+        countsLabel={`查出问题 ${findings.length} 处，未查 ${notEvaluated.length} 项`}
         trendLabel={null}
         untestedLabel={ir?.coverage?.coverage_state ?? "未测"}
       />
@@ -200,7 +200,7 @@ export default function ReportPage() {
       {/* 内嵌六区块只读报告视图（G-06 / UX-03） */}
       {ir ? (
         <div className="report-sections" data-report-six-blocks="">
-          <h2>区块一 · 结论摘要</h2>
+          <h2>结论摘要</h2>
           <dl className="facts">
             <dt>对外标签</dt>
             <dd>
@@ -215,7 +215,7 @@ export default function ReportPage() {
             <dd>{(ir.decision.obligations ?? []).join("、") || "无"}</dd>
           </dl>
 
-          <h2>区块二 · 命中的问题（共 {findings.length} 项）</h2>
+          <h2>命中的问题（共 {findings.length} 项）</h2>
           {findings.length === 0 ? (
             <p className="hint">本次运行未记录命中 finding。</p>
           ) : (
@@ -241,7 +241,7 @@ export default function ReportPage() {
                       依据：
                       {(f.authority_ref ?? []).map((r) => r.ref_id).join("、") ||
                         "未登记"}{" "}
-                      · <span className={auth.cls}>{auth.text}</span>
+                      <span className={auth.cls}>{auth.text}</span>
                     </div>
                   </li>
                 );
@@ -249,7 +249,7 @@ export default function ReportPage() {
             </ol>
           )}
 
-          <h2>区块三 · 覆盖证明</h2>
+          <h2>覆盖证明</h2>
           <dl className="facts">
             <dt>覆盖状态</dt>
             <dd>
@@ -266,7 +266,7 @@ export default function ReportPage() {
             </dd>
           </dl>
 
-          <h2>区块四 · 依据清单与快照</h2>
+          <h2>依据清单与快照</h2>
           <dl className="facts">
             <dt>规则快照</dt>
             <dd className="font-data">{ir.rule_snapshot ?? "未测"}</dd>
@@ -276,7 +276,7 @@ export default function ReportPage() {
             <dd className="font-data">{ir.control_points_version ?? "未测"}</dd>
           </dl>
 
-          <h2>区块五 · 未审说明（不是 0，是没跑）</h2>
+          <h2>未查的部分</h2>
           {notEvaluated.length === 0 ? (
             <p className="hint">无未评估项（所有适用控制点均已评估）。</p>
           ) : (
@@ -292,7 +292,7 @@ export default function ReportPage() {
             </ul>
           )}
 
-          <h2>区块六 · 执行回执与双指纹锚点</h2>
+          <h2>执行回执与指纹锚点</h2>
           <dl className="facts">
             <dt>回执编号</dt>
             <dd className="font-data">{ir.receipt_ref ?? "未测"}</dd>
@@ -316,7 +316,7 @@ export default function ReportPage() {
         <Link to="/reports">
           <Icon name="arrow-left" size={12} /> 报告索引
         </Link>
-        {"　·　"}
+        {"　"}
         <Link to="/queue">
           <Icon name="arrow-left" size={12} /> 返回复核队列
         </Link>

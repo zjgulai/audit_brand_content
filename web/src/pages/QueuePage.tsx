@@ -167,7 +167,7 @@ export default function QueuePage() {
         <section className="case">
           <h1>复核队列</h1>
           <div className="state state--forbidden" role="alert">
-            <h2>401 · 需要登录</h2>
+            <h2>需要登录</h2>
             <p>
               后端要求有效 session。本机联调时，请在上方「身份」下拉里选一个身份；
               生产环境走飞书 OAuth / SSO。
@@ -181,7 +181,7 @@ export default function QueuePage() {
         <section className="case">
           <h1>复核队列</h1>
           <div className="state state--forbidden" role="alert">
-            <h2>403 · 无权读取</h2>
+            <h2>无权读取</h2>
             <p>
               当前身份没有可读的案件（受 tenant + product_line + assigned/actionable 约束）。
               换一个身份，或申请相应权限。
@@ -343,9 +343,6 @@ export default function QueuePage() {
       <div className="queue__detail-pane">
         <div className="queue__detail-header">
           <h1>待人工复核案件</h1>
-          <span className="hint">
-            用 <code>J</code> / <code>K</code> 可直接下一条 / 上一条；点左边的案件行也能切换。
-          </span>
         </div>
         <InlineMetricSummary
           scope="queue"
@@ -358,9 +355,7 @@ export default function QueuePage() {
         ) : (
           <div className="case">
             <p className="hint">
-              点任意一条案件下方的「在这里查看」，或按键盘 <code>J</code> 键，
-              右边就会展开这条内容的原文、查出它哪里有问题、以及可以做什么处置；
-              点案件编号则进入单独的一整页详细视图。
+              从左侧选择一条案件开始复核。
             </p>
           </div>
         )}

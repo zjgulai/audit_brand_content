@@ -42,7 +42,7 @@ export default function ReportsIndexPage() {
           }
           role="alert"
         >
-          <h2>{error.status === 403 ? "403 · 无权读取报告列表" : "读取失败"}</h2>
+          <h2>{error.status === 403 ? "无权读取报告列表" : "读取失败"}</h2>
           <p>{error.message}</p>
         </div>
       </section>

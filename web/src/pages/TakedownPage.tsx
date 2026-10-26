@@ -42,7 +42,7 @@ function formatAgeDays(ageDays: number | undefined): string {
   const totalHours = Math.max(0, Math.floor(ageDays * 24));
   const days = Math.floor(totalHours / 24);
   const remHours = totalHours % 24;
-  return `已持续 ${days} 天 ${remHours} 小时（无硬期限 · 持续追踪）`;
+  return `已持续 ${days} 天 ${remHours} 小时，无硬期限，持续追踪`;
 }
 
 export default function TakedownPage() {
@@ -273,7 +273,7 @@ export default function TakedownPage() {
     if (state === "failed") {
       return (
         <span className="badge badge--block" data-status-badge="">
-          failed（下线失败 · 已升级统筹与法务）
+          failed（下线失败，已升级统筹与法务）
         </span>
       );
     }
@@ -295,7 +295,7 @@ export default function TakedownPage() {
     <section className="cases-page" aria-labelledby="takedown-page-title">
       <div className="cases-page__head">
         <div>
-          <h1 id="takedown-page-title">下线任务台（P-08）</h1>
+          <h1 id="takedown-page-title">违规下架</h1>
           <p className="hint">
             已发布内容在签发撤回（revoke）或自动失效（invalidated）后自动生成下线任务。
             无硬期限（<code>no_hard_deadline</code>），持续展示任务年龄、每日提醒次数与平台积压（TD-8）。
@@ -324,7 +324,7 @@ export default function TakedownPage() {
 
       {modalKind === "complete" && activeTaskId && (
         <div className="actions" role="dialog" aria-label="完成下线证据回填">
-          <h2>完成下线证据回填 · {activeTaskId}（TD-4）</h2>
+          <h2>完成下线证据回填</h2>
           <p className="hint">
             必填：执行平台、执行人、执行时间（不得晚于当前），以及回执编号{" "}
             <code>receipt_id</code> 或可访问的 <code>result_url</code> 至少一项。
@@ -413,7 +413,7 @@ export default function TakedownPage() {
 
       {modalKind === "waive" && activeTaskId && (
         <div className="actions" role="dialog" aria-label="双人独立审批豁免下线">
-          <h2>双人独立审批豁免（Waive） · {activeTaskId}（TF-10…TF-19）</h2>
+          <h2>双人独立审批豁免 {activeTaskId}</h2>
           <p className="hint">
             规则：需两名不同的、具备匹配三维 scope 的 <code>takedown.waive</code> 审批人；
             执行人本人不得自批；原签发人最多作为两名审批人之一，不得唯一。
@@ -491,7 +491,7 @@ export default function TakedownPage() {
 
       {modalKind === "reassign" && activeTaskId && (
         <div className="actions" role="dialog" aria-label="改派下线任务负责人">
-          <h2>改派下线任务 · {activeTaskId}（TD-12）</h2>
+          <h2>改派下线任务 {activeTaskId}</h2>
           <form
             className="submit-form"
             onSubmit={(e) => void handleReassignSubmit(e)}
@@ -542,7 +542,7 @@ export default function TakedownPage() {
                 </span>
                 {renderTaskBadge(t.state)}
                 <span className="font-data hint">
-                  Scope: {t.platform} · {t.tenant ?? "t1"} ·{" "}
+                  范围：{t.platform} {t.tenant ?? "t1"}{" "}
                   {t.product_line ?? "未测"}
                 </span>
               </div>
@@ -563,7 +563,7 @@ export default function TakedownPage() {
                 <dt>提醒记录</dt>
                 <dd className="font-data">
                   已提醒 {t.reminder_count ?? 0} 次
-                  {t.last_reminded_at ? ` · 上次 ${t.last_reminded_at}` : ""}
+                  {t.last_reminded_at ? `，上次 ${t.last_reminded_at}` : ""}
                 </dd>
               </dl>
 

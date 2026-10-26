@@ -286,7 +286,9 @@ try {
 
   // 1) P-06 申诉中心（/appeals）：真实填写表单并提交发起申诉 + UI 状态与列表卡片回读
   await spaGoto("/appeals");
-  await waitText("申诉中心（P-06）");
+  // ★ 2026-10-26 术语：标题去掉内部票号（「申诉中心（P-06）」→「申诉中心」）。
+  //   等待信号跟着改，否则断言会等一个界面上已不存在的串。
+  await waitText("申诉中心");
   await fillInput("#appeal-case-id", caseId);
   await fillInput("#appeal-reason", "CDP 浏览器真实提交申诉测试：请求复核上下文");
   await click("提交申诉");
@@ -313,12 +315,12 @@ try {
   //   夹具该跟着产品走，不是反过来。
   await switchDevIdentity("u_signer");
   await spaGoto("/takedown");
-  await waitText("下线任务台（P-08）");
+  await waitText("违规下架");
   await waitText("td-smoke-1");
   await click("开始执行（Start）");
   await waitText("已执行 start → 当前状态：in_progress");
   await click("完成并回填证据（Complete）");
-  await waitText("完成下线证据回填 · td-smoke-1");
+  await waitText("完成下线证据回填");
   await fillInput("#td-ev-receipt", "AMZ-RM-CDP-001");
   await click("提交回填并结案");
   await waitText("已完成证据回填并结案（completed，停止每日提醒）");
@@ -370,7 +372,7 @@ try {
 
   // 4) P-01 提交审查页（/submit）：真实填写正文并点击提交审查单
   await spaGoto("/submit");
-  await waitText("提交内容审查（P-01）");
+  await waitText("提交内容审查");
   await fillInput("#submit-text", "Momcozy 穿戴式吸奶器日常护理说明");
   await click("提交审查单");
   await waitEval(
@@ -380,7 +382,7 @@ try {
 
   // 5) P-02 收件箱（/inbox）：真实点击「标记已读（Read）」
   await spaGoto("/inbox");
-  await waitText("收件箱与我的内容（P-02）");
+  await waitText("待办收件箱");
   await waitText("notif-smoke-1");
   await click("标记已读（Read）");
   await waitText("notif-smoke-1 已");
@@ -407,14 +409,14 @@ try {
 
   // 7) P-11 授权治理（/admin/grants）与 P-12 会话审计（/admin/sessions）
   await spaGoto("/admin/grants");
-  await waitText("授权名单治理（P-11）");
+  await waitText("授权治理");
   await fillInput("#grant-user", "u_signer_2");
   await fillInput("#grant-reason", "CDP 授权提案测试");
   await click("提交授权提案");
   await waitText("提交响应（HTTP");
 
   await spaGoto("/admin/sessions");
-  await waitText("会话与安全审计（P-12）");
+  await waitText("安全审计");
   await waitText("安全与审计契约状态");
 
   console.log(JSON.stringify({

@@ -210,7 +210,7 @@ export default function ReleasePage() {
       <section className="cases-page" aria-labelledby="release-center-title">
         <div className="cases-page__head">
           <div>
-            <h1 id="release-center-title">签发台 G-1（P-07）</h1>
+            <h1 id="release-center-title">合规签发</h1>
             <p className="hint">
               全系统唯一允许改变 <code>release_status</code> 的受控入口。
               执行人级 allowlist + 租户/品线 scope + 职责分离（SoD：提交人与最终复核人不得自签）+ 飞书 SSO Step-Up 二次认证。
@@ -351,15 +351,15 @@ export default function ReleasePage() {
                 </span>
               </dd>
               <dt>1. 审查记录完整</dt>
-              <dd>IR {ir.ir_id} · 回执 {ir.receipt_ref ?? "未测"}</dd>
+              <dd>{ir.ir_id}，回执 {ir.receipt_ref ?? "未测"}</dd>
               <dt>2. 标签处置前置</dt>
               <dd>
-                当前标签 <strong>{ir.decision.state}</strong> · 台账状态{" "}
+                当前标签 <strong>{ir.decision.state}</strong>，台账状态{" "}
                 <code>{detail.review?.status ?? "unassigned"}</code>
               </dd>
               <dt>3. 并行义务与冲突</dt>
               <dd>
-                义务：{(ir.decision.obligations ?? []).join("、") || "无"} ·
+                义务：{(ir.decision.obligations ?? []).join("、") || "无"}
                 未裁冲突：
                 {(ir.findings ?? []).filter((f) => f.rule_conflict).length} 项
               </dd>

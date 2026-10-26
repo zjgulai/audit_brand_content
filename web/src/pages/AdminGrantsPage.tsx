@@ -66,7 +66,7 @@ export default function AdminGrantsPage() {
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 403) {
         setError(
-          "403 · 仅内部治理角色（IT 管理员 / 项目统筹）可读取授权治理台账（internal_dep）。",
+          "仅内部治理角色可读取授权台账。",
         );
       } else {
         const err = e as { message?: string };
@@ -160,7 +160,7 @@ export default function AdminGrantsPage() {
     <section className="cases-page" aria-labelledby="admin-grants-title">
       <div className="cases-page__head">
         <div>
-          <h1 id="admin-grants-title">授权名单治理（P-11）</h1>
+          <h1 id="admin-grants-title">授权治理</h1>
           <p className="hint">
             三权分立（SoD）：提案人（Proposer） ≠ 执行人（IT Executor） ≠ 第二审批人（Approver）。
             人级 allowlist，无默认 wildcard；撤销授权后既有历史签名保持有效，原签发人仍保留撤回自己历史签名的权利（GR-11 / GR-12）。
@@ -238,7 +238,7 @@ export default function AdminGrantsPage() {
                   <>
                     <option value="release.sign">release.sign（签发）</option>
                     <option value="release.revoke">
-                      release.revoke（撤回 · 需二次审批）
+                      release.revoke（撤回，需二次审批）
                     </option>
                   </>
                 ) : (
@@ -328,8 +328,8 @@ export default function AdminGrantsPage() {
                   <td className="font-data">{g.grant_id ?? g.id ?? `#${i + 1}`}</td>
                   <td className="font-data">{g.user_id ?? "未记录"}</td>
                   <td className="font-data">
-                    {g.capability ?? "未指定"} · {g.product_line ?? "all"}
-                    {g.platform ? ` · ${g.platform}` : ""}
+                    {g.capability ?? "未指定"}，{g.product_line ?? "all"}
+                    {g.platform ? ` ${g.platform}` : ""}
                   </td>
                   <td className="font-data">
                     P:{g.proposed_by ?? "-"} / E:{g.executed_by ?? "-"} / A:

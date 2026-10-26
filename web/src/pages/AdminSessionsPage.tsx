@@ -27,11 +27,11 @@ export default function AdminSessionsPage() {
       if (e instanceof ApiError) {
         if (e.status === 403) {
           setError(
-            "403 · 仅内部治理角色（IT 管理员 / 项目统筹）可访问会话与安全审计（internal_dep）。",
+            "仅内部治理角色可访问会话与安全审计。",
           );
         } else if (e.status === 404) {
           setError(
-            "404 · 生产环境默认关闭在线枚举会话列表（SD-1 / review_api.py:714），会话审计请通过仓外 auth-audit.jsonl / access-log.jsonl 核查。",
+            "生产环境不提供在线会话枚举，请到服务器上的 auth-audit.jsonl 与 access-log.jsonl 核查。",
           );
         } else {
           setError(`HTTP ${e.status}：${e.message}`);
@@ -51,7 +51,7 @@ export default function AdminSessionsPage() {
     <section className="cases-page" aria-labelledby="admin-sessions-title">
       <div className="cases-page__head">
         <div>
-          <h1 id="admin-sessions-title">会话与安全审计（P-12）</h1>
+          <h1 id="admin-sessions-title">安全审计</h1>
           <p className="hint">
             会话存储于独立 <code>session.db</code>（0700，严禁纳入数据备份 SD-14）；
             空闲超时 30m / 绝对超时 8h（AU-11 / AU-12）；只读入口越权写与身份绑定异常实时追加至仓外{" "}
