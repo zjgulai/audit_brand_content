@@ -251,6 +251,9 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > —— **v1 的替代版**（委托方已定：外部 API + magpie + Gemini、参考 claude-video、先打通功能）。
 > 含一个结构性矛盾的处置（finding 三要素含知识库产物 → L1 观察 / L2 候选两级）、
 > claude-video 的适配取舍、balanced 帧策略、`T-430`–`T-436` 七张票。
+> [`PMO/implement/冷启动-媒体审核-给opencode-20261026.md`](./PMO/implement/冷启动-媒体审核-给opencode-20261026.md)
+> —— **交给 opencode 的媒体审核冷启动提示词**（整段复制）。基线读数、
+> `T-430`–`T-435` 开工顺序、第一票完整做法、三件刻意关着不许打开的东西及理由。
 > [`PMO/implement/T-316-施工单-报告生产落盘-20261024.md`](./PMO/implement/T-316-施工单-报告生产落盘-20261024.md)
 > —— 第五张（D5 阶段门最后一环）：**运行时镜像里没有 Node**，而唯一的报告渲染器是 Node 实现；
 > 报告的 ACL 判据读 `principal["role"]`（单数大写），真实身份是 `roles`（复数小写）→
