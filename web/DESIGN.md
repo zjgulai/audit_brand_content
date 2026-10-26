@@ -152,7 +152,7 @@
 | `--secondary` | 34.3 30.4% 95.5% | 次级中性表面色（暖灰 #f7f4f0） |
 | `--secondary-foreground` | 30 7.4% 10.6% | 次级按钮文字色 |
 | `--muted` | 34.3 30.4% 95.5% | 弱化表面色（暖灰 #f7f4f0） |
-| `--muted-foreground` | 30 5.3% 44.3% | 弱化辅助文字色（次级棕灰 #77716b，4.55:1 ≥ 4.5:1） |
+| `--muted-foreground` | 30 5.3% 40% | 弱化辅助文字色（次级棕灰；在 --muted 底上 5.18:1 ≥ 4.5:1） |
 | `--accent` | 6.7 33.3% 94.7% | 强调底色（同 --blush） |
 | `--accent-foreground` | 30 7.4% 10.6% | 强调底前景字 |
 | `--ok` | 141 64% 26.8% | 语义安全/通过绿（6.15:1） |
@@ -189,5 +189,9 @@
 | `--outline-active` | 0.125rem solid currentColor | 激活态轮廓合成变量 |
 | `--page-max` | 96rem | 工作台版心最大宽度 |
 | `--panel-radius` | 0.5rem | 面板圆角（大于控件圆角，形成层级） |
+| `--sidebar-w` | 15rem | 侧边栏展开宽度 |
+| `--sidebar-w-collapsed` | 4rem | 侧边栏收起宽度（只留图标） |
+| `--sidebar-w-narrow` | 2.75rem | 侧边栏极窄档（≤480px，保 320px reflow） |
+| `--topbar-h` | 4rem | 顶栏高度 |
 <!-- TOKENS:END -->
 

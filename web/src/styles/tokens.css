@@ -28,7 +28,7 @@
   --secondary: 34.3 30.4% 95.5%;
   --secondary-foreground: 30 7.4% 10.6%;
   --muted: 34.3 30.4% 95.5%;
-  --muted-foreground: 30 5.3% 44.3%;
+  --muted-foreground: 30 5.3% 40%;
   --accent: 6.7 33.3% 94.7%;
   --accent-foreground: 30 7.4% 10.6%;
 
@@ -79,4 +79,10 @@
   /* 版心与栅格（2026-10-23 全站视觉刷新） */
   --page-max: 96rem;
   --panel-radius: 0.5rem;
+
+  /* 侧边栏几何（2026-10-26 布局重做：顶栏 → 左侧边栏） */
+  --sidebar-w: 15rem;
+  --sidebar-w-collapsed: 4rem;
+  --sidebar-w-narrow: 2.75rem;
+  --topbar-h: 4rem;
 }

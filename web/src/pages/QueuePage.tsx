@@ -258,7 +258,7 @@ export default function QueuePage() {
 
         {rows !== null && queued.length === 0 && (
           <p className="hint">
-            队列为空 —— 没有处于 REVIEW 或 待自决 的案件。
+            这里现在是空的 —— 没有等待人工判定、也没有等待品牌自决的内容。
           </p>
         )}
 
@@ -319,7 +319,7 @@ export default function QueuePage() {
                     )
                   }
                 >
-                  {isSelected ? "收起审视" : "同屏审视"}
+                  {isSelected ? "收起" : "在这里查看"}
                 </button>
               </div>
             </div>
@@ -344,12 +344,12 @@ export default function QueuePage() {
         <div className="queue__detail-header">
           <h1>待人工复核案件</h1>
           <span className="hint">
-            快捷键：按 <code>J</code> / <code>K</code> 在右侧同屏切换待审案件；点击左侧案件行直接进入全宽深审页。
+            用 <code>J</code> / <code>K</code> 可直接下一条 / 上一条；点左边的案件行也能切换。
           </span>
         </div>
         <InlineMetricSummary
           scope="queue"
-          countsLabel={`待办 ${queued.length} 条（REVIEW ${counts.get("REVIEW") ?? 0} / 待自决 ${counts.get("待自决") ?? 0}）`}
+          countsLabel={`待办 ${queued.length} 条（待人工判定 ${counts.get("REVIEW") ?? 0} / 待品牌自决 ${counts.get("待自决") ?? 0}）`}
           trendLabel={null}
           untestedLabel={queued.length > 0 ? "partial" : "未测"}
         />
@@ -358,8 +358,9 @@ export default function QueuePage() {
         ) : (
           <div className="case">
             <p className="hint">
-              点击任意案件下方的「同屏分诊」（或按键盘 <code>J</code> 键）即可在本栏直接展开待审原件、证据链与复核动作；
-              点击案件编号则进入独立双栏深审视图。
+              点任意一条案件下方的「在这里查看」，或按键盘 <code>J</code> 键，
+              右边就会展开这条内容的原文、查出它哪里有问题、以及可以做什么处置；
+              点案件编号则进入单独的一整页详细视图。
             </p>
           </div>
         )}

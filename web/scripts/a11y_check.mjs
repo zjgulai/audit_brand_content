@@ -620,9 +620,9 @@ async function runStandaloneSuite(cdp) {
             </div>
           </div>
           <div class="case__workspace">
-            <aside class="unit-pane" aria-label="待审原件">
+            <aside class="unit-pane" aria-label="原文内容">
               <div class="unit-pane__head">
-                <strong class="unit-pane__title">待审原件（ContentUnit）</strong>
+                <strong class="unit-pane__title">原文内容</strong>
                 <div class="unit-pane__tabs" role="tablist">
                   <button type="button" class="btn">归一化正文</button>
                   <button type="button" class="btn">结构化字段</button>

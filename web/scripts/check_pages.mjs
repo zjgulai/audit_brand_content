@@ -187,7 +187,10 @@ async function main() {
     btn.click();
     return true;
   })()`);
-  const previewBody = previewTriggered ? await waitBody("待审原件（ContentUnit）", 10000) : "";
+  // ★ 2026-10-26 术语统一：「待审原件（ContentUnit）」→「原文内容」（业务听得懂）。
+  //   等待信号必须与界面同步改，否则断言会等一个界面上已经不存在的词而超时。
+  const PREVIEW_SIGNAL = "原文内容";
+  const previewBody = previewTriggered ? await waitBody(PREVIEW_SIGNAL, 10000) : "";
   const previewUrl1 = await evalValue("location.search");
   await evalValue(`(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true }));
@@ -197,7 +200,7 @@ async function main() {
   const previewUrl2 = await evalValue("location.search");
   const queuePreviewOk =
     Boolean(previewTriggered) &&
-    previewBody.includes("待审原件（ContentUnit）") &&
+    previewBody.includes(PREVIEW_SIGNAL) &&
     typeof previewUrl1 === "string" &&
     previewUrl1.startsWith("?caseId=") &&
     typeof previewUrl2 === "string" &&
@@ -205,8 +208,14 @@ async function main() {
     previewUrl2 !== previewUrl1;
   const queueOk =
     queueBody.includes(expectCase) &&
-    queueBody.includes("复核队列") &&
+    // ★ 2026-10-26 术语统一：「复核队列」→「待人工复核」（业务听得懂的名字）。
+    //   这里两个都收：只收新名会让旧快照/回放全部变红，只收旧名则判据
+    //   永远指向一个界面里已经看不到的词。改成「至少出现其一」，
+    //   并在下面单独断言新名确实在（否则「两个都收」会退化成永真）。
+    (queueBody.includes("待人工复核") || queueBody.includes("复核队列")) &&
     queuePreviewOk;
+  // 新术语必须在场（防上一条的「或」被当成永真）
+  const queueTermOk = queueBody.includes("待人工复核");
 
   // ── 布局几何断言（2026-10-23 全站视觉刷新）───────────────────────────────
   //
@@ -235,33 +244,57 @@ async function main() {
   });
   await sleep(400);
   const geometry = await evalValue(`(() => {
-    const nav = document.querySelector('.shell__header nav');
+    // ★ 2026-10-26 布局重做：导航从顶栏搬到侧边栏。
+    //   这条断言原先量「10 个导航项在顶栏里是否排成一行」——
+    //   侧边栏是**竖排**的，那个判据在新布局下恒假（navLinkCount=0）。
+    //   判据跟着形态改，而不是为了让检查变绿把它删掉：
+    //   现在量的是「侧边栏是一列、且没有词中被切开、且主内容没被挤成 0 宽」。
+    const nav = document.querySelector('.shell__nav') || document.querySelector('.shell__sidebar nav');
     const links = nav ? [...nav.querySelectorAll('a')] : [];
     const rects = links.map((a) => a.getBoundingClientRect());
-    // 顶栏是否单行：所有导航项的 top 必须在同一行（容差 1px）
-    const tops = rects.map((r) => Math.round(r.top));
-    const navRows = new Set(tops).size;
+    // 侧边栏必须是**一列**：所有导航项的 left 相同（容差 1px）
+    const lefts = rects.map((r) => Math.round(r.left));
+    const navCols = new Set(lefts).size;
+    // 每一项的文字不许折行（侧边栏宽度固定，折行说明标签太长）
     const wrapIdx = links
-      .filter((a) => getComputedStyle(a).whiteSpace !== "nowrap")
+      .filter((a) => getComputedStyle(a).whiteSpace !== 'nowrap')
       .map((a) => a.textContent.trim());
-    // 导航项本身高度必须等于一个行高（未被压成两行文字）
+    // 任何一项被压成两行文字都不行
     const anyTwoLineText = rects.some(
-      (r) => rects.length > 0 && r.height > rects[0].height * 1.8,
+      (r, i) => i > 0 && r.height > rects[0].height * 1.8,
     );
+    // 侧边栏必须有实际宽度；主内容区不能被它挤成 0
+    const side = document.querySelector('.shell__sidebar');
+    const main = document.querySelector('.shell__main');
+    const sideW = side ? side.getBoundingClientRect().width : 0;
+    const mainW = main ? main.getBoundingClientRect().width : 0;
+    // 侧边栏不许盖住主内容（重叠 = 布局塌了）
+    const sideRect = side ? side.getBoundingClientRect() : null;
+    const mainRect = main ? main.getBoundingClientRect() : null;
+    const overlap = sideRect && mainRect
+      ? Math.max(0, Math.min(sideRect.right, mainRect.right) - Math.max(sideRect.left, mainRect.left))
+      : 0;
     return {
       navLinkCount: links.length,
-      navRows,
+      navCols,
       wrapIdx,
       anyTwoLineText,
       navHeight: nav ? nav.getBoundingClientRect().height : 0,
+      sideW, mainW, overlap: Math.round(overlap),
     };
   })()`);
-  const headerOneLine =
+  // ★ 新判据：侧边栏成立（一列 + 不折行 + 够宽 + 不压主内容）
+  const sidebarOk =
     Boolean(geometry) &&
     geometry.navLinkCount >= 8 &&
-    geometry.navRows === 1 &&
+    geometry.navCols === 1 &&
     geometry.wrapIdx.length === 0 &&
-    !geometry.anyTwoLineText;
+    !geometry.anyTwoLineText &&
+    geometry.sideW >= 60 &&
+    geometry.mainW > 400 &&
+    geometry.overlap === 0;
+  // 兼容名：下游 result 里仍用 header 这个键（改名会牵动 report 结构）
+  const headerOneLine = sidebarOk;
 
   // 表格必须有面板容器（边框 + 非透明底），否则又是一张悬空白纸
   //   ★ 用 SPA 内导航（pushState / 点 nav 链接），不做 Page.navigate：
@@ -355,18 +388,29 @@ async function main() {
   await cdp.send("Page.navigate", { url: `${base}/queue` });
   await waitBody(expectCase);
   const geoControl = await evalValue(`(() => {
-    // ① 撤掉 nav a 的 nowrap → 必须出现 word-wrap 项
+    // ★ 2026-10-26：导航搬到侧边栏后，反向对照也必须指向**新**的判据。
+    //   旧版把 '.shell__header nav a' 的 nowrap 撤掉看会不会折行 ——
+    //   现在那个选择器一个都匹配不到，于是 bad.length 恒为 0，
+    //   这条对照会「看起来通过」而实际什么都没测（恒真）。
+    //
+    //   新的反向对照打两处，对应 sidebarOk 里的两个不同判据：
+    //     ① 撤掉 .shell__nav-item 的 nowrap → 必须抓到（防标签折行）
+    //     ② 把 .shell__sidebar 的宽度改成 0   → 必须抓到（防侧栏塌陷）
     const style = document.createElement('style');
     style.id = '__geo_control__';
-    style.textContent = '.shell__header nav a { white-space: normal !important; }';
+    style.textContent =
+      '.shell__nav-item { white-space: normal !important; }' +
+      '.shell__sidebar { width: 0 !important; min-width: 0 !important; }';
     document.head.appendChild(style);
-    const nav = document.querySelector('.shell__header nav');
-    const links = [...nav.querySelectorAll('a')];
+    const links = [...document.querySelectorAll('.shell__nav a')];
     const bad = links.filter((a) => getComputedStyle(a).whiteSpace !== 'nowrap');
+    const side = document.querySelector('.shell__sidebar');
+    const collapsedSide = side ? side.getBoundingClientRect().width < 60 : true;
     style.remove();
-    const restored = [...document.querySelectorAll('.shell__header nav a')]
+    const restored = [...document.querySelectorAll('.shell__nav a')]
       .every((a) => getComputedStyle(a).whiteSpace === 'nowrap');
-    return { caught: bad.length > 0, restored };
+    return { caught: bad.length > 0 && collapsedSide, restored,
+             badCount: bad.length, collapsedSide };
   })()`);
 
   // 2) 点进案件详情
@@ -384,9 +428,36 @@ async function main() {
   }
   // ★ 2026-10-20：原来等的是「案件详情」，而那个标题在**加载中**就已经出现，
   //   于是读到的是加载态（body 里只有「加载中…」）。改成等一个数据态标志。
-  await waitBody("证据链");
-  const caseBody = await waitBody("证据链");
+  // ★★ 2026-10-26 事故：把「等待信号」写进了常驻外壳，于是等待恒成立。
+  //
+  //   新 AppShell 的页面副标题里写了「原件、证据链与复核动作」，而下面等的是
+  //   `waitBody("证据链")` —— 那个词**在数据到之前就已经在 DOM 里了**，
+  //   于是 waitBody 立刻返回，读到的还是「加载中…」，caseOk 因此判假。
+  //   表现是「API 200 + 无 console 错误 + 页面永远加载中」，三样读数各自都对。
+  //   这与 AGENTS.md §2.4.4 的 `--selftest` 静音告警同一个形状：
+  //   **断言在等的东西，被别的改动顺手满足了**，而它看起来还在等。
+  //
+  //   修法两层：① 把那个词从常驻外壳删掉（治本次）；
+  //             ② 加一条反向对照，常驻外壳里不许出现任何等待信号词（治下一次）。
+  const shellSignalLeak = await evalValue(`(() => {
+    const shell = document.querySelector('.shell__sidebar');
+    const header = document.querySelector('.shell__header');
+    const txt = [shell ? shell.innerText : '', header ? header.innerText : ''].join(' ');
+    const signals = ${JSON.stringify(["证据链", "对外标签", "覆盖证明", "复核动作", "待审原件"])};
+    return signals.filter((w) => txt.includes(w));
+  })()`);
+  const shellNoSignalOk = Array.isArray(shellSignalLeak) && shellSignalLeak.length === 0;
 
+  let caseBody = "";
+  try {
+    caseBody = await waitBody("证据链");
+  } catch (e) {
+    caseBody = await bodyText();
+    console.error(
+      "waitBody(证据链) 超时。常驻外壳里的信号词（会让等待恒成立）：",
+      JSON.stringify(shellSignalLeak),
+    );
+  }
   // ★ D-6 验证：点击左栏原件内第一个 [data-finding-mark] 高亮块，断言右栏对应 .evidence__item 激活
   const clickedMarkId = await evalValue(`(() => {
     const mark = document.querySelector('[data-finding-mark]');
@@ -488,7 +559,7 @@ async function main() {
   await waitBody(expectCase);
   const queueMobile = await evalValue(`(() => {
     const row=document.querySelector('.queue__row');
-    const controls=[...document.querySelectorAll('.queue__filter, .shell__header nav a, .shell__right select')];
+    const controls=[...document.querySelectorAll('.queue__filter, .shell__nav a, .shell__right select')];
     return {
       noOverflow: document.documentElement.scrollWidth <= window.innerWidth,
       rowHeight: row ? row.getBoundingClientRect().height : 0,
@@ -535,7 +606,7 @@ async function main() {
   const viewportOk = Object.values(viewportChecks).every((v) => v.ok);
 
   const result = {
-    ok: queueOk && caseOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk && viewportOk &&
+    ok: queueOk && queueTermOk && caseOk && shellNoSignalOk && reportOk && taxonomyOk && taxonomyLookup && responsiveOk && viewportOk &&
         headerOneLine && tablePanelOk && taxonomyReadable,
     geometry: {
       ok: headerOneLine && tablePanelOk && taxonomyReadable,
@@ -546,6 +617,7 @@ async function main() {
     },
     queue: {
       ok: queueOk,
+      termOk: queueTermOk,
       previewOk: queuePreviewOk,
       previewUrls: [previewUrl1, previewUrl2],
       shot: queueShot,
@@ -553,6 +625,7 @@ async function main() {
     },
     case: {
       ok: caseOk,
+      shellNoSignal: { ok: shellNoSignalOk, leaked: shellSignalLeak || [] },
       clicked,
       markLinkage,
       path: casePath,

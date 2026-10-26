@@ -475,7 +475,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
     <section className={isEmbedded ? "case case--embedded" : "case case--dual"}>
       <div className="case__top-bar">
         <div className="case__head">
-          <TitleTag>{isEmbedded ? `同屏分诊 · ${detail.case_id}` : "案件详情"}</TitleTag>
+          <TitleTag>{isEmbedded ? `正在查看 · ${detail.case_id}` : "案件详情"}</TitleTag>
           <StatusBadge axis="decision" value={dec.state} />
           <span className="font-data">{detail.case_id}</span>
           {isEmbedded && (
@@ -483,7 +483,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
               to={`/cases/${encodeURIComponent(detail.case_id)}`}
               className="btn"
             >
-              独立双栏深审 <Icon name="arrow-up-right" size={11} />
+              单独打开这一页 <Icon name="arrow-up-right" size={11} />
             </Link>
           )}
         </div>
@@ -494,7 +494,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
         </p>
         <InlineMetricSummary
           scope="case"
-          countsLabel={`finding ${(ir.findings ?? []).length} 项 · 未评估 ${notEvaluated.length} 项`}
+          countsLabel={`查出问题 ${(ir.findings ?? []).length} 处 · 这边没查 ${notEvaluated.length} 项`}
           trendLabel={null}
           untestedLabel={notEvaluated.length > 0 ? "partial" : cov.coverage_state}
         />
@@ -524,7 +524,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
               {dec.release_status}
               <span className="hint">
                 {" "}
-                —— 机器与前端都不得改；只由人经 release-decision 变更{" "}
+                —— 机器和前端都改不了，只有人在"合规签发"里正式确认才会变{" "}
               </span>
               <Link
                 to={`/release/${encodeURIComponent(detail.case_id)}`}

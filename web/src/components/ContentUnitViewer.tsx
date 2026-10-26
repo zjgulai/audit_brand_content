@@ -107,11 +107,11 @@ export default function ContentUnitViewer({
   }, [fullText, findings]);
 
   return (
-    <aside className="unit-pane" aria-label="待审原件与覆盖边界">
+    <aside className="unit-pane" aria-label="原文内容与覆盖范围">
       <div className="unit-pane__head">
         <div>
           <strong className="unit-pane__title">
-            <Icon name="file-text" size={13} /> 待审原件（ContentUnit）
+            <Icon name="file-text" size={13} /> 原文内容
           </strong>
           <div className="unit-pane__meta font-data">
             <span>{unitId}</span>
@@ -199,7 +199,7 @@ export default function ContentUnitViewer({
             </div>
           ) : (
             <div className="state state--warn">
-              <strong>当前案件未附带原件全文（ContentUnit.text 为空）</strong>
+              <strong>这条案件没有附带原文内容</strong>
               <p className="hint">
                 可能是无文案格式（DP0）、解析失败（{failureKind ?? "未知"}）或旧版冻结投影未内嵌原件。
                 右侧证据链仍展示每条 finding 自带的原文切片 <code>quote</code>。

@@ -387,16 +387,21 @@ try {
 
   // 6) P-03 案件总览（/cases）：真实点击五标签筛选按钮
   await spaGoto("/cases");
-  await waitText("全量可读案件视图");
+  // ★ 2026-10-26 术语统一：页面文案改成业务话术，
+  //   这里等的东西也跟着改 —— 等待信号必须指向**界面上真的存在**的字。
+  //   「全量可读案件视图」→「支持检索已归档与处理中的全部送审内容」。
+  //   ★ 同时把下面按钮文案的 'REVIEW' 换成「待人工复核」：五标签已经
+  //     显示成业务名，再按英文匹配会找不到按钮（实测 0 个匹配）。
+  await waitText("支持检索已归档与处理中的全部送审内容");
   const filterClicked = await ev(`(() => {
-    const btn = [...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes('REVIEW'));
+    const btn = [...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes(${JSON.stringify("待人工复核")}));
     if (!btn) return false;
     btn.click();
     return true;
   })()`);
-  if (!filterClicked) throw new Error("P-03 找不到 REVIEW 筛选按钮");
+  if (!filterClicked) throw new Error("P-03 找不到「待人工复核」筛选按钮");
   await waitEval(
-    `[...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes('REVIEW'))?.getAttribute('aria-pressed') === 'true'`,
+    `[...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes(${JSON.stringify("待人工复核")}))?.getAttribute('aria-pressed') === 'true'`,
     "P-03 案件总览筛选按钮激活",
   );
 

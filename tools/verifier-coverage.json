@@ -455,6 +455,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_multimodal_client.py",
+      "asserts": "T-432 多模态客户端（`tools/multimodal_client.py`，全仓唯一有网络的地方）与授权闸门（`base/multimodal_provider.py`，一行网络都不许有）的接缝。**全离线，一次网络都不发**：传输层可注入，真实现与打桩走同一套解析与状态映射。N 网络边界（闸门只有 0 条网络 import，**只查 import 行** —— 全文会命中它自己的文档注释，实测 6 处假红；N2 反向证明「没放宽，是没假红」）；T 客户端 TASK_MEDIA 与闸门 _REQUIRED_MEDIA **恒等**；C 配置只读环境变量、两个网关各读自己那对、**代码里没有打开凭据文件的动作**（C7 只查读取动作不查文档里提到的路径）；E 出境清单**按任务收窄**（scene_semantics 不含音轨）、recipient 可指认、registration_for 默认 **authorized 全 False**；A 未授权时 require_authorization 必抛且 provider **一次都没被调用**，已授权时必须放行（闸门不是砖头）；S 状态映射十类失败全都不许落 ok，**S12 是判别用例**：非 2xx 但响应体结构完整（401/403/429/500/503）—— 没有它 S3/S4 是假绿，因为真实网关错误页不是 JSON 会被下一层兜住，实测删掉状态码那行仍全绿；S13 同一结构 2xx 必须 ok（防 S12 恒红）；M 一条 error 不许被另一条 ok 盖成 ok；R 源码不含 sk- 形态凭据。**不证明**模型真的看得懂画面（那要给真素材与真凭据，验的是接缝不是模型质量）",
+      "subjects": [
+        "tools/multimodal_client.py",
+        "base/multimodal_provider.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_media_ingest.py",
       "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow）",
       "subjects": [
