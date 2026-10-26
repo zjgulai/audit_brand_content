@@ -471,6 +471,13 @@
       ]
     },
     {
+      "verifier": "tools/verify_video_ingest.py",
+      "asserts": "T-435 视频抽帧（balanced）+ 音画对齐前提。**分两层自证，缺一层就是「逻辑对但跑不起来」或反之**：E 层用**合成帧**真跑抽帧业务判据（不需要 ffmpeg）；X 层验执行（ffmpeg/ffprobe 在不在），**不在就落未测退 2**，不许用绿的退出码盖住「没跑过」。E1 静止 10 帧去重后 1 帧 / E2 三帧三色全留（不误伤）/ E3b **细渐变（每步差 4 < 阈值 8）留下部分而非全部、也不塌成 1 帧** + E3c 反证「与前一帧比会塌成 1 帧」（第一版用 12 色阶，两种比法都留下全部，E3b/E3c 分不出差别 —— 真变异实测过）/ E3d 空缩略图判大差异并保留（宁可多留不误合）/ E5 `max_frames` 是**硬上限**且在抽帧前截断 / E6 均匀兜底不取两端 / E7 切变点不足回落 uniform + E7b 反证切变够时必须走 scene / E8 V1 五项：无音轨=no（Playbook V1 原文「音轨 ⛔」）、0 帧=no、**完整画面语义永远不是 yes（穷举 20 组合无一 yes）**、**has_audio 不许抬高覆盖声明**（E8-11）+ 它必须影响 audio_note（E8-12，两种成因要分得开）/ E9 音画对齐前提：只有 video 必须拒并点名缺 audio / E10 与 report_render.mjs 的 V1_KEYS **同名同序**、与 verify_report_render.mjs 的 **V1_ENUM 恒等**（第一版指向 V1_KEYS_OUTSIDE 的函数体找字符串，抓到空集恒红；判据要读定义不读消费点）。★ 三处真变异已验：完整画面语义→yes 红 E8-5/E8-9；去重改与前一帧比 红 E3b；切变不够也走 scene 红 E7。**X 层今天未测**：本机无 ffmpeg/ffprobe、盘上 0 个视频文件 —— 判据 1/3/4 需要真素材，换机器或装工具后应转绿",
+      "subjects": [
+        "base/media_ingest.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_media_ingest.py",
       "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow）",
       "subjects": [
