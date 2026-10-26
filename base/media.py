@@ -73,6 +73,7 @@ import time
 import urllib.parse
 import urllib.request
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -109,6 +110,285 @@ MAX_IMAGE_BYTES = 12 * 1024 * 1024
 DEGENERATE_PIXELS = 4
 OCR_TIMEOUT = 60
 OCR_LANGS = ["zh-Hans", "en-US"]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ★ 选型注册（ADR-0018，2026-10-26 委托方批准）
+#
+# 这里是「容器内用什么引擎」的**唯一机器可读声明**。ADR-0018 与它逐字段相等，
+# 由 `tools/verify_media_selection.py` 双向断言 —— 两处各写一遍必然各自漂移，
+# 所以不许只在文档里写、也不许只在代码里写。
+#
+# ⚠️ **注册 ≠ 接线。** 这一段是**声明性的**：它不改变 `ocr_file()` 走哪条路。
+#    今天 `DEFAULT_OCR_ENGINE` 仍是 `host_vision`，因为生产进件不接媒体
+#    （`SUPPORTED_SOURCE_KINDS` 无 image/video），行 118 仍是**空真**。
+#    把容器引擎接成默认 = 打开媒体进件 = 另一张票（T-118-follow），
+#    那张票必须同时处理行 118（宿主原生 3 处）。
+#
+# 选型的三条硬判据（都能指得出可复核物）：
+#   ① 跨平台：wheel 必须在 manylinux x86_64 **与** macOS arm64 各有发行版，
+#      且不依赖宿主 OS 框架（`otool -L` 那种绑定在这里不成立）。
+#   ② 离线：模型权重**随包**（`bundled_models=True`）或**镜像构建期**落盘；
+#      运行期零外呼 —— 后者是 `base/multimodal_provider.py` 授权门的同一口径。
+#   ③ 许可：逐个点名 SPDX 标识，不写「开源」。
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class MediaProvider:
+    """一条容器内媒体引擎的登记项。
+
+    ★ `version` 必须带 `==` 语义的精确版本（`pinned=True` 才允许被当作已选）。
+      「装了某个 3.x」与「锁在 3.10.0」是两件事：前者换台机器就换引擎。
+    ★ `bundled_models=False` 时 `weights_note` **必须**写清权重从哪来 ——
+      否则「能离线」是一句没有执行点的承诺（AGENTS.md §2.4.2）。
+    """
+
+    provider_id: str
+    task: str                    # "ocr" | "asr"
+    package: str                 # PyPI 包名（pip install 的那个）
+    version: str                 # 精确版本
+    license: str                 # SPDX 标识
+    bundled_models: bool         # 权重是否随 wheel 分发
+    weights_note: str
+    adapter: str                 # 本模块里实现它的类名
+    rationale: str = ""
+
+    def __post_init__(self) -> None:
+        if self.task not in ("ocr", "asr"):
+            raise ValueError("task 只允许 ocr / asr，收到 %r" % (self.task,))
+        if not self.version or self.version.count(".") < 1:
+            raise ValueError("version 必须是精确版本（形如 3.10.0），收到 %r"
+                             % (self.version,))
+        # ★ 「有小数点」不等于「精确版本」：`3.x` 也有一个点。
+        #   逐段必须是数字，否则「锁了版本」这句话是假的 —— 而它正是 TS-18/19 的门。
+        parts = self.version.split(".")
+        if not all(seg.isdigit() for seg in parts):
+            raise ValueError("version 的每一段都必须是数字（形如 3.10.0），收到 %r"
+                             % (self.version,))
+        if self.license.upper() in ("", "OPEN SOURCE", "开源", "FREE"):
+            raise ValueError("license 必须是 SPDX 标识，收到 %r" % (self.license,))
+        if not self.bundled_models and not self.weights_note.strip():
+            raise ValueError(
+                "provider %r 的权重不随包，必须写清 weights_note（否则「能离线」无执行点）"
+                % (self.provider_id,))
+
+
+#: 默认 OCR 引擎。★ 今天必须是 `host_vision` —— 改成容器引擎就是打开媒体进件。
+DEFAULT_OCR_ENGINE = "host_vision"
+
+#: 默认 ASR 引擎。今天 `None`：仓里没有 ASR，也没有音频素材。
+DEFAULT_ASR_ENGINE = None
+
+MEDIA_PROVIDERS: "dict[str, MediaProvider]" = {}
+
+
+def register_media_provider(p: MediaProvider) -> MediaProvider:
+    """登记一条容器内媒体引擎。重名报错（不静默覆盖 —— 覆盖会让两处各说一套）。"""
+    if not isinstance(p, MediaProvider):
+        raise TypeError("register_media_provider 只收 MediaProvider，收到 %r"
+                        % (type(p).__name__,))
+    if p.provider_id in MEDIA_PROVIDERS:
+        raise ValueError("provider %r 已登记" % (p.provider_id,))
+    MEDIA_PROVIDERS[p.provider_id] = p
+    return p
+
+
+def unregister_media_provider(provider_id: str) -> bool:
+    """移除登记项。**只给反向对照用** —— 生产路径不该有人调它。"""
+    return MEDIA_PROVIDERS.pop(provider_id, None) is not None
+
+
+def media_provider_ids(task: "str | None" = None) -> "tuple[str, ...]":
+    """已登记的 provider id（可按任务过滤）。"""
+    return tuple(k for k, v in MEDIA_PROVIDERS.items() if task is None or v.task == task)
+
+
+def media_provider(provider_id: str) -> MediaProvider:
+    if provider_id not in MEDIA_PROVIDERS:
+        raise KeyError("未登记的 provider：%r（已登记：%s）"
+                       % (provider_id, ", ".join(media_provider_ids()) or "(空)"))
+    return MEDIA_PROVIDERS[provider_id]
+
+
+class ProviderNotInstalled(RuntimeError):
+    """引擎没装。★ 这是**未测**，不是「识别结果为 0 个字」。
+
+    两者在读数上长得一样（都是「没有文字」），但一个是「环境没备好」，
+    一个是「图里真的没字」。把它们混成一个值，正是 §2.4.1 那个形状。
+    """
+
+
+class ContainerOcrProvider:
+    """OCR 适配层：把容器内引擎的产出**规整成 `ocr_file()` 的同一份 schema**。
+
+    契约（与 `base/ocr_vision.m` 的输出逐字段对齐，`_enrich()` 两条路共用）：
+
+        {"ok": bool, "w": int, "h": int, "ms": int, "n": int,
+         "lines": [{"t": str, "c": float, "x": float, "y": float, "w": float, "h": float}]}
+
+    ★ 坐标系必须与宿主那份**同一约定**：`x/y/w/h` 是**归一化**的左上角 + 宽高。
+      Vision 给的是**左下角原点**（`boundingBox` 的 y 向上），所以适配器要翻一次 y。
+      翻错不会报错，只会让所有框上下颠倒 —— 而 bbox 是 C4 判据的输入。
+      本条是**已知未测**：本机没装引擎，翻没翻对没有读数（ADR-0018 §六）。
+    """
+
+    def __init__(self, provider_id: str = "rapidocr_ppocr_v6"):
+        self.spec = media_provider(provider_id)
+        self._engine = None
+
+    # ---------------------------------------------------------------- 就绪判定
+    def probe(self) -> dict:
+        """引擎在不在。**不抛** —— 返回一个可读的就绪读数。"""
+        try:
+            import importlib.util
+            spec = importlib.util.find_spec(self.spec.package.replace("-", "_"))
+        except Exception as e:                            # noqa: BLE001
+            return {"ready": False, "reason": "probe_failed", "detail": str(e)[:160]}
+        if spec is None:
+            return {"ready": False, "reason": "not_installed",
+                    "detail": "缺 %s==%s（本模块不替你装）"
+                              % (self.spec.package, self.spec.version)}
+        return {"ready": True, "reason": "installed"}
+
+    def _load(self):
+        if self._engine is not None:
+            return self._engine
+        p = self.probe()
+        if not p["ready"]:
+            raise ProviderNotInstalled(
+                "%s：%s。**这是未测，不是「图里没有字」。**"
+                % (self.spec.provider_id, p["detail"]))
+        # ★ 3.10.0 的入口是 `rapidocr.RapidOCR`，返回 `RapidOCROutput`
+        #   （`.boxes` / `.txts` / `.scores`）。旧包名 `rapidocr_onnxruntime`
+        #   返回 `(result, elapse)` 二元组 —— 两个**不一样**的 API。
+        #   按旧包写适配器，接上去就是 AttributeError，而这只有在装了之后才发现。
+        from rapidocr import RapidOCR
+        self._engine = RapidOCR()
+        return self._engine
+
+    # ---------------------------------------------------------------- 一次识别
+    def analyze(self, path: "Path | str") -> dict:
+        engine = self._load()
+        t0 = time.time()
+        out = engine(str(path))
+        ms = int((time.time() - t0) * 1000)
+
+        boxes = getattr(out, "boxes", None)
+        txts = getattr(out, "txts", None)
+        scores = getattr(out, "scores", None)
+        # 拿原图尺寸要自己解：`RapidOCROutput` 不回 w/h，而归一化框必须有分母。
+        import cv2
+        img = cv2.imread(str(path))
+        if img is None:
+            return {"ok": False, "error": "decode_failed"}
+        h, w = img.shape[:2]
+
+        lines = []
+        if boxes is not None and txts is not None:
+            for i, text in enumerate(txts):
+                if not str(text).strip():
+                    continue
+                box = boxes[i]
+                xs = [float(pt[0]) for pt in box]
+                ys = [float(pt[1]) for pt in box]
+                x0, y0 = min(xs), min(ys)
+                bw, bh = max(xs) - x0, max(ys) - y0
+                lines.append({
+                    "t": str(text),
+                    "c": float(scores[i]) if scores is not None else 0.0,
+                    "x": round(x0 / w, 4),
+                    # ★ y 翻转：容器引擎给左上角原点，宿主 Vision 给左下角原点。
+                    "y": round(1.0 - (y0 + bh) / h, 4),
+                    "w": round(bw / w, 4), "h": round(bh / h, 4),
+                })
+        return {"ok": True, "w": w, "h": h, "ms": ms,
+                "n": len(lines), "lines": lines}
+
+
+class ContainerAsrProvider:
+    """ASR 适配层：输出**带起止时间的片段**，`speaker` 恒为 `unknown`。
+
+    TS-21 明文：阶段一**不做** speaker diarization，多人**完整转写不丢内容**。
+    所以这里没有 `speaker` 参数可以传 —— 不是没实现，是**不该有**。
+    """
+
+    def __init__(self, provider_id: str = "faster_whisper"):
+        self.spec = media_provider(provider_id)
+        self._engine = None
+
+    def probe(self) -> dict:
+        try:
+            import importlib.util
+            spec = importlib.util.find_spec(self.spec.package.replace("-", "_"))
+        except Exception as e:                            # noqa: BLE001
+            return {"ready": False, "reason": "probe_failed", "detail": str(e)[:160]}
+        if spec is None:
+            return {"ready": False, "reason": "not_installed",
+                    "detail": "缺 %s==%s（本模块不替你装）"
+                              % (self.spec.package, self.spec.version)}
+        return {"ready": True, "reason": "installed"}
+
+    def _load(self, weights_dir: "str | None" = None):
+        if self._engine is not None:
+            return self._engine
+        p = self.probe()
+        if not p["ready"]:
+            raise ProviderNotInstalled(
+                "%s：%s。**这是未测，不是「音频里没人说话」。**"
+                % (self.spec.provider_id, p["detail"]))
+        if not weights_dir:
+            raise ProviderNotInstalled(
+                "%s 的权重不随 wheel（%s）。运行期**不许**自己联网下 —— "
+                "镜像构建期落盘，路径从参数传进来。"
+                % (self.spec.provider_id, self.spec.weights_note))
+        from faster_whisper import WhisperModel
+        self._engine = WhisperModel(weights_dir, device="cpu", compute_type="int8")
+        return self._engine
+
+    def analyze(self, path: "Path | str", weights_dir: "str | None" = None) -> dict:
+        engine = self._load(weights_dir)
+        t0 = time.time()
+        segments, info = engine.transcribe(str(path), vad_filter=True)
+        out = []
+        for s in segments:
+            out.append({"start": round(float(s.start), 3),
+                        "end": round(float(s.end), 3),
+                        "text": s.text.strip(),
+                        # ★ TS-21：不做 diarization，且**不因无法区分说话人而丢内容**
+                        "speaker": "unknown"})
+        return {"ok": True, "ms": int((time.time() - t0) * 1000),
+                "language": getattr(info, "language", None),
+                "n": len(out), "segments": out}
+
+
+#: ★ 两条登记。改这里必须同步改 ADR-0018 —— `verify_media_selection.py` 会双向对账。
+register_media_provider(MediaProvider(
+    provider_id="rapidocr_ppocr_v6",
+    task="ocr",
+    package="rapidocr",
+    version="3.10.0",
+    license="Apache-2.0",
+    bundled_models=True,
+    weights_note=("PP-OCRv6 det/rec + PP-OCRv4 cls 三个 .onnx **随 wheel 分发**"
+                  "（实测 wheel 26.0 MB，含 models/ 目录）"),
+    adapter="ContainerOcrProvider",
+    rationale=("PaddleOCR 权重 + onnxruntime CPU + opencv-**headless**；"
+               "不装 paddlepaddle（186 MB）与其 63 个传递依赖"),
+))
+
+register_media_provider(MediaProvider(
+    provider_id="faster_whisper",
+    task="asr",
+    package="faster-whisper",
+    version="1.2.1",
+    license="MIT",
+    bundled_models=False,
+    weights_note=("权重来自 Systran/faster-whisper-*（MIT），**镜像构建期**落盘；"
+                  "运行期零外呼。small 的 model.bin 实测 484 MB"),
+    adapter="ContainerAsrProvider",
+    rationale="CTranslate2 CPU int8；wheel 自带 VAD 模型；依赖闭包 22 包 / 124 MiB",
+))
 
 
 # ------------------------------------------------------------------ OCR 二进制
@@ -1273,13 +1553,66 @@ def selftest(verbose: bool = True) -> list[str]:
         print("  · 盘上还没有样本 —— 先跑 `python3 base/media.py --collect N`（联网）")
         print("    这一条**不算失败**：自证必须离线可复现，样本是联网一次性产物。")
 
+    print("\n[8] 容器内引擎选型（ADR-0018）：登记项必须是可判的，不是一句话")
+
+    def bad_raises(fn) -> bool:
+        try:
+            fn()
+        except Exception:                                 # noqa: BLE001
+            return True
+        return False
+
+    check("两条登记都在（ocr 一个、asr 一个）",
+          set(media_provider_ids("ocr")) == {"rapidocr_ppocr_v6"}
+          and set(media_provider_ids("asr")) == {"faster_whisper"},
+          "ocr=%s asr=%s" % (media_provider_ids("ocr"), media_provider_ids("asr")))
+    check("★ 默认引擎仍是宿主 Vision —— 注册**不等于**接线",
+          DEFAULT_OCR_ENGINE == "host_vision" and DEFAULT_ASR_ENGINE is None,
+          "DEFAULT_OCR_ENGINE=%r DEFAULT_ASR_ENGINE=%r"
+          % (DEFAULT_OCR_ENGINE, DEFAULT_ASR_ENGINE))
+    check("版本是精确版本（不是「3.x」）",
+          all(len(p.version.split(".")) >= 2 for p in MEDIA_PROVIDERS.values()))
+    check("许可逐个点名 SPDX，不是「开源」",
+          all(p.license not in ("", "开源", "OPEN SOURCE") for p in MEDIA_PROVIDERS.values()),
+          "、".join("%s=%s" % (p.provider_id, p.license) for p in MEDIA_PROVIDERS.values()))
+    check("★ 权重不随包的，必须写清 weights_note（否则「能离线」无执行点）",
+          all(p.bundled_models or p.weights_note.strip() for p in MEDIA_PROVIDERS.values()))
+    # ★ 反向对照：这些**必须**抛。抛不出来就说明校验是装饰。
+    check("必红：版本写成「3.x」→ 必须拒绝",
+          bad_raises(lambda: MediaProvider("x", "ocr", "p", "3.x", "MIT", True, "", "A")))
+    check("必红：license 写成「开源」→ 必须拒绝",
+          bad_raises(lambda: MediaProvider("x", "ocr", "p", "1.0.0", "开源", True, "", "A")))
+    check("必红：权重不随包又没写 note → 必须拒绝",
+          bad_raises(lambda: MediaProvider("x", "asr", "p", "1.0.0", "MIT", False, "", "A")))
+    check("必红：task 写成 vlm → 必须拒绝",
+          bad_raises(lambda: MediaProvider("x", "vlm", "p", "1.0.0", "MIT", True, "", "A")))
+    check("必红：重名登记 → 必须拒绝（不静默覆盖）",
+          bad_raises(lambda: register_media_provider(media_provider("faster_whisper"))))
+
+    print("\n[9] 容器引擎的**就绪读数**：没装必须是「未测」，不是「0 个字」")
+    ocr_p = ContainerOcrProvider()
+    st = ocr_p.probe()
+    check("probe 返回结构完整（ready / reason / detail）",
+          set(st) == {"ready", "reason", "detail"}, str(st.get("reason")))
+    if not st["ready"]:
+        # ★ 这一条是本案的核心：没装引擎时，调用必须抛 ProviderNotInstalled，
+        #   而不是返回 {"ok": True, "n": 0} —— 后者与「图里真的没字」不可分。
+        check("★ 没装引擎时 analyze 必须抛 ProviderNotInstalled（不是静默 0 个字）",
+              bad_raises(lambda: ocr_p.analyze("x.png")))
+    else:
+        check("引擎已装（本机有引擎）—— 就绪读数与 import 一致", True)
+    asr_p = ContainerAsrProvider()
+    check("ASR 权重不随包 → 不给 weights_dir 时 analyze 必须抛（不许自己联网下）",
+          bad_raises(lambda: asr_p.analyze("x.wav")))
+
     print("\n" + "=" * 78)
     if fails:
         print("✗ B1 自证未通过：%d 项" % len(fails))
         for f in fails:
             print("   - " + f)
     else:
-        print("✓ B1 自证全绿：OCR 通道可重建 · 图片契约带边界 · 视频档如实说「没有数字」")
+        print("✓ B1 自证全绿：OCR 通道可重建 · 图片契约带边界 · 视频档如实说「没有数字」"
+              " · 容器引擎登记可判")
     print("=" * 78)
     return fails
 

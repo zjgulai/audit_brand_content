@@ -34,13 +34,27 @@ skills
 research/repos
 research/live
 research/landing/_evidence
-# ★ tools/ 整体排除（75 个 verifier 不该进镜像），但 bj_time.py 是**运行时依赖**：
-#   base/takedown.py 与 base/notifications.py 都 `from bj_time import`。
+# ★ tools/ 整体排除（75 个 verifier 不该进镜像），但下面四个是**运行时依赖**。
 #   .dockerignore 的 `!` 例外必须写在排除行之后才生效。
+#
+#   ★ 父目录被排除后，`!` 例外**仍然有效** —— 这一点是实测的（2026-10-26）：
+#     补上 `!tools/redact.py` 之后 `COPY tools/redact.py` 真的成功了。
+#     所以「排除了 tools 就只能整目录重开」是错的理解，别照着它去改。
 tools
+# bj_time.py：base/takedown.py、base/notifications.py 的 `from bj_time import`
 !tools/bj_time.py
-# ★ redact.py 同上：send_gateway 在 import 期就要它。少了它容器起不来。
+# redact.py：base/send_gateway.py 在 import 期就要它。少了容器起不来。
 !tools/redact.py
+# 报告渲染器与它那条相对 import 链（report_render.mjs → registry.mjs → cards.mjs）
+# ★ 2026-10-26 实测：这三个**原先一个例外都没有**，于是 Dockerfile 里那三条
+#   COPY 全部拿不到文件 —— `COPY failed: … stat tools/audit/report_render.mjs:
+#   file does not exist`。构建在第 24 步停住，镜像根本做不出来。
+#   注意这与 redact.py 那个 P0 是**两个不同的失败**：那个是「文件进了上下文但
+#   Dockerfile 没拷」，这个是「Dockerfile 拷了但文件没进上下文」。
+#   三者的 import 关系是硬的，缺一个就在运行时 ERR_MODULE_NOT_FOUND。
+!tools/audit/report_render.mjs
+!tools/reply-cards/registry.mjs
+!tools/reply-cards/cards.mjs
 tests
 .ua
 .vendor

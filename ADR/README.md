@@ -35,8 +35,9 @@
 | [ADR-0016](./ADR-0016-判定跳改挂orchestrator与引擎唯一化.md) | 判定这一跳改挂 orchestrator：**群交互保留 LLM 循环、判定不走模型**（委托方 2026-10-20 定）· **`rule_judge` 为唯一判定引擎**，`skeleton/judge.py` 降为分析工具 · `catch_all` 只能落「未审查/DP0」· 换引擎**不重跑** 65 条归轴基准（三层区分）· 代价：U2 四空族仍在，PASS 不会因此可达 · ★ **2026-10-25 裁定 accepted**；**双轨（守衡 `judge_copy` → `skeleton/judge.py`）仍在 = 已知未完成，不是设计**（§5.4） | **`accepted`** | 2026-10-20 |
 | [ADR-0015](./ADR-0015-工作台人工动作权威投影与独立Web认证.md) | 工作台人工动作以仓外文件 + manifest 为唯一真相，SQLite 为可重建投影；独立飞书 Web OAuth；生产单写者；首批仅开放复核台账 | **`accepted`** | 2026-10-20 |
 | [ADR-0017](./ADR-0017-报告链接的过期签名与R3修订.md) | 报告链接的过期签名：**修订 R3** —— URL 仍须指向 `reports/<id>.md` 本体、仍禁渲染服务与 `/api/`，但允许**一个**查询串且键集合恒等 `{exp, sig}` · 三态（无签名走 ACL / 有效签名**仍要过** ACL / 过期与篡改一律 403，参与人也一样）· 密钥走环境变量、双密钥轮换窗口、无密钥时 `resign` 返 503 而**不降级成无签名链接** · TTL 默认 1h、上限 30d | **`accepted`** | 2026-10-26 |
+| [ADR-0018](./ADR-0018-容器内OCR与ASR选型.md) | 容器内 OCR/ASR 选型：**OCR = `rapidocr` 3.10.0**（Apache-2.0，PP-OCRv6 权重**随 wheel**，onnxruntime CPU，`opencv-python-headless` 避开 slim 镜像无 `libGL` 的坑）、**ASR = `faster-whisper` 1.2.1**（MIT，CTranslate2 int8，权重**镜像构建期**落盘、运行期零外呼）· 落在 `base/media.py` 的一层 provider 注册 + 两个适配器后面（**注册 ≠ 接线**：默认引擎仍是 `host_vision`）· 被否候选各带一条可核理由（paddleocr 63 包/146.8 MiB + paddlepaddle 185.8 MiB、openai-whisper torch 528.9 MiB、tesseract 版本锁不住、云通道未过授权门）· **不引模型权重进仓 / 不改 `SUPPORTED_SOURCE_KINDS` / 不动判定主链** · 行 118 **仍是 `vacuous_true`**，改成 passed 需要四件事（素材 / 容器内装引擎 / 一次真跑 + 坐标系对拍 / 打开进件并移除宿主实现），见该 ADR §六 · **T-412 不阻塞上线**（媒体不在上线最小集，进件在代码里真的是关的） | **`accepted`** | 2026-10-26 |
 
-> ### ⚠️ 2026-09-22 更正：台账原先把 ADR-0001 与 ADR-0012 记成 `accepted`，两份文件都写着 `proposed`
+
 >
 > 两处**双源冲突**，现场读数由新加的检查器逐条打出来：
 >

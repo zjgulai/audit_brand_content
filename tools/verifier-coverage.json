@@ -455,6 +455,15 @@
       ]
     },
     {
+      "verifier": "tools/verify_media_selection.py",
+      "asserts": "T-412 选型契约（ADR-0018 ≡ base/media.py 的 MEDIA_PROVIDERS）。S1 ADR 存在/状态 accepted/日期 2026-10-26；S2 provider_id **集合恒等**（双向：ADR 多点名一个红、代码多注册一个红）；S3 逐字段相等 package/version/license/bundled_models/adapter（版本 3.10.0→3.9.0 即红）；S4 adapter 类必须**在 media.py 里真实存在**（ast 查 ClassDef，不是 grep 名字）；S5 「不选的候选」≥2 且逐条有理由（子标题不提前收尾）；S6 **注册 ≠ 接线**：DEFAULT_OCR_ENGINE 必须仍是 host_vision、DEFAULT_ASR_ENGINE 仍 None、SUPPORTED_SOURCE_KINDS 不含 image/video；S7 宿主原生命中数**不许因本票减少**（<3 红；变多 4 处不误报）—— 堵「靠删 base/ocr_vision.m 让行 118 看起来变绿」；S8 行 118 必须仍被写成 `vacuous_true`，写成 passed/已满足即红。21 项反向对照（含三条真实仓内变异已验：删注册→S2 红、改默认引擎→S6 红、删 .m→S7 红而 verify_media_portability 转绿）。★ 不改造 verify_media_portability.py：那个管「还有没有宿主调用 + 进件开没开」，本条管「选定的是哪个、真的注册了吗」，失败后要查的东西不同，合成一个退出码就分不清该改哪一侧（与 verify_secret_patterns 不并进 DG 同一条理由）。★ 不证明容器内能跑：那是行 118 的另一半，今天仍 untested（素材 0 视频/0 音频、镜像无引擎）",
+      "subjects": [
+        "ADR/ADR-0018-容器内OCR与ASR选型.md",
+        "base/media.py",
+        "base/submission_service.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_metrics_read_model.py",
       "asserts": "metrics_read_model：四指标七要素 / 未测不是 0 / 样本不足不出比率 / 抽样层与 BLOCK 全量复核 / 目标线待基线",
       "subjects": [
@@ -635,6 +644,13 @@
       "subjects": [
         "research/governance/regression-set-v1.json",
         "research/governance/control-points-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_regression_signoff.py",
+      "asserts": "T-407 法务签署的**存在性执行点**（行 86 第 ② 段的逐条一侧）：S1 顶层 signoff 与 83 条样本 id 互等（缺一条红、多孤儿键红）；S2 每条 by/at/basis 三项非空；S3 at 可解析且不在未来（--today 可注入，不落状态）；S4/S5 **should_hit 9 条 + trap_negative 4 条逐条必须有完整 signoff**；S6 signoff.kind_signed 必须等于盘上 expected.kind（改了 kind 没重签即红）；S7 GS-011 必须维持 should_hit 且与 D2 放行带的冲突仍记录在 signoff_meta.待裁定（防被悄悄改掉/抹掉）。★ 不替 verify_regression_governance.py 的 G-LEGAL 作证：那一条只圈引擎今天命中的 7 条，本条覆盖全部 13 条 should_hit+trap_negative 并另查签署层与盘上层是否脱钩。**不证明签名真实**，真伪只能人核原件（行 86 第 ③ 段如实留 manual）",
+      "subjects": [
+        "research/governance/regression-set-v1.json"
       ]
     },
     {

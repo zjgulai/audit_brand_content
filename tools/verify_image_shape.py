@@ -27,6 +27,13 @@ ModuleNotFoundError: No module named 'tools.redact'
 
     I1  **import 图**：`base/` `api/` 下每一处 `from tools.X` / `from tools import X`
         都必须在 Dockerfile 里有对应的 `COPY`，且没有被 `.dockerignore` 排除
+    I2  ★ **反向的同一个病**：Dockerfile 里每一条 `COPY <src>`，`<src>` 都必须
+        **真的进得了构建上下文**（存在、且没被 `.dockerignore` 排除）。
+        I1 查的是「代码依赖了但镜像没拷」，I2 查的是「镜像拷了但上下文没有」——
+        两者是**相反方向**，而 2026-10-26 一天之内两个都真实发生过：
+          · `redact.py`：进了上下文、Dockerfile 没拷 → 运行期 ModuleNotFoundError
+          · 三个 `.mjs`：Dockerfile 拷了、上下文没有 → **构建期 COPY failed**
+        只做 I1 会漏掉后者，而后者更早（镜像根本做不出来）。
     I2  **反向对照**：把 Dockerfile 里那条 COPY 注释掉 → I1 必红
     I3  **真跑**：在临时目录里按 import 图建出最小子树，真 import 一次
 
@@ -232,6 +239,58 @@ def check_import_graph():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def check_dockerfile_copy_sources():
+    """I2：Dockerfile 每一条 COPY 的源都必须真进得了构建上下文。
+
+    ★ 判据是「文件存在 且 未被 .dockerignore 排除（或已被 ! 例外放行）」。
+    ★ 只查**本仓文件**（相对路径）的 COPY；`COPY --from=<stage>` 跳过。
+    """
+    dockerfile_path = os.path.join(ROOT, "Dockerfile")
+    with open(dockerfile_path, encoding="utf-8") as f:
+        raw = f.read()
+    _ig_raw, excluded, reincluded = parse_dockerignore()
+
+    problems = []
+    checked = 0
+    for ln in raw.splitlines():
+        line = ln.strip()
+        if not line.startswith("COPY "):
+            continue
+        if "--from=" in line:
+            continue            # stage 间拷贝，源不在构建上下文里
+        parts = line.split()[1:]
+        # 丢掉 COPY 的选项（以 -- 开头的）
+        parts = [p for p in parts if not p.startswith("--")]
+        if len(parts) < 2:
+            continue
+        srcs, _dst = parts[:-1], parts[-1]
+        for src in srcs:
+            src = src.strip("{}[]\"'")
+            if "*" in src or "?" in src:
+                continue        # 通配符另说
+            checked += 1
+            abs_src = os.path.join(ROOT, src)
+            if not os.path.exists(abs_src):
+                problems.append((src, "盘上不存在"))
+                continue
+            # 目录类 COPY（如 `COPY api/ ./api/`）不需要逐文件判 ignore；
+            # 只判文件类
+            if os.path.isdir(abs_src):
+                continue
+            is_excluded = any(
+                src == ex or src.startswith(ex.rstrip("/") + "/")
+                for ex in excluded)
+            is_reincluded = any(src == ri for ri in reincluded)
+            if is_excluded and not is_reincluded:
+                problems.append(
+                    (src, "在构建上下文里被 .dockerignore 排除（COPY 会在构建期失败）"))
+
+    if problems:
+        no("I2 ★ Dockerfile 的 COPY 源必须真进得了构建上下文", repr(problems))
+    else:
+        ok("I2 ★ Dockerfile 的 %d 个 COPY 源都在构建上下文里" % checked)
+
+
 def check_frontend_default_base():
     """D0：默认 API 前缀必须**随构建模式变**，且两侧都能观测到。
 
@@ -308,6 +367,7 @@ def run_checks():
             print("UNTESTED: 找不到 %s —— 本文件的前提不存在" % name)
             return 2
     check_import_graph()
+    check_dockerfile_copy_sources()
     check_frontend_default_base()
     check_frontend_api_prefix()
     return None
