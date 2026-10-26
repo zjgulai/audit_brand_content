@@ -114,7 +114,7 @@ COPY tools/reply-cards/cards.mjs ./tools/reply-cards/cards.mjs
 # ★ /data 挂载点必须在 USER audit 之前由 root 建好并授权，
 #   否则切换用户后 mkdir 会 Permission denied。
 RUN useradd --system --uid 10001 --create-home --shell /usr/sbin/nologin audit \
- && mkdir -p /data/authority /data/projection /data/logs \
+ && mkdir -p /data/authority /data/projection /data/logs /data/reports-root \
  && chown -R audit:audit /app /data
 USER audit
 

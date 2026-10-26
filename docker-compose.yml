@@ -50,6 +50,21 @@ services:
       - /opt/momcozy-audit-platform/config/principals.json:/data/principals.json:ro
       # SQLite 落在 data 下，与上面三个目录不重叠（ProductionSettings 会校验这一点）
       - /opt/momcozy-audit-platform/data/db:/data/db
+      # ★ 报告正文 + index.jsonl 必须有自己的 bind mount（2026-10-26 实测缺陷）。
+      #
+      #   不加这一行时：`/data` 是 Dockerfile 末尾的 VOLUME（**匿名卷**），
+      #   而 `reports-root` 落在它里面。于是 `docker compose down && up` 之后
+      #   匿名卷被换成新的一个 —— 症状是
+      #       GET /api/v1/reports      → 200，列表里有那条 report_id
+      #       GET /static/reports/….md → 404，正文没了
+      #       GET /readyz              → 200，七项全 true
+      #   也就是说「列表有、点开 404」，且**没有任何检查会红**。
+      #
+      #   ★ 为什么单独的 readyz 检查盖不住：`data_permissions` 只遍历
+      #     authority / projection / logs / principals 四项，**不含 report_root**
+      #     （api/production_app.py 的 _ensure_private_dir 循环）。
+      #     所以这不是「少配了一个目录」，是「配了但没人在查」。
+      - /opt/momcozy-audit-platform/data/reports-root:/data/reports-root
 
     networks:
       - momcozy-audit-net

@@ -41,6 +41,11 @@ ModuleNotFoundError: No module named 'tools.redact'
   而 `send_gateway` 那条的失败是**运行时**的（import 期），
   只有真 import 一次才算证过。这与 §2.4「名字出现过 ≠ 拦得住」是同一条。
 
+    I4  ★ **持久目录的挂载与检查必须成对**：
+        a) `docker-compose.yml` 里每一个会被写入的 `/data/*` 目录都要有 bind mount
+           （否则落在 Dockerfile 的匿名 `VOLUME ["/data"]` 里，`down && up` 后丢）
+        b) `/readyz` 的权限循环与 `start()` 的 `_ensure_private_dir` 循环
+           必须覆盖**同一组**目录（两处口径不一致 = 配了但没人在查）
     D0  **默认 API 前缀随 PROD 切换**（D0a 源码两分支都在 + 用编译期常量）。
         ★ 这一条的第一版是「查 `??` 后面有没有括号」，那个诊断**是错的**
           （实测两种写法在 JS 里等价），而且判据本身恒真 —— 已整段重写。
@@ -291,6 +296,96 @@ def check_dockerfile_copy_sources():
         ok("I2 ★ Dockerfile 的 %d 个 COPY 源都在构建上下文里" % checked)
 
 
+def check_persistent_mounts():
+    """I4：持久目录的挂载与检查必须成对。
+
+    2026-10-26 实测的三个读数同时成立：
+        GET /api/v1/reports      → 200（列表里有）
+        GET /static/reports/….md → 404（正文没了）
+        GET /readyz              → 200，七项全 true
+    真因有两条，缺一条都不会出这个组合：
+      a) `report_root` 落在匿名 `VOLUME ["/data"]` 里，compose 没给它 bind mount
+         → `down && up` 换了匿名卷，正文丢
+      b) `/readyz` 的 `permissions_ok` 循环**不含** `report_root`
+         → 丢了也没有任何检查会红
+    """
+    compose_path = os.path.join(ROOT, "docker-compose.yml")
+    app_path = os.path.join(ROOT, "api", "production_app.py")
+    for p in (compose_path, app_path):
+        if not os.path.isfile(p):
+            print("⚠ 未测：找不到 %s" % p)
+            UNTESTED.append("I4")
+            return
+
+    with open(compose_path, encoding="utf-8") as f:
+        compose = f.read()
+    # a) compose 的 bind mount 目标集合（形如 `- host:/data/xxx`）
+    mounted = set(re.findall(r"-\s+[^:\n]+:(/data/[A-Za-z0-9_.-]+)", compose))
+    # Dockerfile 里 mkdir 的 /data/* 目录 = 「会被写入的目录」的声明面
+    dockerfile_path = os.path.join(ROOT, "Dockerfile")
+    with open(dockerfile_path, encoding="utf-8") as f:
+        dockerfile = f.read()
+    m = re.search(r"mkdir -p ((?:/data/[A-Za-z0-9_./ -]+)+)", dockerfile)
+    declared = set()
+    if m:
+        declared = {tok for tok in m.group(1).split() if tok.startswith("/data/")}
+    missing_mount = sorted(declared - mounted)
+    if missing_mount:
+        no("I4a ★ 每个 /data/* 目录都要有 bind mount（否则 down&&up 后丢）",
+           repr(missing_mount))
+    else:
+        ok("I4a ★ Dockerfile 声明的 %d 个 /data 目录全部有 bind mount"
+           % len(declared), repr(sorted(mounted)))
+
+    # b) 两处循环覆盖同一组目录
+    with open(app_path, encoding="utf-8") as f:
+        app = f.read()
+    start_block = app[app.index("def start(self):"):]
+    start_block = start_block[:start_block.index("raise SettingsError")] \
+        if "raise SettingsError" in start_block else start_block
+    readyz_at = app.index("permissions_ok = True")
+    readyz_block = app[readyz_at:readyz_at + 1200]
+
+    def loop_dirs(anchor, block):
+        """只取 `for directory in ( ... ):` 那个元组里的 settings 字段。
+
+        ★ 第一版取「块里出现的所有 self.settings.X」，于是把
+          `frozen_projection_root` 也算进去了 —— 而它只做 `is_dir()`
+          检查、不建目录不查权限，本来就不该在这个循环里。
+          判据把「无关字段」当缺项，得到一条假红。**只比循环体本身。**
+        """
+        i = block.find(anchor)
+        if i < 0:
+            return None
+        tail = block[i:]
+        j = tail.find("in (")
+        if j < 0:
+            return None
+        k = tail.find("):", j)
+        if k < 0:
+            return None
+        return set(re.findall(r"self\.settings\.([a-z_]+)", tail[j:k]))
+
+    start_at = app.index("def start(self):")
+    start_dirs = loop_dirs("for directory in (", app[start_at:start_at + 1400])
+    readyz_dirs = loop_dirs("for directory in (", readyz_block)
+    if start_dirs is None or readyz_dirs is None:
+        no("I4b 两处循环体都找不到（判据输入为空，不能当成通过）",
+           "start=%r readyz=%r" % (start_dirs, readyz_dirs))
+        return
+    only_readyz = sorted(readyz_dirs - start_dirs)
+    only_start = sorted(start_dirs - readyz_dirs)
+    if only_start:
+        no("I4b ★ /readyz 的目录检查漏了 start() 会建的那些",
+           repr(only_start))
+    elif only_readyz:
+        ok("I4b ★ 两处目录检查口径一致（readyz 额外覆盖 %r）"
+           % (only_readyz,))
+    else:
+        ok("I4b ★ /readyz 与 start() 覆盖同一组持久目录（%d 个）"
+           % len(start_dirs), repr(sorted(start_dirs)))
+
+
 def check_frontend_default_base():
     """D0：默认 API 前缀必须**随构建模式变**，且两侧都能观测到。
 
@@ -368,6 +463,7 @@ def run_checks():
             return 2
     check_import_graph()
     check_dockerfile_copy_sources()
+    check_persistent_mounts()
     check_frontend_default_base()
     check_frontend_api_prefix()
     return None

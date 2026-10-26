@@ -557,6 +557,13 @@ class ProductionRuntime:
             self.settings.review_projection_db.parent,
             self.settings.session_db.parent,
             self.settings.access_log_path.parent,
+            # ★ 2026-10-26：`report_root` 此前不在这个循环里，而 `start()` 的
+            #   `_ensure_private_dir` 循环**含**它。两处口径不一致的后果是：
+            #   报告目录被换成 0755（或整个丢了），`/readyz` 仍然七项全 true。
+            #   实测到的组合是「列表有、点开 404、readyz 全绿」——
+            #   三个读数各自都对，合起来是一次数据缺失。
+            #   两个循环现在覆盖同一组目录，这一条由 verify_image_shape 的 I4 断言。
+            self.settings.report_root,
         ):
             try:
                 permissions_ok = permissions_ok and not (
