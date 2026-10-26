@@ -5,6 +5,7 @@ import { useIdentity } from "../components/IdentitySwitcher";
 import StatusBadge from "../components/StatusBadge";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
+import Pager, { slicePage } from "../ui/Pager";
 
 /**
  * 案件总览列表（P-03 · Wave B）。
@@ -20,6 +21,9 @@ export default function CasesPage() {
   const [labelFilter, setLabelFilter] = useState<string>("all");
   const [lineFilter, setLineFilter] = useState<string>("all");
   const [query, setQuery] = useState<string>("");
+  // ★ 2026-10-26 分页：只切数组，不动 API（服务端分页要改契约，属 ③ 那一环）
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(20);
 
   useEffect(() => {
     if (devEnabled && current === null) {
@@ -65,6 +69,18 @@ export default function CasesPage() {
       return true;
     });
   }, [rows, labelFilter, lineFilter, query]);
+
+  // ★ 筛选一变就回第一页。
+  //   不这么做的话「筛成 3 条却停在第 7 页」会显示空白，
+  //   而读的人会以为「筛出来没有数据」—— 这是分页最常见的假空态。
+  useEffect(() => {
+    setPage(1);
+  }, [labelFilter, lineFilter, query, pageSize]);
+
+  const visibleRows = useMemo(
+    () => slicePage(filtered, page, pageSize),
+    [filtered, page, pageSize],
+  );
 
   if (error) {
     return (
@@ -205,7 +221,7 @@ export default function CasesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
+              {visibleRows.map((c) => (
                 <tr key={c.case_id}>
                   <td className="font-data">
                     <Link to={`/cases/${encodeURIComponent(c.case_id)}`}>
@@ -243,6 +259,18 @@ export default function CasesPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* 分页：只在表格渲染出来后出现，避免空态时多一行无意义控件 */}
+      {!error && (rows ?? []).length > 0 && (
+        <Pager
+          page={page}
+          pageSize={pageSize}
+          total={filtered.length}
+          onPage={setPage}
+          onPageSize={setPageSize}
+          noun="条案件"
+        />
       )}
     </section>
   );
