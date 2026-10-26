@@ -1,0 +1,41 @@
+[
+ {
+  "事项名称": "T-451 工作流耗时打通：从「测了但读不出」到报告／接口／指标三处都读得到",
+  "关联执行票": "T-451",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "审计发现：base/orchestrator.py 早就在用真时钟测每步 duration_ms，contracts/receipt-v1.schema.json 也把它列为 steps[] 的 required；但没有任何东西把它读出来——报告「执行回执」只打印 skill/版本/指纹/跳过步骤/规则快照，api/ 与 web/src 搜 duration_ms|耗时|elapsed 是 0 命中，指标模型里也没有。测了，用户看不见。★ 加一个新模块 base/workflow_timing.py 作为唯一实现（三态 ok/untested、最慢三步、并列按名排序），生产者 orchestrator 算一次放进 report_snapshot.receipt，报告与接口都只读那一份。★ 指标新增第五个 P50/P95——它是分位数不是比例，所以 ratio 恒 None，不硬套分子分母（硬套会逼出一个不存在的比率，并把「P50=1200ms」读成「50% 的案件耗时 1200ms」）。",
+  "验收标准": "verify_workflow_timing 41/41（A 正常／B 归因／C 三态／D 端到端／E 反向对照）。★ 关键判据：总耗时 = 步骤 duration_ms 求和，**不用 ended_at - started_at**——实测三次两个时间戳恒相等（_iso 精度只到秒，而整链只跑 0.8–3.0 ms），秒差会算出恒为 0 的假读数。端到端：真判定 → 快照 → 真 node 渲染器，报告那一行的数字必须等于快照里的 total_ms。三态：空步骤/缺值/负值/bool/非对象一律 untested 并点名；未测文案不含「0 ms／很快」。指标侧 W 组 9 项：分母只数已出结论且读数有效的案件。",
+  "状态依据": "三个真变异各红一次：① 总耗时改成常 0（=秒差形状）→ D5 红；② 渲染器改用写死的数 → D6b 红（两口径必须恒等）；③ 未测当成 0 进分母 → metrics W5/W6 红。★★ 这条判据抓到一个真实断链：D5-2d 首次跑是 FAIL（workflow_timing=None），根因是 api/review_api.py 的 _case() 投影时把 report_snapshot 掉掉了——数据在 authority state 里，投影不带出来，下游永远读不到。修的是投影，不是断言。与审计里 due_at 那个病同一形状。读数：workflow_timing 41 · metrics 60 · orchestrator 57 · judge_entry 12 · engine_contract 227 · stage_gate_d5 23 · review_api 50 · write_api 75 · api_integration 17 · production_app 82 · submission_pipeline 43 · report_store 63 · report_render 105 · coverage 679（--controls）。提交 80d42a6。",
+  "下一步行动": "T-452 图片进件接进生产"
+ },
+ {
+  "事项名称": "ADR-0020 后端链路七段审计：三处「自证全绿但生产断线」",
+  "关联执行票": "ADR-0020",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端",
+   "规则与知识库"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "按委托方要求对「输入→意图识别→skill 工作流→输出标准化→时间分析→知识库查询比对」做一次深度审计。七段判决：①输入接入 部分通（文本进件端到端真通，但图片进件 MEDIA_INGEST_ENABLED=False 且无 env 入口、无上传路由）②意图识别 找不到实现（classify_intent|detect_content_type 全仓 0 命中，有正向对照；上游 PRD:135 要求自动识别）③skill 工作流 只有桩（无 skill_registry.py、无 registry.json、skill/ 被 gitignore 只 2 份文档入库）④判定引擎 已通单链⑤输出标准化 部分通⑥时间分析（工作流耗时）测了但读不出⑦知识库 部分通。★ 最有说服力的发现：verify_coverage 通过 661 项全绿，但它保证的是「验算器存在且 subjects 能在源码里查到」，**不保证被验的东西在生产链路上**。三个实例：due_at（orchestrator 写回执只取三个键+schema additionalProperties:false，进不了权威）、工作流耗时（测了没人读）、semantic_judge（生产传硬编码 untested）。",
+  "验收标准": "每条结论都指得出文件:行。两处 0 命中做了正向对照（同法搜 classify_submission 命中 3 个文件、搜「时间线」命中 ADR 与 .ua），证明扫描器活着而不是命令坏了。三个决定性断言逐条复核：MEDIA_INGEST_ENABLED 是模块常量且该文件 environ|getenv = 0；orchestrator.py:479-483 写回执只取 state/layer/release_status；judge_entry.py:263 传 semantic_judge={\"status\":\"untested\"}。",
+  "状态依据": "ADR/ADR-0020-后端链路七段审计与执行次序.md 已落盘，含排期原则（A 已测未送出→B 缺组装→C 根本没有）、五票 T-451…T-455、依赖图、以及「本轮不改变 GO/NO-GO」的口径声明。★ ADR 自己带可证伪性表：每条「缺」都写明什么会让它过期，且要求补上之后从表里删掉，不留成永远正确的清单。",
+  "下一步行动": "按 T-451→452→453→454→455 依次执行"
+ }
+]
