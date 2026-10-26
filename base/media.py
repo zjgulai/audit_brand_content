@@ -120,8 +120,13 @@ OCR_LANGS = ["zh-Hans", "en-US"]
 # 所以不许只在文档里写、也不许只在代码里写。
 #
 # ⚠️ **注册 ≠ 接线。** 这一段是**声明性的**：它不改变 `ocr_file()` 走哪条路。
-#    今天 `DEFAULT_OCR_ENGINE` 仍是 `host_vision`，因为生产进件不接媒体
+#    今天 `DEFAULT_OCR_ENGINE` 仍是 `host_vision`，因为生产进件**不接媒体**
 #    （`SUPPORTED_SOURCE_KINDS` 无 image/video），行 118 仍是**空真**。
+#    ★ 2026-10-26 T-431 之后这句要补一层：图片进件的**代码路径**已建成
+#      （`submission_service._build_image_unit`），但生产路径由
+#      `MEDIA_INGEST_ENABLED=False` 显式挡着 —— 所以「生产进件不接媒体」这句
+#      仍然是**事实**，只是挡住它的东西从「没实现」变成了「一个默认关的开关」。
+#      **能力建成 ≠ 生产路径打开**，两者各有断言（`verify_media_ingest` A/C 组）。
 #    把容器引擎接成默认 = 打开媒体进件 = 另一张票（T-118-follow），
 #    那张票必须同时处理行 118（宿主原生 3 处）。
 #

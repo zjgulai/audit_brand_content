@@ -455,6 +455,13 @@
       ]
     },
     {
+      "verifier": "tools/verify_media_ingest.py",
+      "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow）",
+      "subjects": [
+        "base/submission_service.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_media_selection.py",
       "asserts": "T-412 选型契约（ADR-0018 ≡ base/media.py 的 MEDIA_PROVIDERS）。S1 ADR 存在/状态 accepted/日期 2026-10-26；S2 provider_id **集合恒等**（双向：ADR 多点名一个红、代码多注册一个红）；S3 逐字段相等 package/version/license/bundled_models/adapter（版本 3.10.0→3.9.0 即红）；S4 adapter 类必须**在 media.py 里真实存在**（ast 查 ClassDef，不是 grep 名字）；S5 「不选的候选」≥2 且逐条有理由（子标题不提前收尾）；S6 **注册 ≠ 接线**：DEFAULT_OCR_ENGINE 必须仍是 host_vision、DEFAULT_ASR_ENGINE 仍 None、SUPPORTED_SOURCE_KINDS 不含 image/video；S7 宿主原生命中数**不许因本票减少**（<3 红；变多 4 处不误报）—— 堵「靠删 base/ocr_vision.m 让行 118 看起来变绿」；S8 行 118 必须仍被写成 `vacuous_true`，写成 passed/已满足即红。21 项反向对照（含三条真实仓内变异已验：删注册→S2 红、改默认引擎→S6 红、删 .m→S7 红而 verify_media_portability 转绿）。★ 不改造 verify_media_portability.py：那个管「还有没有宿主调用 + 进件开没开」，本条管「选定的是哪个、真的注册了吗」，失败后要查的东西不同，合成一个退出码就分不清该改哪一侧（与 verify_secret_patterns 不并进 DG 同一条理由）。★ 不证明容器内能跑：那是行 118 的另一半，今天仍 untested（素材 0 视频/0 音频、镜像无引擎）",
       "subjects": [
