@@ -1,0 +1,142 @@
+[
+  {
+    "事项名称": "T-430 覆盖率声明不再丢 does_not_cover",
+    "关联执行票": "T-430",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "覆盖与依据",
+    "功能三级分类": "未评原因",
+    "工作类型": [
+      "后端"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "未测",
+    "上线状态": "未核验",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "contract.from_media() 刻意不给 covers/does_not_cover 默认值（默认值会让「只做了 OCR」看起来像「图片已审」），但 _coverage_ir() 用白名单重建 coverage 时漏了这个键，声明在最后一跳被静默丢弃。修法：分支白名单 + 从 unit.textification 合并，两条路都兜。IR schema 的 coverage 是 additionalProperties:false 且原先无此字段，不同步改 schema 会被自己的校验器拒掉。判据：verify_orchestrator C16a–C16g（7 条）+ 4 条反向对照。",
+    "验收标准": "C16a 只有 unit 声明时逐字进 IR；C16b 只有 coverage 声明时也搬过来；C16c 两侧合并且不许收窄；C16d/e 端到端 IR 与顶层同源；C16f 键不省略；C16g 非空不许 full。真变异：删掉合并那行 → 5 条红（实测 52 passed / 5 failed、退 1）。",
+    "状态依据": "verify_orchestrator 57/57 全过；--controls 12/12；真变异复测已跑（改真文件 + 清陈旧字节码）。提交 6e4ad7c。",
+    "下一步行动": "随生产进件打开一起进上线核验"
+  },
+  {
+    "事项名称": "T-431 图片进件能力建成（生产路径未打开）",
+    "关联执行票": "T-431",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "覆盖与依据",
+    "功能三级分类": "语义/OCR/ASR",
+    "工作类型": [
+      "后端",
+      "模型与解析"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "未测",
+    "上线状态": "未核验",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "SUPPORTED_SOURCE_KINDS 刻意不动（ADR-0018 §6.2 把顺序写死）。用 MEDIA_INGEST_ENABLED 默认 False 把「能力」与「生产路径」分开：进件这一层真能收图、出合法 image unit、进判定，生产路径由显式开关挡着。路径约束：未配根 503 / 根外 403 / 不存在 404 —— 没有根约束时这个端点会变成对任意文件做 OCR 的读取器。",
+    "验收标准": "verify_media_ingest 31 条（A 开关语义 / B 两个读数不许混用 / C 归因不串门 / D 真实位图真跑 / E 路径约束 / F OCR 失败不许伪装已审 / G 现有守门读数仍绿）+ 6 条反向对照。真变异：把 image 加进 SUPPORTED_SOURCE_KINDS → 本票 5 条红 + verify_media_selection S6 红 + verify_media_portability G2 红（三个方向同时红）。",
+    "状态依据": "verify_media_ingest 31/31；--controls 6/6；verify_media_selection 13 项全过（S6 三件仍关着）；verify_media_portability 退 0（G1 空真）。提交 4a7694b。",
+    "下一步行动": "打开生产进件必须与 T-436 容器内引擎同时做"
+  },
+  {
+    "事项名称": "T-432 多模态客户端与授权闸门接通",
+    "关联执行票": "T-432",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "规则/模型",
+    "功能三级分类": "语义/OCR/ASR",
+    "工作类型": [
+      "后端",
+      "模型与解析",
+      "安全权限"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "部分通过",
+    "上线状态": "未上线",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "新增 tools/multimodal_client.py 作为全仓唯一发请求的地方，base/multimodal_provider.py（授权闸门）一行网络都没加。真网关已连通：tokenhub/glm-5.3-flash → ok（正确描述探针图「深红色纯色背景」）；vod/gemini-3.1-flash-lite 与 gemini-3.5-flash → ok；vod/gemini-3.8-flash → HTTP 429 rate limited。凭据只读环境变量、不读凭据文件，真实值落仓外 ~/.dsh/credentials/ 0600。",
+    "验收标准": "verify_multimodal_client 65 条（全离线一次网络不发）：N 网络边界只查 import 行（全文命中 6 处全在注释里）/ T 两张任务表恒等 / C 只读环境变量 / E 出境清单按任务收窄 / A 未授权时 provider 一次都不许调 / S 十类失败都不许落 ok + S12 判别用例（非 2xx 但结构完整）/ M 一条 error 不许被 ok 盖住。--controls 7/7。",
+    "状态依据": "离线判据全绿且真网关已连通；但「模型真的看得懂中文广告画面」没有真实素材验证过，所以验收结论写「部分通过」而不是「通过」。提交 0ad0d03。",
+    "下一步行动": "拿真实广告图跑一轮，把验收结论转「通过」"
+  },
+  {
+    "事项名称": "T-433 L1 多模态观察落地并进报告与工作台",
+    "关联执行票": "T-433",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "覆盖与依据",
+    "功能三级分类": "未评原因",
+    "工作类型": [
+      "后端",
+      "前端"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "未测",
+    "上线状态": "未核验",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "finding 三要素是合取（control_code/authority_ref/location），多模态给不出前两项（知识库产物），所以「先打通 + 落 candidate finding + 知识库慢慢建」三条不能同时成立。处置：L1 观察落 case.multimodal_observations（进权威、可重放、报告单独成节、标「候选 · 待人工确认」），L2 候选等 T-434。五种「没看成」全落成带原因的条目，不落空列表。空观察在报告与工作台上都写「未评」并带原因。",
+    "验收标准": "verify_multimodal_observation 42 条 + verify_report_render T433-1…11（看渲染出来的文本）+ C5f（CaseDetail 键集合双向对拍，此前完全没这口子）+ L7（报告与工作台两处措辞逐字一致）。真变异：改措辞为「已通过」→ #67 与 T433-5 双红；删整节 → T433-1/6 红；渲染处改「已确认」→ L7-2 红；页面不传值 → L7-7 红。",
+    "状态依据": "verify_multimodal_observation 42/42；verify_report_render 105/105；verify_review_api 49/49（.venv）；tsc --noEmit 0。提交 d7fd919 + 8989ac3。",
+    "下一步行动": "L2 升级需等一批画面语义 control_code"
+  },
+  {
+    "事项名称": "T-435 视频抽帧（balanced）与音画对齐前提",
+    "关联执行票": "T-435",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "规则/模型",
+    "功能三级分类": "语义/OCR/ASR",
+    "工作类型": [
+      "后端",
+      "模型与解析"
+    ],
+    "完成状态": "进行中",
+    "验收结论": "未测",
+    "上线状态": "未上线",
+    "阻塞状态": "已阻塞",
+    "阻塞原因": "本机无 ffmpeg/ffprobe（which 实测为空），盘上与仓内 0 个视频文件。执行层（真抽帧、真文件读数）无对象。",
+    "页面路由": "全站",
+    "事项明细": "base/media_ingest.py：ffprobe 读事实（时长/分辨率/帧率/有无音轨）+ balanced 抽帧（场景切变优先、几乎静止回落均匀、16×16 RGB 均值通道差去重、上限 100、源相对时间戳、每帧 sha256）+ V1 五项覆盖声明 + 音画对齐前提检查。ffmpeg 做成可注入 runner，所以抽帧业务判据能在合成帧上真验。",
+    "验收标准": "verify_video_ingest 38 条 E 层（合成帧真跑）：去重有效/不误伤/细渐变不塌成 1 帧 + 反证/上限硬截断/均匀兜底/静止回落 uniform + 反证/V1 五项（无音轨=no、0 帧=no、完整画面语义穷举 20 组合无一 yes、has_audio 不许抬高覆盖声明）/音画对齐前提/与 V1_KEYS 和 V1_ENUM 恒等。X 层（执行）**未测**，退 2。",
+    "状态依据": "E 层 38 项全过；X 层未测（缺工具与素材）—— 未测不是通过，所以完成状态记「进行中」而不是「已完成」，验收结论记「未测」而不是「通过」。提交 5331243。",
+    "下一步行动": "装 ffmpeg + 提供 1–2 段带音轨广告视频，X 层即可转绿"
+  },
+  {
+    "事项名称": "T-437/T-438 素材根进配置 + 出境清单落盘",
+    "关联执行票": "T-437, T-438",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "身份权限",
+    "功能三级分类": "目标主体/能力/品线/平台",
+    "工作类型": [
+      "后端",
+      "安全权限"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "未测",
+    "上线状态": "未核验",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "① REVIEW_MEDIA_ROOTS 进 ProductionSettings（非必填，不配=不收图；配了必须存在、不许重复、不许空串），SubmissionIngestor 从 settings 读。刻意不塞进 path_names：那批是写出去的数据根，素材根是读进来的，允许与写路径重叠。② base/multimodal_egress.py 把出境清单落盘，补上此前**完全不存在**的「留多久」：到期时刻算出来、仓内根拒绝、append-only 不覆盖历史、读不出的文件不删并记 errors、到期判定 fail-closed。",
+    "验收标准": "verify_egress_manifest 38 条 + 5 条反向对照：三要素齐备 / 到期时刻=生成+days×86400（改 days 跟着变）/ 按任务收窄 / 快照与注册表逐字同源 / fail-closed 到期判定 / 落盘 0600 与 append-only / 清理不删读不出的文件 / 保留期非法值必须抛。真变异：去掉 audio 项的 tasks → T1 红。",
+    "状态依据": "verify_egress_manifest 38/38；--controls 5/5；verify_coverage --controls 647；verify_secret_patterns 0 命中。★ 本票抓到一个真缺陷：EGRESS_ITEMS 第一版没写 tasks，而 tasks 为空=适用于全部任务，导致只做画面语义的部署也会在清单里列出音轨（审计读到的出境面比实际大）。提交 8989ac3。",
+    "下一步行动": "生产部署时配 REVIEW_MEDIA_ROOTS"
+  },
+  {
+    "事项名称": "媒体审核五票的验收读数与已知未测项",
+    "关联执行票": "T-430…T-439",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "指标",
+    "功能三级分类": "四指标真实数据",
+    "工作类型": [
+      "测试验收"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "部分通过",
+    "上线状态": "未核验",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "本轮交付 T-430/T-431/T-432/T-433/T-435 + 收尾 T-437/T-438/T-439。媒体子系统自证：verify_orchestrator 57 · verify_contracts 84 · verify_media_ingest 31 · verify_multimodal_client 65 · verify_multimodal_observation 42 · verify_egress_manifest 38 · verify_video_ingest 38 过+1 未测 · verify_report_render 105 · verify_review_api 49 · verify_submission_router 43 · verify_submission_pipeline 43 · smoke_end_to_end 58 · verify_coverage --controls 647 · verify_secret_patterns 0 命中 · verify_depad 0 填充。",
+    "验收标准": "全局验收 verify_acceptance_run 在媒体线改动后仍为 passed=126 failed=0 untested=10（与交接基线一致）。★ 期间出现的 #113（web/src/styles.css 私有 CSS 前缀 -webkit-line-clamp）经二分归因到提交 1a85999，属另一路前端工作在途改动，不属媒体线，未处置。",
+    "状态依据": "媒体线全部自证绿；视频执行层与真实素材验证未测；L2 candidate finding 待 control_code。因此整体记「部分通过」而非「通过」。",
+    "下一步行动": "（1）装 ffmpeg + 给视频素材 → T-435 X 层转绿；（2）给一批画面语义 control_code → T-434 可做；（3）确认 vod/gemini-3.8-flash 配额或固定用 gemini-3.1-flash-lite"
+  }
+]

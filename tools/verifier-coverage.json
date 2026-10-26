@@ -493,6 +493,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_lark_progress.py",
+      "asserts": "T-440 「改动完成即同步飞书事项主表」（AGENTS.md §2.8）这条承诺**没有变成一句空话**。被验对象是 `tools/lark_progress.py`（不叫 verify_*，故不进名册，由本文件管它）。W1/W2 §2.8 真的写着这条约定且点名了执行点、那个文件真的存在；**W5 表坐标（APP_TOKEN / TABLE_ID）与 §2.8 逐字一致**（改表不改文档 → 红）+ W5c 反证不存在的 token 查不到；**W3 `--apply` 是 store_true、写入路径的 dry_run 取反自它**（默认 dry-run）+ W3d 反证 dry-run 下 token=None 也不炸（真的没发请求）；**W4 凭据路径只出现一处、指向仓外 ~/.dsh/credentials、不在仓内**；**W6/W7 真跑一遍工具的 --selftest**（读数由工具自己报，本文件不抄死数），项数 ≥15 且 0 红，并断言它自称「0 网络请求、0 凭据读取」；W7d 反证缺必填时真跑必须退非 0。★ 工具自己的 18 条判据（单选未知选项 / 未测不许标已完成 / 编号取最大号+1 / upsert 幂等）在 `lark_progress.py --selftest`，已用三处真变异验过：删「未测不许标已完成」→2 红、编号改按条数→2 红、单选不校验→2 红",
+      "subjects": [
+        "tools/lark_progress.py",
+        "AGENTS.md"
+      ]
+    },
+    {
       "verifier": "tools/verify_media_selection.py",
       "asserts": "T-412 选型契约（ADR-0018 ≡ base/media.py 的 MEDIA_PROVIDERS）。S1 ADR 存在/状态 accepted/日期 2026-10-26；S2 provider_id **集合恒等**（双向：ADR 多点名一个红、代码多注册一个红）；S3 逐字段相等 package/version/license/bundled_models/adapter（版本 3.10.0→3.9.0 即红）；S4 adapter 类必须**在 media.py 里真实存在**（ast 查 ClassDef，不是 grep 名字）；S5 「不选的候选」≥2 且逐条有理由（子标题不提前收尾）；S6 **注册 ≠ 接线**：DEFAULT_OCR_ENGINE 必须仍是 host_vision、DEFAULT_ASR_ENGINE 仍 None、SUPPORTED_SOURCE_KINDS 不含 image/video；S7 宿主原生命中数**不许因本票减少**（<3 红；变多 4 处不误报）—— 堵「靠删 base/ocr_vision.m 让行 118 看起来变绿」；S8 行 118 必须仍被写成 `vacuous_true`，写成 passed/已满足即红。21 项反向对照（含三条真实仓内变异已验：删注册→S2 红、改默认引擎→S6 红、删 .m→S7 红而 verify_media_portability 转绿）。★ 不改造 verify_media_portability.py：那个管「还有没有宿主调用 + 进件开没开」，本条管「选定的是哪个、真的注册了吗」，失败后要查的东西不同，合成一个退出码就分不清该改哪一侧（与 verify_secret_patterns 不并进 DG 同一条理由）。★ 不证明容器内能跑：那是行 118 的另一半，今天仍 untested（素材 0 视频/0 音频、镜像无引擎）",
       "subjects": [
