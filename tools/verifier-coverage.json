@@ -463,6 +463,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_multimodal_observation.py",
+      "asserts": "T-433 L1 多模态观察。**核心边界**：finding 三要素是合取（control_code/authority_ref/location，缺一即拒），多模态给不出前两项（知识库产物），所以「先打通 + 落 candidate finding + 知识库慢慢建」三条不能同时成立 —— L1 观察落 `case.multimodal_observations`（进权威、可重放、报告单独成节、标候选待人工确认），L2 候选等 T-434。**L1 不是降级，是照实说**：把观察伪装成 finding 的后果是复核时无法申诉。L1 观察原样进 state、**不进 ir.findings**、缺省是 [] 不是缺字段；L2 三态可分（ok/untested/error），观察状态域与 finding 状态词**不重叠**；L3 reducer 拒坏形状（ok 无 statement / 非 ok 无 reason / status 用了 finding 的词 / 缺 task / 不是对象 / 整体不是数组）；L4 judge_entry 的五种「没看成」都不许被读成「看过没问题」（未注入 analyze → note、非媒体载体 → note、analyze 抛异常 → 落 error 观察、provider 少给任务 → untested、provider 报 ok 但 observations 空 → 落 untested）；L5 报告快照**判定时冻结**（快照观察 == 返回值观察，同源；None 不造壳；不原地改传入快照）；L6 finding 表未被污染（multimodal 仍不在白名单、准入三要素未放宽）。★ 报告成节的措辞判据在 `verify_report_render.mjs` 的 T433-1…11，那里看的是**渲染出来的文本**而非源码。四条真变异已验：删 statement 校验 → L3-1/2 红；未注入 analyze 去 note → L4-1 红；去掉 ok 空观察检查 → L4-5 红；报告标题改「已通过」→ #67 与 T433-5 同时红",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/judge_entry.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_media_ingest.py",
       "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow）",
       "subjects": [

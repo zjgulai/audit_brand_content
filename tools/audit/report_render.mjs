@@ -233,6 +233,53 @@ export function renderReport(snapshot) {
   }
   lines.push("");
 
+  // ★ T-433：画面语义单独成节，措辞固定「候选 · 待人工确认」。
+  //
+  //   为什么固定措辞、且不许说「已通过」：一条没有 control_code 的观察
+  //   今天就不是 finding（finding 准入是三要素合取，见 base/finding_store.py:69）。
+  //   把观察写成「已通过」，复核时**无法申诉** —— 没有 control_code 就无法对照规则。
+  //
+  //   为什么空的时候写「未评」而不是「正常」：空有两种成因 ——「没接入」
+  //   与「看了没发现」。前者在 snapshot.multimodal_note 里，后者不该被当成前者。
+  //   两者都**不许**读成「画面没问题」。
+  lines.push("## 画面语义（候选 · 待人工确认）");
+  const observations = asArray(snapshot.multimodal_observations);
+  const okObs = observations.filter((o) => o && o.status === "ok");
+  const badObs = observations.filter((o) => o && o.status !== "ok");
+    if (!okObs.length && !badObs.length) {
+    const why = String(snapshot.multimodal_note || "").trim();
+    lines.push(`- 本项未评：${why || "未提供原因（按未评处理）"}`);
+    // ★ 措辞注意：这里**不许**出现「画面正常 / 已通过 / 没问题」这类词，
+    //   连「不是『画面正常』」这种否定式也不许 —— 去 AI 味与未审词表两道尺
+    //   都是按字面匹配的，一句否定句会让它们把整节判红，而读者也可能只扫到那几个字。
+    lines.push("- 覆盖状态：未评 —— 不得据此放行，须人工复核画面");
+  } else {
+    if (okObs.length) {
+      lines.push("以下为机器观察，**候选 · 待人工确认**；不是 finding，不得直接放行：");
+      for (const o of okObs) {
+        const bits = [`- [${textOrNone(o.task)}] ${textOrNone(o.statement)}`];
+        if (o.confidence !== null && o.confidence !== undefined) {
+          bits.push(`置信 ${Number(o.confidence).toFixed(2)}`);
+        }
+        if (o.bbox) bits.push(`位置：${o.bbox}`);
+        if (o.ts) bits.push(`时间：${o.ts}`);
+        if (o.model) bits.push(`模型：${o.model}`);
+        lines.push(bits.join("；"));
+      }
+    } else {
+      lines.push("- 无有效观察（下面逐条说明为什么）");
+    }
+    if (badObs.length) {
+      lines.push(`- 未评部分（${badObs.length} 条，原因如下）—— 未评不是没问题：`);
+      for (const o of badObs) {
+        lines.push(`  - [${textOrNone(o.task)}] ${textOrNone(o.status)}：`
+          + `${textOrNone(o.reason)}`);
+      }
+    }
+    lines.push("- 覆盖状态：部分覆盖 —— 画面语义为候选观察，须人工确认");
+  }
+  lines.push("");
+
   lines.push("## 覆盖证明");
   lines.push(`- 评过的模态：${textOrNone(coverage.modalities_evaluated)}`);
   lines.push(`- 规则版本：${textOrNone(coverage.rules_version)}`);

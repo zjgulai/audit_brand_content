@@ -97,6 +97,23 @@ def initial_state(case_id):
         "kb_snapshot_hash": None,
         "conflict_table_version": None,
         "media_fingerprints": {},
+        # T-433：L1 多模态**观察**（不是 finding）。
+        #
+        # ★ 为什么单独一个格子、不进 ir.findings：
+        #   finding 的准入是三要素合取 —— control_code / authority_ref / location
+        #   （base/finding_store.py:69）。多模态能给 location，给不出前两项
+        #   （它们是知识库产物）。把观察塞进 finding 表，后果是复核时**无法申诉**：
+        #   没有 control_code 就无法对照规则。
+        #
+        # ★ 为什么仍然进权威（随 state 走）：观察是「机器看过什么」的证据。
+        #   放在 state 之外就等于放了一个没有重放能力的旁路 —— 重启后它消失，
+        #   而报告里已经写过它。
+        #
+        # 每条含 {task, model, model_version, ts, bbox, statement, confidence,
+        #        egress_status, status, created_at}；`status` 保留 untested/error
+        # 的条目，好让「模型没看成」与「模型看了没问题」在数据上分开。
+        "multimodal_observations": [],
+
         # T-310b：签发状态容器；active_job / successor 键为 T-317 重审预留。
         "release": None,
         # T-316b: 判定时冻结的报告渲染输入（与 ir 并列，不是 ir 的一部分）。
@@ -120,6 +137,12 @@ def initial_state(case_id):
 
 # 判定表五标签；ingest 时拒绝任何不在这五个值里的 label。
 DECISION_LABELS = ("PASS", "待自决", "REVIEW", "BLOCK", "未审查")
+
+#: T-433：一条多模态观察的状态域。
+#: ★ 刻意**不含** "candidate"/"rejected" 这类 finding 用的词 ——
+#:   观察不是 finding，共用一套状态名会让下游把两者混读。
+#:   ok = 模型给出了观察；untested = 没测成；error = 测了但失败。
+OBSERVATION_STATUSES = frozenset({"ok", "untested", "error"})
 
 
 def public_case(state):
@@ -1094,6 +1117,37 @@ def _ingest_submission(state, actor, payload, now):
     if not isinstance(media_fp, dict):
         raise LedgerValidation(
             "bad_binding_fields", "media_fingerprints 必须是对象")
+    # T-433：L1 多模态观察。形状在这里拒，**不许**坏数据随权威永久保存。
+    observations = payload.get("multimodal_observations")
+    if observations is None:
+        observations = []
+    if not isinstance(observations, list):
+        raise LedgerValidation(
+            "bad_multimodal_observations", "multimodal_observations 必须是数组")
+    for index, entry in enumerate(observations):
+        where = "multimodal_observations[%d]" % index
+        if not isinstance(entry, dict):
+            raise LedgerValidation("bad_multimodal_observations",
+                                   "%s 必须是对象" % where)
+        if str(entry.get("status") or "") not in OBSERVATION_STATUSES:
+            raise LedgerValidation(
+                "bad_multimodal_observations",
+                "%s.status 必须在 %r" % (where, sorted(OBSERVATION_STATUSES)))
+        if not isinstance(entry.get("task"), str) or not entry["task"].strip():
+            raise LedgerValidation("bad_multimodal_observations",
+                                   "%s.task 必须是非空字符串" % where)
+        # ★ status=ok 的条目必须带非空 statement；未测/出错的条目带 reason。
+        #   这条断言堵的是「一条空观察被读成『看过、没问题』」—— 本项目反复踩的形状。
+        if entry["status"] == "ok":
+            if not isinstance(entry.get("statement"), str) or not entry["statement"].strip():
+                raise LedgerValidation(
+                    "bad_multimodal_observations",
+                    "%s 是 ok 却没有非空 statement" % where)
+        else:
+            if not isinstance(entry.get("reason"), str) or not entry["reason"].strip():
+                raise LedgerValidation(
+                    "bad_multimodal_observations",
+                    "%s 非 ok 必须带非空 reason（未测不是没问题）" % where)
     state.update({
         "submission_id": submission_id,
         "submission_hash": submission_hash,
@@ -1104,6 +1158,7 @@ def _ingest_submission(state, actor, payload, now):
         "kb_snapshot_hash": kb_hash,
         "conflict_table_version": ctv,
         "media_fingerprints": copy.deepcopy(media_fp),
+        "multimodal_observations": copy.deepcopy(observations),
         "tenant": _nonempty(payload.get("tenant"), "tenant"),
         "product_line": _nonempty(payload.get("product_line"), "product_line"),
         "submitter_id": _nonempty(payload.get("submitter_id"), "submitter_id"),

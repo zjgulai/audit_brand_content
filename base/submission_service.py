@@ -366,6 +366,11 @@ class SubmissionIngestor:
             # failure surfaces as "report not produced", never as a report with
             # missing sections. See T-316d.
             "report_snapshot": judgment.get("report_snapshot"),
+            # T-433：L1 多模态观察进权威（随 state 走，可重放）。
+            # ★ 不进 ir.findings：finding 的准入是 control_code/authority_ref/
+            #   location 三要素合取，多模态给不出前两项（知识库产物）。
+            #   把观察塞进 finding 表的后果是**复核时无法申诉**。
+            "multimodal_observations": judgment.get("multimodal_observations") or [],
             "judgment": {
                 "label": label,
                 "layer": judgment.get("layer"),

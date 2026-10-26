@@ -65,11 +65,136 @@ def _local_authority_query(_ref):
     return {"state": "untested", "reason": "authority_query_not_wired"}
 
 
+#: 图片/视频单元默认请求的多模态任务。视频的 av_alignment 要 provider 声明
+#: audio+video 才谈得上，所以它不在这里 —— 由调用方按 provider 能力追加。
+DEFAULT_MEDIA_TASKS = ("scene_semantics",)
+
+
+def _collect_multimodal_observations(unit, analyze, *, clock=None):
+    """产出 L1 观察列表 + 一句说明（说明用于报告里的「未评」措辞）。
+
+    ★ 返回的**永远**是一个 (list, note) 二元组，note 只在「没有观察」时非空：
+      · analyze 没注入        → ([], "未接入多模态分析")
+      · 载体不是图片/视频      → ([], "本载体无需多模态分析")
+      · analyze 抛异常        → ([{"status":"error",...}], "")  ← 落观察，不落空
+      · analyze 返回 untested → ([{"status":"untested",...}], "") ← 保留原因
+
+    最后两种情况**必须**落进观察列表而不是返回空：空列表在报告里会被读成
+    「画面语义这一节没有内容 = 没问题」。而实际上它恰恰是「没看成」。
+    """
+    if not callable(analyze):
+        return [], "未接入多模态分析"
+    source = (unit.get("source") or {}) if isinstance(unit, dict) else {}
+    kind = source.get("kind")
+    if kind not in ("image", "video"):
+        return [], "本载体无需多模态分析"
+    tasks = list(DEFAULT_MEDIA_TASKS)
+    if kind == "video":
+        tasks.append("av_alignment")
+    media_ref = {
+        "kind": kind,
+        "uri": source.get("uri") or unit.get("unit_id") or "inline:unknown",
+        "sha256": (unit.get("fingerprint") or {}).get("raw_sha256"),
+        "byte_size": source.get("raw_bytes"),
+    }
+    try:
+        raw = analyze(media_ref, tasks)
+    except Exception as exc:  # noqa: BLE001
+        return ([{
+            "status": "error", "task": ",".join(tasks), "statement": "",
+            "reason": "%s: %s" % (type(exc).__name__, exc),
+            "model": None, "model_version": None,
+            "ts": None, "bbox": None, "confidence": None,
+            "egress_status": "unknown",
+        }], "")
+    return _observations_from_result(raw, tasks, clock=clock)
+
+
+def _observations_from_result(raw, tasks, *, clock=None):
+    """把 provider 的返回形状摊平成观察条目。"""
+    import time as _time
+
+    now = _time.time() if clock is None else clock()
+    created = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime(now))
+    if not isinstance(raw, dict):
+        return ([{
+            "status": "error", "task": ",".join(tasks), "statement": "",
+            "reason": "provider 返回的不是对象：%r" % (type(raw).__name__,),
+            "model": None, "model_version": None, "ts": None, "bbox": None,
+            "confidence": None, "egress_status": "unknown",
+        }], "")
+    model = raw.get("model")
+    overall = raw.get("status")
+    entries = []
+    per_task = raw.get("tasks") if isinstance(raw.get("tasks"), dict) else {}
+    for task in tasks:
+        item = per_task.get(task)
+        if not isinstance(item, dict):
+            # ★ provider 没给这个任务 → 未测，**不许**当成「没有观察」
+            entries.append({
+                "status": "untested", "task": task, "statement": "",
+                "reason": "provider 未返回该任务的结果（overall=%r）" % (overall,),
+                "model": model, "model_version": model, "ts": None, "bbox": None,
+                "confidence": None, "egress_status": "authorized",
+                "created_at": created,
+            })
+            continue
+        status = str(item.get("status") or "untested")
+        if status not in ("ok", "untested", "error"):
+            status, extra = "error", "未知 status %r" % (status,)
+        else:
+            extra = ""
+        obs_list = item.get("observations") if isinstance(item.get("observations"), list) else []
+        if status == "ok" and not obs_list:
+            # ok 但空观察 = 自我矛盾，落 untested 而不是 ok
+            status = "untested"
+            extra = "provider 报 ok 但没有 observations"
+        if status != "ok":
+            entries.append({
+                "status": status, "task": task, "statement": "",
+                "reason": str(item.get("reason") or extra or "未说明"),
+                "model": model, "model_version": model, "ts": None, "bbox": None,
+                "confidence": None, "egress_status": "authorized",
+                "created_at": created,
+            })
+            continue
+        for obs in obs_list:
+            if not isinstance(obs, dict):
+                continue
+            statement = str(obs.get("statement") or "").strip()
+            if not statement:
+                continue
+            conf = obs.get("confidence")
+            entries.append({
+                "status": "ok", "task": task, "statement": statement,
+                "reason": "",
+                "model": model, "model_version": model,
+                "ts": obs.get("timecode"), "bbox": obs.get("region"),
+                "confidence": float(conf) if isinstance(conf, (int, float))
+                and not isinstance(conf, bool) else None,
+                "egress_status": "authorized", "created_at": created,
+            })
+    return entries, ""
+
+
 def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
                skill_id="content-review", skill_version="1",
-               skill_hash="local", authority_query=None, clock=None):
+               skill_hash="local", authority_query=None, clock=None,
+               multimodal_analyze=None):
+    """把一份 ContentUnit 判成结论。
+
+    `multimodal_analyze` 是 T-433 的注入点：`analyze(media_ref, tasks)` 形状的
+    可调用对象（通常是 provider 注册表的 `analyze` 包一层）。
+
+    ★ 默认 None = **不做多模态**，此时 `multimodal_observations` 返回空列表 +
+      一条 `untested` 说明 —— 而**不是**返回空列表就完事。
+      「没有观察」与「看了没问题」在数据上必须长得不一样，否则报告里
+      「画面语义」那一节会读成「画面没问题」。这是本项目反复踩的形状。
+    """
     if not isinstance(unit, dict):
         raise ValueError("unit 必须是 dict")
+    observations, observation_note = _collect_multimodal_observations(
+        unit, multimodal_analyze, clock=clock)
     registry = ControlPointRegistry()
     engine = RuleJudge(registry)
     query = authority_query or _local_authority_query
@@ -151,6 +276,13 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
         "receipt": result["receipt"],
         "steps": result["steps"],
         "run_state": result["run_state"],
+        # T-433：L1 多模态观察 + 一句「为什么没有观察」的说明。
+        #
+        # ★ note 只在 observations 为空时非空，两者合起来才能表达三态：
+        #   有观察（看过了）／空 + note（没看，原因是 X）／空 + 空 note（不可能）。
+        #   只交 observations 会让「没接入」与「看了没问题」在调用方看来一样。
+        "multimodal_observations": observations,
+        "multimodal_note": observation_note,
         # T-316b: report render input, previously dropped here.
         #
         # Orchestrator.run() always builds result["report_snapshot"] and returns
@@ -166,8 +298,28 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
         # decides whether a payload without a snapshot may be ingested) instead
         # of a KeyError surfacing as "process crashed" during a review.
         # ★ Do not read this as "ERROR path yields None" — measured false.
-        "report_snapshot": result.get("report_snapshot"),
+        "report_snapshot": _with_observations(
+            result.get("report_snapshot"), observations, observation_note),
     }
+
+
+def _with_observations(snapshot, observations, note):
+    """把 L1 观察塞进冻结的报告快照。
+
+    ★ 为什么在 judge_entry 而不是在 report_render 里现取：
+      报告快照是**判定时冻结**的（见 review_reducer 里 report_snapshot 的注释）。
+      渲染时再去取一次观察，会让「报告的 IR」与「报告的画面语义」来自两个时刻 ——
+      而重审会新增观察。同一个量两个口径是 AGENTS §2.4.8 点名的病。
+
+    ★ 快照为 None 时原样返回 None，不凭观察造一个壳：没有快照就是
+      「这份报告渲染不出来」，由发布时拒（ReportStore），不在这里发明。
+    """
+    if not isinstance(snapshot, dict):
+        return snapshot
+    out = dict(snapshot)
+    out["multimodal_observations"] = list(observations or [])
+    out["multimodal_note"] = note or ""
+    return out
 
 
 def main():

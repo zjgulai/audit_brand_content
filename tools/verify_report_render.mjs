@@ -926,6 +926,53 @@ try {
          "C13 ★ 反向对照：带 subclass_code 时仍以 control_code 为键，subclass 不渲染",
          md_sub.slice(0, 160));
 
+  // ── T-433：画面语义成节（L1 观察，候选 · 待人工确认）─────────────
+  //
+  //   ★ 断言全部看**渲染出来的文本**，不看源码里有没有这个词 ——
+  //     源码写了 snapshot.multimodal_observations 但模板没输出它，静态扫描照样绿。
+  const obsSnap = baseSnapshot();
+  obsSnap.multimodal_observations = [
+    { status: "ok", task: "scene_semantics", statement: "画面演示婴儿睡眠场景",
+      confidence: 0.82, bbox: "中央", model: "glm-5.3-flash" },
+    { status: "ok", task: "mark_symbol", statement: "背景出现认证徽章",
+      confidence: 0.4, model: "glm-5.3-flash" },
+  ];
+  const md_obs = (R.renderReport(obsSnap).markdown || "");
+  report(md_obs.includes("## 画面语义"), "T433-1 有观察时渲染画面语义节", "");
+  report(md_obs.includes("候选") && md_obs.includes("待人工确认"),
+         "T433-2 ★ 措辞逐字含「候选」与「待人工确认」", "");
+  report(md_obs.includes("画面演示婴儿睡眠场景")
+         && md_obs.includes("背景出现认证徽章"),
+         "T433-3 每条观察逐字进报告", "");
+  report(md_obs.includes("0.82"), "T433-4 带置信度时渲染出来", "");
+  report(!md_obs.includes("已通过") && !md_obs.includes("画面语义正常")
+         && !md_obs.includes("画面正常"),
+         "T433-5 ★★ 不许出现「已通过 / 画面语义正常 / 画面正常」这类冒充表述", "");
+
+  // 空观察 + note：必须是「未评」，不许写「正常」
+  const emptyObs = baseSnapshot();
+  emptyObs.multimodal_observations = [];
+  emptyObs.multimodal_note = "未接入多模态分析";
+  const md_empty = (R.renderReport(emptyObs).markdown || "");
+  report(md_empty.includes("## 画面语义"), "T433-6 无观察时该节仍在（不整节省略）", "");
+  report(md_empty.includes("未评"), "T433-7 ★★ 无观察 → 写「未评」，不写「正常」", "");
+  report(md_empty.includes("未接入多模态分析"),
+         "T433-8 未评要带原因（note 逐字渲染）", "");
+  report(!md_empty.includes("画面正常") && !md_empty.includes("没有问题"),
+         "T433-9 ★★ 空观察绝不许读成「画面正常」", "");
+
+  // 只有失败/未测观察：必须逐条给原因，且不许落成「无有效观察」就完事
+  const badObs = baseSnapshot();
+  badObs.multimodal_observations = [
+    { status: "untested", task: "scene_semantics",
+      reason: "provider 未返回该任务的结果（overall=untested）" },
+    { status: "error", task: "mark_symbol", reason: "网关返回 HTTP 429" },
+  ];
+  const md_bad = (R.renderReport(badObs).markdown || "");
+  report(md_bad.includes("429") && md_bad.includes("provider 未返回该任务的结果"),
+         "T433-10 ★ 未测/出错条目逐条渲染原因（未评不是没问题）", "");
+  report(md_bad.includes("未评"), "T433-11 失败观察也落「未评」措辞", "");
+
   console.log("----------------------------------------");
   const ranControls = process.argv.includes("--controls");
   const controlsOk = ranControls ? checkControls(report) : null;
