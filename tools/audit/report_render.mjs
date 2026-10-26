@@ -200,6 +200,29 @@ function receiptLine(receipt, key, label) {
   return `- ${label}：${textOrNone(receipt ? receipt[key] : null)}`;
 }
 
+/**
+ * 工作流耗时那一行。口径与 `base/workflow_timing.py` 的 `format_line()` **逐字同构**：
+ * 总耗时（N 步求和）+ 最慢三步。改一处必须改另一处，`verify_workflow_timing` 的 D 组
+ * 会检查两侧都在读同一个快照键。
+ *
+ * ★ 未测时**不许**出现「0」「ms 数值」「很快」—— 空步骤集与「跑得极快」长得一样，
+ *   写 0 就是把「没测」说成「测过了、很快」。
+ */
+function timingLine(timing) {
+  if (!timing || timing.status !== "ok") {
+    const why = (timing && timing.reason) || "原因不明";
+    return `未测（${why}）`;
+  }
+  const total = Number(timing.total_ms).toFixed(2);
+  const steps = timing.step_count;
+  const slow = (timing.slowest || [])
+    .map((s) => `${s.name} ${Number(s.duration_ms).toFixed(2)} ms`)
+    .join("、");
+  return slow
+    ? `总耗时 ${total} ms（${steps} 步求和）；最慢：${slow}`
+    : `总耗时 ${total} ms（${steps} 步求和）`;
+}
+
 export function renderReport(snapshot) {
   const errors = validateSnapshot(snapshot);
   if (errors.length) {
@@ -331,6 +354,10 @@ export function renderReport(snapshot) {
   lines.push(receiptLine(receipt, "fingerprint", "指纹"));
   lines.push(`- 跳过的步骤：${textOrNone(receipt.skipped_steps)}`);
   lines.push(`- 规则快照：${textOrNone(receipt.rule_snapshot || ir.rule_snapshot)}`);
+  // ★ T-451：工作流耗时。**只读快照里那一份**（生产者是 orchestrator），
+  //   渲染器不自己算 —— 两边各算一份就是两个口径。
+  //   ★ 未测时写「未测（原因）」，不写 0 ms —— 空步骤集与「跑得极快」必须长得不一样。
+  lines.push(`- 工作流耗时：${timingLine(receipt.workflow_timing)}`);
 
   const markdown = lines.join("\n") + "\n";
   const claimErrors = [];

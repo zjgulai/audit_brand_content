@@ -167,12 +167,15 @@ def main():
         if not ok:
             fails.append("%s  %s" % (cid, detail))
 
-    # ── A 四指标七要素 + 主读数 ────────────────────────────────────
+    # ── A 指标七要素 + 主读数 ────────────────────────────────────
     out = MetricsReadModel(loader()).compute("2026-10")
     ms = out.get("metrics", {})
-    T("A1 四个指标都存在",
-      set(ms) == {"recall_l4_l5", "false_positive_l4_l5",
-                  "uncovered_ratio", "human_overturn_rate"}, str(sorted(ms)))
+    # ★ T-451：第五个指标 `workflow_latency_ms` 是同一天加的。
+    #   这一行原先写死四个 —— 加了第五个它就该红，红得对（数字型清单会过期）。
+    RATIO_METRICS = {"recall_l4_l5", "false_positive_l4_l5",
+                     "uncovered_ratio", "human_overturn_rate"}
+    T("A1 五个指标都在（四个比例型 + 一个分位型）",
+      set(ms) == RATIO_METRICS | {"workflow_latency_ms"}, str(sorted(ms)))
     for mid, m in ms.items():
         T("A2 %s 七要素齐全" % mid, all(k in m for k in SEVEN), str(sorted(m)))
         T("A2b %s 带 n 且 n==denominator" % mid,
@@ -368,6 +371,60 @@ def main():
     oa = MetricsReadModel(loader()).compute("2026-10")
     ob = MetricsReadModel(loader()).compute("2026-10")
     T("G1 同一数据两次结果一致", oa == ob, "")
+
+    # ── W 工作流耗时 P50/P95（T-451）──────────────────────────────
+    # ★ 这是一组**行为级**断言：直接调 `_latency` 并喂构造样本，
+    #   不看源码长什么样。本组最关键的不是「能算出分位数」，
+    #   而是「未测的案件不许进分母」—— 那才是会把指标做漂亮的那条路。
+    import metrics_read_model as _MRM
+    _saved_min_n = _MRM.MIN_N
+    _MRM.MIN_N = 1
+    try:
+        rm_lat = MetricsReadModel(lambda w: {})
+
+        def _mk(vals):
+            return [{"state": "BLOCK",
+                     "workflow_timing": {"status": "ok", "total_ms": v}} for v in vals]
+
+        lat = rm_lat._latency(_mk([float(i) for i in range(1, 101)]), "w")
+        T("W1 ★ 1..100 ms 的 P50 = 50（最近秩法）",
+          lat["quantiles"].get("p50") == 50.0, repr(lat["quantiles"]))
+        T("W2 ★ 1..100 ms 的 P95 = 95",
+          lat["quantiles"].get("p95") == 95.0, repr(lat["quantiles"]))
+        T("W3 分位型指标 kind=quantile / unit=ms / ratio 为 None",
+          lat.get("kind") == "quantile" and lat.get("unit") == "ms"
+          and lat.get("ratio") is None and lat.get("numerator") is None,
+          repr((lat.get("kind"), lat.get("unit"), lat.get("ratio"))))
+        T("W4 ★★ 分母只数已出结论且读数有效的案件",
+          lat["denominator"] == 100 and lat["n"] == 100, repr(lat["denominator"]))
+
+        # ★★ 这一条是本组的核心：坏样本不许进分母
+        mixed = [
+            {"state": "BLOCK", "workflow_timing": {"status": "ok", "total_ms": 100.0}},
+            {"state": "PASS", "workflow_timing": {"status": "ok", "total_ms": 300.0}},
+            {"state": "未审查", "workflow_timing": {"status": "ok", "total_ms": 99999.0}},
+            {"state": "BLOCK", "workflow_timing": {"status": "untested", "total_ms": None}},
+            {"state": "BLOCK"},
+            {"state": "BLOCK", "workflow_timing": {"status": "ok", "total_ms": -5.0}},
+        ]
+        mix = rm_lat._latency(mixed, "w")
+        T("W5 ★★★ 未审查 / untested / 缺读数 / 负值 都不进分母",
+          mix["denominator"] == 2, "den=%r（应为 2）" % (mix["denominator"],))
+        T("W6 ★★ 被排除的条数如实记下（excluded_untested）",
+          mix["excluded_untested"] == 4, repr(mix.get("excluded_untested")))
+        T("W7 ★★★ 未审查那条的 99999 ms 没进分位数（否则 P95 会被它拉爆）",
+          (mix["quantiles"].get("p95") or 0) <= 300.0, repr(mix["quantiles"]))
+
+        # 空样本：不许给分位数
+        empty = rm_lat._latency([], "w")
+        T("W8 ★ 空样本 → 无分位数、status 不是 ok",
+          empty["quantiles"] == {} and empty["status"] != "ok", repr(empty["status"]))
+
+        # 未测模板里必须有这个键（否则数据源读不出时它静默消失）
+        T("W9 ★ 未测模板含 workflow_latency_ms（不许静默少一个键）",
+          "workflow_latency_ms" in _MRM._untested(), "")
+    finally:
+        _MRM.MIN_N = _saved_min_n
 
     if "--controls" in sys.argv:
         rc_controls = controls(sample_insufficient, gives_ratio)

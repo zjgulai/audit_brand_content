@@ -153,6 +153,13 @@ class CaseDetail(BaseModel):
     #:   `note` 只在**没有观察**时非空，说明为什么没看。
     multimodal_observations: List[Dict[str, Any]] = Field(default_factory=list)
     multimodal_note: Optional[str] = None
+    # ★ T-451：工作流耗时读数（从判定时冻结的快照里读，**接口不另算**）。
+    #:
+    #: ★ 键的形状与报告「执行回执」那一行同源（生产者是判定层写进
+    #:   report_snapshot 的那一份），所以工作台看到的数与用户看到的报告逐字一致。
+    #: ★ 取不到时给 None 而不是 `{"total_ms": 0}` —— 「没测」不许长得像
+    #:   「跑得极快」（AGENTS.md §2.4.1）。
+    workflow_timing: Optional[Dict[str, Any]] = None
 
 
 class ReportSummary(BaseModel):
@@ -295,6 +302,12 @@ class AuthorityCaseSource:
             "case_version": int(state.get("version") or 0),
             "ir_id": ir.get("ir_id"),
             "ir_version": ir.get("ir_version"),
+            # ★ T-451：投影里必须带上判定时冻结的快照，
+            #   否则下游（案件详情）永远读不到 `workflow_timing` ——
+            #   这正是 due_at 那个病的同形：数据在 state 里，投影时掉了。
+            #   ★ 只在快照是对象时透传（坏数据不透传，避免把坏形状往下喂）。
+            "report_snapshot": (state.get("report_snapshot")
+                                if isinstance(state.get("report_snapshot"), dict) else None),
         }
 
     def get_case(self, case_id):
@@ -745,6 +758,15 @@ def create_app(*, session_store=None, repository=None, principals=None,
             maybe = case["report_snapshot"].get("multimodal_note")
             if isinstance(maybe, str) and maybe.strip():
                 note = maybe
+        # ★ T-451：耗时从**判定时冻结的那份快照**读，接口自己不算。
+        #   路径与报告一致（report_snapshot.receipt.workflow_timing），
+        #   所以工作台与报告显示的是同一个数。
+        #   取不到 → None（不是 {"total_ms": 0}）：没测不许冒充很快。
+        timing = None
+        if isinstance(case.get("report_snapshot"), dict):
+            rc = case["report_snapshot"].get("receipt")
+            if isinstance(rc, dict) and isinstance(rc.get("workflow_timing"), dict):
+                timing = rc["workflow_timing"]
         return {
             "case_id": id,
             "ir": case["ir"],
@@ -752,6 +774,7 @@ def create_app(*, session_store=None, repository=None, principals=None,
             "content_unit": unit if isinstance(unit, dict) else None,
             "multimodal_observations": observations if isinstance(observations, list) else [],
             "multimodal_note": note,
+            "workflow_timing": timing,
         }
 
     @app.get("/api/v1/queue", response_model=List[CaseSummary])

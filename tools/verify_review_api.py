@@ -771,8 +771,46 @@ def _run_main():
     forbidden = ["decision_table", "coverage_composer", "evidence_sync",
                  "semantic_judge", "rule_judge", "normalizer",
                  "orchestrator", "derive_state(", "decide("]
-    leaked = [x for x in forbidden if x in src]
-    report(not leaked, "C5/R1 API 层不含判定实现", repr(leaked))
+    # ★ 2026-10-27 修：这条原先直接在**整份源码**里找这些词，于是
+    #   「注释里提到 `base/orchestrator.py`」也会红 —— 实测了一次真误报
+    #   （T-451 加了一行说明「快照由判定层写」，判据就红了）。
+    #   本条意图是「API 层不许**调用**判定实现」，不是「不许提到名字」。
+    #
+    # ★ 剥注释要**两种都剥**：整行注释 + 行尾注释。
+    #   第一版只剥整行，反向对照当场就红了：
+    #   `x = 1  # 注释里的 orchestrator` 那行的词还在，判据抓到了自己的盲区。
+    #   宁可这段剥法粗一点（字符串里的 # 会被误剥），也不要留一个
+    #   「注释里提一句就红」的误报源 —— 一个会误报的检查器比没有更糟（§2.1.1）。
+    def _strip_comments(text):
+        out = []
+        for ln in text.splitlines():
+            if ln.lstrip().startswith("#"):
+                continue
+            # 行尾注释：取第一个不在引号里的 #
+            quote = None
+            cut = len(ln)
+            for i, ch in enumerate(ln):
+                if quote:
+                    if ch == quote:
+                        quote = None
+                elif ch in ("'", '"'):
+                    quote = ch
+                elif ch == "#":
+                    cut = i
+                    break
+            out.append(ln[:cut])
+        return "\n".join(out)
+
+    code = _strip_comments(src)
+    leaked = [x for x in forbidden if x in code]
+    report(not leaked, "C5/R1 API 层不含判定实现（注释不算代码）", repr(leaked))
+    # ★ 反向对照：剥注释不能把真代码也剥掉 —— 这一条证明扫描器还活着。
+    probe = ('x = 1  # 注释里的 orchestrator 不算\n'
+             'from base import rule_judge  # 行尾也提到 orchestrator\n')
+    probe_code = _strip_comments(probe)
+    report("orchestrator" not in probe_code and "rule_judge" in probe_code,
+           "C5/R1b ★★ 反向对照：整行 + 行尾注释都剥掉，真 import 仍被看见",
+           repr(probe_code))
     computed = [
         line for line in src.splitlines()
         if re.match(r"^\s*(state|decision|[a-z_]*_state)\s*=", line)

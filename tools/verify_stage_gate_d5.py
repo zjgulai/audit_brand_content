@@ -270,6 +270,25 @@ def main():
         report(st == 200 and (closed or {}).get("status") == "closed",
                "D5-2c close", "%s %r" % (st, (closed or {}).get("status")))
 
+        # ── D5-2d ★ T-451：工作流耗时必须能被 HTTP 读到 ──────────────
+        # ★ 为什么这条不能只在 verify_workflow_timing 里验：
+        #   那边验的是「算得对」；这里验的是「**真的从生产接口读得出来**」。
+        #   两者是两件事 —— due_at 就是「算得对但进不了权威」的先例，
+        #   而自证当时是 60/60 全绿。
+        st, detail = call(client, "GET", "/api/v1/cases/%s" % case_id, "d5-timing")
+        timing = (detail or {}).get("workflow_timing") if st == 200 else None
+        report(isinstance(timing, dict) and timing.get("status") == "ok",
+               "D5-2d ★★ 案件详情接口返回 workflow_timing（status=ok）",
+               "%s %r" % (st, (timing or {}).get("status")))
+        report(isinstance(timing, dict) and isinstance(timing.get("total_ms"), (int, float))
+               and timing["total_ms"] > 0,
+               "D5-2e ★★★ 总耗时是正数（秒差会得 0，本行必红）",
+               repr((timing or {}).get("total_ms")))
+        report(isinstance(timing, dict) and isinstance(timing.get("slowest"), list)
+               and len(timing["slowest"]) >= 1,
+               "D5-2f ★ 最慢步骤非空（能归因到具体哪一步慢）",
+               repr((timing or {}).get("slowest")))
+
         # D5-3 report published
         rep = (closed or {}).get("report") or {}
         record = (runtime.authority.state(case_id) or {}).get("report") or {}

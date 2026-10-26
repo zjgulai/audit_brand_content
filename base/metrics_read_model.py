@@ -2,15 +2,25 @@
 # -*- coding: utf-8 -*-
 """base/metrics_read_model.py —— 唯一只读指标聚合（T1-14）
 
-## 四个指标（Playbook §6.1）
+## 五个指标（Playbook §6.1 + T-451）
 
   1. `recall_l4_l5`          高危（L4/L5）召回率
   2. `false_positive_l4_l5`  高危（L4/L5）误判率
   3. `uncovered_ratio`       未覆盖占比
   4. `human_overturn_rate`   人工推翻率
+  5. `workflow_latency_ms`   **工作流耗时 P50/P95**（T-451，2026-10-27 加）
 
-每个指标**各自七要素**：`numerator` / `denominator` / `window` /
+★ 标题原先写「四个指标」—— 加第 5 个时它就成了错的。凡是数字型标题都会过期
+  （AGENTS.md §2.2 第 1 条），所以这条注释以后只写「本文件列出的指标」，
+  不再抄一个数目。
+
+每个**比例型**指标各自七要素：`numerator` / `denominator` / `window` /
 `sampling_layer` / `min_n` / `status` / `target`。
+
+★ 第 5 个**不是比例**：它是分位数，`kind="quantile"`、`unit="ms"`、
+  `quantiles={"p50","p95"}`，`numerator`/`ratio` 恒为 `None`。
+  硬套成「分子/分母」会逼出一个不存在的比率，并把「P50 = 1200 ms」
+  读成「50% 的案件耗时 1200 ms」—— 那是另一件事。
 
 ## 口径
 
@@ -32,6 +42,8 @@
 submissions+receipts 的只读聚合），本模块只算数与判定「未测/样本不足」。
 """
 from __future__ import annotations
+
+import math
 
 RECALL_LAYERS = ("PASS", "待自决", "REVIEW", "未审查")
 MIN_N = 30
@@ -85,6 +97,12 @@ def _untested():
                                    "全量", MIN_N_UNCOVERED),
         "human_overturn_rate": _metric("human_overturn_rate", "人工推翻率", None,
                                        "全量", MIN_N),
+        # ★ T-451：未测模板也必须含第五个键。否则数据源读不出时它会**静默消失**，
+        #   前端拿到 undefined —— 「这个指标挂了」与「这个指标不存在」长得一样。
+        "workflow_latency_ms": dict(
+            _metric("workflow_latency_ms", "工作流耗时（P50/P95）", None,
+                    "已出结论的案件", MIN_N),
+            kind="quantile", unit="ms", quantiles={}, excluded_untested=0),
     }
 
 
@@ -117,6 +135,9 @@ class MetricsReadModel(object):
         metrics["false_positive_l4_l5"] = self._false_positive(cases, cov, window)
         metrics["uncovered_ratio"] = self._uncovered(cases, window)
         metrics["human_overturn_rate"] = self._overturn(cases, window)
+        # ★ T-451：第五个指标。不加这一行，`_latency` 就是一个定义了没人调的死方法 ——
+        #   那正是 AGENTS.md §2.4 点名的病（常量/方法定义了没人用 ＝ 只是一句注释）。
+        metrics["workflow_latency_ms"] = self._latency(cases, window)
         return {"window": window, "metrics": metrics}
 
     # ── ① 召回 ──────────────────────────────────────────────────────
@@ -206,3 +227,77 @@ class MetricsReadModel(object):
         m["appeal_won"] = sum(1 for c in eligible if c.get("appeal_result") == "won")
         m["appeal_lost"] = sum(1 for c in eligible if c.get("appeal_result") == "lost")
         return _finalize(m, numerator, denominator)
+
+    # ── ⑤ 工作流耗时 P50 / P95（T-451）────────────────────────────────
+    def _latency(self, cases, window):
+        """一次审核从进件到出结论的耗时分布。
+
+        ★ **它不是比例，所以不用 `_finalize`。** 前四个指标都是
+          「分子/分母 = ratio」，硬套到这里会逼出一个不存在的分母，
+          并且把「P50 = 1200 ms」读成「50% 的案件耗时 1200 ms」——
+          那是另一件事。所以这里单列 `quantiles`，并把
+          `denominator` 明确设成参与统计的案件数、`ratio` 恒为 None。
+
+        ★ 分母只数**已出结论**的案件：
+          未出结论（`state` 缺失 / `未审查` / 跑挂了）的案件没有有效耗时，
+          把它们算进分母会让 P95 看起来"很快"——因为它们的耗时是 0 或缺失。
+          这是「用错的样本把指标做漂亮」，比缺指标更糟。
+
+        ★ 每个案件读的是 `workflow_timing.total_ms`（判定时冻结在快照里那一份），
+          **不在这里重算**：重算就是第二个口径。
+        """
+        m = _metric("workflow_latency_ms", "工作流耗时（P50/P95）", window,
+                    "已出结论的案件", MIN_N)
+        m["kind"] = "quantile"
+        m["unit"] = "ms"
+        m["quantiles"] = {}
+        m["excluded_untested"] = 0
+
+        done = []
+        for c in cases:
+            if c.get("state") in (None, "", "未审查"):
+                m["excluded_untested"] += 1
+                continue
+            timing = c.get("workflow_timing")
+            if not isinstance(timing, dict) or timing.get("status") != "ok":
+                # 读数没测成 → 不进样本。**不许当成 0 ms**。
+                m["excluded_untested"] += 1
+                continue
+            total = timing.get("total_ms")
+            if isinstance(total, bool) or not isinstance(total, (int, float)) or total < 0:
+                m["excluded_untested"] += 1
+                continue
+            done.append(float(total))
+
+        m["denominator"] = len(done)
+        m["n"] = len(done)
+        m["numerator"] = None
+        m["ratio"] = None
+        if len(done) < m["min_n"]:
+            m["status"] = "样本不足"
+            return m
+
+        m["status"] = "ok"
+        ordered = sorted(done)
+        m["quantiles"]["p50"] = _quantile(ordered, 0.50)
+        m["quantiles"]["p95"] = _quantile(ordered, 0.95)
+        m["min"] = round(ordered[0], 3)
+        m["max"] = round(ordered[-1], 3)
+        return m
+
+
+def _quantile(ordered, q):
+    """最近秩法（nearest-rank）取分位数。
+
+    ★ 刻意不用插值：耗时是**离散的实测值**，插出来的 1234.5678 ms
+      在盘上没有任何一条案件对应它 —— 那是一个算得出来但指不出对象的数
+      （与 AGENTS.md §2.2 第 1 条「数字要算出来」同一立场：
+       要算，但要能指回一条真实记录）。
+
+    ★ 空集返回 None 而不是 0：0 会被读成「很快」。
+    """
+    if not ordered:
+        return None
+    n = len(ordered)
+    idx = max(0, min(n - 1, int(math.ceil(q * n)) - 1))
+    return round(ordered[idx], 3)

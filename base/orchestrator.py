@@ -28,6 +28,29 @@ if REPO_ROOT not in sys.path:
 
 STEP_ORDER = ("normalize", "judge", "dispose", "output", "evaluate")
 
+
+def _workflow_timing(receipt):
+    """算工作流耗时读数。**实现只在 `base/workflow_timing.py` 一处**。
+
+    ★ 这里刻意**不**复制算法：报告与接口都要读这个数，
+      算法放两处就是两套口径，迟早各自漂移（AGENTS.md §2.4.8）。
+    ★ import 失败时落 untested 而不是抛 —— 一张报告不该因为一个读数没算出来就整份失败；
+      但 `status` 会变成 `untested`，报告里写「未测」，不会冒充 0。
+    """
+    try:
+        from base import workflow_timing as _wt
+        return _wt.compute(receipt)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "untested",
+            "reason": "workflow_timing 不可用：%s" % (type(exc).__name__,),
+            "total_ms": None,
+            "step_count": 0,
+            "slowest": [],
+            "source": "steps-duration-sum",
+        }
+
+
 REQUIRED_IR_FIELDS = (
     "ir_id", "ir_version", "content_unit_ref", "source_ir_version",
     "findings", "decision", "coverage", "receipt_ref",
@@ -543,6 +566,13 @@ class Orchestrator(object):
                 "fingerprint": receipt["skill_hash"],
                 "skipped_steps": "无",
                 "rule_snapshot": receipt["rule_snapshot"],
+                # ★ T-451：工作流耗时读数。**算在这里、只算一次** ——
+                #   报告（report_render.mjs）与接口（review_api）都按这个键名读，
+                #   谁也不许自己再算一份（口径分两处就是两套，迟早各自漂移）。
+                #   ★ 用步骤求和而不是 ended_at-started_at：`_iso()` 精度只到秒，
+                #     而整条链只跑毫秒级，两个时间戳恒相等 → 秒差恒为 0。
+                #     详见 base/workflow_timing.py 的文件头。
+                "workflow_timing": _workflow_timing(receipt),
             },
         }
 

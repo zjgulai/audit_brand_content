@@ -511,8 +511,9 @@
     },
     {
       "verifier": "tools/verify_metrics_read_model.py",
-      "asserts": "metrics_read_model：四指标七要素 / 未测不是 0 / 样本不足不出比率 / 抽样层与 BLOCK 全量复核 / 目标线待基线",
+      "asserts": "metrics_read_model：四指标七要素 / 未测不是 0 / 样本不足不出比率 / 抽样层与 BLOCK 全量复核 / 目标线待基线 · ★ T-451 第五个指标 workflow_latency_ms（P50/P95，kind=quantile，不是比例所以 ratio 恒 None）· W 组：分母只数已出结论且读数有效的案件，未审查/untested/缺读数/负值都不进分母（否则指标会被做漂亮）",
       "subjects": [
+        "base/metrics_read_model.py",
         "base/metrics_read_model.py"
       ]
     },
@@ -1129,6 +1130,16 @@
         "artifacts/audit_content_ontology_patch.json",
         "tools/mem/distill_to_nmem.py",
         "tools/mem/ingest_library.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_workflow_timing.py",
+      "asserts": "T-451 工作流耗时读数：总耗时=步骤 duration_ms 求和（**不用 ended_at-started_at** —— `_iso()` 精度只到秒而整链只跑毫秒级，秒差恒为 0）· 最慢三步降序且并列次序可复现 · 空步骤/缺值/负值/bool/非对象一律 untested 并点名 · 未测文案不含「0 ms/很快」· 端到端：真判定 → 快照 → 真渲染器，报告那一行的数必须等于快照里的 total_ms",
+      "subjects": [
+        "base/workflow_timing.py",
+        "base/orchestrator.py",
+        "tools/audit/report_render.mjs",
+        "api/review_api.py"
       ]
     }
   ],
