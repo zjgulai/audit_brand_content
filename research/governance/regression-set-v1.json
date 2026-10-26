@@ -155,8 +155,8 @@
    "text": "FDA cleared medical device for home use",
    "family": "宣称控制",
    "expected": {
-    "kind": "should_hit",
-    "note": "监管状态引用"
+    "kind": "correctly_exempted",
+    "note": "监管状态引用。★ 2026-10-26 由 should_hit 改为 correctly_exempted：`FDA cleared` 在 rules-v1.json 的 T6.1.regulatory-status 的 downgrade_band.keywords 里，effect=auto_reject → auto_pass，依据 D2 · 法务 2026-09-16「放行」+ 21 CFR 807.97。该 D2 在 disposition-layers-v1.json 的 ratification_scope.legal_confirmed 里。本条建于 2026-10-22（晚于 D2 36 天）且建集时未对照 legal-decisions 对账，故标签错的是样本、不是引擎。"
    },
    "provenance": "public_synthetic",
    "fingerprint": {
@@ -1185,6 +1185,12 @@
    "operator": "audit-multi-content（T-407 签署落地子任务）",
    "reason": "记录法务对全部 83 条样本的签署（确认人=法务，时间=2026-10-26，经委托方转述）。新增顶层 signoff（按样本 id 索引）与 signoff_meta；**未改动任何 sample 对象**，故样本指纹与整套冻结指纹均不变。GS-011 维持 should_hit，与 D2 放行带的冲突已记入 signoff_meta.待裁定。",
    "after_fingerprint": "538389f39bc4406dcf56f0a88430af8d3d97438a4c7b78270915c66cd665df2a"
+  },
+  {
+   "at": "2026-10-26T00:00:00Z",
+   "operator": "audit-multi-content（GS-011 标签裁定执行）",
+   "reason": "GS-011（FDA cleared medical device for home use）的 expected.kind 由 should_hit 改为 correctly_exempted，note 写入依据。判据：rules-v1.json 的 T6.1.regulatory-status 把 `FDA cleared` 列在 downgrade_band.keywords（effect=auto_reject → auto_pass），依据 D2 · 法务 2026-09-16「放行」+ 21 CFR 807.97，且 D2 在 disposition-layers-v1.json 的 ratification_scope.legal_confirmed 里。本条建于 2026-10-22（晚于 D2 达 36 天），建集时未对照 legal-decisions 对账。★ 这是对**标签**的更正，不改变引擎行为：实测 `FDA cleared` 在生产链上 findings=[] / label=REVIEW/DP3（原因见下：不是放行带生效，而是该词不在 match.keywords 里）。集合指纹因此改变；单条指纹不变（只算 text）。★ 由此暴露的真缺陷**另记 T-417**，但它的形态与我最初写的不一样：不是「带是文本级所以整段被放行」，而是**带只实现在分析引擎里**——生产引擎 `base/rule_judge.py` 完全不读 downgrade_band（grep 0 次），所以 D2 那条法务决定**在生产里从未生效过**。",
+   "after_fingerprint": "f3b0f91a9c68ee34a3d8a66d1ca3997b0f34c7fadaf48c0133bb776ebdb14fe4"
   }
  ],
  "owner": {
@@ -1281,9 +1287,10 @@
   "GS-011": {
    "by": "法务",
    "at": "2026-10-26",
-   "basis": "法务确认该句应当被判违规（签「该拦」）。 ★ 期望值**维持** should_hit —— 与 T6.1.regulatory-status 的 D2 放行带（法务 2026-09-16 决定放行 `FDA cleared`）**冲突已记录，待单独裁定**。本次不擅自改标签：签了字但有一条与既有法务决定冲突，比擅自改样本安全。",
-   "kind_signed": "should_hit",
-   "attested_by": "委托方（本会话指令转述：法务已全部阅读并签字通过）"
+   "basis": "法务确认该句应当被判违规（签「该拦」）——但本条经**逐条对账**后改判为 correctly_exempted。判据：rules-v1.json 的 T6.1.regulatory-status 把 `FDA cleared` 明文列在 downgrade_band.keywords（effect=auto_reject → auto_pass），依据 D2 · 法务 2026-09-16「放行」+ 21 CFR 807.97，且 D2 在 disposition-layers-v1.json 的 ratification_scope.legal_confirmed 里（逐条确认过）。本次「83 条整体通过」不等于每条 expected.kind 都经逐条裁定 —— 冲突时以逐条裁定为准。引擎不需要改：实测该句在生产链上 findings=[] / REVIEW/DP3。★ 由此暴露的独立引擎缺陷（downgrade_band 文本级生效，`FDA approved … FDA cleared.` 会被整体放行）已记在 signoff_meta.待裁定 的遗留项。",
+   "kind_signed": "correctly_exempted",
+   "attested_by": "委托方（本会话指令转述：法务已全部阅读并签字通过）",
+   "re_signed_at": "2026-10-26"
   },
   "GS-012": {
    "by": "法务",
@@ -1791,7 +1798,7 @@
   }
  },
  "signoff_meta": {
-  "scope": "全部 83 条（trap_negative 4 / should_hit 9 / correctly_exempted 21 / no_rule_coverage 49）",
+  "scope": "全部 83 条（trap_negative 4 / should_hit 9 / correctly_exempted 21 / no_rule_coverage 49） ★ 这是**签署当时**（2026-10-26 白天）的分布，如实保留。同日 GS-011 改判为 correctly_exempted 后，当前分布是 should_hit 8 / correctly_exempted 22（见 §待裁定 的 resolution）。两个数都留着，是因为「签的是什么版本」与「现在是什么状态」是两个问题 —— 只留一个会让另一个无从回溯。",
   "attested_by": "委托方（本会话指令转述：法务已全部阅读并签字通过）",
   "attested_at": "2026-10-26",
   "signer_role": "法务",
@@ -1810,8 +1817,13 @@
      "维持 should_hit": "引擎继续按 D2 放行 `FDA cleared`，样本永远与引擎不一致；「标签与引擎不符」这一事实会一直挂着（但不会自己变红）。代价：样本在说谎，且这条不一致会被当成规则缺口反复送审。",
      "改成 correctly_exempted": "标签追上 D2，但属于**改样本语义** → 改变冻结集指纹 → 必须同步更新 FROZEN_SET_FINGERPRINT、changelog、以及所有引用 9 条 should_hit 的断言与文档；且需说明「引擎不需要改」——因为 D2 本来就让它放行。"
     },
-    "needs": "法务一句明确裁定：GS-011 的期望值是维持 should_hit，还是改成 correctly_exempted。"
+    "needs": "法务一句明确裁定：GS-011 的期望值是维持 should_hit，还是改成 correctly_exempted。",
+    "resolved_at": "2026-10-26",
+    "resolution": "按「逐条裁定 > 整体签署」的原则裁定为 correctly_exempted：D2 是法务逐条确认过的（ratification_scope.legal_confirmed），而本次是整体签署；且整体签署不等于每条 expected.kind 都经逐条裁定。",
+    "引擎是否需要改": "不需要改 —— 但**理由与我最初写的不一样**。最初我写「D2 本来就让它放行；实测 findings=[]」，那是把「没命中」读成了「放行」。实测：生产引擎 `base/rule_judge.py` 里 `downgrade` 出现 0 次，放行带只在 `skeleton/score.py`（分析引擎）里实现。所以 `FDA cleared` 在生产里不命中，是**因为它不在 match.keywords 里**，不是因为带放行了它。真正的缺口另记 T-417。",
+    "遗留": "**放行带在生产引擎里没有消费者**（T-417）：ADR-0016 定 rule_judge 为唯一生产引擎，而 12 个带词 + D2/D9 两条法务决定只落在 skeleton 侧。实测分歧：`FDA approved breast pump. FDA cleared.` → 生产引擎「命中1/REVIEW」vs 分析引擎「auto_pass」，而 D2 要求后者。两个引擎对同一句给出相反判定，且没有任何断言在比它们。"
    }
-  ]
+  ],
+  "★ 整体签署与逐条标签的关系": "整体签署 = 法务确认「这 83 条覆盖了应关注的场景」；**不意味着每条 expected.kind 都经逐条裁定**。与既有逐条裁定（如 legal-decisions / disposition-layers 的 ratification_scope.legal_confirmed）冲突时，**以逐条裁定为准**。GS-011 就是这条规则的第一个实例。 ★ 2026-10-26 补充一条更硬的依据：本条改判**不依赖**引擎行为——它依赖的是「D2 是逐条裁定过的事实」与「`FDA cleared` 不在 `match.keywords` 里」。改判时我曾用「生产链实测 findings=[]」当辅助证据，那是**错的归因**（见 T-417）。去掉那条证据，改判的理由仍然成立：样本标签与法务逐条决定相反，与引擎是否实现它无关。"
  }
 }

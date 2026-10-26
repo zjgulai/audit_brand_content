@@ -365,6 +365,11 @@ git ls-files -z | tr '\0' '\n' | grep -cE '\.(md|mdx|rst|txt)$' # 238  其中文
 > [`PMO/implement/冷启动交接-Prompt-20261026.md`](./PMO/implement/冷启动交接-Prompt-20261026.md)
 > —— 本轮开工时使用的冷启动提示词正文（含「先做这三件事」「硬约束」「已踩过的坑」）。
 >
+> ★ [`PMO/implement/放行带在哪-自查纠正-20261026.md`](./PMO/implement/放行带在哪-自查纠正-20261026.md)
+> —— **一次自我推翻**：我原写「放行带已生效」，实测是「放行带只在分析引擎里、
+> 生产引擎从不读它」（`downgrade` 在 `base/rule_judge.py` 出现 **0** 次，在
+> `skeleton/score.py` 出现 **13** 次）。两个引擎对 `FDA approved … FDA cleared.`
+> 给相反判定，而没有任何断言在比它们。已记 **T-417**。
 > ★ [`PMO/implement/上线判断-GO-NOGO-20261026.md`](./PMO/implement/上线判断-GO-NOGO-20261026.md)
 > —— 今天能不能上线的判断：技术侧 GO，卡在「谁执行」与「真实人员名单」；
 > 含今天修掉的 4 个 P0 与一条回滚硬边界（**第一条通知产生后旧镜像就起不来**）；

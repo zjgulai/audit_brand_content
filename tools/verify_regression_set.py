@@ -126,8 +126,13 @@ ENGINE_MANIFEST = ROOT / "research" / "governance" / "skeleton" / "engine-manife
 # ★ 与 `tools/acceptance-ratchet.json` 的 passed_floor 同一个模式：
 #   今天的读数钉下来；动它 = 一次有记录的决定（changelog 新条目 + 本值同步更新，
 #   同一提交）。改样本而三者缺一，GS-CHG-PIN 红。
+#: 冻结集指纹。**2026-10-26 由 538389f3… 改为 f3b0f91a…**：
+#: GS-011 的 expected.kind 由 should_hit 改为 correctly_exempted（法务 D2 逐条裁定优先于
+#: 本次整体签署），样本对象变了 → 集合指纹随之变。单条指纹不变（它只算 text）。
+#: ★ 改这个常量是**一次有记录的决定**，不是「让检查变绿」：
+#:   理由写在 regression-set-v1.json 的 changelog 末条。
 FROZEN_SET_FINGERPRINT = (
-    "538389f39bc4406dcf56f0a88430af8d3d97438a4c7b78270915c66cd665df2a")
+    "f3b0f91a9c68ee34a3d8a66d1ca3997b0f34c7fadaf48c0133bb776ebdb14fe4")
 
 
 def sample_fingerprint(text: str) -> str:

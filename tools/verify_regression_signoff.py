@@ -21,7 +21,8 @@
      （缺一条 → 红；多一个孤儿键 → 红）
   S2 每条的 `signoff.by` / `signoff.at` / `signoff.basis` 三项非空
   S3 每条的 `signoff.at` 是**可解析的日期**，且**不在未来**（`--today` 可注入）
-  S4 **`expected.kind == "should_hit"` 的每一条都必须带 signoff**（9 条，签「该拦」）
+  S4 **`expected.kind == "should_hit"` 的每一条都必须带 signoff**（8 条，签「该拦」；
+     2026-10-26 前是 9 条 —— GS-011 按 D2 逐条裁定改为 correctly_exempted）
   S5 **`expected.kind == "trap_negative"` 的每一条都必须带 signoff**（4 条，验收表点名的陷阱）
   S6 `signoff.kind_signed` 必须等于该样本**当前**的 `expected.kind` ——
      否则「签的是哪一层」与「盘上现在是哪一层」脱钩（改过 kind 却没重签）
@@ -65,7 +66,15 @@ REQUIRED_KINDS = ("should_hit", "trap_negative")
 #: S7 守的那条。它同时被「改标签」和「改规则」两种做法影响，
 #: 而两种都不是本脚本能替法务做的决定 —— 所以只能断言「它仍被记录着」。
 PINNED_ID = "GS-011"
-PINNED_KIND = "should_hit"
+#: GS-011 当期**已裁定**的期望值。
+#: ★ 2026-10-26 由 "should_hit" 改为 "correctly_exempted"。
+#:   裁定依据：D2（法务 2026-09-16）是**逐条确认过**的
+#:   （在 disposition-layers-v1.json 的 ratification_scope.legal_confirmed 里），
+#:   而本次「83 条全通过」是**整体签署**。冲突时以逐条裁定为准。
+#: ★ 改这个常量必须同时：改 FROZEN_SET_FINGERPRINT + 追加 changelog +
+#:   更新本文档头与所有引用「9 条 should_hit」的断言。下面 S7 会核对
+#:   changelog 里确实有一条提到 GS-011 —— 只改常量、不写理由，仍会红。
+PINNED_KIND = "correctly_exempted"
 
 REQUIRED_FIELDS = ("by", "at", "basis")
 
@@ -195,6 +204,18 @@ def check_pinned(reg):
             "必须同步：改 FROZEN_SET_FINGERPRINT + changelog + 本脚本的 PINNED_KIND + "
             "所有引用 should_hit 计数的断言与文档。**不许只改 JSON。**"
             % (PINNED_ID, kind, PINNED_KIND))
+    else:
+        # ★ 光「值对」不够：必须是**有留痕的**裁定，不是顺手改的。
+        #   判据是 changelog 里存在一条提到 PINNED_ID 的记录。
+        #   这条挡的是「把常量改成当前值，让检查闭嘴」——那与本项目反复记的
+        #   「改判据让它变绿」是同一个动作。
+        logs = reg.get("changelog") or []
+        named = [c for c in logs
+                 if isinstance(c, dict) and PINNED_ID in str(c.get("reason") or "")]
+        if not named:
+            problems.append(
+                "%s 的值虽等于 PINNED_KIND，但 changelog 里没有任何一条提到它 —— "
+                "**裁定必须留痕**，否则「值对」与「有人决定过」长得一样" % PINNED_ID)
 
     meta = reg.get("signoff_meta") or {}
     pending = meta.get("待裁定")
@@ -206,6 +227,16 @@ def check_pinned(reg):
         if not named:
             problems.append(
                 "signoff_meta.待裁定 里没有点名 %s —— 冲突被记在了别处或已被抹掉" % PINNED_ID)
+        elif named[0].get("resolved_at"):
+            # 已裁定：必须写清「怎么裁的」与「遗留什么」。
+            if not str(named[0].get("resolution") or "").strip():
+                problems.append(
+                    "%s 的待裁定条目标了 resolved_at 但没写 resolution" % PINNED_ID)
+            if not str(named[0].get("遗留") or "").strip():
+                problems.append(
+                    "%s 已裁定但没写「遗留」—— 这次裁定暴露的引擎缺陷"
+                    "（downgrade_band 文本级生效）必须留在盘上，否则下一个人只会看到"
+                    "「标签改好了」" % PINNED_ID)
         elif not str(named[0].get("needs") or "").strip():
             problems.append("%s 的待裁定条目没有写「需要谁确认什么」" % PINNED_ID)
     return problems
@@ -388,12 +419,20 @@ def run_controls() -> int:
          lambda: check_kind_signed(samples, with_kind(first_should, "correctly_exempted"))),
 
         # ── S7 GS-011 ───────────────────────────────────────────────
-        ("好样本：GS-011 维持 should_hit 且冲突有记录", False,
+        ("好样本：GS-011 = correctly_exempted 且裁定有留痕", False,
          lambda: check_pinned(reg)),
-        ("★ 坏样本：GS-011 被悄悄改成 correctly_exempted", True,
+        # ★ 2026-10-26 起这两个方向反过来了。
+        #   旧世界守的是「必须是 should_hit」；裁定之后守的是「必须是 correctly_exempted
+        #   且 changelog 里有一条提到它」。所以现在的坏样本是**退回旧值**、
+        #   以及**值对但没留痕**。★ 别把这两条删掉——它们是这条判据唯一能红的证明。
+        ("★ 坏样本：GS-011 被退回 should_hit（与已裁定值不符）", True,
          lambda: check_pinned(reg_with(samples=[
-             dict(s, expected=dict(s["expected"], kind="correctly_exempted"))
+             dict(s, expected=dict(s["expected"], kind="should_hit"))
              if s["id"] == PINNED_ID else s for s in samples]))),
+        ("★ 坏样本：值对但 changelog 没提到 GS-011（没有留痕的裁定）", True,
+         lambda: check_pinned(reg_with(changelog=[
+             c for c in reg["changelog"]
+             if PINNED_ID not in str(c.get("reason") or "")]))),
         ("★ 坏样本：待裁定 里没点名 GS-011（冲突被抹掉）", True,
          lambda: check_pinned(pending_without_pin())),
         ("坏样本：待裁定 为空", True,
