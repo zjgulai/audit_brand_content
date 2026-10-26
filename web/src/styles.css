@@ -1428,7 +1428,9 @@ code {
   gap: var(--space-5);
   padding: var(--space-5);
   box-sizing: border-box;
-  background: var(--bg);
+  /* ★ 页面底 sand-3、面板 sand-1 —— 中间隔一级，0.5px 边框才看得出是边界。
+     只差一级（sand-2 vs sand-1）时，卡片看起来像「贴在纸上的另一张纸」。 */
+  background: var(--surface-muted);
 }
 
 /* 面板：宽度按「二维码 + 按钮」并排的舒适值定，不是按整行文字定。
