@@ -19,8 +19,8 @@ import CaseDetailPage from "./CaseDetailPage";
 
 const FILTERS = [
   { key: "all", label: "全部待办" },
-  { key: "REVIEW", label: "REVIEW" },
-  { key: "待自决", label: "待自决" },
+  { key: "REVIEW", label: "待人工复核" },
+  { key: "待自决", label: "品牌自决" },
 ] as const;
 
 const SORTS = [
@@ -319,7 +319,7 @@ export default function QueuePage() {
                     )
                   }
                 >
-                  {isSelected ? "收起同屏" : "同屏分诊"}
+                  {isSelected ? "收起审视" : "同屏审视"}
                 </button>
               </div>
             </div>
@@ -342,9 +342,9 @@ export default function QueuePage() {
 
       <div className="queue__detail-pane">
         <div className="queue__detail-header">
-          <h1>复核队列</h1>
+          <h1>待人工复核案件</h1>
           <span className="hint">
-            快捷键：按 <code>J</code> / <code>K</code> 在右侧同屏切换待办案件；点击左侧案件行直接进入全宽双栏深审页。
+            快捷键：按 <code>J</code> / <code>K</code> 在右侧同屏切换待审案件；点击左侧案件行直接进入全宽深审页。
           </span>
         </div>
         <InlineMetricSummary

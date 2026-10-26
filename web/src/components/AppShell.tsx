@@ -92,18 +92,24 @@ export default function AppShell() {
         跳到主内容
       </a>
       <header className="shell__header">
-        <span className="shell__brand">内容审核工作台</span>
+        <div className="shell__brand-wrap">
+          <div className="shell__brand-badge" aria-hidden="true">M</div>
+          <div className="shell__brand-text">
+            <span className="shell__brand">Momcozy</span>
+            <span className="shell__brand-sub">内容审核工作台</span>
+          </div>
+        </div>
         <nav aria-label="主导航">
-          <NavLink to="/inbox">收件箱</NavLink>
-          <NavLink to="/queue">复核队列</NavLink>
-          <NavLink to="/cases">案件总览</NavLink>
-          <NavLink to="/appeals">申诉中心</NavLink>
-          <NavLink to="/release">签发台</NavLink>
-          <NavLink to="/takedown">下线任务</NavLink>
-          <NavLink to="/reports">报告索引</NavLink>
-          <NavLink to="/taxonomy">分类规范</NavLink>
-          <NavLink to="/admin/grants">授权治理</NavLink>
-          <NavLink to="/admin/sessions">安全审计</NavLink>
+          <NavLink to="/inbox"><Icon name="inbox" size={13} /> 收件箱</NavLink>
+          <NavLink to="/queue"><Icon name="clock" size={13} /> 待人工复核</NavLink>
+          <NavLink to="/cases"><Icon name="search" size={13} /> 审核全景</NavLink>
+          <NavLink to="/appeals"><Icon name="help-circle" size={13} /> 申诉复议</NavLink>
+          <NavLink to="/release"><Icon name="check-circle" size={13} /> 合规签发</NavLink>
+          <NavLink to="/takedown"><Icon name="shield-alert" size={13} /> 违规下架</NavLink>
+          <NavLink to="/reports"><Icon name="file-text" size={13} /> 合规报告</NavLink>
+          <NavLink to="/taxonomy"><Icon name="layers" size={13} /> 规则词典</NavLink>
+          <NavLink to="/admin/grants"><Icon name="user-check" size={13} /> 授权治理</NavLink>
+          <NavLink to="/admin/sessions"><Icon name="history" size={13} /> 安全审计</NavLink>
         </nav>
         <div className="shell__right">
           {current && current.product_lines.length > 0 && (

@@ -20,15 +20,15 @@ export function resolveDecisionBadge(state: string | null | undefined): {
 } {
   switch (state) {
     case "BLOCK":
-      return { cls: "badge badge--block", text: "BLOCK", icon: "octagon-x" };
+      return { cls: "badge badge--block", text: "违规拦截", icon: "octagon-x" };
     case "REVIEW":
-      return { cls: "badge badge--review", text: "REVIEW", icon: "alert-triangle" };
+      return { cls: "badge badge--review", text: "待人工复核", icon: "alert-triangle" };
     case "PASS":
-      return { cls: "badge badge--pass", text: "PASS", icon: "check-circle" };
+      return { cls: "badge badge--pass", text: "审核通过", icon: "check-circle" };
     case "待自决":
-      return { cls: "badge badge--pending", text: "待自决", icon: "clock" };
+      return { cls: "badge badge--pending", text: "品牌自决", icon: "clock" };
     case "未审查":
-      return { cls: "badge badge--untested", text: "未审查", icon: "help-circle" };
+      return { cls: "badge badge--untested", text: "待检测", icon: "help-circle" };
     default:
       // ★ 断言 A2：未测是独立状态，不许折叠成「—」或空
       return { cls: "badge badge--untested", text: "未测", icon: "help-circle" };
@@ -42,13 +42,13 @@ export function resolveCoverageBadge(coverageState: string | null | undefined): 
   isPartial: boolean;
 } {
   if (coverageState === "full") {
-    return { cls: "badge badge--pass", text: "full", icon: "check-circle", isPartial: false };
+    return { cls: "badge badge--pass", text: "全规则覆盖", icon: "check-circle", isPartial: false };
   }
   if (coverageState === "partial") {
-    return { cls: "badge badge--partial", text: "partial", icon: "layers", isPartial: true };
+    return { cls: "badge badge--partial", text: "部分规则覆盖", icon: "layers", isPartial: true };
   }
   if (coverageState === "not_evaluated") {
-    return { cls: "badge badge--untested", text: "not_evaluated", icon: "help-circle", isPartial: false };
+    return { cls: "badge badge--untested", text: "尚未评估", icon: "help-circle", isPartial: false };
   }
   return {
     cls: "badge badge--untested",
@@ -88,13 +88,13 @@ export function resolveSeverityBadge(severity: string | null | undefined): {
 } {
   const s = (severity ?? "").trim().toUpperCase();
   if (s === "L4" || s === "L5") {
-    return { cls: "badge badge--severity-high", text: s, icon: "shield-alert" };
+    return { cls: "badge badge--severity-high", text: `${s} 极高危`, icon: "shield-alert" };
   }
   if (s === "L2" || s === "L3") {
-    return { cls: "badge badge--severity-med", text: s, icon: "alert-triangle" };
+    return { cls: "badge badge--severity-med", text: `${s} 中风险`, icon: "alert-triangle" };
   }
   if (s === "L0" || s === "L1") {
-    return { cls: "badge badge--sample", text: s, icon: "layers" };
+    return { cls: "badge badge--sample", text: `${s} 低风险`, icon: "layers" };
   }
   return { cls: "badge badge--untested", text: s || "未测", icon: "help-circle" };
 }

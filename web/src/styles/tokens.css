@@ -16,21 +16,21 @@
   --sand: 21.7 31% 77.3%;
   --stone: 17.1 14.9% 72.4%;
 
-  /* 中性表面与文本（control-room 冷灰） */
-  --background: 211 24% 96.2%;
-  --foreground: 211 26% 8.9%;
+  /* 中性表面与文本（Warm Editorial 人文暖调，对齐 Reddit 舆情工作台标杆） */
+  --background: 36 33.3% 97.1%;
+  --foreground: 30 7.4% 10.6%;
   --card: 0 0% 100%;
-  --card-foreground: 211 26% 8.9%;
+  --card-foreground: 30 7.4% 10.6%;
   --popover: 0 0% 100%;
-  --popover-foreground: 211 26% 8.9%;
+  --popover-foreground: 30 7.4% 10.6%;
   --primary: 346.5 41.3% 29.4%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 211 18% 92.4%;
-  --secondary-foreground: 211 26% 8.9%;
-  --muted: 211 18% 92.4%;
-  --muted-foreground: 211 10% 37.3%;
+  --secondary: 34.3 30.4% 95.5%;
+  --secondary-foreground: 30 7.4% 10.6%;
+  --muted: 34.3 30.4% 95.5%;
+  --muted-foreground: 30 5.3% 44.3%;
   --accent: 6.7 33.3% 94.7%;
-  --accent-foreground: 211 26% 8.9%;
+  --accent-foreground: 30 7.4% 10.6%;
 
   /* 语义状态 —— 与品牌红分工，绝不混用（断言 A6） */
   --ok: 141 64% 26.8%;
@@ -41,9 +41,9 @@
   --destructive: 356 77% 40.6%;
   --destructive-foreground: 0 0% 100%;
 
-  /* 边框分离：--border 仅非交互分隔（1.39:1）；--input 专供交互控件边框（3.44:1 ≥ 3:1，修 D-11 / AX-5） */
-  --border: 211 13% 86%;
-  --input: 211 13% 55%;
+  /* 边框分离：--border 柔和暖灰分隔（对齐 Reddit #e7e0d9）；--input 专供交互控件边框（≥ 3:1） */
+  --border: 30 22.6% 87.8%;
+  --input: 28 16.5% 55%;
   --ring: 346.5 41.3% 29.4%;
   --radius: 0.25rem;
 

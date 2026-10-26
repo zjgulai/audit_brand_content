@@ -76,53 +76,104 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── 外壳 ──────────────────────────────────────────────────────────────── */
+/* ── 外壳（Warm Editorial 人文暖调卡片架构） ────────────────────────── */
 
 .shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: hsl(var(--background));
 }
 
 .shell__header {
   display: flex;
   gap: 1.25rem;
   align-items: center;
-  padding: 0.55rem 1rem;
+  padding: 0.65rem 1.25rem;
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
+  box-shadow: 0 1px 3px 0 hsl(var(--foreground) / 0.03);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.shell__brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: none;
+}
+
+.shell__brand-badge {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius);
+  background: hsl(var(--brand));
+  color: hsl(var(--brand-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: -0.02em;
+  box-shadow: 0 2px 6px hsl(var(--brand) / 0.25);
+}
+
+.shell__brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
 }
 
 .shell__brand {
   font-weight: 600;
   font-size: var(--text-lg);
-  letter-spacing: -0.01em;
-  /* ★ 2026-10-23 视觉校验：品牌名曾被压成「内容审核工作 / 台」两行 */
+  color: hsl(var(--foreground));
+  letter-spacing: -0.015em;
   white-space: nowrap;
-  flex: none;
+}
+
+.shell__brand-sub {
+  font-size: var(--text-xs);
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.01em;
 }
 
 .shell__header nav {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.35rem;
   flex-wrap: wrap;
+  align-items: center;
   min-width: 0;
+  padding: 0.2rem 0.35rem;
+  background: hsl(var(--muted));
+  border-radius: var(--panel-radius);
+  border: 1px solid hsl(var(--border));
 }
 
 .shell__header nav a {
   color: hsl(var(--muted-foreground));
   text-decoration: none;
-  padding: 0.3rem 0.55rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
   border-radius: var(--radius);
-  /* ★ 2026-10-23 视觉校验：10 个导航项在 1440px 下被词中折行
-     （「复核队 / 列」「报告索 / 引」）。导航标签一律不折行；
-     宽度不够时让 flex 容器换行，而不是把词切开。 */
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.shell__header nav a:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--card) / 0.7);
 }
 
 .shell__header nav a.active {
   color: hsl(var(--brand));
-  background: hsl(var(--blush));
+  background: hsl(var(--card));
+  box-shadow: 0 1px 3px 0 hsl(var(--foreground) / 0.06);
   font-weight: 600;
 }
 

@@ -96,9 +96,9 @@ export default function CasesPage() {
     <section className="cases-page" aria-labelledby="cases-page-title">
       <div className="cases-page__head">
         <div>
-          <h1 id="cases-page-title">案件总览</h1>
+          <h1 id="cases-page-title">内容审核全景</h1>
           <p className="hint">
-            全量可读案件视图（含 BLOCK / PASS / 未审查 终态案件；待办分诊请前往「复核队列」）。
+            支持检索已归档与处理中的全部送审内容（含违规拦截、审核通过与待检测等全部状态；如需处理待办，请前往「待人工复核」）。
           </p>
         </div>
         <span className="font-data hint">
@@ -118,6 +118,13 @@ export default function CasesPage() {
           </button>
           {FIVE_LABELS.map((lbl) => {
             const cnt = (rows ?? []).filter((r) => r.state === lbl).length;
+            const friendlyName: Record<string, string> = {
+              BLOCK: "违规拦截",
+              REVIEW: "待人工复核",
+              PASS: "审核通过",
+              待自决: "品牌自决",
+              未审查: "待检测",
+            };
             return (
               <button
                 key={lbl}
@@ -126,7 +133,7 @@ export default function CasesPage() {
                 aria-pressed={labelFilter === lbl}
                 onClick={() => setLabelFilter(lbl)}
               >
-                {lbl}（{cnt}）
+                {friendlyName[lbl] || lbl}（{cnt}）
               </button>
             );
           })}
