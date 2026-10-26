@@ -1501,9 +1501,16 @@ code {
   align-items: center;
 }
 
+/* ★ 2026-10-26：按钮不再通栏。
+ *   通栏的实心品牌色在浅色界面上占的面积太大 —— 视线先被色块抓住，
+ *   再去找它的文字，而这里真正要读的是「产品名 + 一句话」。
+ *   宽度收到内容宽度，色块就退回「一个动作」的体量。
+ *   ★ Radix 亮色板里没有低饱和的陶土色（tomato-11 饱和度 82%，
+ *     参照站的品牌色是 54%），所以不靠调色降低存在感，靠**减小面积**。 */
 .login__sso {
-  align-self: center;
+  justify-self: start;
   min-height: 2.5rem;
+  padding: 0 var(--space-5);
   font-size: var(--text-base);
   font-weight: 500;
 }
@@ -1517,6 +1524,7 @@ code {
 
   .login__sso {
     width: 100%;
+    justify-self: stretch;
   }
 }
 
