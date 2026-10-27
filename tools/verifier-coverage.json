@@ -1052,7 +1052,7 @@
     },
     {
       "verifier": "tools/verify_openapi_spec.py",
-      "asserts": "T-408 / TS-10 OpenAPI 3.1 装配层：两个 spec 入口（/openapi.json 与 /api/openapi.json）逐字节恒等；实现表（定义在 api/write_api.py）/生产表/声明表三个方向都 ⊆ spec；★ 占位端点只许声明 501、只读守卫的写方法只许声明 403 —— spec 不得对它们说 200（改前实测五个占位端点 + 三个只读入口全部声明 200，而它们永远返 501/403）；spec 无自指条目；生产 spec 无无人认领的写端点；API 层不得调用判定引擎。--controls 5 项：占位声明 200 / 只读声明 200 / 实现端点从 spec 消失 / 版本 3.0 四个坏样本各自红，好样本绿",
+      "asserts": "T-408 / TS-10 OpenAPI 3.1 装配层：两个 spec 入口（/openapi.json 与 /api/openapi.json）逐字节恒等；实现表（定义在 api/write_api.py）/生产表/声明表三个方向都 ⊆ spec；★ 占位端点只许声明 501、只读守卫的写方法只许声明 403 —— spec 不得对它们说 200（改前实测五个占位端点 + 三个只读入口全部声明 200，而它们永远返 501/403）；spec 无自指条目；生产 spec 无无人认领的写端点；API 层不得调用判定引擎。--controls 5 项：占位声明 200 / 只读声明 200 / 实现端点从 spec 消失 / 版本 3.0 四个坏样本各自红，好样本绿 · ★ T-454 加 S8b/S8c：只读 POST 豁免表自己的两个方向 —— 名单里的路径必须真在 prod spec 里（否则是过期豁免）、豁免不许与四张写表重叠（否则被用来夹带真写端点）；--controls 4 项",
       "subjects": [
         "api/review_api.py",
         "api/production_app.py",
@@ -1152,6 +1152,15 @@
         "base/submission_service.py",
         "agent-skills/内容合规审查/SKILL.md",
         "agent-skills/守衡语域/SKILL.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_version_diff.py",
+      "asserts": "T-454 两版比对端点 POST /api/v1/version-diff · A 三值：同版／换版声明未变／声明已变三个结论互不相同（不许混成一档）· B 判据层反向对照：两次完全相同的文本必须判同版（不许因调用时间不同判已变）、空词表必须报错（否则每条都判「声明未变」，一个恒假的判据）· C 端点口径：端点结论与 change_detect 逐字相同（共用 _same_as_local 比较器，不各写一套）、未登录 401、缺字段 422 · ★★★ D 不写：先往 repo 放种子数据再装方法计数器，**先用读接口证明计数器会动**（否则 0 次调用是恒真），再断言三次 version-diff 一次都没碰 repo · D6 差异只出现在 2 万字符之后的正文仍判对（改成 GET 截断会静默判成「声明未变」）+ D6b 反向对照同一段长文本自比必须判同版 · E 比较器既不许恒真也不许恒假（好样本绿／改写措辞红／丢差集红／换判据名红／空返回红）",
+      "subjects": [
+        "api/review_api.py",
+        "base/change_detect.py",
+        "tools/verify_openapi_spec.py"
       ]
     }
   ],

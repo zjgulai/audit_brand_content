@@ -162,6 +162,20 @@ class CaseDetail(BaseModel):
     workflow_timing: Optional[Dict[str, Any]] = None
 
 
+class VersionDiffRequest(BaseModel):
+    """两版正文 → 一条变更结论（T-454）。
+
+    ★ 为什么不做成「案件自动比上一次」：案件 state 里**没有历史版本链**
+      （`base/submission_service.py` 只存当前 `content`）。做版本链要改
+      authority 的写入语义，而那是已冻结的写路径（T-310 那一族）。
+      所以本轮只做**独立的两版比对**：调用方传两份正文，立刻拿到结论。
+      它不依赖任何 state，也不写任何 state —— 一个纯函数端点。
+    """
+
+    old_text: str
+    new_text: str
+
+
 class ReportSummary(BaseModel):
     report_id: str
     case_id: Optional[str] = None
@@ -776,6 +790,31 @@ def create_app(*, session_store=None, repository=None, principals=None,
             "multimodal_note": note,
             "workflow_timing": timing,
         }
+
+    @app.post("/api/v1/version-diff")
+    def version_diff(body: VersionDiffRequest, principal=Depends(principal_dep)):
+        """两版正文的变更结论（T-454）。**只读、不落盘、不写 state。**
+
+        ★ 为什么用 POST 而不是 GET：它要传两份正文，正文可能很长
+          （实测过 17,585 字符的变更段），放 query string 会被长度上限截断 ——
+          而截断后的正文会让判据**静默地**判错（那是本项目最怕的形状）。
+        ★ 它不碰 authority：没有任何 case 被创建或修改。所以这里不需要
+          `enabled_capabilities` 那套写闸门 —— 它不是在写。
+        ★ 判据与实现全部在 `base/change_detect.py`（`claim-set-v1`），
+          本端点只做「转发 + 落三态」，**不重新实现比对**。
+        """
+        from base import change_detect as CD
+
+        if not isinstance(body.old_text, str) or not isinstance(body.new_text, str):
+            raise HTTPException(422, "old_text / new_text 必须是字符串")
+        try:
+            verdict = CD.judge(body.old_text, body.new_text)
+        except ValueError as exc:
+            # ★ 词表为空会让每一对都判成「声明未变」—— 一个恒假的判据，
+            #   而它长得和「今天什么都没变」一模一样。那种情况必须报错，
+            #   不许当成一次正常结论返回。
+            raise HTTPException(503, "变更判据不可用：%s" % (exc,)) from exc
+        return verdict
 
     @app.get("/api/v1/queue", response_model=List[CaseSummary])
     def queue(principal=Depends(principal_dep)):

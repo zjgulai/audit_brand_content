@@ -1404,6 +1404,15 @@ signed ──内容/依据/指纹/冲突变化──> invalidated ──全量�
 | GET/POST /admin/takedown-grants | proposed | pending_approval/active/revoked | SoD/缺第二审批/scope → 403/409 | Key |
 | GET /admin/sessions | — | — | 无权限 403 | 只读 |
 | GET /metrics | — | — | 无 | 只读 |
+| POST /version-diff | — | — | 未登录 403 / 词表不可用 503 | 只读（不落盘、不写 state） |
+
+&gt; **`POST /api/v1/version-diff`（T-454，2026-10-27 加）** 为什么是 POST 而不是 GET：
+&gt; 它要传两份正文，而实测过 17,585 字符的变更段 —— 塞进 query string 会被长度上限截断，
+&gt; 而**截断后的正文会让判据静默地判错**（本项目最怕的形状）。
+&gt; 它**不创建也不修改任何 case**，所以不在 `PRODUCTION_WRITE_PATHS` 里 —— 那不是漏登记。
+&gt; 判据与实现全在 `base/change_detect.py`（`claim-set-v1`），端点只转发 + 落三态。
+&gt; ★ **已知边界**：那份声明词表**只有英文**（`medical` 只认 `hospital-grade` /
+&gt; `clinically` 这类），中文「治疗堵奶」抽不出来 —— 属判定规则内容，另票处理。
 
 ---
 

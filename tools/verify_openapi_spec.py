@@ -110,6 +110,27 @@ except Exception as exc:  # noqa: BLE001
 #: 于是「新增了一个没人认领的写端点」会在这里被逼着做一次决定。
 UNCLAIMED_ALLOWED = frozenset({"/api/v1/logout"})
 
+#: 生产装配里**用 POST 表达、但语义只读**的端点（T-454，2026-10-27 加）。
+#:
+#: ★ 为什么不与 `UNCLAIMED_ALLOWED` 合并：那一条的豁免理由是「登录/登出生命周期、
+#:   没有 capability 语义」；这一个是「要传大段正文，塞 query 会被截断，
+#:   而截断会让判据**静默判错**」。两条理由不同、将来会分别过期，混在一起
+#:   就会出现「删掉一条时顺手把另一条的理由也删了」。
+#:
+#: ★ 一条纯豁免就是一句没有执行点的话（AGENTS.md §2.4.2）。所以这里配了两条硬约束，
+#:   都在本文件的 S8b/S8c 里：
+#:   ① 名单里的路径**必须真的还在** prod spec 里以 POST 出现 ——
+#:      否则它是一条指不出对象的过期豁免；
+#:   ② 名单里的路径**不许**同时出现在任何写表里（IMPLEMENTED_WRITE_PATHS /
+#:      PRODUCTION_WRITE_PATHS / WRITE_PATHS / READONLY_WRITE_PATHS）——
+#:      否则这条豁免就被用来夹带一个真正的写端点。
+#:
+#: ★ 行为级证明（「它真的不写」）不在本文件，在 `tools/verify_version_diff.py`
+#:   的 D 组：真跑两次请求，断言 authority 的案件数与报告数一个没变。
+#:   本文件只管「声明侧」，那边管「行为侧」—— 两件事分开是因为一个查 spec、
+#:   一个要真跑 HTTP，混在一起会让本文件从「静态对拍」变成「集成测试」。
+READONLY_POST_ALLOWED = frozenset({"/api/v1/version-diff"})
+
 
 def _prod_settings(root):
     root = Path(root)
@@ -272,13 +293,37 @@ def _check_spec(tag, dev_spec, prod_spec, *, placeholders=None,
         prod_posts = _post_paths(prod_spec)
         claimed = (set(IMPLEMENTED_WRITE_PATHS) | set(PRODUCTION_WRITE_PATHS)
                    | set(WRITE_PATHS) | set(READONLY_WRITE_PATHS)
-                   | set(UNCLAIMED_ALLOWED))
+                   | set(UNCLAIMED_ALLOWED) | set(READONLY_POST_ALLOWED))
         orphans = sorted(prod_posts - claimed)
         if orphans:
             no("S8-%s ★ 生产 spec 里不许有没人认领的写端点" % tag, repr(orphans))
         else:
             ok("S8-%s ★ 生产 spec 的 %d 条 POST 全部有主（实现/生产/声明/只读/白名单）"
                % (tag, len(prod_posts)))
+
+        # ── S8b/S8c 只读 POST 白名单自己的两个方向 ────────────────────────
+        # ★ 为什么要单独两条：`READONLY_POST_ALLOWED` 是一张**豁免表**，
+        #   而豁免表最常见的坏法不是「漏了一条」，是「它说的东西已经不存在了」
+        #   （路径改了名、端点被删），此时它看起来仍然合规，实际是一条死规则 ——
+        #   下一个人照着它给一个**真写端点**开豁免就没人拦了。
+        #   所以两个方向都查：名单里的必须真在、真在的必须不在写表里。
+        stale = sorted(p for p in READONLY_POST_ALLOWED if p not in prod_posts)
+        if stale:
+            no("S8b-%s ★ 只读 POST 白名单里的路径必须真在 prod spec 里（否则是过期豁免）"
+               % tag, repr(stale))
+        else:
+            ok("S8b-%s ★ 只读 POST 白名单 %d 条都指得出对象"
+               % (tag, len(READONLY_POST_ALLOWED)))
+
+        overlap = sorted(
+            set(READONLY_POST_ALLOWED)
+            & (set(IMPLEMENTED_WRITE_PATHS) | set(PRODUCTION_WRITE_PATHS)
+               | set(WRITE_PATHS) | set(READONLY_WRITE_PATHS)))
+        if overlap:
+            no("S8c-%s ★ 只读 POST 豁免不许同时落在写表里（否则被用来夹带真写端点）"
+               % tag, repr(overlap))
+        else:
+            ok("S8c-%s ★ 只读 POST 豁免与四张写表零重叠" % tag)
 
 
 def _check_no_recompute():
@@ -410,11 +455,81 @@ def run_controls():
     for name, red, want, good_ in results:
         print("%s %s（红了=%s，期望红=%s）"
               % ("✅" if good_ else "❌", name, red, not want))
-    if bad_ok == len(results):
-        print("✅ 反向对照 %d/%d 全过" % (bad_ok, len(results)))
+
+    # ── S8/S8b/S8c 的反向对照 ────────────────────────────────────────
+    # ★ 上面那个循环固定传 `prod_spec=None`，所以 S8 系列**一次都没跑到**。
+    #   一组从不执行的反向对照等于没有 —— 所以这里单独跑一遍，并显式传 prod_spec。
+    print("-" * 70)
+    print("[S8 系列：只读 POST 白名单两个方向]")
+    s8_results = _controls_s8(dev)
+
+    total = len(results) + len(s8_results)
+    passed = bad_ok + sum(1 for _, good_ in s8_results if good_)
+    for name, good_ in s8_results:
+        print("%s %s" % ("✅" if good_ else "❌", name))
+    if passed == total:
+        print("✅ 反向对照 %d/%d 全过" % (passed, total))
         return 0
-    print("❌ 反向对照 %d/%d 通过" % (bad_ok, len(results)), file=sys.stderr)
+    print("❌ 反向对照 %d/%d 通过" % (passed, total), file=sys.stderr)
     return 1
+
+
+def _controls_s8(dev):
+    """S8b/S8c 的反向对照：三条必须红、一条必须绿。
+
+    ★ 判据本身是「白名单不许过期」「豁免不许夹带真写端点」，
+      所以要喂的是**构造出来的坏白名单**，而不是坏 spec ——
+      这两条查的是名单与 spec/写表的关系，spec 本身可以完全正常。
+
+    ★★ 必须用**真实的 prod spec**，不能用 dev spec 顶替。
+      第一版就是用 dev spec 造的，好样本当场红了 ——
+      但红的不是 S8，而是 S3（「生产放行的写端点必须出现在 spec 里」，
+      dev 装配里根本没有生产路由）。那条红是真的，只是与本组无关；
+      如果当时把它读成「误差」去过滤掉，就等于把一条真判据关掉了。
+    """
+    root = tempfile.mkdtemp(prefix="openapi-s8ctl-")
+    try:
+        provider = FakeOAuthProvider({"good": OAuthIdentity("t1", "ou-reviewer")})
+        prod_app = create_production_app(_prod_settings(root),
+                                         oauth_provider=provider)
+        spec = json.loads(json.dumps(prod_app.openapi()))
+        ph = _placeholder_paths(prod_app)
+        ro = _readonly_paths(prod_app)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+    results = []
+
+    def _run(spec_obj, allow, want_red):
+        before = len(FAIL)
+        saved = globals()["READONLY_POST_ALLOWED"]
+        globals()["READONLY_POST_ALLOWED"] = frozenset(allow)
+        try:
+            _check_spec("ctl", spec_obj, spec_obj, placeholders=ph, readonly=ro)
+        finally:
+            globals()["READONLY_POST_ALLOWED"] = saved
+        went_red = len(FAIL) > before
+        while len(FAIL) > before:
+            FAIL.pop()
+        return went_red == want_red
+
+    # ① 好样本必须绿（当前真实名单）
+    results.append(("good:当前真实白名单",
+                    _run(spec, READONLY_POST_ALLOWED, want_red=False)))
+    # ② ★ 白名单里塞一条 spec 里不存在的路径 → S8b 必须红（过期豁免）
+    results.append(("bad:白名单指向不存在的路径",
+                    _run(spec, set(READONLY_POST_ALLOWED) | {"/api/v1/no-such-post"},
+                         want_red=True)))
+    # ③ ★ 豁免与写表重叠 → S8c 必须红（被用来夹带真写端点）
+    a_write = sorted(IMPLEMENTED_WRITE_PATHS)[0]
+    results.append(("bad:豁免与写表重叠",
+                    _run(spec, set(READONLY_POST_ALLOWED) | {a_write},
+                         want_red=True)))
+    # ④ ★ 把白名单整个换成一条真写端点 → 必须红
+    #    这是 S8c 真正要拦的形状：豁免变成「让写端点免检」的后门。
+    results.append(("bad:用白名单给真写端点开后门",
+                    _run(spec, {a_write}, want_red=True)))
+    return results
 
 
 def main():
