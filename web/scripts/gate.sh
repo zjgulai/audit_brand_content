@@ -65,6 +65,14 @@ if [ "${STAGE}" = "static" ]; then
   #
   #   Chrome 起不来时它退 2 → 落「未测」，**不会**假装通过。
   run_rc_check login_qr node "${HERE}/check_login_qr.mjs"
+  # ★ 2026-10-27（ADR-0021 · W-2）：文本字段三态。
+  #   守两件事：① 统一写法本身不撒谎（缺值不许兜底成看起来正常的值）；
+  #   ② 六处「缺失装成有值」的站点是否真的改成了它。
+  #
+  #   ★ 必须带 --experimental-strip-types：它要 import 真的
+  #     `src/ui/fieldState.logic.ts`（测真身，不测拷贝）。
+  #     忘了带会退 2 → 落「未测」，**不会**假装通过。
+  run_rc_check field_state node --experimental-strip-types "${HERE}/check_field_state.mjs"
 else
   # build 阶段：dist 必须已经由 `npm run build` 产好（verify:build 的顺序就是这样）
   run_json_check bundle_budget node "${HERE}/check_bundle_budget.mjs" --dir "${WEB}/dist" --json

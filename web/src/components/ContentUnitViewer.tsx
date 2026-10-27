@@ -6,6 +6,7 @@ import type {
 } from "../api/client";
 import StatusBadge from "./StatusBadge";
 import Button from "../ui/Button";
+import FieldState from "../ui/FieldState";
 import Icon from "../ui/icon";
 
 /**
@@ -113,7 +114,12 @@ export default function ContentUnitViewer({
   );
 
   const kind = unit?.kind ?? unitRef?.kind ?? "未测";
-  const parseStatus = unit?.parse_status ?? unitRef?.parse_status ?? "ok";
+  // ★ ADR-0021 · W-2：去掉 `?? "ok"`。
+  //   改前：`parse_status ?? "ok"` —— 后端没给 parse_status 时显示「已提取正文」，
+  //   于是**没解析的图看起来解析成功了**。这是六处「缺失装成有值」里最危险的一处：
+  //   审核员会以为系统已经读过图里的文字。
+  //   现在：拿不到就是 `undefined` → 由 FieldState 渲染成「未测」。
+  const parseStatus = unit?.parse_status ?? unitRef?.parse_status;
   const failureKind = unit?.failure_kind ?? unitRef?.failure_kind ?? null;
   const fullText = unit?.text ?? null;
   const covers = unit?.textification?.covers ?? [];
@@ -144,7 +150,24 @@ export default function ContentUnitViewer({
           </strong>
           <div className="unit-pane__meta">
             <span>载体：{kindLabel(kind)}</span>
-            <span>状态：{parseStatus === "ok" ? "已提取正文" : parseStatus}</span>
+            {/* ★ ADR-0021 · W-2：三态。
+                有值 → 「已提取正文」/ 具体状态；
+                没值 → 「未测」（**不许**回落成「已提取正文」）；
+                failureKind 存在 → 走 unreadable 那一支，说清「读不出」。 */}
+            <span>
+              状态：
+              {parseStatus === "ok" ? (
+                "已提取正文"
+              ) : (
+                <FieldState
+                  value={parseStatus}
+                  unreadableReason={
+                    parseStatus ? failureKind ?? undefined : undefined
+                  }
+                  missingReason={failureKind ? undefined : "后端未返回解析状态"}
+                />
+              )}
+            </span>
             {failureKind && <span>异常：{failureKind}</span>}
           </div>
         </div>

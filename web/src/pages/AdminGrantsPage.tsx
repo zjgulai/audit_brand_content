@@ -3,6 +3,7 @@ import { ApiError, request } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import LoadingRows from "../components/LoadingRows";
 import Button from "../ui/Button";
+import FieldState from "../ui/FieldState";
 
 /**
  * 授权名单治理（P-11 · Wave E 落 §1.5 与 GR-1…GR-18 三权分立台账）。
@@ -34,6 +35,41 @@ export interface GrantRecord {
   executed_by?: string;
   approved_by?: string;
   reason?: string;
+}
+
+/**
+ * 授权状态徽标（ADR-0021 · W-2）。
+ *
+ * 改前是 `<span className="badge badge--pending">{state ?? "active"}</span>` ——
+ * 两处都错：
+ *   ① 类名写死 `badge--pending`，所以不管 state 是什么都长成「待定」的黄色；
+ *   ② 兜底值 `"active"` 在后端**不存在**。真实状态域是
+ *      `proposed` / `executed` / `approved` / `revoked`
+ *      （`base/review_reducer.py:615 / 651 / 668 / 692`）。
+ *
+ * ★ 未知状态一律落 `badge--untested` + 「未测」，不许猜成某个正常状态 ——
+ *   这条与 `StatusBadge.resolveDecisionBadge` 的口径一致（断言 A2）。
+ */
+function GrantStateBadge({ value }: { value?: string | null }) {
+  const map: Record<string, { cls: string; text: string }> = {
+    proposed: { cls: "badge badge--pending", text: "待执行" },
+    executed: { cls: "badge badge--warn", text: "待审批" },
+    approved: { cls: "badge badge--pass", text: "已生效" },
+    revoked: { cls: "badge badge--block", text: "已撤销" },
+  };
+  const hit = value ? map[value] : undefined;
+  if (!hit) {
+    return (
+      <span className="badge badge--untested" data-status-badge="">
+        {value ?? "未测"}
+      </span>
+    );
+  }
+  return (
+    <span className={hit.cls} data-status-badge="">
+      {hit.text}
+    </span>
+  );
 }
 
 export default function AdminGrantsPage() {
@@ -328,16 +364,29 @@ export default function AdminGrantsPage() {
                   <td className="font-data">{g.grant_id ?? g.id ?? `#${i + 1}`}</td>
                   <td className="font-data">{g.user_id ?? "未记录"}</td>
                   <td className="font-data">
-                    {g.capability ?? "未指定"}，{g.product_line ?? "all"}
+                    {/* ★ ADR-0021 · W-2：`product_line ?? "all"` 已去掉。
+                        改前缺品线显示 "all" —— 而 `all` 在权限语义里是
+                        **全部品线授权**，等于把「不知道」显示成「权限最大」。
+                        现在缺值走 FieldState → 「未测」。 */}
+                    {g.capability ?? "未指定"}，
+                    <FieldState
+                      value={g.product_line}
+                      emptyText="品线未测"
+                      missingReason="后端未返回 product_line"
+                    />
                     {g.platform ? ` ${g.platform}` : ""}
                   </td>
                   <td className="font-data">
                     提案 {g.proposed_by ?? "-"}，执行 {g.executed_by ?? "-"}，审批 {g.approved_by ?? "-"}
                   </td>
                   <td>
-                    <span className="badge badge--pending" data-status-badge="">
-                      {g.state ?? g.status ?? "active"}
-                    </span>
+                    {/* ★ ADR-0021 · W-2：徽标跟随真实 state。
+                        改前 `badge--pending` 是写死的类名 —— 不管 state 是什么，
+                        都长成「待定」的黄色徽标；而兜底值 `?? "active"` 在后端
+                        **不存在**（真实状态域是 proposed/executed/approved/revoked，
+                        见 review_reducer.py:615/651/668/692）。
+                        现在：未知状态 → badge--untested + 「未测」。 */}
+                    <GrantStateBadge value={g.state ?? g.status} />
                     {(g.state ?? g.status) === "proposed" && (
                       <button
                         type="button"

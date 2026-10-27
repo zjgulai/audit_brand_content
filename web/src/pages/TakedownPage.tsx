@@ -4,6 +4,7 @@ import LoadingRows from "../components/LoadingRows";
 import { ApiError, request } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import Button from "../ui/Button";
+import FieldState from "../ui/FieldState";
 import Icon from "../ui/icon";
 
 /**
@@ -540,7 +541,16 @@ export default function TakedownPage() {
                 </span>
                 {renderTaskBadge(t.state)}
                 <span className="font-data hint">
-                  范围：{t.platform} {t.tenant ?? "t1"}{" "}
+                  {/* ★ ADR-0021 · W-2：`tenant ?? "t1"` 已去掉。
+                      改前缺租户显示 "t1" —— 而 `t1` 是**真实的租户号格式**，
+                      于是「不知道属于哪个租户」被显示成「属于 t1」。
+                      这类兜底比留空更糟：它给出的不是一个占位符，是一个具体答案。 */}
+                  范围：{t.platform}{" "}
+                  <FieldState
+                    value={t.tenant}
+                    emptyText="租户未测"
+                    missingReason="后端未返回 tenant"
+                  />{" "}
                   {t.product_line ?? "未测"}
                 </span>
               </div>

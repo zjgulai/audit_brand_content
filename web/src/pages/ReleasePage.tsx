@@ -203,7 +203,15 @@ export default function ReleasePage() {
             state: c.state,
             product_line: c.product_line,
             release_status: c.release_status,
-            submitter_id: null,
+            // ★ ADR-0021 · W-2：改前这里是 `submitter_id: null` ——
+            //   一个写死的 null 让 `isSelfSub` 恒 false，自签检查等于不存在。
+            //   现在**不编值**：`undefined` 表示「这个数据源没有这个字段」，
+            //   由下面的 `sodUnknown` 把它渲染成「未测（提交人未知）」。
+            //
+            //   ★ 为什么不是 null：`CaseSummary` 的 submitter 字段类型就是
+            //     `string | null`，null 在正常路径上也会出现（真的没有提交人）。
+            //     用 undefined 才能区分「没有这个字段」与「字段是 null」。
+            submitter_id: undefined,
             final_reviewer_id: c.assignee_id,
           }));
 
@@ -254,7 +262,16 @@ export default function ReleasePage() {
                   const isSelfRev =
                     Boolean(current?.id) &&
                     item.final_reviewer_id === current?.id;
-                  const sodBlocked = isSelfSub || isSelfRev;
+                  // ★ ADR-0021 · W-2：提交人未知时不能装作「可签」。
+                  //   判定口径：两条规则都读过、且**至少一条的数据缺失**
+                  //   （undefined = 这个源没有这个字段；null = 字段确实是空）。
+                  //   `submitter_id: undefined` 就是 fallback 分支标记「我不知道」的方式。
+                  const sodUnknown =
+                    !isSelfSub &&
+                    !isSelfRev &&
+                    (item.submitter_id === undefined ||
+                      item.submitter_id === null ||
+                      item.final_reviewer_id === undefined);
                   return (
                     <tr key={item.case_id}>
                       <td className="font-data">
@@ -270,14 +287,28 @@ export default function ReleasePage() {
                       <td>{item.product_line ?? "未测"}</td>
                       <td>{item.release_status ?? "待放行"}</td>
                       <td>
-                        {sodBlocked ? (
-                          <span
-                            className="badge badge--warn"
-                            data-status-badge=""
-                          >
-                            {isSelfSub
-                              ? "不可自签"
-                              : "不可自签"}
+                        {/* ★ ADR-0021 · W-2：改前三元的两个分支文案完全相同
+                            （`? "不可自签" : "不可自签"`），改一个分支不会有任何
+                            可见变化 —— 那是死分支。
+                            改前这里是一个 `sodBlocked = isSelfSub || isSelfRev` 的并集，但它
+                            只拦不说是哪一条：**自签**（提交人签自己）与
+                            **自审**（终审人签字）是两条不同的规则，
+                            补救动作也不同（前者要换人签，后者要有第二审批）。
+                            所以这里分开说。 */}
+                        {isSelfSub ? (
+                          <span className="badge badge--warn" data-status-badge="">
+                            不可自签（本人提交）
+                          </span>
+                        ) : isSelfRev ? (
+                          <span className="badge badge--warn" data-status-badge="">
+                            不可自签（本人终审）
+                          </span>
+                        ) : sodUnknown ? (
+                          /* ★ 「不知道能不能签」必须与「能签」长得不一样。
+                             改前 submitter_id 被写死成 null，于是 isSelfSub 恒 false，
+                             界面一律显示「可签发」—— 静默的合规失效。 */
+                          <span className="badge badge--untested" data-status-badge="">
+                            未测（提交人未知）
                           </span>
                         ) : (
                           <span
