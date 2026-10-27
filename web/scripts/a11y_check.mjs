@@ -717,21 +717,57 @@ async function runStandaloneSuite(cdp) {
 <body>
   <div class="shell">
     <a class="skip-link" href="#main">跳到主内容</a>
-    <header class="shell__header">
-      <span class="shell__brand">内容审核工作台</span>
-      <nav aria-label="主导航">
-        <a href="#inbox">收件箱</a>
-        <a href="#queue" class="active">复核队列</a>
-        <a href="#cases">案件总览</a>
-        <a href="#release">签发台</a>
-        <a href="#taxonomy">分类规范</a>
-      </nav>
-      <div class="shell__right">
-        <label>开发身份：<select aria-label="切换本地开发身份"><option>DP3 审核员</option></select></label>
+    <!-- ★ 2026-10-27（ADR-0021 · a11y）：模板改成**真实的** AppShell 结构。
+         改前是「header 里塞一个 开发身份：<select>」——而真实页面里
+         那个 select 在**侧边栏底部**（.shell__sidebar-foot > .shell__dev-id），
+         header 里放的是品线 pill 与通知徽标。
+
+         代价是实测出来的：reflow-320 下报「DP3 审核员 压住 认领 / 存草稿」
+         （overlap 50×38 / 35×38）。把那个 select 拿掉，13/13 全过 ——
+         说明**重叠是模板自己造出来的**，不是真实页面的缺陷。
+         一份不忠实于真实结构的模板，报出的问题既不能直接修（真实页面没有那个元素），
+         也不能忽略（它会让闸门一直红）—— 这正是「会误报的检查器比没有更糟」。 -->
+    <aside class="shell__sidebar" aria-label="工作台导航">
+      <div class="shell__brand-wrap">
+        <span class="shell__brand">内容审核工作台</span>
+        <span class="shell__brand-sub">内容审核工作台</span>
       </div>
-    </header>
-    <main id="main" class="shell__main" tabindex="-1">${innerBody}</main>
-    <footer class="shell__footer">判定由后端唯一产出，本页不重算；五标签一律止于「待放行」。</footer>
+      <nav class="shell__nav" aria-label="主导航">
+        <div class="shell__nav-group">
+          <p class="shell__nav-caption">审核流</p>
+          <a class="shell__nav-item" href="#inbox"><span class="shell__nav-label">收件箱</span></a>
+          <a class="shell__nav-item active" href="#queue"><span class="shell__nav-label">复核队列</span></a>
+          <a class="shell__nav-item" href="#cases"><span class="shell__nav-label">案件总览</span></a>
+          <a class="shell__nav-item" href="#release"><span class="shell__nav-label">签发台</span></a>
+          <a class="shell__nav-item" href="#taxonomy"><span class="shell__nav-label">分类规范</span></a>
+        </div>
+      </nav>
+      <div class="shell__sidebar-foot">
+        <label class="shell__dev-id">
+          <span class="shell__nav-caption">开发身份</span>
+          <select aria-label="切换本地开发身份">
+            <option>DP3 审核员</option>
+            <option>DP4 签发人</option>
+          </select>
+        </label>
+      </div>
+    </aside>
+    <div class="shell__body">
+      <header class="shell__header">
+        <div class="shell__heading">
+          <div class="shell__heading-text">
+            <p class="shell__title">复核队列</p>
+            <p class="shell__subtitle">按紧迫度排序，J/K 切换</p>
+          </div>
+        </div>
+        <div class="shell__right">
+          <span class="shell__scope-pill font-data" title="授权产品线范围：pump / wearable">品线 2</span>
+          <a class="shell__notif-badge" href="#inbox" aria-label="工作台通知：3 条未读">3</a>
+        </div>
+      </header>
+      <main id="main" class="shell__main" tabindex="-1">${innerBody}</main>
+      <footer class="shell__footer">判定由后端唯一产出，本页不重算；五标签一律止于「待放行」。</footer>
+    </div>
   </div>
 </body>
 </html>`;
