@@ -1,0 +1,21 @@
+[
+ {
+  "事项名称": "W-2 文本字段三态：六处「缺失装成有值」收成一个执行点",
+  "关联执行票": "ADR-0021 · W-2",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+   "前端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "审计实测界面把「缺失」渲染成「确定状态」共六处：① ContentUnitViewer `parse_status ?? \"ok\"` → 没解析的图显示「已提取正文」（最危险：审核员会以为系统读过图里文字）；② AdminGrants `product_line ?? \"all\"` → all 在权限语义里是**全部品线授权**，等于把「不知道」显示成「权限最大」；③ AdminGrants 徽标类名写死 badge--pending + 兜底 `?? \"active\"`（active 在后端不存在，真实域是 proposed/executed/approved/revoked）；④ Takedown `tenant ?? \"t1\"` → t1 是真实租户号格式，缺失读成「属于 t1」；⑤ ReleasePage `submitter_id: null` 写死 → isSelfSub 恒 false，自签检查等于不存在（静默合规失效）；⑥ ReleasePage 三元两分支文案完全相同（死分支）。做法：新建 web/src/ui/fieldState.logic.ts（三态纯逻辑）+ FieldState.tsx（只挂 class）+ scripts/check_field_state.mjs（28 项自证，已挂进 gate static 阶段）。ReleasePage 那处顺手拆细：自签（本人提交）与自审（本人终审）是两条规则、补救动作不同，改前合并成一个 sodBlocked 且只显示同一句话；现在分开说，并在提交人未知时落第三态「未测（提交人未知）」，**不许装成「可签发」**。",
+  "验收标准": "check_field_state.mjs 28/28：A 三态判定 9 项（含「数字 0 → ok」「unreadable 优先于有值」）· B 不许默认值 8 项（含「missing 时输出不含任何看起来像值的字符」「unreadable 与 missing 文案必须不同」）· C 反向对照 6 项（五种兜底写法重放，输出必须不是那个值；C6 好样本必须绿否则上面全是恒真）· D 六处站点扫描 + D5 扫描器自身反向对照。gate[static] 与 gate[build] 全绿；npm run build 通过（tsc -b 严格模式）；production_bundle 14/14。",
+  "状态依据": "三个真变异各红一次：① 把 `parse_status ?? \"ok\"` 加回去 → D 组红；② fieldStateKind 恒返回 missing（组件「安全」到什么都显示未测）→ A/B/C6 共 5 条红（证明「好样本必须绿」那条判据确实在起作用）；③ submitter_id 改回写死 null → D 组红。★ 执行中撞到并修好的判据缺陷：D 组第一次跑三条全红而代码其实已改好——红的是**我自己的注释**（「改前 parse_status ?? \\\"ok\\\" 会显示…」），判据把解释文字当成违规代码，是 §2.4.4「被自己的解释文字绊倒」重演；修法为扫描前剥注释（整行+块注释），与 verify_shouheng_ops C5、verify_cards J1a 同一条读法。★ 另一个自踩的坑：自证第一版用「正则从 .tsx 抠函数体再 new Function 执行」，当场挂在可选链上（`props.missingReason?.trim()` → Unexpected token '?'），且抠出来的是**一段文本**不是被 TS 检查过的真身；改成把纯逻辑抽到 .ts 用 --experimental-strip-types 直接 import，测真身不测副本。读数：field_state 28/28 · gate[static] 全绿 · gate[build] 全绿 · bundle_budget initial 144733/170000 total 171281/240000 · verify:pages 双向可达（20 条 Route / 14 个页面文件）。★ 三条与本次无关的既有红已用 git stash 做对照确认不是本票引入：a11y 双闸（badge--review 对比度 4.25 < 4.5、控件重叠）、check_frontend_gates / check_review_slice / verify_frontend_stack_contract（需 dev server 或 Chrome）。提交 c3d9be3。",
+  "下一步行动": "W-1 数据收敛（实测 18 处裸 request 收进 api 模块）→ W-3 ErrorBoundary + 轮询 → A 级 SubmitPage 两层结论"
+ }
+]
