@@ -1141,6 +1141,18 @@
         "tools/audit/report_render.mjs",
         "api/review_api.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_skill_registry.py",
+      "asserts": "T-453 skill 加载器：注册表可读且字段齐 / id 唯一 / 触发词不许重叠 · ★ 双向完整：登记了但文件不在→红 **且** 盘上有规程但没登记→红（两个方向各自能红）· 指纹 = 真实文件字节 sha256（改一个字必须变，证明不是 mtime/size）· ★★★ 回执里的 skill_hash 不再是硬编码的 \"local\"，且生产链路**真的把 skill_id 传给了判定函数**（D7 用 spy 观察入参 —— 只看结果值的 D6 抓不住「删掉那行」的变异，因为默认值恰好相同）",
+      "subjects": [
+        "base/skill_registry.py",
+        "agent-skills/registry.json",
+        "base/judge_entry.py",
+        "base/submission_service.py",
+        "agent-skills/内容合规审查/SKILL.md",
+        "agent-skills/守衡语域/SKILL.md"
+      ]
     }
   ],
   "exempt": [

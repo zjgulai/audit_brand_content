@@ -178,10 +178,20 @@ def _observations_from_result(raw, tasks, *, clock=None):
 
 
 def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
-               skill_id="content-review", skill_version="1",
-               skill_hash="local", authority_query=None, clock=None,
+               skill_id="content-review", skill_version=None,
+               skill_hash=None, authority_query=None, clock=None,
                multimodal_analyze=None):
     """把一份 ContentUnit 判成结论。
+
+    ★ T-453：`skill_version` / `skill_hash` 的默认值从「写死的 '1' / 'local'」
+      改成 `None` —— `None` 表示**去注册表算**（`base/skill_registry.py`）。
+
+      改之前的样子是本项目一个典型病：回执里那三个字段读起来像「查过了」，
+      而实际 `skill_hash` 是 `judge_entry.py:182` 的一个字面量 `"local"`，
+      生产链路一个参数都没传。**说不出版本的回执比没有这三个字段更糟。**
+
+      现在：默认走注册表，拿到的指纹是规程文件字节的 sha256。
+      调用方显式传值时仍以调用方为准（注入点保留给自检与回放）。
 
     `multimodal_analyze` 是 T-433 的注入点：`analyze(media_ref, tasks)` 形状的
     可调用对象（通常是 provider 注册表的 `analyze` 包一层）。
@@ -193,6 +203,19 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
     """
     if not isinstance(unit, dict):
         raise ValueError("unit 必须是 dict")
+    # ★ T-453：未显式给出时，从注册表算。
+    if skill_version is None or skill_hash is None:
+        from base import skill_registry as _SR
+        _fields, _why = _SR.receipt_fields(skill_id)
+        if _fields:
+            skill_version = skill_version if skill_version is not None else _fields["skill_version"]
+            skill_hash = skill_hash if skill_hash is not None else _fields["skill_hash"]
+        else:
+            # ★ 取不到**不许**编一个好看的默认值（那正是 "local" 的老毛病）。
+            #   `untested` 是一个能指认的状态：读的人立刻知道"这一版规程没查到"。
+            skill_version = skill_version if skill_version is not None else "untested"
+            skill_hash = skill_hash if skill_hash is not None else "untested"
+            unit.setdefault("_skill_registry_note", _why)
     observations, observation_note = _collect_multimodal_observations(
         unit, multimodal_analyze, clock=clock)
     registry = ControlPointRegistry()

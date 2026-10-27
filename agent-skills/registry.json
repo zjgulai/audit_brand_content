@@ -1,0 +1,66 @@
+{
+  "$schema": "skill-registry/v1",
+  "$why": [
+    "这文件存在的理由：回执里有 skill_id / skill_version / skill_hash 三个字段，",
+    "而 2026-10-27 的实测是——生产链路一个都没传，回执永远写着 content-review / 1 / local。",
+    "也就是说：「这次判定用的是哪一版规程」这句话，在盘上指不出任何文件。",
+    "",
+    "★ 那个 `skill_hash=\"local\"` 是 base/judge_entry.py:182 的硬编码字面量。",
+    "  它比「没有加载器」更该修：没有加载器只是缺功能，而它是在**声称**一个",
+    "  自己并不知道的版本 —— 回执读起来像查过了，实际什么都没查。",
+    "",
+    "本文件把「有哪些 skill、各自在哪、内容指纹是什么」显式声明成机器可读的，",
+    "由 tools/verify_skill_registry.py 反证：指纹必须等于真实文件 sha256、",
+    "触发词不许重叠、登记了必须存在且存在了必须登记。"
+  ],
+  "$how_to_add": [
+    "新增一个 skill：把 SKILL.md 放进 agent-skills/<目录>/，然后在这里加一条。",
+    "path 相对仓库根；id 一旦发布就不许改（它是回执里那个值）。"
+  ],
+  "$fingerprint": "sha256(文件字节)，64 位小写十六进制 —— 与回执 skill_hash 同源",
+  "skills": [
+    {
+      "id": "content-review",
+      "version": "1.0.0",
+      "path": "agent-skills/内容合规审查/SKILL.md",
+      "trigger_words": [
+        "合规审查",
+        "合规判定",
+        "内容审查",
+        "帮我看这条能不能投",
+        "广告文案过审"
+      ],
+      "deliverable": "一次判定 + 一份回执",
+      "not_for": [
+        "这条文案能不能投（那是人的决定，见规程 §六）",
+        "图片/视频的画面语义判定（判定只用文本）"
+      ],
+      "$note": [
+        "id 必须是 content-review —— 它是 base/judge_entry.py 的默认值，也是",
+        "历史上回执里一直写的那个值。改成别的会让存量回执与新回执分成两个 id。",
+        "version 是**规程文档的版本**，不是判定引擎的版本；两者的关系写在 SKILL.md 里。"
+      ]
+    },
+    {
+      "id": "shouheng-tone",
+      "version": "1.0.0",
+      "path": "agent-skills/守衡语域/SKILL.md",
+      "trigger_words": [
+        "群回复怎么写",
+        "语域",
+        "去 AI 味",
+        "回话口径"
+      ],
+      "deliverable": "一条符合守衡语域的群回复",
+      "not_for": [
+        "内容合规判定（那是 content-review）",
+        "卡片字段白名单（那是 tools/reply-cards/contract.md）"
+      ],
+      "$note": [
+        "★ 这个是「怎么写话」的规程，不是判定 skill。它不产出判定结论。",
+        "守衡已按长期停令关闭（PMO/shouheng-state/stop-lock），但规程本身仍在，",
+        "因为将来恢复时要用同一份。"
+      ]
+    }
+  ]
+}

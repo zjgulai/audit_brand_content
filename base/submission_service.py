@@ -378,6 +378,11 @@ class SubmissionIngestor:
             kwargs = {
                 "authority_query": self._query(),
                 "kb_snapshot": self._kb_snapshot(),
+                # ★ T-453：显式说出用的是哪个 skill，不再依赖 judge_entry 的默认值。
+                #   改之前这里一个参数都没传，于是回执永远写默认的 content-review /
+                #   "1" / "local" —— 而生产链路「用哪一版规程」这件事**在盘上指不出文件**。
+                #   现在 `skill_id` 传下去，`skill_version`/`skill_hash` 由注册表算。
+                "skill_id": "content-review",
             }
             if self.clock is not None:
                 kwargs["clock"] = self.clock
