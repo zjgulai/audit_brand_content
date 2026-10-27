@@ -1,0 +1,21 @@
+[
+ {
+  "事项名称": "a11y 对比度：三个语义文字色 -11→-12，并补上三个从未被测过的徽标",
+  "关联执行票": "ADR-0021 · a11y",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+   "前端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "a11y 双闸机器半边一直红，报 badge--review 对比度 4.25<4.5；git stash 对照确认不是近期改动引入，是既有缺陷。★ 实测范围比报出来的大得多：styles.css 里 10 个徽标变体逐对算，block/severity-high 4.54 ✅、review/partial/warn/severity-med 4.25 ❌、pass 4.21 ❌、pending 4.25 ❌、untested/sample 5.60 ✅。★★ 为什么 pass 与 pending 从来没红：a11y_check.mjs 的 TEMPLATES 是手写 HTML 模板不是真页面，模板里只有 4 种徽标而仓里有 10 种，于是 pass/pending/block 一直落在扫描射程外——不达标却永远不会红，这比缺一条判据更糟。修法两件缺一不可：① ok-text→green-12(11.00)、warn-text→amber-12(10.47)、info-text→blue-12(11.26)，--*-graphic 是纯图形档不动；② 把 pass/pending/block 三种徽标补进 a11y 模板。",
+  "验收标准": "真变异两次：① warn-text 改回 amber-11 → 8 条对比度违规重现，失败 1→4 项；② ok-text/info-text 改回 -11 → 'text':'PASS' 与 badge--pending ratio:4.25 双双出现（改之前 PASS 从不在这条判据射程内，直接证明补模板必要）。DT 全绿（含 DT-5 台账 147 条对齐）· gate[static] 全绿 · gate[build] 全绿 · build 14/14 · a11y 对比度违规 8→0。",
+  "状态依据": "★ 顺手撞到并修掉一个环境问题：改 DESIGN.md 时 DT-5 报「没有 TOKENS:BEGIN/END 机器块」，三个读数互不相同（ls 17604B / wc -c 13508B / Node readFileSync 16871B），是 AGENTS.md §2.1 记的填充态（stat 比真实内容多 4096B）；用 python3 tools/verify_depad.py --fix 修掉（cp 往返 + sha256 前后比对），两读数回到 13508 一致。★ 若把 DT-5 的「未测」读成「这台机器上 DESIGN.md 没有机器块」，就会去新建一个机器块——而它本来就在，只是被填充挡住了。★ 提交方式：index 里有另一会话的 8 个文件（含 AGENTS.md），按 AGENTS.md 新增第 8 条「git reset HEAD~1 会清空整个 index」，改用 git commit --only 限定路径，未触碰他人暂存。剩 1 项失败=控件重叠（reflow-320 下「DP3 审核员」压住「认领」「存草稿」），按裁定另计。提交 8c627c9。",
+  "下一步行动": "W-1 数据收敛（18 处裸 request 收进 api 模块）；控件重叠另开票"
+ }
+]
