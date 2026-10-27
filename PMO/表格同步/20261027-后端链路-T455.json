@@ -1,0 +1,21 @@
+[
+ {
+  "事项名称": "T-455 意图识别：只做 content_stage 建议值，并如实报「无规则消费」",
+  "关联执行票": "T-455",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "上游 PRD:137 要求「Agent 自动识别内容类型和内容阶段」，本仓 0 行。★ 执行时查清两件改了形态的事：① `content_type` 其实**早已确定性推导**（_SOURCE_KIND_CONTENT_TYPE 把 free_text/ad_text→文本、image→图片，传错直接 422）——不需要「识别」，需要的是说出它已经发生过；② 真正的缺口 `content_stage` 四维校验必填但没有任何东西推断它。★★ 更根本的一条：36 条规则里 content_stage / brief / final_content **各出现 0 次**（正向对照 severity 39 次、layer 38 次），base/ 里它只在两处出现（取值域校验、写进 ContentUnit）——**推断得再准，今天也不会改变任何一条判定**。委托方裁定：只做建议值 + 如实报「无规则消费」，不动判定规则。改法：新建 base/intent_infer.py 规则推断（不用模型——模型无法反向对照）三态 inferred/untested/absent；submission_service.apply_stage_inference() 作为唯一补值点在四维校验之前调用；推断观察落 payload[intent_inference] 随案件走；rule_consumer_status() 把「没有规则消费」做成可读读数并带正向对照。",
+  "验收标准": "verify_intent_infer 42/42。B1 调用方给值→一律采信不许被改 / B5 ★★★ 不许原地改入参（上游要用原对象算幂等哈希）/ C1 ★★★ 两边都没命中→untested 且不产值，不许默认成某一档 / D1 service 侧哈希==payload 哈希 / D4 ★★★ 用真实 BusinessEventStore + WriterLease 真跑两次 execute_submission，同 key 重放不许报 idempotency_conflict / G4 ★★★ 如实报告「没有任何规则消费 content_stage」。",
+  "状态依据": "★★ 执行中撞到并在同一票里修掉一个真缺陷：execute_submission() 在调 prepare() **之前**就用 submission_hash() 算了幂等哈希，而哈希 body 里含 content_stage；第一版只把推断写在 prepare() 里，实测重放时 service 侧哈希 65d53ca4… ≠ payload 哈希 2ef748f6… → 同 key 重放被判 idempotency_conflict。修法：补值必须在算哈希之前、且两处走同一个函数（各自补一次必然分叉），为此加 known_inference= 参数，否则 prepare() 会把上游补的值当成「调用方申报的」而丢掉推断记录。四个真变异：未命中默认 final_content→A3/B6/C1/C2 红；未命中默认 brief→同样四条红（两个方向都堵住）；忽略「调用方已给值」→A4/A5/B2/D3/F2 红；删掉 service 里「算哈希前补值」那行→**D1/D2/D3 全绿只有 D4 红**。最后一条最值得记：D1 是「手工模拟 service 的顺序」，它证明的是「如果照我写的顺序做两个哈希相等」，而真实 execute_submission 是不是照那个顺序做 D1 管不着——**只在「我以为的顺序」下成立的判据等于没有**；所以 D4 改用真实 store 真跑，变异时它报出的就是缺陷本身。读数：intent_infer 42/42 · submission_pipeline 43 · stage_gate_d5 23 · media_ingest 42 · production_app 85 · review_api 50 · write_api 75 · api_integration 17 · submission_router 43 · skill_registry 27 · version_diff 30 · openapi_spec 18 · coverage 705（--controls）。★ 过程事故：做变异时用 git checkout 恢复，连带回退了我这一票的三处改动，发现后逐处重建并把「备份到 /tmp 再恢复」定为后续变异的标准做法，重建后全部回归复跑通过。提交 471581e。",
+  "下一步行动": "要让推断生效需给 36 条规则加 content_stage 维度（判定规则内容，另立票）。本轮 T-451…T-455 五票全部完成"
+ }
+]
