@@ -134,6 +134,7 @@ export default function ReportPage() {
 
   return (
     <section className="case case--dual">
+      <div className="case__top-bar">
       <div className="case__head">
         <h1>报告查看</h1>
         <span className="font-data">{report.report_id}</span>
@@ -191,6 +192,7 @@ export default function ReportPage() {
           )}
         </dd>
       </dl>
+      </div>
 
       {/* 内嵌六区块只读报告视图（G-06 / UX-03） */}
       {ir ? (

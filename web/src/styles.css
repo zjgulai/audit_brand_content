@@ -106,7 +106,7 @@ code {
   top: 0;
   align-self: start;
   max-height: 100vh;
-  background: var(--bg);
+  background: var(--surface);
   border-right: var(--hairline) solid var(--border);
   overflow: hidden;
 }
@@ -117,6 +117,7 @@ code {
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   min-height: var(--topbar-h);
+  border-bottom: var(--hairline) solid var(--border);
 }
 
 /* 真实 Momcozy logo：不加 badge 底、不加阴影、不加圆角 ——
@@ -207,17 +208,15 @@ code {
 }
 
 .shell__nav-item:hover {
-  background: var(--surface-muted);
+  background: var(--sand-1);
   color: var(--text);
 }
 
-/* 选中态：中性灰 pill + 字重。品牌色只留给内容与主行动（研究 §3.2：
-   active nav 是中性灰 pill，彩色选中 23 屏中仅 3 例且全是 rail）。 */
+/* 借鉴 mkt.lute-tlz-dddd.top Sidebar：选中项为柔和玫瑰粉胶囊 + 品牌深色字 */
 .shell__nav-item.is-active {
-  background: var(--surface);
-  color: var(--text);
+  background: var(--brand-surface);
+  color: var(--brand-text-on-surface);
   font-weight: 600;
-  border: var(--hairline) solid var(--border);
 }
 
 .shell__nav-icon {
@@ -310,7 +309,7 @@ code {
   align-items: center;
   min-height: var(--topbar-h);
   padding: var(--space-2) var(--space-5);
-  background: var(--bg);
+  background: var(--surface);
   border-bottom: var(--hairline) solid var(--border);
   position: sticky;
   top: 0;
@@ -318,6 +317,26 @@ code {
 }
 
 .shell__heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 借鉴 mkt.lute-tlz-dddd.top 页面头部：玫瑰豆沙淡底圆角图标块 */
+.shell__title-icon {
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: none;
+  border-radius: var(--radius-control);
+  background: var(--brand-surface);
+  color: var(--brand-text-on-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shell__heading-text {
   min-width: 0;
 }
 
@@ -683,29 +702,29 @@ code {
   border-bottom: var(--hairline) solid var(--rule);
 }
 
-/* 视图切换：安静的分段按钮（radius 6px，不描粗框，选中态用浅灰槽填充 + 600 字重） */
+/* 借鉴 mkt 分类胶囊：未选中白底细边、悬停暖米色 #FBF8F5、选中实心玫瑰豆沙色白字 */
 .queue__filter {
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 500;
-  min-height: 28px;
+  min-height: 32px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-control);
-  border: var(--hairline) solid transparent;
-  background: transparent;
+  border: var(--hairline) solid var(--border-strong);
+  background: var(--surface);
   color: var(--text-muted);
   cursor: pointer;
 }
 
 .queue__filter:hover {
   color: var(--text);
-  background: var(--bg);
+  background: var(--sand-1);
 }
 
 .queue__filter[aria-pressed="true"] {
-  border-color: var(--border-strong);
-  color: var(--text);
-  background: var(--surface);
+  border-color: transparent;
+  color: var(--on-brand);
+  background: var(--brand);
   font-weight: 600;
 }
 
@@ -722,7 +741,7 @@ code {
 }
 
 .queue__row:hover {
-  background: var(--surface-muted);
+  background: var(--sand-1);
 }
 
 /* ★ 2026-10-26：选中态原来靠「左侧 3px 品牌色条」，委托方明确不要这种形态。
@@ -865,14 +884,14 @@ code {
   padding: 0;
 }
 
-/* 原文阅读井：用浅暖灰底（--bg）与极轻边承托正文，不画生硬线框 */
+/* 借鉴 mkt 卡片：外层纯白圆角卡 + #EDE6DF 细边，内部正文区用 #FBF8F5 暖米内嵌盒 */
 .unit-pane {
   position: sticky;
   top: var(--space-3);
-  background: var(--bg);
+  background: var(--surface);
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius-panel);
-  padding: var(--space-4);
+  padding: var(--space-5);
   min-width: 0;
 }
 
@@ -922,8 +941,12 @@ code {
   white-space: pre-wrap;
   word-break: break-word;
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--text);
+  background: var(--sand-1);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-4);
 }
 
 .unit-mark {
@@ -1037,11 +1060,11 @@ code {
 
 .evidence__item {
   position: relative;
-  padding: var(--space-3) var(--space-4);
-  border: var(--hairline) solid var(--rule);
+  padding: var(--space-4);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius-control);
   margin-bottom: var(--space-3);
-  background: var(--bg);
+  background: var(--sand-1);
 }
 
 .evidence__item--active {
@@ -1287,11 +1310,15 @@ code {
 
 .cases-page__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .cases-page__head h1 {
@@ -1344,7 +1371,7 @@ code {
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-muted);
-  background: var(--bg);
+  background: var(--sand-1);
   border-bottom: var(--hairline) solid var(--border);
   white-space: nowrap;
 }
@@ -1379,7 +1406,7 @@ code {
 }
 
 .cases-table tbody tr:hover {
-  background: var(--surface-muted);
+  background: var(--sand-1);
 }
 
 /* 面板：任何「一段独立内容」的统一容器（2026-10-23 全站视觉刷新） */
@@ -2084,4 +2111,20 @@ code {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.case__top-bar {
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+}
+
+.case--embedded .case__top-bar {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: var(--space-3);
 }

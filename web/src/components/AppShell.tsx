@@ -103,25 +103,26 @@ const NAV_GROUPS: NavGroup[] = [
  *   所以：**外壳文案不许复用数据区的词**（证据链 / 待审原件 / 对外标签 /
  *   覆盖证明 / 复核动作）。这条由 check_pages 的 `shellNoSignal` 反向对照守着。
  */
-const PAGE_META: { match: (p: string) => boolean; title: string; sub: string }[] = [
-  { match: (p) => p === "/inbox", title: "待办收件箱", sub: "分派给你、或等待认领的案件" },
-  { match: (p) => p === "/queue", title: "待人工复核", sub: "机器拿不准的内容，需要你给出结论" },
-  { match: (p) => p === "/cases", title: "审核全景", sub: "全部送审内容与它们当前的去向" },
-  { match: (p) => p.startsWith("/cases/"), title: "案件详情", sub: "查看这一条内容的判定与处置" },
-  { match: (p) => p === "/release", title: "合规签发", sub: "确认无误后正式放行" },
-  { match: (p) => p === "/takedown", title: "违规下架", sub: "已发布内容的召回与处置" },
-  { match: (p) => p === "/appeals", title: "申诉复议", sub: "业务方对结论有异议时的复审" },
-  { match: (p) => p === "/reports", title: "合规报告", sub: "每一份判定与签发的书面留痕" },
-  { match: (p) => p.startsWith("/reports/"), title: "报告详情", sub: "判定依据与签发记录的完整视图" },
-  { match: (p) => p === "/taxonomy", title: "规则词典", sub: "查一条规则管什么、依据是什么" },
-  { match: (p) => p === "/admin/grants", title: "授权治理", sub: "谁能审哪些品线、谁批的" },
-  { match: (p) => p === "/admin/sessions", title: "安全审计", sub: "登录与高风险动作的流水" },
-  { match: (p) => p === "/submit", title: "提交送审", sub: "把一段内容送进审核流程" },
+const PAGE_META: { match: (p: string) => boolean; icon: IconName; title: string; sub: string }[] = [
+  { match: (p) => p === "/inbox", icon: "inbox", title: "待办收件箱", sub: "分派给你、或等待认领的案件" },
+  { match: (p) => p === "/queue", icon: "clock", title: "待人工复核", sub: "机器拿不准的内容，需要你给出结论" },
+  { match: (p) => p === "/cases", icon: "search", title: "审核全景", sub: "全部送审内容与它们当前的去向" },
+  { match: (p) => p.startsWith("/cases/"), icon: "file-text", title: "案件详情", sub: "查看这一条内容的判定与处置" },
+  { match: (p) => p === "/release", icon: "check-circle", title: "合规签发", sub: "确认无误后正式放行" },
+  { match: (p) => p === "/takedown", icon: "shield-alert", title: "违规下架", sub: "已发布内容的召回与处置" },
+  { match: (p) => p === "/appeals", icon: "help-circle", title: "申诉复议", sub: "业务方对结论有异议时的复审" },
+  { match: (p) => p === "/reports", icon: "file-text", title: "合规报告", sub: "每一份判定与签发的书面留痕" },
+  { match: (p) => p.startsWith("/reports/"), icon: "file-text", title: "报告详情", sub: "判定依据与签发记录的完整视图" },
+  { match: (p) => p === "/taxonomy", icon: "layers", title: "规则词典", sub: "查一条规则管什么、依据是什么" },
+  { match: (p) => p === "/admin/grants", icon: "user-check", title: "授权治理", sub: "谁能审哪些品线、谁批的" },
+  { match: (p) => p === "/admin/sessions", icon: "history", title: "安全审计", sub: "登录与高风险动作的流水" },
+  { match: (p) => p === "/submit", icon: "plus", title: "提交送审", sub: "把一段内容送进审核流程" },
 ];
 
-function metaFor(pathname: string) {
+function metaFor(pathname: string): { icon: IconName; title: string; sub: string } {
   return (
     PAGE_META.find((m) => m.match(pathname)) ?? {
+      icon: "sparkles",
       title: "内容审核工作台",
       sub: "机器先判、人来复核",
     }
@@ -328,8 +329,13 @@ export default function AppShell() {
               a11y_check 的 h1-unique 在 15 条路由上全部报 count=2。
               外壳的标题是**路标**，不是文档标题，所以用 p + aria-labelledby 之外的语义。 */}
           <div className="shell__heading">
-            <p className="shell__title">{meta.title}</p>
-            <p className="shell__subtitle">{meta.sub}</p>
+            <span className="shell__title-icon" aria-hidden="true">
+              <Icon name={meta.icon} size={15} />
+            </span>
+            <div className="shell__heading-text">
+              <p className="shell__title">{meta.title}</p>
+              <p className="shell__subtitle">{meta.sub}</p>
+            </div>
           </div>
           <div className="shell__right">
             {current && current.product_lines.length > 0 && (

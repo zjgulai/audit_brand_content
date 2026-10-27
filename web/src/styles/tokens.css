@@ -32,32 +32,32 @@
 
 :root {
   /* ── 色阶（Radix Colors 原值，只在这里出现一次）────────────────────── */
-  /* sand：中性 */
-  --sand-1: #fdfdfc;
-  --sand-2: #f9f9f8;
-  --sand-3: #f1f0ef;
-  --sand-4: #e9e8e6;
-  --sand-5: #e2e1de;
-  --sand-6: #dad9d6;
-  --sand-7: #cfceca;
-  --sand-8: #bcbbb5;
-  --sand-9: #8d8d86;
-  --sand-10: #82827c;
-  --sand-11: #63635e;
-  --sand-12: #21201c;
+  /* sand：对齐 mkt.lute-tlz-dddd.top 暖杏仁米色阶（#F7F0EB 页面底 / #EDE6DF 边框 / #1D1D1F 墨色） */
+  --sand-1: #fbf8f5;
+  --sand-2: #f7f0eb;
+  --sand-3: #f5ede8;
+  --sand-4: #f3eee9;
+  --sand-5: #ede6df;
+  --sand-6: #e5ddd5;
+  --sand-7: #d8d0ca;
+  --sand-8: #b5afa8;
+  --sand-9: #857b73;
+  --sand-10: #7a6b6b;
+  --sand-11: #635d59;
+  --sand-12: #1d1d1f;
 
   /* brand：Momcozy 品牌酒红（logo 实测 #6A2B3A）。
      ★ 只用深色端承载文字与实心底；3/4 做 hover 底。
      ★ 不删 tomato：状态红（red-*)与品牌色必须可区分（A6 前提）。 */
-  --brandc-1: #fdfafa;
-  --brandc-2: #faf3f4;
-  --brandc-3: #f5e6e9;
-  --brandc-4: #eed9dd;
-  --brandc-6: #dfb9c0;
-  --brandc-8: #c98492;
-  --brandc-9: #a94159;
-  --brandc-11: #6a2b3a;
-  --brandc-12: #38121c;
+  --brandc-1: #fdfbfb;
+  --brandc-2: #fbf4f5;
+  --brandc-3: #f9eef0;
+  --brandc-4: #f2dce0;
+  --brandc-6: #e2b8c0;
+  --brandc-8: #c25b6e;
+  --brandc-9: #c25b6e;
+  --brandc-11: #a34759;
+  --brandc-12: #6a2b3a;
 
   /* tomato：过渡性品牌色（存量元素迁移中） */
   --tomato-1: #fffcfc;
@@ -199,9 +199,9 @@
 
   /* ── 圆角：只有两档，且嵌套同心 ───────────────────────────────────── */
   /* 面板 6px，面板内的控件 4px = 6 - 2（内边距 2px 时同心） */
-  --radius-panel: 8px;
-  --radius-control: 6px;
-  --radius-chip: 4px;   /* 徽标专用 */
+  --radius-panel: 14px;
+  --radius-control: 10px;
+  --radius-chip: 6px;   /* 徽标专用 */
 
   /* ── 字号：只有三档（委托方要求 ≤4，最好三种；最小 12px）──────────── */
   --text-sm: 12px;   /* 仅徽标 / 表头 / 时间戳三处，正文禁用 */

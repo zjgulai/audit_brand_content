@@ -107,27 +107,27 @@
 <!-- TOKENS:BEGIN -->
 | Token | Value | 用途说明 |
 | :--- | :--- | :--- |
-| `--sand-1` | #fdfdfc |  |
-| `--sand-2` | #f9f9f8 |  |
-| `--sand-3` | #f1f0ef |  |
-| `--sand-4` | #e9e8e6 |  |
-| `--sand-5` | #e2e1de |  |
-| `--sand-6` | #dad9d6 |  |
-| `--sand-7` | #cfceca |  |
-| `--sand-8` | #bcbbb5 |  |
-| `--sand-9` | #8d8d86 |  |
-| `--sand-10` | #82827c |  |
-| `--sand-11` | #63635e |  |
-| `--sand-12` | #21201c |  |
-| `--brandc-1` | #fdfafa | Momcozy 酒红 step 1 |
-| `--brandc-2` | #faf3f4 | step 2 |
-| `--brandc-3` | #f5e6e9 | step 3（淡底） |
-| `--brandc-4` | #eed9dd | step 4 |
-| `--brandc-6` | #dfb9c0 | step 6（细边框） |
-| `--brandc-8` | #c98492 | step 8（focus 环） |
-| `--brandc-9` | #a94159 | step 9（纯图形） |
-| `--brandc-11` | #6a2b3a | Momcozy 酒红 #6A2B3A（logo 主色） |
-| `--brandc-12` | #38121c | step 12（高对比） |
+| `--sand-1` | #fbf8f5 |  |
+| `--sand-2` | #f7f0eb |  |
+| `--sand-3` | #f5ede8 |  |
+| `--sand-4` | #f3eee9 |  |
+| `--sand-5` | #ede6df |  |
+| `--sand-6` | #e5ddd5 |  |
+| `--sand-7` | #d8d0ca |  |
+| `--sand-8` | #b5afa8 |  |
+| `--sand-9` | #857b73 |  |
+| `--sand-10` | #7a6b6b |  |
+| `--sand-11` | #635d59 |  |
+| `--sand-12` | #1d1d1f |  |
+| `--brandc-1` | #fdfbfb | Momcozy 玫瑰 step 1 |
+| `--brandc-2` | #fbf4f5 | step 2 |
+| `--brandc-3` | #f9eef0 | step 3（#F9EEF0 玫瑰淡底） |
+| `--brandc-4` | #f2dce0 | step 4 |
+| `--brandc-6` | #e2b8c0 | step 6（细边框） |
+| `--brandc-8` | #c25b6e | step 8（#C25B6E 焦点环） |
+| `--brandc-9` | #c25b6e | step 9（#C25B6E 图形主色） |
+| `--brandc-11` | #a34759 | Momcozy 玫瑰豆沙 #A34759（白字 5.83:1） |
+| `--brandc-12` | #6a2b3a | Momcozy 深酒红 #6A2B3A（高对比 10.4:1） |
 | `--tomato-1` | #fffcfc |  |
 | `--tomato-2` | #fff8f7 |  |
 | `--tomato-3` | #feebe7 |  |
@@ -188,23 +188,23 @@
 | `--blue-10` | #0588f0 |  |
 | `--blue-11` | #0d74ce |  |
 | `--blue-12` | #113264 |  |
-| `--bg` | var(--sand-2) | 应用背景（sand-2） |
-| `--surface` | #ffffff | 卡面（纯白） |
-| `--surface-muted` | var(--sand-3) | 次级面与分段底（sand-3） |
-| `--surface-hover` | var(--sand-4) | 组件 hover（sand-4） |
-| `--surface-active` | var(--sand-5) | 组件 active（sand-5） |
-| `--text` | var(--sand-12) | 主文字（sand-12） |
-| `--text-muted` | var(--sand-11) | 次要文字（sand-11） |
-| `--rule` | var(--sand-4) | 行内弱分隔（sand-4） |
-| `--border` | var(--sand-5) | 容器与面板外沿（sand-5） |
-| `--border-strong` | var(--sand-9) | 控件边框（sand-9，3.28:1） |
-| `--brand` | var(--brandc-11) | 品牌实心底（brandc-11 #6A2B3A） |
-| `--brand-hover` | var(--brandc-12) | 品牌 hover（brandc-12） |
-| `--brand-graphic` | var(--brandc-9) | 纯图形品牌色（brandc-9） |
-| `--brand-text` | var(--brandc-11) | 品牌文字（brandc-11） |
-| `--brand-text-on-surface` | var(--brandc-12) | 品牌淡底上的文字（brandc-12） |
-| `--brand-surface` | var(--brandc-3) | 品牌淡底（brandc-3） |
-| `--brand-ring` | var(--brandc-8) | 焦点环（brandc-8） |
+| `--bg` | var(--sand-2) | 全局暖杏仁米底（sand-2 #F7F0EB，对齐 mkt） |
+| `--surface` | #ffffff | 卡面（纯白 #FFFFFF） |
+| `--surface-muted` | var(--sand-3) | 次级暖米面（sand-3 #F5EDE8） |
+| `--surface-hover` | var(--sand-4) | 组件 hover（sand-4 #F3EEE9） |
+| `--surface-active` | var(--sand-5) | 组件 active（sand-5 #EDE6DF） |
+| `--text` | var(--sand-12) | 主文字（sand-12 #1D1D1F） |
+| `--text-muted` | var(--sand-11) | 次要文字（sand-11 #635D59） |
+| `--rule` | var(--sand-4) | 行内弱分隔（sand-4 #F3EEE9） |
+| `--border` | var(--sand-5) | 容器与面板外沿（sand-5 #EDE6DF） |
+| `--border-strong` | var(--sand-9) | 控件边框（sand-9 #857B73，≥3:1） |
+| `--brand` | var(--brandc-11) | 品牌实心底（brandc-11 #A34759，对齐 mkt 深玫瑰豆沙） |
+| `--brand-hover` | var(--brandc-12) | 品牌 hover（brandc-12 #6A2B3A） |
+| `--brand-graphic` | var(--brandc-9) | 纯图形品牌色（brandc-9 #C25B6E） |
+| `--brand-text` | var(--brandc-11) | 品牌文字（brandc-11 #A34759） |
+| `--brand-text-on-surface` | var(--brandc-12) | 品牌淡底上的文字（brandc-12 #6A2B3A） |
+| `--brand-surface` | var(--brandc-3) | 品牌玫瑰淡底（brandc-3 #F9EEF0） |
+| `--brand-ring` | var(--brandc-8) | 焦点环（brandc-8 #C25B6E） |
 | `--ok` | var(--green-11) | 通过实心底（green-11） |
 | `--ok-graphic` | var(--green-9) | 通过图形色（green-9） |
 | `--ok-text` | var(--green-11) | 通过文字（green-11） |
@@ -225,9 +225,9 @@
 | `--untested-surface` | var(--sand-3) | 未测淡底（sand-3） |
 | `--ring` | var(--brandc-8) | 焦点环（brandc-8） |
 | `--hairline` | 0.5px | 边框宽度 0.5px |
-| `--radius-panel` | 8px | 卡圆角 8px |
-| `--radius-control` | 6px | 控件圆角 6px |
-| `--radius-chip` | 4px | 徽标圆角 4px |
+| `--radius-panel` | 14px | 卡圆角 14px |
+| `--radius-control` | 10px | 控件圆角 10px |
+| `--radius-chip` | 6px | 徽标圆角 6px |
 | `--text-sm` | 12px | 12px，仅徽标/表头/时间戳 |
 | `--text-base` | 14px | 14px 正文 |
 | `--text-section` | 16px | 16px 区块与卡标题 |
