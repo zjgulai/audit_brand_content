@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import LoadingRows from "../components/LoadingRows";
 import { reviewApi, type ReportSummary } from "../api/client";
 import Icon from "../ui/icon";
 
@@ -62,7 +63,7 @@ export default function ReportsIndexPage() {
       </div>
 
       {rows === null ? (
-        <p className="hint">加载中…</p>
+        <LoadingRows rows={3} label="正在加载报告列表" />
       ) : rows.length === 0 ? (
         <div className="state">
           <p className="hint">暂无可查阅的静态报告存档。</p>

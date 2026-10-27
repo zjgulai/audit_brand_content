@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
+import LoadingRows from "../components/LoadingRows";
 import { ApiError, request } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import Button from "../ui/Button";
@@ -369,7 +370,7 @@ export default function AppealsPage() {
 
           <h2>申诉记录列表（共 {(rows ?? []).length} 条）</h2>
           {rows === null ? (
-            <p className="hint">加载中…</p>
+            <LoadingRows rows={4} label="正在加载申诉记录" />
           ) : rows.length === 0 ? (
             <div className="empty">
               <p className="empty__title">当前租户暂无申诉记录</p>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import LoadingRows from "../components/LoadingRows";
 import { ApiError, request } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import Button from "../ui/Button";
@@ -520,7 +521,7 @@ export default function TakedownPage() {
       )}
 
       {tasks === null ? (
-        <p className="hint">{error ? "无可读任务。" : "加载下线任务中…"}</p>
+        <LoadingRows rows={3} label="正在加载下线任务" />
       ) : tasks.length === 0 ? (
         <div className="empty">
           <p className="empty__title">当前租户没有待执行的下线任务</p>
@@ -553,14 +554,10 @@ export default function TakedownPage() {
                 </dd>
                 <dt>执行负责人</dt>
                 <dd className="font-data">{t.assignee ?? "未指派（默认投放侧）"}</dd>
-                <dt>任务年龄与积压</dt>
+                <dt>开单时长与提醒</dt>
                 <dd className="font-data" data-takedown-age="">
                   <Icon name="clock" size={11} /> {formatAgeDays(ageByTask.get(t.task_id))}
-                </dd>
-                <dt>提醒记录</dt>
-                <dd className="font-data">
-                  已提醒 {t.reminder_count ?? 0} 次
-                  {t.last_reminded_at ? `，上次 ${t.last_reminded_at}` : ""}
+                  ，已提醒 {t.reminder_count ?? 0} 次
                 </dd>
               </dl>
 

@@ -1029,7 +1029,7 @@ code {
   font-size: var(--text-section);
   font-weight: 600;
   color: var(--text);
-  margin: var(--space-5) 0 var(--space-3);
+  margin: var(--space-5) 0 var(--space-2);
   padding: 0;
 }
 
@@ -1351,8 +1351,8 @@ code {
   background: var(--surface);
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius-panel);
+  /* 卡内左右内距全站统一 --space-5：头部卡、表格卡、面板卡的标题与内容共享同一条左线 */
   padding: var(--space-4) var(--space-5);
-  margin-bottom: var(--space-4);
 }
 
 .cases-page__head h1 {
@@ -1387,9 +1387,7 @@ code {
 
 .cases-table-wrap {
   overflow-x: auto;
-  /* ★ 2026-10-23 全站视觉刷新：表格原来悬空在白底上，没有容器，
-     与队列页的卡片层完全不是一个产品。统一给面板容器。 */
-  border: var(--border-subtle);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
 }
@@ -1415,6 +1413,16 @@ code {
   text-align: left;
   padding: var(--space-3) var(--space-4);
   vertical-align: middle;
+}
+
+.cases-table thead th:first-child,
+.cases-table tbody td:first-child {
+  padding-left: var(--space-5);
+}
+
+.cases-table thead th:last-child,
+.cases-table tbody td:last-child {
+  padding-right: var(--space-5);
 }
 
 /* ★ 2026-10-26：案件编号与「处置层」这类**短标识**不许在词中折行。
@@ -1446,10 +1454,10 @@ code {
 /* 面板：任何「一段独立内容」的统一容器（2026-10-23 全站视觉刷新） */
 .panel {
   background: var(--surface);
-  border: var(--border-subtle);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 0.9rem 1rem;
-  margin-bottom: 0.9rem;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
   min-width: 0;
 }
 
@@ -2231,4 +2239,47 @@ code {
   margin: 0;
   font-size: var(--text-sm);
   color: var(--text-muted);
+}
+
+
+/* ── 全站统一加载骨架（LoadingRows 组件）────────────────────────────── */
+.loading-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.loading-rows__bar {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+  animation: loading-rows-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes loading-rows-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+
+/* ── 分类规范：待明确边界折叠面板（七轴卡回首屏）────────────────────── */
+.taxonomy-disputes {
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+}
+
+.taxonomy-disputes summary {
+  cursor: pointer;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.taxonomy-disputes .notrun {
+  margin-top: var(--space-3);
 }

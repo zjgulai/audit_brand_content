@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import LoadingRows from "../components/LoadingRows";
 import { FIVE_LABELS, reviewApi, type CaseSummary } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import StatusBadge from "../components/StatusBadge";
@@ -198,7 +199,7 @@ export default function CasesPage() {
       </div>
 
       {rows === null ? (
-        <p className="hint">加载中…</p>
+        <LoadingRows rows={4} label="正在加载案件列表" />
       ) : filtered.length === 0 ? (
         <div className="state">
           <p className="hint">当前筛选条件下没有匹配的案件。</p>

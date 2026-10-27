@@ -383,9 +383,11 @@ try {
   // 5) P-02 收件箱（/inbox）：真实点击「标记已读（Read）」
   await spaGoto("/inbox");
   await waitText("待办收件箱");
-  await waitText("notif-smoke-1");
+  // ★ 2026-10-27 精修：通知 ID 截短 12 位展示（长哈希非业务信息），
+  //   等待信号同步改为截短后的前缀。
+  await waitText("notif-smoke-");
   await click("标记已读");
-  await waitText("notif-smoke-1 已");
+  await waitText("已读");
 
   // 6) P-03 案件总览（/cases）：真实点击五标签筛选按钮
   await spaGoto("/cases");

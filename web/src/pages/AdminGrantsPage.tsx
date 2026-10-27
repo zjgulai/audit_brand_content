@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { ApiError, request } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
+import LoadingRows from "../components/LoadingRows";
 import Button from "../ui/Button";
 
 /**
@@ -304,7 +305,7 @@ export default function AdminGrantsPage() {
 
       <h2>当前授权台账列表</h2>
       {activeRows === null ? (
-        <p className="hint">{error ? "无可读数据。" : "加载中…"}</p>
+        <LoadingRows rows={4} label="正在加载授权台账" />
       ) : activeRows.length === 0 ? (
         <div className="state">
           <p className="hint">暂无授权记录。</p>
@@ -331,8 +332,7 @@ export default function AdminGrantsPage() {
                     {g.platform ? ` ${g.platform}` : ""}
                   </td>
                   <td className="font-data">
-                    P:{g.proposed_by ?? "-"} / E:{g.executed_by ?? "-"} / A:
-                    {g.approved_by ?? "-"}
+                    提案 {g.proposed_by ?? "-"}，执行 {g.executed_by ?? "-"}，审批 {g.approved_by ?? "-"}
                   </td>
                   <td>
                     <span className="badge badge--pending" data-status-badge="">

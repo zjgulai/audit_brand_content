@@ -251,11 +251,12 @@ export default function TaxonomyPage() {
           )}
 
           {disputes.length > 0 && (
-            <>
-              <h2>待明确边界条目（{disputes.length} 条）</h2>
+            <details className="taxonomy-disputes">
+              <summary>
+                待明确边界条目（{disputes.length} 条 underdetermined，点击展开）
+              </summary>
               <p className="hint">
-                以下条目处于规则边界修订中，涉及跨维度判定（标记为{" "}
-                <code>underdetermined</code>）。
+                以下条目处于规则边界修订中，涉及跨维度判定。
               </p>
               <ul className="notrun">
                 {disputes.map((d) => (
@@ -272,7 +273,7 @@ export default function TaxonomyPage() {
                   </li>
                 ))}
               </ul>
-            </>
+            </details>
           )}
 
           <h2>七轴卡片</h2>

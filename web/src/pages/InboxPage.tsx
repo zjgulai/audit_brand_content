@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import LoadingRows from "../components/LoadingRows";
 import {
   ApiError,
   request,
@@ -123,14 +124,11 @@ export default function InboxPage() {
       )}
 
       <h2>
-        <Icon name="bell" size={13} /> 工作台通知收件箱（
-        {notifications === null
-          ? "尚未读取"
-          : `${notifications.length} 条`}
-        ）
+        <Icon name="bell" size={13} /> 工作台通知收件箱
+        {notifications !== null && `（${notifications.length} 条）`}
       </h2>
       {notifications === null ? (
-        <p className="hint">{error ? "无可读通知。" : "加载通知中…"}</p>
+        <LoadingRows rows={3} label="正在加载通知" />
       ) : notifications.length === 0 ? (
         <div className="state">
           <p className="hint">当前主体暂无工作台内通知记录。</p>
@@ -141,7 +139,7 @@ export default function InboxPage() {
             <li key={n.notification_id} className="state">
               <div className="evidence__head">
                 <span className="font-data">
-                  <strong>{n.notification_id}</strong>
+                  <strong>{n.notification_id.slice(0, 12)}</strong>
                 </span>
                 <span className="badge badge--pending" data-status-badge="">
                   {n.type ?? "in_app"}
@@ -156,22 +154,26 @@ export default function InboxPage() {
                   {JSON.stringify(n.payload, null, 2)}
                 </pre>
               )}
-              <div className="actions__row">
-                <Button
-                  variant="secondary"
-                  disabled={n.unread === false}
-                  onClick={() => void handleNotifAction(n.notification_id, "read")}
-                >
-                  标记已读
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={Boolean(n.acked_at)}
-                  onClick={() => void handleNotifAction(n.notification_id, "ack")}
-                >
-                  确认知悉
-                </Button>
-              </div>
+              {(n.unread !== false || !n.acked_at) && (
+                <div className="actions__row">
+                  {n.unread !== false && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void handleNotifAction(n.notification_id, "read")}
+                    >
+                      标记已读
+                    </Button>
+                  )}
+                  {!n.acked_at && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => void handleNotifAction(n.notification_id, "ack")}
+                    >
+                      确认知悉
+                    </Button>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -185,7 +187,7 @@ export default function InboxPage() {
         以下内容需业务方自行评估确认，核对后可修改重提或进入案件补充说明。
       </p>
       {cases === null ? (
-        <p className="hint">{error ? "无可读案件。" : "加载案件中…"}</p>
+        <LoadingRows rows={2} label="正在加载案件" />
       ) : pendingSelfCases.length === 0 ? (
         <div className="empty">
           <p className="empty__title">当前没有处于「待自决」状态的案件</p>

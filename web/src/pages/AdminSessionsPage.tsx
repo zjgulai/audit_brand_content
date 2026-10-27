@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, request } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
+import LoadingRows from "../components/LoadingRows";
 
 /**
  * 会话与安全审计（P-12 · Wave E 落 SD-1…SD-18 与 C-103 / C-104 审计面板）。
@@ -79,7 +80,7 @@ export default function AdminSessionsPage() {
 
       <h2>在线会话记录</h2>
       {sessions === null ? (
-        <p className="hint">{error ? "当前身份或环境不展示在线会话表。" : "加载中…"}</p>
+        <LoadingRows rows={3} label="正在加载会话记录" />
       ) : sessions.length === 0 ? (
         <div className="state">
           <p className="hint">当前无在线会话记录。</p>

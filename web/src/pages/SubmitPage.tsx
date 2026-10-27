@@ -488,6 +488,9 @@ export default function SubmitPage() {
               填入示例文案并体验审查
             </Button>
           </div>
+          <p className="hint">
+            提交后自动生成审查案件，审计结果将直接显示在本页下方。
+          </p>
         </form>
       </div>
 

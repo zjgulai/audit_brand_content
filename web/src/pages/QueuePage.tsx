@@ -366,6 +366,9 @@ export default function QueuePage() {
             <p className="hint">
               选中后这里会展开原文、查出的问题和可做的处置。
             </p>
+            <Link to="/submit" className="btn">
+              <Icon name="sparkles" size={11} /> 打开审核工作台
+            </Link>
           </div>
         )}
       </div>

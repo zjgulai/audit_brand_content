@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
+import LoadingRows from "../components/LoadingRows";
 import {
   ApiError,
   appOrigin,
@@ -227,7 +228,7 @@ export default function ReleasePage() {
         )}
 
         {loading ? (
-          <p className="hint">加载待签发队列中…</p>
+          <LoadingRows rows={3} label="正在加载待签发队列" />
         ) : mergedList.length === 0 ? (
           <div className="state">
             <p className="hint">当前没有处于「待放行」状态的案件。</p>
@@ -275,8 +276,8 @@ export default function ReleasePage() {
                             data-status-badge=""
                           >
                             {isSelfSub
-                              ? "不可自签（本人提交）"
-                              : "不可自签（本人复核）"}
+                              ? "不可自签"
+                              : "不可自签"}
                           </span>
                         ) : (
                           <span
@@ -329,7 +330,7 @@ export default function ReleasePage() {
       )}
 
       {loading || !detail || !ir ? (
-        <p className="hint">加载签发核验数据中…</p>
+        <LoadingRows rows={2} rowHeight={28} label="正在加载签发核验数据" />
       ) : (
         <div className="case__workspace">
           {/* 左栏：四前置就绪度 + 18 项签名绑定清单（SB-1…SB-11） */}
