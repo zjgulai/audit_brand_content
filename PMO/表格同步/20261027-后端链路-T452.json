@@ -1,0 +1,21 @@
+[
+ {
+  "事项名称": "T-452 图片进件的 env 入口：能打开了，但引擎仍不接，且这件事有人能看见",
+  "关联执行票": "T-452",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "改前 MEDIA_INGEST_ENABLED 是模块常量、无 env 入口，运维配了 REVIEW_MEDIA_ROOTS 也永远打不开图片进件——能力建成却焊死，盘上没有任何东西会说这件事。★ 执行前查清一件改变写法的事：DEFAULT_OCR_ENGINE 仍是 host_vision（macOS 专用），容器引擎 rapidocr_ppocr_v6 只是注册、没接线；而 ocr_file() 失败时不抛异常只返回 ok=False，_build_image_unit 已把失败落成 parse_status=failed。所以「打开开关」的真实后果不是崩溃，而是**每张图都落 failed**——开了个什么都审不了的入口。委托方裁定：只补 env 入口，不开引擎。改法：REVIEW_MEDIA_INGEST 读环境变量（默认仍 False），只认 1/true，胡话必须报错不许静默当关；新增 media_ingest_readiness() 在开关开了但引擎仍是 host_vision 时点名；生产装配构造期落 media_ingest_ready / note，**不 raise**（配错一个开关不该让全站起不来）。",
+  "验收标准": "verify_media_ingest 42/42（H 组 7 项全新）：H2 不设变量→关（反向对照）· H3 ★★ 设 =1 → 真的打开（改之前这条路根本不存在）· H4 打开后 supported_source_kinds_now() 含 image · H5 ★★★ 打开但引擎 host_vision → readiness 点名（不许静默）· H6 关着时 readiness 通过（不误报）· H7 只配根目录不设开关 → 仍是不收图。A7 ★★ =yes 这种胡话必须报错并点名变量，不许静默当关。生产装配 M1/M2/M3。",
+  "状态依据": "两个真变异各红一次：① 让 env 入口永远返回 False（= 改回硬编码）→ H3/H4/H5 全红；② 让 readiness 永远返回 ok → H5 + M1 红。读数：media_ingest 42/42（原 31）· media_selection 全过 · media_portability 全过 · production_app 85/85（原 82）· submission_pipeline 43/43 · submission_router 43/43 · coverage 679（--controls）。★ 两个真正受影响的检查器都没坏——因为引擎没开、SUPPORTED_SOURCE_KINDS 没动，这正是只做 env 入口的收益：把「配置通路」与「能力上线」拆开。★ 自证本身也跟着改了：原 _with_flag 直接改模块常量，开关改读 env 后继续那样写会测不到真正的开关（改常量、生产读 env，两边不同源），现在改 os.environ 与生产同路。提交 7857ef1。",
+  "下一步行动": "接引擎是 T-118-follow（要装 rapidocr + 权重，且会让行 118 从空真翻成真违规）"
+ }
+]
