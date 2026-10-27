@@ -240,6 +240,12 @@ class ProductionSettings:
     #:   authority_root 旁边）。把它塞进 `path_names` 会让「素材目录与数据目录
     #:   同处一个父目录」变成构造期失败，而那是一个完全正常的部署。
     media_roots: tuple[str, ...] = ()
+    #: T-452：媒体进件「开关与引擎是否配套」的构造期读数。
+    #: ★ 只在 `__post_init__` 里写，**不参与任何校验**（不 raise）——
+    #:   配错一个开关不该把「全站起不来」当代价。
+    #: ★ 必须声明成正式字段：这是 `slots` 类，动态 setattr 新名字会 TypeError。
+    media_ingest_ready: bool = True
+    media_ingest_readiness_note: str = ""
 
     def __post_init__(self):
         # ★ `report_root` 必须在这里，不能只加一个字段。
@@ -310,6 +316,20 @@ class ProductionSettings:
                 raise SettingsError("media_roots[%d]_duplicate" % index)
             roots.append(path)
         object.__setattr__(self, "media_roots", tuple(str(p) for p in roots))
+        # ★ T-452：开关与引擎是否配套。**这里只记读数、不 raise** ——
+        #   配了开关但引擎没接不该让整个服务起不来（那会让「配错一个开关」
+        #   升级成「全站不可用」，代价与收益不成比例）。
+        #   但必须**在启动时就落一条可指认的读数**，由 /readyz 或日志带出去，
+        #   否则运维会以为「开关开了 = 图片能审了」。
+        #   ★ 为什么要读真实环境而不是 self 上的字段：开关是**运行时**读的
+        #     （`ingest_media_enabled()` 每次现读），构造期快照会与它不同源。
+        try:
+            from base.submission_service import media_ingest_readiness
+            ok, why = media_ingest_readiness()
+        except Exception as exc:  # noqa: BLE001
+            ok, why = False, "readiness 检查本身失败：%s" % (type(exc).__name__,)
+        object.__setattr__(self, "media_ingest_ready", ok)
+        object.__setattr__(self, "media_ingest_readiness_note", why)
 
     @staticmethod
     def from_env(env=None):

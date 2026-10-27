@@ -1565,6 +1565,38 @@ def main():
                 "step_up_single_use", "step_up_token_hashed",
                 "session_generation_verified")),
                 "C23c live OAuth evidence 不止登录，含 reauth/step-up/generation")
+
+            # ── M 组（T-452）：媒体进件开关的配置通路 ──────────────
+            # ★ 判据要点：开关能通过环境变量打开（改之前是硬编码，永远打不开），
+            #   而「开了但引擎没接」必须在构造期留下可指认的读数。
+            # ★ 这里必须用一份**合法**配置（上面那份故意让两个 DB 同路径，
+            #   用来触发 data_paths_must_be_distinct —— 拿它建 settings 会抛）。
+            ok_cfg = dict(common)
+            ok_cfg["REVIEW_PROJECTION_DB"] = str(env_root / "projection.db")
+            ok_cfg["REVIEW_API_SESSION_DB"] = str(env_root / "session.db")
+            _saved = os.environ.get("REVIEW_MEDIA_INGEST")
+            try:
+                os.environ["REVIEW_MEDIA_INGEST"] = "1"
+                s2 = ProductionSettings.from_env(ok_cfg)
+                report(s2.media_ingest_ready is False
+                       and "host_vision" in s2.media_ingest_readiness_note,
+                       "M1 ★★★ 开关开了但引擎仍是 host_vision → 构造期留下可指认读数",
+                       "%r / %r" % (s2.media_ingest_ready,
+                                    s2.media_ingest_readiness_note[:48]))
+                # ★★★ 但不许 raise —— 配错一个开关不该让全站起不来
+                report(True, "M2 ★★ 配错开关不阻断启动（只记读数，不 raise）")
+                os.environ.pop("REVIEW_MEDIA_INGEST", None)
+                s3 = ProductionSettings.from_env(ok_cfg)
+                report(s3.media_ingest_ready is True
+                       and s3.media_ingest_readiness_note == "",
+                       "M3 ★★ 反向对照：没开开关时 readiness 通过、note 为空",
+                       "%r / %r" % (s3.media_ingest_ready,
+                                    s3.media_ingest_readiness_note[:40]))
+            finally:
+                if _saved is None:
+                    os.environ.pop("REVIEW_MEDIA_INGEST", None)
+                else:
+                    os.environ["REVIEW_MEDIA_INGEST"] = _saved
         finally:
             shutil.rmtree(env_root, ignore_errors=True)
 

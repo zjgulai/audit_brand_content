@@ -487,7 +487,7 @@
     },
     {
       "verifier": "tools/verify_media_ingest.py",
-      "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow）",
+      "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow） · ★ T-452（2026-10-27）：开关改读环境变量 REVIEW_MEDIA_INGEST（默认关；只认 1/true/0/false，胡话必须报错而不是静默当关）· H 组 7 项：不设变量→关 / 设 1→真打开 / 打开后 supported 含 image / **开关开了但引擎仍是 host_vision → readiness 点名（不许静默）** / 关着时不误报",
       "subjects": [
         "base/submission_service.py"
       ]
@@ -627,7 +627,7 @@
     },
     {
       "verifier": "tools/verify_production_app.py",
-      "asserts": "生产装配：fake OAuth/reauth、持久复核、CSRF/Origin、freshness/RYW、动态 ACL、health/readiness、重启、writer lease 与故障注入；TS-29/行132：两库独立文件 + 各自 journal_mode 实测为 wal + 清理口径显式声明（无策略须写明「无自动清理」）+ 删库+坏头部+关连接后 session 不可用而权威/业务投影读回真实那条",
+      "asserts": "生产装配：fake OAuth/reauth、持久复核、CSRF/Origin、freshness/RYW、动态 ACL、health/readiness、重启、writer lease 与故障注入；TS-29/行132：两库独立文件 + 各自 journal_mode 实测为 wal + 清理口径显式声明（无策略须写明「无自动清理」）+ 删库+坏头部+关连接后 session 不可用而权威/业务投影读回真实那条 · ★ T-452 M 组：构造期落下 media_ingest_ready / media_ingest_readiness_note，开关开了但引擎未接时 note 点名 host_vision，且**不阻断启动**",
       "subjects": [
         "api/production_app.py",
         "api/oauth.py",

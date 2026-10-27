@@ -116,53 +116,143 @@ def _expect_reject(fn, *a, **kw):
 
 
 def _with_flag(value):
-    """临时改开关；用 try/finally 复原，避免把后面所有用例带歪。"""
+    """临时改开关；用 try/finally 复原，避免把后面所有用例带歪。
+
+    ★ T-452：开关从「模块常量」改成**环境变量**之后，这里也必须跟着改 ——
+      原先直接给 `S.MEDIA_INGEST_ENABLED` 赋值，而今那个名字不是一个可赋值的判据，
+      继续这么写会**测不到真正的开关**（改了常量、生产读 env，两边不同源）。
+      所以现在改的是 `os.environ`，与生产走同一条路。
+      `None` 表示「不设这个变量」（回到默认关）。
+    """
     class _Flag:
         def __enter__(self):
-            self.old = S.MEDIA_INGEST_ENABLED
-            S.MEDIA_INGEST_ENABLED = value
+            self.had = S.MEDIA_INGEST_ENV in os.environ
+            self.old = os.environ.get(S.MEDIA_INGEST_ENV)
+            if value is None:
+                os.environ.pop(S.MEDIA_INGEST_ENV, None)
+            else:
+                os.environ[S.MEDIA_INGEST_ENV] = value
             return self
 
         def __exit__(self, *exc):
-            S.MEDIA_INGEST_ENABLED = self.old
+            if self.had and self.old is not None:
+                os.environ[S.MEDIA_INGEST_ENV] = self.old
+            else:
+                os.environ.pop(S.MEDIA_INGEST_ENV, None)
             return False
     return _Flag()
 
 
 def check_gate_defaults():
     """A 组：开关的语义。"""
-    report(S.MEDIA_INGEST_ENABLED is False,
-           "A1 开关默认关（MEDIA_INGEST_ENABLED is False）",
-           repr(S.MEDIA_INGEST_ENABLED))
+    # ★ T-452：开关从模块常量改成环境变量，A1 也跟着改 ——
+    #   它现在验的是「**不设变量时**是关」，而不是「那个常量是 False」。
+    with _with_flag(None):
+        report(S.ingest_media_enabled() is False,
+               "A1 不设 REVIEW_MEDIA_INGEST 时开关为关（默认安全不变）",
+               repr(S.ingest_media_enabled()))
     report(S.ingest_media_enabled() is False,
-           "A2 未打开时 ingest_media_enabled() 为 False（判据读一处）")
+           "A2 当前真实环境下 ingest_media_enabled() 为 False（判据读一处）")
     report("image" not in S.SUPPORTED_SOURCE_KINDS,
            "A3 ★ SUPPORTED_SOURCE_KINDS 不含 image（ADR-0018 §6.2 的静态那一半）",
            repr(sorted(S.SUPPORTED_SOURCE_KINDS)))
     report(S.MEDIA_SOURCE_KINDS == frozenset({"image"}),
            "A4 媒体载体集合今天只有 image（视频要 T-435 抽帧，不提前收）",
            repr(sorted(S.MEDIA_SOURCE_KINDS)))
-    # ★ 反例：字符串真值不算打开。用真值判的写法会让 "false"/"0"/1 都算开。
+    # ★ 反例：只有明确的真值才算打开。
+    #   T-452 之前开关是模块常量，A5/A6 验的是「字符串真值不算打开」。
+    #   现在它读环境变量，语义变了：**环境变量里只有字符串**，所以那条判据不再成立。
+    #   换成新语义下真正要紧的三条：假值明确关、真值明确开、**胡话必须报错而不是静默当关**。
     with _with_flag("false"):
         report(S.ingest_media_enabled() is False,
-               "A5 ★ 字符串 'false' 不许算打开（用 is True 判，不用真值判）")
-    with _with_flag(1):
-        report(S.ingest_media_enabled() is False,
-               "A6 ★ 整数 1 不许算打开（同上）")
-    with _with_flag(True):
+               "A5 ★ 'false' → 关（运维写 false 就必须真是关的）")
+    with _with_flag("0"):
+        report(S.ingest_media_enabled() is False, "A5b '0' → 关")
+    with _with_flag(""):
+        report(S.ingest_media_enabled() is False, "A5c 空串 → 关（不是「配了就开」）")
+    with _with_flag("1"):
         report(S.ingest_media_enabled() is True,
-               "A7 显式 True → 算打开（否则开关是砖头，永远开不了）")
+               "A6 显式 '1' → 算打开（否则开关是砖头，永远开不了）")
+    with _with_flag("TRUE"):
+        report(S.ingest_media_enabled() is True, "A6b 'TRUE' 不分大小写 → 开")
+    # ★★ 这一条是本组最要紧的：胡话不许静默当关。
+    #   「配了但没生效」与「没配」长得一样，正是 §2.4.1 那个形状。
+    with _with_flag("yes"):
+        try:
+            S.ingest_media_enabled()
+            report(False, "A7 ★★ 'yes' 这种胡话必须报错，不许静默当关（实际没报）")
+        except S.MediaIngestConfigError as exc:
+            report("REVIEW_MEDIA_INGEST" in str(exc),
+                   "A7 ★★ 'yes' 这种胡话必须报错并点名变量（不许静默当关）",
+                   str(exc)[:70])
+    # ★ 反向对照：合法的两个值不许报错（否则上面那条恒真——一个永远报错的实现也能过）
+    with _with_flag("1"):
+        try:
+            S.ingest_media_enabled()
+            report(True, "A8 ★ 反向对照：合法值 '1' 不许报错")
+        except S.MediaIngestConfigError as exc:
+            report(False, "A8 ★ 反向对照：合法值 '1' 不许报错", str(exc))
+
+
+def check_env_entry():
+    """H 组（T-452）：开关的**配置通路**与其配套判据。
+
+    ★ 为什么单独一组：A 组验的是「值怎么解读」，这组验的是
+      「运维真的能通过环境变量打开它」以及「打开了但引擎没接时，有没有东西说这件事」。
+      两件事分开，是因为**前者今天才刚有**（改之前是硬编码），
+      而后者是这次决定「不kai引擎」时唯一的安全网。
+    """
+    # H1 环境变量名要对得上（改了名字运维的配置就静默失效）
+    report(S.MEDIA_INGEST_ENV == "REVIEW_MEDIA_INGEST",
+           "H1 环境变量名是 REVIEW_MEDIA_INGEST", repr(S.MEDIA_INGEST_ENV))
+
+    # H2 ★ 默认关（反向对照：不设变量时不许是开的）
+    with _with_flag(None):
+        report(S.ingest_media_enabled() is False,
+               "H2 ★ 不设变量 → 关（默认安全不变）")
+
+    # H3 ★★ 设成 1 → 真的打开（这是 T-452 补的那条路，改之前它永远打不开）
+    with _with_flag("1"):
+        report(S.ingest_media_enabled() is True,
+               "H3 ★★ 设 REVIEW_MEDIA_INGEST=1 → 真的打开（改之前这条路不存在）")
+        report("image" in S.supported_source_kinds_now(),
+               "H4 ★ 打开后 supported_source_kinds_now() 含 image",
+               repr(sorted(S.supported_source_kinds_now())))
+
+    # H5 ★★★ 打开但引擎没接 → readiness 必须说清，不许让运维以为图片能审了
+    with _with_flag("1"):
+        ok, why = S.media_ingest_readiness()
+        import base.media as MEDIA
+        if MEDIA.DEFAULT_OCR_ENGINE == "host_vision":
+            report(ok is False and "host_vision" in why,
+                   "H5 ★★★ 开关开了但引擎仍是 host_vision → readiness 点名（不许静默）",
+                   "%r / %r" % (ok, why[:60]))
+        else:
+            report(ok is True, "H5 引擎已接线 → readiness 通过（本机已是新引擎）",
+                   "%r / %r" % (ok, why[:60]))
+
+    # H6 关着时 readiness 必须通过（否则「没开」会被读成「配错了」）
+    with _with_flag("0"):
+        ok, why = S.media_ingest_readiness()
+        report(ok is True and why == "", "H6 ★ 关着时 readiness 通过（不误报）",
+               "%r / %r" % (ok, why[:60]))
+
+    # H7 ★★ 反向对照：设了根目录但开关是关的 → 行为仍是「不收图」，
+    #    但**必须有人能看见这件事**（readiness 通过 ≠ 根目录白配了）
+    with _with_flag(None):
+        report(S.ingest_media_enabled() is False,
+               "H7 ★★ 只配根目录、不设开关 → 仍是不收图（根目录不会自己打开开关）")
 
 
 def check_two_readings():
     """B 组：两个读数不许混用。"""
-    with _with_flag(False):
+    with _with_flag('0'):
         now = S.supported_source_kinds_now()
         report("image" not in now,
                "B1 关时不接受 image", repr(sorted(now)))
         report(now == S.SUPPORTED_SOURCE_KINDS,
                "B2 关时「此刻」与「声明」相等（关闭状态两者不该分叉）")
-    with _with_flag(True):
+    with _with_flag('1'):
         now = S.supported_source_kinds_now()
         report(now == S.SUPPORTED_SOURCE_KINDS | S.MEDIA_SOURCE_KINDS,
                "B3 ★ 开时「此刻」= 声明 ∪ 媒体载体", repr(sorted(now)))
@@ -174,14 +264,14 @@ def check_two_readings():
 def check_gate_blocks(image_path):
     """C 组：开关关时挡在哪一道门 —— 必须点名是媒体那道，不是别的。"""
     ing = S.SubmissionIngestor(media_roots=[str(image_path.parent)])
-    with _with_flag(False):
+    with _with_flag('0'):
         code = _expect_reject(ing.prepare, _submission(image_path),
                               principal=PRINCIPAL)
     report(code == "media_ingest_disabled",
            "C1 ★ 开关关 → media_ingest_disabled（不是 unsupported_source_kind）",
            repr(code))
     # ★ 反向：别的载体被挡时**不许**借用媒体那个码，否则两者分不开
-    with _with_flag(False):
+    with _with_flag('0'):
         code2 = _expect_reject(
             ing.prepare,
             _submission(image_path, source={"kind": "video", "uri": "x"}),
@@ -189,7 +279,7 @@ def check_gate_blocks(image_path):
     report(code2 != "media_ingest_disabled",
            "C2 ★ video 被挡不许用媒体的码（它连能力都还没有）", repr(code2))
     # 媒体门开着时，文本链路不许受影响
-    with _with_flag(True):
+    with _with_flag('1'):
         code3 = _expect_reject(
             ing.prepare,
             _submission(image_path, content_type="文本",
@@ -203,7 +293,7 @@ def check_gate_blocks(image_path):
 def check_real_image(image_path):
     """D 组：真跑一张图。"""
     ing = S.SubmissionIngestor(media_roots=[str(image_path.parent)])
-    with _with_flag(True):
+    with _with_flag('1'):
         try:
             unit = ing._build_unit(_submission(image_path),
                                    product_line="momcozy", uri="submission:s1")
@@ -226,7 +316,7 @@ def check_real_image(image_path):
     report(C.validate(unit) == [],
            "D6 产出的 unit 过 contract.validate", repr(C.validate(unit)[:3]))
     # ★ 端到端形状：把 switch 打开后走 prepare，案件真的建出来
-    with _with_flag(True):
+    with _with_flag('1'):
         got = _expect_reject(ing.prepare, _submission(image_path),
                              principal=PRINCIPAL)
     report(got != "media_ingest_disabled" and got != "image_ingest_failed",
@@ -238,7 +328,7 @@ def check_path_constraints(image_path):
     """E 组：路径约束 —— 不能让这个端点变成任意文件的读取器。"""
     root = image_path.parent
     ing = S.SubmissionIngestor(media_roots=[str(root)])
-    with _with_flag(True):
+    with _with_flag('1'):
         code = _expect_reject(
             ing._build_unit,
             _submission(image_path, source={"kind": "image", "uri": "/etc/hosts"}),
@@ -282,7 +372,7 @@ def check_failure_not_fake():
         bad = Path(td) / "not-an-image.png"
         bad.write_bytes(b"this is definitely not a png")
         ing = S.SubmissionIngestor(media_roots=[td])
-        with _with_flag(True):
+        with _with_flag('1'):
             try:
                 unit = ing._build_unit(_submission(bad), product_line="p", uri="u")
             except S.SubmissionRejected as exc:
@@ -521,6 +611,7 @@ def main(argv):
     print("T-431 · 图片进件（能力建成 · 生产路径未打开）")
     print("=" * 78)
     check_gate_defaults()
+    check_env_entry()
     check_two_readings()
     if image_path is None:
         untested("盘上没有 ok 状态的真实位图 —— C/D/E 组无对象")

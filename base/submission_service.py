@@ -26,6 +26,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 
 from base import contract as C
 from base import submission_router as SR
@@ -54,10 +55,47 @@ SUPPORTED_SOURCE_KINDS = frozenset({"free_text", "ad_text"})
 # 只换引擎不开开关 → 那三个宿主文件白删（`verify_media_selection` S7 会红）。
 # ──────────────────────────────────────────────────────────────────────────────
 
-#: 生产进件是否接受 image。**默认 False**，且只有显式 `True` 才算打开。
-#: ★ 用 `is True` 判，不用真值判：`"false"` / `"0"` / `1` 这些从环境变量读来的
-#:   字符串都是真值 —— 用真值判等于「配了字符串就打开了」，而运维会以为写 false 是关的。
-MEDIA_INGEST_ENABLED = False
+#: 生产进件是否接受 image。**默认 False**，只有显式打开才算。
+#:
+#: ★ T-452（2026-10-27）：从「模块常量」改成**读环境变量 `REVIEW_MEDIA_INGEST`**。
+#:   改之前它是一行硬编码，运维配了 `REVIEW_MEDIA_ROOTS` 也永远打不开 ——
+#:   能力建成、入口却焊死，而盘上没有任何东西会说这件事。
+#:
+#: ★ 取值只认 `"1"` / `"true"`（不分大小写），其余一律当关。
+#:   用真值判会出事：`"false"` `/` `"0"` 这些字符串在 Python 里都是真值，
+#:   于是「运维写了 false」反而打开了 —— 而那是最该避免的方向。
+MEDIA_INGEST_ENV = "REVIEW_MEDIA_INGEST"
+
+#: 环境变量缺省时用的值。**保持 False**：默认安全不变。
+MEDIA_INGEST_ENABLED_DEFAULT = False
+
+
+def _env_media_ingest(env=None):
+    """读 `REVIEW_MEDIA_INGEST`。返回值只有 True / False 两种。"""
+    raw = (os.environ if env is None else env).get(MEDIA_INGEST_ENV)
+    if raw is None:
+        return MEDIA_INGEST_ENABLED_DEFAULT
+    text = str(raw).strip().lower()
+    if text in ("1", "true"):
+        return True
+    if text in ("", "0", "false"):
+        return False
+    # ★ 胡话（`yes` / `on` / `是` / `2`）**不许**静默当成 False。
+    #   静默当关会让「配了但没生效」与「没配」长得一样 —— 那正是 §2.4.1 的形状。
+    raise MediaIngestConfigError(
+        "%s=%r 不是可识别的开关值（只接受 1/true/0/false）"
+        % (MEDIA_INGEST_ENV, raw))
+
+
+class MediaIngestConfigError(ValueError):
+    """媒体进件开关配错了。启动时就该炸，不许带着坏配置跑起来。"""
+
+
+#: 兼容旧引用：模块级常量改成**函数**（同一个名字不再是一个固定的值）。
+#: ★ 保留这个名字是因为有 4 处 `from ... import MEDIA_INGEST_ENABLED` 与
+#:   `MEDIA_INGEST_ENABLED is True` 的写法；改成函数会静默把所有调用点变成
+#:   「函数对象 is True」→ 恒 False。所以这里不保留同名对象，而是**逐个改调用点**，
+#:   改完删掉旧常量。见下方 `ingest_media_enabled()` —— 它才是唯一判据。
 
 #: 打开后允许的媒体载体种类。今天只有 image（视频要 T-435 的抽帧，
 #: 没有抽帧就收视频等于收一个「审过了」的空壳）。
@@ -69,9 +107,38 @@ _SOURCE_KIND_CONTENT_TYPE = {"free_text": "文本", "ad_text": "文本", "image"
 DECISION_LABELS = ("PASS", "待自决", "REVIEW", "BLOCK", "未审查")
 
 
-def ingest_media_enabled():
-    """媒体进件此刻是否打开。**唯一判据**，读一个地方。"""
-    return MEDIA_INGEST_ENABLED is True
+def ingest_media_enabled(env=None):
+    """媒体进件此刻是否打开。**唯一判据**，读一个地方。
+
+    ★ `env` 只为自证注入用（默认读真实环境）。★ 不设「模块级可改写开关」——
+      那种写法下，生产读 env、自证改常量、两边判据不同源，就会出现
+      「自证测过的开关」与「生产真正读的开关」是两个东西（§2.4.8）。
+    """
+    return _env_media_ingest(env)
+
+
+def media_ingest_readiness(env=None):
+    """开关与引擎是否**配套**。返回 (ok, reason)。
+
+    ★ T-452 的核心判据，也是这一票**没有直接打开开关**的原因：
+      `DEFAULT_OCR_ENGINE` 仍是 `host_vision`（macOS 专用），容器引擎
+      `rapidocr_ppocr_v6` 只是**注册**、没接线。此时把进件开关打开，
+      每张图都会落 `parse_status=failed` —— 不崩，但等于开了个什么都审不了的入口。
+
+      所以这里把「开关开了但引擎没接」做成一个**可指认**的状态：
+      运维看到 reason，就知道该去接引擎（T-118-follow），而不是以为图片能审了。
+    """
+    from base import media as MEDIA
+
+    if not ingest_media_enabled(env):
+        return True, ""
+    engine = getattr(MEDIA, "DEFAULT_OCR_ENGINE", None)
+    if engine == "host_vision":
+        return False, (
+            "进了图片进件开关（%s），但 OCR 引擎仍是 host_vision（macOS 专用）。"
+            "在生产容器里每张图都会落 parse_status=failed。"
+            "接引擎是 T-118-follow，本票不打开它。" % MEDIA_INGEST_ENV)
+    return True, ""
 
 
 def supported_source_kinds_now():
@@ -164,8 +231,10 @@ class SubmissionIngestor:
                 raise SubmissionRejected(
                     "media_ingest_disabled", 422,
                     "source.kind=%r 的进件能力已建成，但生产路径未打开"
-                    "（MEDIA_INGEST_ENABLED=False）。打开它必须与行 118 的"
-                    "容器内引擎同时做（ADR-0018 §6.2 / T-118-follow）。" % (kind,))
+                    "（%s 未设或为假）。打开它必须与容器内 OCR 引擎同时做"
+                    "（ADR-0018 §6.2 / T-118-follow）—— 只开开关不给引擎，"
+                    "每张图都会落 parse_status=failed。"
+                    % (kind, MEDIA_INGEST_ENV))
             raise SubmissionRejected(
                 "unsupported_source_kind", 422,
                 "本轮只接 %s，收到 %r" % (sorted(allowed), kind))
