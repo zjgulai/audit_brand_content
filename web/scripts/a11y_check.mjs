@@ -641,6 +641,20 @@ async function runStandaloneSuite(cdp) {
                 <dd><span class="badge badge--partial">partial</span> <strong>仅已覆盖部分可判</strong></dd>
                 <dt>依据核验</dt>
                 <dd><span class="badge badge--untested">未测</span></dd>
+                <!-- ★ 2026-10-27（ADR-0021 · a11y）：补上三个**从未被测过**的徽标。
+                    改前模板里只有 review / partial / untested / sample 四种，
+                    而 styles.css 里有 10 种。于是 badge--pass（实测 4.21）、
+                    badge--pending（4.25）、badge--block 这些
+                    **一直不达标却从来不会红** —— 一个不覆盖它的检查器
+                    比没有更糟：它让人以为「徽标对比度已经查过了」。
+                    实测：修 token 前 pass=4.21 / pending=4.25 / review=4.25，
+                    三个都低于 4.5，而闸门只报了 review 一个。 -->
+                <dt>通过态</dt>
+                <dd><span class="badge badge--pass">PASS</span></dd>
+                <dt>待定态</dt>
+                <dd><span class="badge badge--pending">待自决</span></dd>
+                <dt>拦截态</dt>
+                <dd><span class="badge badge--block">BLOCK</span></dd>
               </dl>
               <div class="actions">
                 <h2>复核动作</h2>

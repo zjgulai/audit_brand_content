@@ -166,12 +166,19 @@
   /* 语义状态：每个都成对给出「实心 / 文字 / 淡底」三档 */
   --ok: var(--green-11);        /* 带文字的实心底（白字 ≥4.5） */
   --ok-graphic: var(--green-9); /* 纯图形 */
-  --ok-text: var(--green-11);
+  /* ★ 2026-10-27（ADR-0021 · a11y）：`--ok-text` 从 green-11 改 green-12。
+     green-11 (#218358) 配 green-3 (#e6f6eb) 实测对比度 **4.21 < 4.5**，
+     不达 WCAG AA。这是既有缺陷，不是本次改动引入的。
+     同一处修掉的还有 warn-text 与 info-text（下面两个），
+     三者是同一个病：**Radix 的 -11 是「配白底的正文色」，配淡底（-3）不够**。 */
+  --ok-text: var(--green-12);
   --ok-surface: var(--green-3);
 
   --warn: var(--amber-11);
   --warn-graphic: var(--amber-9);
-  --warn-text: var(--amber-11);
+  /* ★ amber-11 (#ab6400) 配 amber-3 (#fff7c2) 实测 **4.25 < 4.5**。
+     这条曾经让 a11y 双闸的机器半边红着（badge--review / badge--partial）。 */
+  --warn-text: var(--amber-12);
   --warn-surface: var(--amber-3);
 
   --bad: var(--red-11);
@@ -181,7 +188,8 @@
 
   --info: var(--blue-11);
   --info-graphic: var(--blue-9);
-  --info-text: var(--blue-11);
+  /* ★ blue-11 (#0d74ce) 配 blue-3 (#e6f4fe) 实测 **4.25 < 4.5**。 */
+  --info-text: var(--blue-12);
   --info-surface: var(--blue-3);
 
   --untested-text: var(--sand-11);

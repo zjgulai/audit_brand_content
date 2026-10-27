@@ -207,11 +207,11 @@
 | `--brand-ring` | var(--brandc-8) | 焦点环（brandc-8 #C25B6E） |
 | `--ok` | var(--green-11) | 通过实心底（green-11） |
 | `--ok-graphic` | var(--green-9) | 通过图形色（green-9） |
-| `--ok-text` | var(--green-11) | 通过文字（green-11） |
+| `--ok-text` | var(--green-12) | 通过文字（green-12，**配 green-3 淡底 11.00:1**；green-11 只有 4.21 不达 AA） |
 | `--ok-surface` | var(--green-3) | 通过淡底（green-3） |
 | `--warn` | var(--amber-11) | 待复核实心底（amber-11） |
 | `--warn-graphic` | var(--amber-9) | 待复核图形色（amber-9） |
-| `--warn-text` | var(--amber-11) | 待复核文字（amber-11） |
+| `--warn-text` | var(--amber-12) | 待复核文字（amber-12，**配 amber-3 淡底 10.47:1**；amber-11 只有 4.25 不达 AA） |
 | `--warn-surface` | var(--amber-3) | 待复核淡底（amber-3） |
 | `--bad` | var(--red-11) | 拦截实心底（red-11） |
 | `--bad-graphic` | var(--red-9) | 拦截图形色（red-9） |
@@ -219,7 +219,7 @@
 | `--bad-surface` | var(--red-3) | 拦截淡底（red-3） |
 | `--info` | var(--blue-11) | 待检测实心底（blue-11） |
 | `--info-graphic` | var(--blue-9) | 待检测图形色（blue-9） |
-| `--info-text` | var(--blue-11) | 待检测文字（blue-11） |
+| `--info-text` | var(--blue-12) | 待检测文字（blue-12，**配 blue-3 淡底 11.26:1**；blue-11 只有 4.25 不达 AA） |
 | `--info-surface` | var(--blue-3) | 待检测淡底（blue-3） |
 | `--untested-text` | var(--sand-11) | 未测文字（sand-11，中性灰） |
 | `--untested-surface` | var(--sand-3) | 未测淡底（sand-3） |
