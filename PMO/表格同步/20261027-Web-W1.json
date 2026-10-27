@@ -1,0 +1,21 @@
+[
+ {
+  "事项名称": "W-1 数据收敛：18 处裸 request/fetch 收进 api 模块",
+  "关联执行票": "ADR-0021 · W-1",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+   "前端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "审计实测 pages/ 下 18 处裸 request()（另有 ReleasePage 一处裸 fetch），与 api/client.ts 的封装并存——同一接口在两处拼 URL，一处写错就 404 而没有东西会发现。全部收进三个客户端：api/client.ts（appeals/rules/control-points/routing/notifications/reports resign）、api/admin-client.ts（新建，grants/sessions/takedown）、api/write-client.ts（submissions）。新增 web/scripts/check_api_centralization.mjs（33 项）并挂进 gate static。★ 最严重一处：ReleasePage 的裸 fetch 有三个缺陷叠在一起——① 路径错了（写 `${appOrigin}/auth/reauth/start`，真实端点是 POST /api/v1/reauth/start，appOrigin 是开发身份的根不是 API base）；② 期望形状错了（后端返 302 RedirectResponse，而它 await res.json()）；③ 绕过 CSRF（裸 fetch 不带 x-csrf-token，生产 gate 会 403）。三种失败都被 catch 成「当前环境未开启在线飞书 Step-Up 重定向」——读起来像功能没做，实际是三处接线错误。修法：fetch + redirect:manual + CSRF 头。表单 POST 走不通（该端点不在 gate 豁免名单里，CSRF 读的是请求头）；request() 走不通（强制 res.json() 而它回 302）。★ 这是登记过的例外不是先例：ALLOWED_BARE_FETCH 逐条点名+写明理由，多一处就红。",
+  "验收标准": "check_api_centralization.mjs 33/33：A ★★★ pages/ 下没有未登记的裸 request(/fetch( 调用 + A2/A3/A4 三条反向对照（裸 request 必抓、裸 fetch 必抓、requestGeneration.current **不许**算成裸调用）；B api/ 下确实收下了 15 个方法 + B2 反向对照（不存在的名字不许被找到）；D ★★ 十个后端路径不作为 API 路径出现在 pages/ + D2/D3（前端路由不许被判成 API、真调用必须抓到）。门禁：gate[static] 全绿（api_centralization + field_state + login_qr + design_tokens）· build 14/14 · tsc -b 严格模式通过 · a11y 13/13 · verify:pages 双向可达 · budget 通过。",
+  "状态依据": "★ 两个判据自己不够格，被实测抓出来：① D 组第一版用 src.includes(path) 查「路径只在 api/ 拼」，于是 /appeals 与 /reports/ 报红——而它们是**前端路由**（<Link to=\"/appeals\">）不是 API 路径；改成正则只认调用形状并加两条反向对照。② A 组第一版只查 request(，而最严重的病是**裸 fetch**——只查 request 会让它一直绿；补上 fetch( 后计数从 18 变 22，原因是 CaseDetailPage 的 requestGeneration.current 被算进去，加 A4 反向对照钉住。★ 顺手收紧两处类型：SubmitResult（页面拿 case_id 决定「显示真判定还是本地预检」，原来 Record<string, unknown> 让这个分支在类型层面完全不受保护）、TakedownMetrics.ages（原来 task_id 隐式 unknown 导致 new Map 推不出 Map<string, number>）。★ 类型收敛到唯一来源：GrantRecord（从 AdminGrantsPage 搬来）、TakedownTaskItem（从 TakedownPage 搬来）、AppealItem（从 AppealsPage 搬来），页面改成 export type { X } 再导出。★★ 两个真变异：CasesPage 加一处裸 request<unknown>(\"/cases\") → A 组红；页面里出现 fetch(\"/takedown-tasks\") → A + D 两组同时红。提交 929a5c0。",
+  "下一步行动": "W-3 ErrorBoundary + 三列表页轮询 → A 级 SubmitPage 两层结论"
+ }
+]
