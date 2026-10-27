@@ -1,0 +1,22 @@
+[
+ {
+  "事项名称": "T-453 skill 加载器与注册表：回执里的 skill_hash=\"local\" 是个硬编码字面量",
+  "关联执行票": "T-453",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端",
+   "规则与知识库"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "审计说「skill 工作流只有桩」，执行时发现一件更严重的事：回执里的 skill_id / skill_version / skill_hash 三个字段，生产链路**一个参数都没传**——base/submission_service.py 调判定时只传了 authority_query 与 kb_snapshot，于是 judge_entry.py:181-182 的默认值生效，回执永远写着 content-review / \"1\" / \"local\"，而 \"local\" 是硬编码字面量。★ \"local\" 比\"没实现\"更该修：没有加载器只是缺功能，而它让回执**声称**一个自己并不知道的版本——读起来像「查过了」，实际什么都没查。改法：新建 agent-skills/registry.json（id/version/path/trigger_words/not_for）与 base/skill_registry.py（唯一加载点，指纹 = 文件字节 sha256，不是 mtime/size——那两个数会被「相等」骗过去）；judge_entry 的 version/hash 默认值改成 None 走注册表，取不到落 untested 而不是编默认值；submission_service 显式传 skill_id。",
+  "验收标准": "verify_skill_registry 27/27。B1 登记了但文件不在→红 / B2 ★★ 盘上有规程但没登记→红（两个方向各自能红，只查一个方向另一个永远绿）/ C1·C4 指纹=真实 sha256 且加一个字节必须变 / D1 judge_entry 里不再有 skill_hash=\"local\" / D3 回执里的 skill_hash = 注册表算出的真指纹（实测 fefa55116868ba81…）/ D7 ★★★ 生产链路真的把 skill_id 传给了判定函数（spy 观察入参）。",
+  "状态依据": "★★ 一条判据自己不够格，被变异抓出来：D6 最初只断言「回执里的 skill_hash = 真指纹」，做变异删掉生产链路那行 skill_id —— **D6 照样全绿**，因为 judge_entry 的默认值恰好也是 content-review，于是「没传」与「传了」产出同一个回执。一个抓不住真实变异的判据等于没有。改成 D7（spy 观察入参）之后同一个变异立刻红（skill_id=None）。结论：「结果对」不等于「过程对」。读数：skill_registry 27/27 · submission_pipeline 43 · stage_gate_d5 23 · judge_entry 12 · orchestrator 57 · engine_contract 227 · rule_judge 46 · report_store 63 · coverage 691（--controls）。★ 补登记时 E 段与 C 段各红一次且都红得对：registry.json 已声明但未 git add（换机器会静默失效）；声明验 submission_service.py 但该文件名在源码里一次没出现（声明与实现脱钩）。提交 c0d04fc。",
+  "下一步行动": "T-454 知识库比对接进生产"
+ }
+]
