@@ -112,7 +112,6 @@ export default function ContentUnitViewer({
     "text",
   );
 
-  const unitId = unit?.unit_id ?? unitRef?.unit_id ?? "未登记";
   const kind = unit?.kind ?? unitRef?.kind ?? "未测";
   const parseStatus = unit?.parse_status ?? unitRef?.parse_status ?? "ok";
   const failureKind = unit?.failure_kind ?? unitRef?.failure_kind ?? null;
@@ -143,11 +142,10 @@ export default function ContentUnitViewer({
           <strong className="unit-pane__title">
             <Icon name="file-text" size={13} /> 原文内容
           </strong>
-          <div className="unit-pane__meta font-data">
-            <span>{unitId}</span>
-            <span>载体 {kindLabel(kind)}</span>
-            <span>解析 {parseStatus}</span>
-            {failureKind && <span>失败原因 {failureKind}</span>}
+          <div className="unit-pane__meta">
+            <span>载体：{kindLabel(kind)}</span>
+            <span>状态：{parseStatus === "ok" ? "已提取正文" : parseStatus}</span>
+            {failureKind && <span>异常：{failureKind}</span>}
           </div>
         </div>
         <div className="unit-pane__tabs" role="tablist" aria-label="原件视图切换">
@@ -158,7 +156,7 @@ export default function ContentUnitViewer({
             className={tab === "text" ? "unit-tab--active" : ""}
             onClick={() => setTab("text")}
           >
-            归一化正文
+            正文内容
           </Button>
           <Button
             variant="secondary"
@@ -167,7 +165,7 @@ export default function ContentUnitViewer({
             className={tab === "fields" ? "unit-tab--active" : ""}
             onClick={() => setTab("fields")}
           >
-            结构化字段
+            送审信息
           </Button>
           <Button
             variant="secondary"
@@ -176,7 +174,7 @@ export default function ContentUnitViewer({
             className={tab === "boundary" ? "unit-tab--active" : ""}
             onClick={() => setTab("boundary")}
           >
-            覆盖与双指纹
+            核查范围
           </Button>
           <Button
             variant="secondary"
@@ -240,8 +238,7 @@ export default function ContentUnitViewer({
             <div className="state state--warn">
               <strong>这条案件没有附带原文内容</strong>
               <p className="hint">
-                可能是无文案格式（DP0）、解析失败（{failureKind ?? "未知"}）或旧版冻结投影未内嵌原件。
-                右侧证据链仍展示每条 finding 自带的原文切片 <code>quote</code>。
+                未提取到正文文本（{failureKind ?? "无文本内容"}），可在右侧查看命中的原文片段。
               </p>
             </div>
           )}
@@ -260,7 +257,7 @@ export default function ContentUnitViewer({
               ))}
             </dl>
           ) : (
-            <p className="hint">无额外结构化字段（fields 为空）。</p>
+            <p className="hint">无附加送审信息。</p>
           )}
         </div>
       )}
@@ -268,14 +265,14 @@ export default function ContentUnitViewer({
       {tab === "boundary" && (
         <div className="unit-pane__body">
           <dl className="facts">
-            <dt>已覆盖模态/范围</dt>
+            <dt>已核查范围</dt>
             <dd>{covers.length > 0 ? covers.join("、") : "未声明"}</dd>
-            <dt>未覆盖范围</dt>
-            <dd>{doesNotCover.length > 0 ? doesNotCover.join("、") : "无（全覆盖）"}</dd>
-            <dt>原件指纹 raw_sha256</dt>
-            <dd className="font-data">{rawSha ?? "未测"}</dd>
-            <dt>正文指纹 text_sha256</dt>
-            <dd className="font-data">{textSha ?? "未测"}</dd>
+            <dt>未核查范围</dt>
+            <dd>{doesNotCover.length > 0 ? doesNotCover.join("、") : "无（全部覆盖）"}</dd>
+            <dt>原件校验码</dt>
+            <dd className="font-data">{rawSha ? `${rawSha.slice(0, 16)}…` : "未测"}</dd>
+            <dt>正文校验码</dt>
+            <dd className="font-data">{textSha ? `${textSha.slice(0, 16)}…` : "未测"}</dd>
           </dl>
         </div>
       )}

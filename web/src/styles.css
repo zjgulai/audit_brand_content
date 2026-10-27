@@ -106,7 +106,7 @@ code {
   top: 0;
   align-self: start;
   max-height: 100vh;
-  background: var(--surface);
+  background: var(--bg);
   border-right: var(--hairline) solid var(--border);
   overflow: hidden;
 }
@@ -117,7 +117,6 @@ code {
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   min-height: var(--topbar-h);
-  border-bottom: var(--hairline) solid var(--border);
 }
 
 /* 真实 Momcozy logo：不加 badge 底、不加阴影、不加圆角 ——
@@ -215,9 +214,10 @@ code {
 /* 选中态：中性灰 pill + 字重。品牌色只留给内容与主行动（研究 §3.2：
    active nav 是中性灰 pill，彩色选中 23 屏中仅 3 例且全是 rail）。 */
 .shell__nav-item.is-active {
-  background: var(--surface-muted);
+  background: var(--surface);
   color: var(--text);
   font-weight: 600;
+  border: var(--hairline) solid var(--border);
 }
 
 .shell__nav-icon {
@@ -306,11 +306,11 @@ code {
 
 .shell__header {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   align-items: center;
   min-height: var(--topbar-h);
-  padding: 0.6rem 1.5rem;
-  background: var(--surface);
+  padding: var(--space-2) var(--space-5);
+  background: var(--bg);
   border-bottom: var(--hairline) solid var(--border);
   position: sticky;
   top: 0;
@@ -471,6 +471,15 @@ code {
 
   .queue__list {
     max-height: 40vh;
+  }
+
+  .cases-table th,
+  .cases-table td {
+    padding: var(--space-2);
+  }
+
+  .queue__filter {
+    padding: 0 var(--space-2);
   }
 }
 
@@ -666,30 +675,37 @@ code {
   top: 0;
   z-index: 1;
   display: flex;
-  gap: 0.3rem;
+  gap: var(--space-1);
   flex-wrap: wrap;
-  padding: 0.55rem 0.7rem;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
   background: var(--surface);
-  border-bottom: var(--hairline) solid var(--border);
+  border-bottom: var(--hairline) solid var(--rule);
 }
 
-/* 筛选 chip 是可点控件：32px 高、14px 文字（研究 control 27-40px / 文字 14） */
+/* 视图切换：安静的分段按钮（radius 6px，不描粗框，选中态用浅灰槽填充 + 600 字重） */
 .queue__filter {
   font: inherit;
-  font-size: var(--text-base);
-  min-height: 32px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  min-height: 28px;
   padding: 0 var(--space-3);
-  border-radius: 999px;
-  border: var(--hairline) solid var(--border-strong);
+  border-radius: var(--radius-control);
+  border: var(--hairline) solid transparent;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
 }
 
+.queue__filter:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
 .queue__filter[aria-pressed="true"] {
-  border-color: var(--brand);
-  color: var(--brand-text-on-surface);
-  background: var(--brand-surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface);
   font-weight: 600;
 }
 
@@ -699,9 +715,8 @@ code {
 
 .queue__row {
   display: block;
-  /* 双行制：主行标题 14px、副行元信息 12px。行高 64px 档（研究 two-line rows）。 */
-  padding: var(--space-3) var(--space-3) var(--space-2);
-  border-bottom: var(--hairline) solid var(--border);
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  border-bottom: var(--hairline) solid var(--rule);
   text-decoration: none;
   color: inherit;
 }
@@ -813,8 +828,10 @@ code {
 /* ── 详情页：双栏高亮联动（左原件 ContentUnit ↔ 右证据链与裁决） ──────── */
 
 .case {
-  padding: 1rem 1.25rem 3rem;
-  max-width: 66ch;
+  padding: var(--space-5) var(--space-5) var(--space-6);
+  max-width: var(--page-max);
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .case--dual,
@@ -822,25 +839,40 @@ code {
   max-width: none;
 }
 
+.case--embedded {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
 .case__workspace {
   display: grid;
-  grid-template-columns: minmax(18rem, 28rem) minmax(22rem, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: minmax(20rem, 30rem) minmax(24rem, 1fr);
+  gap: var(--space-5);
   align-items: start;
 }
 
 .case__inspector {
   min-width: 0;
-  max-width: 68ch;
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-5);
 }
 
+.case--embedded .case__inspector {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+/* 原文阅读井：用浅暖灰底（--bg）与极轻边承托正文，不画生硬线框 */
 .unit-pane {
   position: sticky;
-  top: 0.75rem;
-  background: var(--surface);
-  border: var(--border-subtle);
-  border-radius: var(--radius-control);
-  padding: 0.75rem;
+  top: var(--space-3);
+  background: var(--bg);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-4);
   min-width: 0;
 }
 
@@ -856,8 +888,12 @@ code {
 }
 
 .unit-pane__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
   font-size: var(--text-sm);
-  margin-top: 0.15rem;
+  color: var(--text-muted);
+  margin-top: var(--space-1);
 }
 
 .unit-pane__tabs {
@@ -885,8 +921,9 @@ code {
 .unit-text {
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: var(--text-sm);
-  line-height: 1.65;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--text);
 }
 
 .unit-mark {
@@ -899,7 +936,10 @@ code {
 }
 
 .unit-mark--active {
-  outline: var(--outline-active);
+  outline: none;
+  border-bottom: 2px solid var(--brand);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
   font-weight: 600;
 }
 
@@ -929,38 +969,47 @@ code {
 }
 
 .case h2 {
-  font-size: var(--text-base);
+  font-size: var(--text-section);
   font-weight: 600;
-  /* ★ 2026-10-26：章节标题从「一条下划线」改成**卡片头**。
-     上一版每个 h2 只是一条 border-bottom，整页仍然是一张白纸上的长列表；
-     参照站（reddit 舆情工作台）的每一块都是独立白卡，扫读时能一眼分节。
-     卡片化之后 h2 是卡的标题栏，下方内容同属这一块。 */
-  margin: 0 0 0.75rem;
-  padding: 0 0 0.5rem;
-  border-bottom: var(--hairline) solid var(--border);
+  color: var(--text);
+  margin: var(--space-5) 0 var(--space-3);
+  padding: 0;
 }
 
-/* 章节卡片：h2 与其后兄弟内容成为一个视觉块 */
+.case__inspector > h2:first-child,
+.case > h2:first-child {
+  margin-top: 0;
+}
+
+/* 独立详情页的章节块：白卡 + 极轻边框；内嵌在队列右栏时去掉外框避免框套框 */
 .case > section,
 .case__section {
   background: var(--surface);
   border: var(--hairline) solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 1rem 1.15rem;
-  margin-bottom: 0.9rem;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
-/* 关键读数：两列 dl，不堆 KPI 卡片 */
+.case--embedded > section,
+.case--embedded .case__section,
+.case--embedded .actions {
+  border: none;
+  border-top: var(--hairline) solid var(--rule);
+  border-radius: 0;
+  padding: var(--space-4) 0 0;
+  margin-top: var(--space-4);
+  background: transparent;
+}
+
+/* 键值表（Key-Value）：标签 12px 灰字，值 14px 正文，行间留气 */
 .facts {
   display: grid;
-  /* ★ 2026-10-23 视觉校验：固定 9rem 标签列在签发台溢出，
-     实测渲染成 `control_points_vercp-fixture-1`、`used_authority_refEXT-021`
-     —— 标签与值粘连，读起来是两个不存在的字段名。
-     改成可伸缩标签列（上限 14rem），长标签在自己的格子里换行。 */
-  grid-template-columns: minmax(9rem, 14rem) 1fr;
-  gap: 0.3rem 0.75rem;
+  grid-template-columns: minmax(7.5rem, 11rem) 1fr;
+  gap: var(--space-2) var(--space-4);
   margin: 0;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  align-items: baseline;
 }
 
 .facts__pair {
@@ -968,6 +1017,7 @@ code {
 }
 
 .facts dt {
+  font-size: var(--text-sm);
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
@@ -987,12 +1037,17 @@ code {
 
 .evidence__item {
   position: relative;
-  padding: 0.5rem 0 0.5rem 0.9rem;
-  border-bottom: var(--hairline) solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  border: var(--hairline) solid var(--rule);
+  border-radius: var(--radius-control);
+  margin-bottom: var(--space-3);
+  background: var(--bg);
 }
 
 .evidence__item--active {
-  outline: var(--outline-active);
+  outline: none;
+  border-color: var(--brand);
+  background: var(--surface);
 }
 
 .evidence__item:last-child {
@@ -1109,12 +1164,20 @@ code {
 
 /* 动作区与草稿交接（Handoff） */
 .actions {
-  margin-top: 0.9rem;
-  padding: 0.9rem 1rem;
-  border: var(--border-subtle);
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
   min-width: 0;
+}
+
+.case__inspector .actions {
+  border: none;
+  border-top: var(--hairline) solid var(--rule);
+  border-radius: 0;
+  padding: var(--space-4) 0 0;
+  background: transparent;
 }
 
 .handoff-bar {
@@ -1273,21 +1336,23 @@ code {
 .cases-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
 }
 
 .cases-table thead th {
   text-align: left;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 500;
   color: var(--text-muted);
-  background: var(--surface-muted);
+  background: var(--bg);
+  border-bottom: var(--hairline) solid var(--border);
   white-space: nowrap;
 }
 
 .cases-table th,
 .cases-table td {
   text-align: left;
-  padding: 0.5rem 0.65rem;
+  padding: var(--space-3) var(--space-4);
   vertical-align: middle;
 }
 
@@ -1310,7 +1375,7 @@ code {
 
 .cases-table tbody tr + tr th,
 .cases-table tbody tr + tr td {
-  border-top: var(--border-subtle);
+  border-top: var(--hairline) solid var(--rule);
 }
 
 .cases-table tbody tr:hover {
@@ -1400,8 +1465,8 @@ code {
 
 .submit-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: var(--space-3);
 }
 
 .submit-field {
@@ -1448,25 +1513,30 @@ code {
   gap: 0 0;
 }
 
+.report-sections {
+  background: var(--surface);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-5);
+}
+
 .report-sections > h2 {
-  margin: 0;
-  padding: 0.7rem 1rem;
-  font-size: var(--text-base);
+  margin: var(--space-5) 0 var(--space-3);
+  padding: var(--space-4) 0 0;
+  border-top: var(--hairline) solid var(--rule);
+  font-size: var(--text-section);
   font-weight: 600;
   color: var(--text);
-  background: var(--surface-muted);
-  border: var(--hairline) solid var(--border);
-  border-bottom: none;
-  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+}
+
+.report-sections > h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .report-sections > h2 + * {
-  background: var(--surface);
-  border: var(--hairline) solid var(--border);
-  border-top: none;
-  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
-  padding: 0.9rem 1rem;
-  margin: 0 0 0.9rem;
+  margin: 0;
 }
 
 /* 上一个 dl 与下一个 h2 之间要留出卡片间距（相邻选择器的落脚点） */
@@ -1803,8 +1873,8 @@ code {
 .taxonomy-card {
   background: var(--surface);
   border: var(--hairline) solid var(--border);
-  border-radius: var(--radius-control);
-  padding: 0.75rem;
+  border-radius: var(--radius-panel);
+  padding: var(--space-4) var(--space-5);
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -2007,4 +2077,11 @@ code {
 
 .taxonomy-card__more .taxonomy-fields dt {
   margin-top: var(--space-2);
+}
+
+.facts__inline-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }

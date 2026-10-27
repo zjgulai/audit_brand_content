@@ -317,9 +317,9 @@ try {
   await spaGoto("/takedown");
   await waitText("违规下架");
   await waitText("td-smoke-1");
-  await click("开始执行（Start）");
+  await click("开始执行");
   await waitText("已执行 start → 当前状态：in_progress");
-  await click("完成并回填证据（Complete）");
+  await click("完成并回填证据");
   await waitText("完成下线证据回填");
   await fillInput("#td-ev-receipt", "AMZ-RM-CDP-001");
   await click("提交回填并结案");
@@ -364,7 +364,7 @@ try {
 
   // 3) P-07 签发中心（/release/:caseId）：真实填写理由与 step_up_token 并点击确认签发放行
   await spaGoto(`/release/${encodeURIComponent(caseId)}`);
-  await waitText("飞书 SSO Step-Up 二次认证与受控签发");
+  await waitText("二次认证与签发确认");
   await fillInput("#release-reason", "CDP 签发门测试理由");
   await fillInput("#release-stepup", "stepup-test-token");
   await click("确认签发放行");
@@ -384,7 +384,7 @@ try {
   await spaGoto("/inbox");
   await waitText("待办收件箱");
   await waitText("notif-smoke-1");
-  await click("标记已读（Read）");
+  await click("标记已读");
   await waitText("notif-smoke-1 已");
 
   // 6) P-03 案件总览（/cases）：真实点击五标签筛选按钮
@@ -419,7 +419,7 @@ try {
 
   await spaGoto("/admin/sessions");
   await waitText("安全审计");
-  await waitText("安全与审计契约状态");
+  await waitText("安全与审计策略");
 
   console.log(JSON.stringify({
     ok: true,

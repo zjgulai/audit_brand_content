@@ -102,7 +102,7 @@ export default function InboxPage() {
         <div>
           <h1 id="inbox-page-title">待办收件箱</h1>
           <p className="hint">
-            失效与自动重审仅产生工作台内（In-App）通知记录，不代表飞书或个人外部消息已送达（UJ-7）。
+            集中查看分配给您的待办提醒与需品牌自决的案件。
           </p>
         </div>
         <Link to="/submit" className="btn">
@@ -162,14 +162,14 @@ export default function InboxPage() {
                   disabled={n.unread === false}
                   onClick={() => void handleNotifAction(n.notification_id, "read")}
                 >
-                  标记已读（Read）
+                  标记已读
                 </Button>
                 <Button
                   variant="secondary"
                   disabled={Boolean(n.acked_at)}
                   onClick={() => void handleNotifAction(n.notification_id, "ack")}
                 >
-                  确认知悉（Ack）
+                  确认知悉
                 </Button>
               </div>
             </li>
@@ -182,7 +182,7 @@ export default function InboxPage() {
         {cases === null ? "尚未读取" : `${pendingSelfCases.length} 条`}）
       </h2>
       <p className="hint">
-        「待自决」不等同于「通过」或「已放行」（UIUX §5.1）：请核对提示后选择修改重提或进入案件补充说明。
+        以下内容需业务方自行评估确认，核对后可修改重提或进入案件补充说明。
       </p>
       {cases === null ? (
         <p className="hint">{error ? "无可读案件。" : "加载案件中…"}</p>

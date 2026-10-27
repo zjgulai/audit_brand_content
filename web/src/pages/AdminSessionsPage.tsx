@@ -53,9 +53,7 @@ export default function AdminSessionsPage() {
         <div>
           <h1 id="admin-sessions-title">安全审计</h1>
           <p className="hint">
-            会话存储于独立 <code>session.db</code>（0700，严禁纳入数据备份 SD-14）；
-            空闲超时 30m / 绝对超时 8h（AU-11 / AU-12）；只读入口越权写与身份绑定异常实时追加至仓外{" "}
-            <code>access-log.jsonl</code>（C-103 / C-104）。
+            查看登录会话策略与安全审计日志说明。
           </p>
         </div>
       </div>
@@ -67,37 +65,24 @@ export default function AdminSessionsPage() {
         </div>
       )}
 
-      <h2>安全与审计契约状态（SD-1…SD-18 / C-103 / C-104）</h2>
+      <h2>安全与审计策略</h2>
       <dl className="facts">
-        <dt>Session Cookie 策略</dt>
-        <dd>
-          仅存 opaque 随机 ID（无 PII/claims），强制{" "}
-          <code>HttpOnly + Secure + SameSite</code>（AU-3 / SD-1）
-        </dd>
-        <dt>双库物理隔离</dt>
-        <dd>
-          <code>session.db</code> 与 <code>projection.db</code> 独立 WAL；
-          <code>session.db</code> 丢失仅触发全员重登與 Step-Up 失效，不影响 IR 与权威投影（SD-7…SD-15）
-        </dd>
-        <dt>C-103 只读入口审计</dt>
-        <dd>
-          对 <code>/api/v1/rules</code>、<code>/control-points</code>、<code>/routing</code>{" "}
-          发起 POST/PUT/PATCH/DELETE 一律返 403 并写入{" "}
-          <code>reason=read_only_entry</code>
-        </dd>
-        <dt>C-104 身份绑定审计</dt>
-        <dd>
-          生产模式缺 <code>open_id/tenant_id</code> 返 401（<code>identity_incomplete</code>）；
-          模拟身份在生产模式一律返 403（<code>simulated_identity_in_production</code>）
-        </dd>
+        <dt>会话凭证保护</dt>
+        <dd>仅保存随机句柄，不含个人敏感信息，启用严格同源与加密传输保护</dd>
+        <dt>会话有效期</dt>
+        <dd>空闲 30 分钟或连续登录 8 小时后需重新验证身份</dd>
+        <dt>规则只读保护</dt>
+        <dd>网页端不直接修改审核规则与路由配置，越权请求自动拦截并记入审计日志</dd>
+        <dt>企业身份核验</dt>
+        <dd>生产环境强制校验飞书企业身份与租户归属</dd>
       </dl>
 
-      <h2>会话投影记录</h2>
+      <h2>在线会话记录</h2>
       {sessions === null ? (
         <p className="hint">{error ? "当前身份或环境不展示在线会话表。" : "加载中…"}</p>
       ) : sessions.length === 0 ? (
         <div className="state">
-          <p className="hint">当前会话投影集合为空（0 条记录）。</p>
+          <p className="hint">当前无在线会话记录。</p>
         </div>
       ) : (
         <ul className="notrun">

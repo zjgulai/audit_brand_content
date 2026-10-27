@@ -220,8 +220,7 @@ export default function AppealsPage() {
             {appealId ? `申诉详情 ${appealId}` : "申诉中心"}
           </h1>
           <p className="hint">
-            案件号即回执号；DP3 受理 SLA 为 2 个工作日；争议指向规则本身时升级法务（DP4）。
-            原案件失效重审时申诉自动暂停（<code>version_invalidated</code>），不自动关闭或自动迁移（AP-1 / AP-2）。
+            对审查结论有异议时可在此发起申诉，通常在 2 个工作日内受理答复。
           </p>
         </div>
         {appealId && (
@@ -257,14 +256,14 @@ export default function AppealsPage() {
 
           {selected.state === "paused_version_invalidated" && (
             <div className="state state--warn" role="note">
-              <strong>版本失效暂停保护（AP-1 / AP-5）</strong>：原案件因规则、依据或内容更新已触发全量重审，
+              <strong>原案件重审暂停中</strong>：原案件因规则、依据或内容更新已触发全量重审，
               当前申诉处于暂停态，不得直接受理、驳回或关闭。重审完成后，仅<strong>原申诉人</strong>可确认迁移至新版本。
             </div>
           )}
 
           {selected.state === "stale" && (
             <div className="state" role="note">
-              <strong>逾期未确认长期保留（AP-9…AP-14）</strong>：暂停已满 30 天未确认，已停止每日提醒，
+              <strong>超期未确认（记录保留）</strong>：暂停已满 30 天未确认，已停止每日提醒，
               但记录与材料长期保留且不自动关闭；原申诉人仍可确认迁移或针对新版本发起新申诉。
             </div>
           )}
@@ -286,7 +285,7 @@ export default function AppealsPage() {
 
           <div className="submit-field">
             <label htmlFor="appeal-withdraw-reason">
-              撤销书面理由（撤销申诉必填，AP / C2）
+              撤销申诉理由（必填）
             </label>
             <input
               id="appeal-withdraw-reason"
@@ -308,7 +307,7 @@ export default function AppealsPage() {
               }
               onClick={() => void handleMigrate(selected)}
             >
-              确认迁移至重审新版本（Migrate）
+              迁移至重审新版本
             </Button>
             <Button
               variant="secondary"
@@ -319,7 +318,7 @@ export default function AppealsPage() {
               }
               onClick={() => void handleWithdraw(selected)}
             >
-              附理由撤销申诉（Withdraw）
+              撤销申诉
             </Button>
           </div>
         </div>

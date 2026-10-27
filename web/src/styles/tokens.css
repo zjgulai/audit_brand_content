@@ -142,9 +142,13 @@
   --text: var(--sand-12);
   --text-muted: var(--sand-11);
 
-  /* 边框（6 非交互细线 / 8 focus 与强分隔） */
-  --border: var(--sand-6);          /* 非交互细线（1.39:1，仅装饰） */
-  --border-strong: var(--sand-9);   /* 控件边框 3.28:1 ≥ 3:1 */
+  /* 边框三阶（研究 §9.2 Lines in three steps）：
+     · --rule          行内弱分隔（sand-4 #e9e8e6，表行 / 键值行 / 章节底线）
+     · --border        容器与面板外沿（sand-5 #e2e1de，比之前 sand-6 轻一档，不抢内容）
+     · --border-strong 交互控件边框（sand-9 #8d8d86，对白 3.28:1 ≥ 3:1 无障碍硬底线） */
+  --rule: var(--sand-4);
+  --border: var(--sand-5);
+  --border-strong: var(--sand-9);
 
   /* 品牌（9 实心 / 10 hover / 11 文字 / 3 淡底） */
   /* ★ 2026-10-26 实测校正：白字压在 tomato-9 上只有 3.87:1，达不到 4.5。

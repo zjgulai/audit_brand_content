@@ -211,44 +211,41 @@ export default function SubmitPage({
         {selectedSource.tier === "浅档" && (
           <div className="state state--warn" role="note">
             <StatusBadge axis="coverage" value="partial" />{" "}
-            <strong>浅档审查声明</strong>：图片与视频在第一阶段仅覆盖 OCR/ASR 提取文本，
-            <strong>不做区域级像素审计或画面构图判断</strong>，产出结论必带{" "}
-            <code>coverage=partial</code> 声明且永不直接输出裸 PASS。
+            <strong>多媒体核查说明</strong>：图片与视频当前提取画面文字与语音进行合规核查，
+            画面构图需结合人工复核确认。
           </div>
         )}
 
         {isUnsupported && (
           <div className="state state--warn" role="note">
-            <strong>通道或载体受限提示</strong>：当前所选通道/载体在{" "}
-            <code>submission_router</code> 或在线入库服务中登记为{" "}
-            <code>rejected_unsupported</code>（不会静默成功或丢弃，提交后将返回明确拒绝原因）。
+            <strong>暂不支持该载体</strong>：当前所选渠道或内容类型暂未开放线上直接送审。
           </div>
         )}
 
         <div className="submit-field">
-          <label htmlFor="submit-uri">来源定位符（source.uri）</label>
+          <label htmlFor="submit-uri">内容来源链接或标识（选填）</label>
           <input
             id="submit-uri"
             type="text"
             value={uri}
             onChange={(e) => setUri(e.target.value)}
-            placeholder="例如 https://momcozy.com/products/... 或 inline:web-submit"
+            placeholder="例如商品页链接 https://momcozy.com/products/..."
           />
         </div>
 
         {sourceKind === "ad_text" ? (
           <div className="submit-grid">
             <div>
-              <label htmlFor="submit-pt">Primary Text（主广告语）</label>
+              <label htmlFor="submit-pt">主广告语（Primary Text）</label>
               <textarea
                 id="submit-pt"
                 value={primaryText}
                 onChange={(e) => setPrimaryText(e.target.value)}
-                placeholder="输入广告主文案（将按 fields-pipe-v1 规范以 ' | ' 拼接）…"
+                placeholder="输入广告主文案…"
               />
             </div>
             <div>
-              <label htmlFor="submit-hl">Headline（标题）</label>
+              <label htmlFor="submit-hl">广告标题（Headline）</label>
               <textarea
                 id="submit-hl"
                 value={headline}
@@ -304,11 +301,11 @@ export default function SubmitPage({
 
       {receipt && (
         <div className="state" role="status" data-submission-receipt="">
-          <h2>受理回执（Submission Receipt）</h2>
+          <h2>提交已受理</h2>
           <dl className="facts">
-            <dt>submission_id</dt>
+            <dt>提交单号</dt>
             <dd className="font-data">{String(receipt.submission_id ?? "未测")}</dd>
-            <dt>case_id</dt>
+            <dt>关联案件</dt>
             <dd className="font-data">
               {receipt.case_id ? (
                 <Link
@@ -318,12 +315,12 @@ export default function SubmitPage({
                   {String(receipt.case_id)}
                 </Link>
               ) : (
-                "未建案"
+                "生成中"
               )}
             </dd>
-            <dt>ir_id</dt>
+            <dt>审查单号</dt>
             <dd className="font-data">{String(receipt.ir_id ?? "未测")}</dd>
-            <dt>机器预审标签</dt>
+            <dt>初审结论</dt>
             <dd>
               <StatusBadge
                 axis="decision"

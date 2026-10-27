@@ -297,8 +297,7 @@ export default function TakedownPage() {
         <div>
           <h1 id="takedown-page-title">违规下架</h1>
           <p className="hint">
-            已发布内容在签发撤回（revoke）或自动失效（invalidated）后自动生成下线任务。
-            无硬期限（<code>no_hard_deadline</code>），持续展示任务年龄、每日提醒次数与平台积压（TD-8）。
+            已发布内容被撤回或规则更新失效后，在此跟踪各渠道下架进度并回填凭证。
           </p>
         </div>
         <span className="font-data hint">
@@ -326,8 +325,7 @@ export default function TakedownPage() {
         <div className="actions" role="dialog" aria-label="完成下线证据回填">
           <h2>完成下线证据回填</h2>
           <p className="hint">
-            必填：执行平台、执行人、执行时间（不得晚于当前），以及回执编号{" "}
-            <code>receipt_id</code> 或可访问的 <code>result_url</code> 至少一项。
+            请填写下架平台、执行人与执行时间，并提供平台回执单号或核验链接。
           </p>
           <form
             className="submit-form"
@@ -335,7 +333,7 @@ export default function TakedownPage() {
           >
             <div className="submit-grid">
               <div>
-                <label htmlFor="td-ev-platform">执行平台（platform）</label>
+                <label htmlFor="td-ev-platform">下架平台</label>
                 <input
                   id="td-ev-platform"
                   type="text"
@@ -344,7 +342,7 @@ export default function TakedownPage() {
                 />
               </div>
               <div>
-                <label htmlFor="td-ev-by">执行人（executed_by）</label>
+                <label htmlFor="td-ev-by">执行人</label>
                 <input
                   id="td-ev-by"
                   type="text"
@@ -354,7 +352,7 @@ export default function TakedownPage() {
                 />
               </div>
               <div>
-                <label htmlFor="td-ev-at">执行时刻（ISO UTC）</label>
+                <label htmlFor="td-ev-at">执行时间</label>
                 <input
                   id="td-ev-at"
                   type="text"
@@ -367,7 +365,7 @@ export default function TakedownPage() {
             <div className="submit-grid">
               <div>
                 <label htmlFor="td-ev-receipt">
-                  平台下线回执号（receipt_id，与 URL 二选一必填）
+                  平台下架回执单号（与链接二选一）
                 </label>
                 <input
                   id="td-ev-receipt"
@@ -380,7 +378,7 @@ export default function TakedownPage() {
               </div>
               <div>
                 <label htmlFor="td-ev-url">
-                  下线结果核验链接（result_url）
+                  下架核验链接
                 </label>
                 <input
                   id="td-ev-url"
@@ -415,8 +413,7 @@ export default function TakedownPage() {
         <div className="actions" role="dialog" aria-label="双人独立审批豁免下线">
           <h2>双人独立审批豁免 {activeTaskId}</h2>
           <p className="hint">
-            规则：需两名不同的、具备匹配三维 scope 的 <code>takedown.waive</code> 审批人；
-            执行人本人不得自批；原签发人最多作为两名审批人之一，不得唯一。
+            需两名不同的授权审批人共同确认；执行人本人不可自批。
           </p>
           <form
             className="submit-form"
@@ -424,7 +421,7 @@ export default function TakedownPage() {
           >
             <div className="submit-grid">
               <div>
-                <label htmlFor="td-waive-a1">第一审批人（Approver 1）</label>
+                <label htmlFor="td-waive-a1">第一审批人</label>
                 <input
                   id="td-waive-a1"
                   type="text"
@@ -435,7 +432,7 @@ export default function TakedownPage() {
               </div>
               <div>
                 <label htmlFor="td-waive-a2">
-                  第二审批人（Approver 2，不得与第一审批人相同）
+                  第二审批人
                 </label>
                 <input
                   id="td-waive-a2"
@@ -497,7 +494,7 @@ export default function TakedownPage() {
             onSubmit={(e) => void handleReassignSubmit(e)}
           >
             <div className="submit-field">
-              <label htmlFor="td-reassign-to">新执行负责人（需匹配平台与品线 scope）</label>
+              <label htmlFor="td-reassign-to">新执行负责人</label>
               <input
                 id="td-reassign-to"
                 type="text"
@@ -574,7 +571,7 @@ export default function TakedownPage() {
                     disabled={busy}
                     onClick={() => void runTransition(t.task_id, "start")}
                   >
-                    开始执行（Start）
+                    开始执行
                   </Button>
                 )}
                 {t.state === "in_progress" && (
@@ -588,14 +585,14 @@ export default function TakedownPage() {
                         setModalKind("complete");
                       }}
                     >
-                      完成并回填证据（Complete）
+                      完成并回填证据
                     </Button>
                     <Button
                       variant="secondary"
                       disabled={busy}
                       onClick={() => void runTransition(t.task_id, "fail")}
                     >
-                      标记下线失败（Fail）
+                      标记下架失败
                     </Button>
                   </>
                 )}
@@ -606,7 +603,7 @@ export default function TakedownPage() {
                       disabled={busy}
                       onClick={() => void runTransition(t.task_id, "retry")}
                     >
-                      重新尝试（Retry）
+                      重新尝试
                     </Button>
                     <Button
                       variant="secondary"
@@ -616,7 +613,7 @@ export default function TakedownPage() {
                         setModalKind("waive");
                       }}
                     >
-                      双人审批豁免（Waive）
+                      申请豁免
                     </Button>
                   </>
                 )}
@@ -629,7 +626,7 @@ export default function TakedownPage() {
                       setModalKind("reassign");
                     }}
                   >
-                    改派（Reassign）
+                    改派
                   </Button>
                 )}
               </div>

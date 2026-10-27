@@ -189,13 +189,14 @@
 | `--blue-11` | #0d74ce |  |
 | `--blue-12` | #113264 |  |
 | `--bg` | var(--sand-2) | 应用背景（sand-2） |
-| `--surface` | #ffffff | 卡面（纯白，2026-10-27 起） |
-| `--surface-muted` | var(--sand-3) | 次级面与表头（sand-3） |
+| `--surface` | #ffffff | 卡面（纯白） |
+| `--surface-muted` | var(--sand-3) | 次级面与分段底（sand-3） |
 | `--surface-hover` | var(--sand-4) | 组件 hover（sand-4） |
 | `--surface-active` | var(--sand-5) | 组件 active（sand-5） |
 | `--text` | var(--sand-12) | 主文字（sand-12） |
 | `--text-muted` | var(--sand-11) | 次要文字（sand-11） |
-| `--border` | var(--sand-6) | 非交互细线（sand-6，仅装饰） |
+| `--rule` | var(--sand-4) | 行内弱分隔（sand-4） |
+| `--border` | var(--sand-5) | 容器与面板外沿（sand-5） |
 | `--border-strong` | var(--sand-9) | 控件边框（sand-9，3.28:1） |
 | `--brand` | var(--brandc-11) | 品牌实心底（brandc-11 #6A2B3A） |
 | `--brand-hover` | var(--brandc-12) | 品牌 hover（brandc-12） |

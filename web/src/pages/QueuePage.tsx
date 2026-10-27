@@ -169,7 +169,7 @@ export default function QueuePage() {
           <div className="state state--forbidden" role="alert">
             <h2>需要登录</h2>
             <p>
-              后端要求有效 session。本机联调时，请在上方「身份」下拉里选一个身份；
+              请先登录后访问。本地调试可在左侧边栏启用开发身份；
               生产环境走飞书 OAuth / SSO。
             </p>
           </div>
@@ -208,8 +208,8 @@ export default function QueuePage() {
             <span>
               <StatusBadge axis="sample" value="样例数据" />{" "}
               {sampleHidden
-                ? `已隐藏 ${sampleCount} 条夹具`
-                : `含 ${sampleCount} 条确定性测试夹具`}
+                ? `已隐藏 ${sampleCount} 条演示数据`
+                : `当前包含 ${sampleCount} 条演示数据`}
             </span>
             <Button
               variant="secondary"
@@ -340,7 +340,7 @@ export default function QueuePage() {
               <Icon name="alert-triangle" size={13} /> 队列口径异常
             </h2>
             <p>
-              后端返回了 {offQueue.length} 条不属于待办队列的案件（
+              已过滤 {offQueue.length} 条非待办状态的案件（
               {[...new Set(offQueue.map((c) => String(c.state)))].join(" / ")}）。
               待办队列只应有 {QUEUE_LABELS.join(" 与 ")}。已从列表里排除，但这条不该出现。
             </p>

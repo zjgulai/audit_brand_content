@@ -184,37 +184,25 @@ function EvidenceItem({
       )}
 
       <div className="evidence__why">
-        {f.location && f.location.start !== undefined ? (
-          <span className="evidence__loc font-data">
-            位置 {f.location.type ?? "text"} {f.location.start}–{f.location.end}
-            {"　"}
-          </span>
-        ) : null}
         <span>
-          依据：{(f.authority_ref ?? []).map((r) => r.ref_id).join("、") || "未登记"}
-          {"， "}
+          规则依据：{(f.authority_ref ?? []).map((r) => r.ref_id).join("、") || "未登记"}{" "}
           <span className={authInfo.cls} data-status-badge="">
             {authInfo.text}
           </span>
         </span>
-        {f.derived_from && (
-          <>
-            {"　"}由 <span className="font-data">{f.derived_from}</span> 派生
-          </>
-        )}
       </div>
 
       {f.rule_conflict && (
         <div className="state state--warn">
-          <strong>规则冲突</strong>
-          ：这条 finding 涉及互相矛盾的依据，<strong>须人工裁定</strong>，不静默取一。
+          <strong>规则依据冲突</strong>
+          ：该项涉及两条相互冲突的规则依据，<strong>需人工裁定</strong>。
           {f.resolution_detail?.reason ? `（${f.resolution_detail.reason}）` : ""}
           {conflictRefs.length > 0 && (
             <div className="conflict-grid">
               {conflictRefs.map((ref, idx) => (
-                <div key={idx} className="conflict-card font-data">
-                  依据 #{idx + 1}：{String(ref.ref_id ?? "未命名")}（状态：
-                  {String(ref.state ?? "未测")}）
+                <div key={idx} className="conflict-card">
+                  依据 {idx + 1}：<span className="font-data">{String(ref.ref_id ?? "未命名")}</span>
+                  （{ref.state === "ok" ? "有效" : String(ref.state ?? "待核")}）
                 </div>
               ))}
             </div>
@@ -279,13 +267,13 @@ function EvidenceItem({
 
 function NotEvaluatedList({ items }: { items: NotEvaluated[] }) {
   if (items.length === 0) {
-    return <p className="hint">无未评估项（所有适用控制点都已跑过）。</p>;
+    return <p className="hint">全部适用规则项均已核查。</p>;
   }
   return (
     <ul className="notrun">
       {items.map((it, i) => (
         <li key={i}>
-          <span>{it.what ?? "未命名控制点"}</span>
+          <span>{it.what ?? "未命名规则项"}</span>
           <span className="notrun__why">
             {it.label ?? WHY_TEXT[String(it.why)] ?? String(it.why ?? "未说明")}
           </span>
@@ -479,9 +467,8 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           )}
         </div>
         <p className="case__sub">
-          <span className="font-data">{ir.ir_id}</span>（{ir.ir_version}），回执{" "}
-          <span className="font-data">{ir.receipt_ref ?? "未测"}</span>
-          {ir.created_at && <>，{ir.created_at}</>}
+          审查单 <span className="font-data">{ir.ir_id}</span>
+          {ir.created_at && <>，提交于 {ir.created_at}</>}
         </p>
         <InlineMetricSummary
           scope="case"
@@ -510,18 +497,20 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
             <dt>对外标签</dt>
             <dd>
               <StatusBadge axis="decision" value={dec.state} />{" "}
-              <span className="hint">（{dec.layer}，判定由后端产出）</span>
+              <span className="hint">（系统初审结论）</span>
             </dd>
             <dt>放行状态</dt>
             <dd>
-              {dec.release_status}
-              <span className="hint">由人在合规签发里确认，机器不改</span>
-              <Link
-                to={`/release/${encodeURIComponent(detail.case_id)}`}
-                className="btn"
-              >
-                前往合规签发 <Icon name="arrow-up-right" size={11} />
-              </Link>
+              <span className="facts__inline-row">
+                <strong>{dec.release_status}</strong>
+                <span className="hint">（须经合规签发确认后放行）</span>
+                <Link
+                  to={`/release/${encodeURIComponent(detail.case_id)}`}
+                  className="btn"
+                >
+                  前往合规签发 <Icon name="arrow-up-right" size={11} />
+                </Link>
+              </span>
             </dd>
             <dt>并行义务</dt>
             <dd>{(dec.obligations ?? []).join("、") || "无"}</dd>
@@ -534,9 +523,9 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
               <StatusBadge axis="coverage" value={cov.coverage_state} />
               {covBadge.isPartial && <strong> 仅已覆盖部分可判</strong>}
             </dd>
-            <dt>评过的模态</dt>
-            <dd>{(cov.modalities_evaluated ?? []).join("、") || "未测"}</dd>
-            <dt>适用控制点</dt>
+            <dt>已核查类型</dt>
+            <dd>{(cov.modalities_evaluated ?? []).map((m) => ({ free_text: "文本", product_listing: "商品页", image: "图片", video: "视频" }[m] ?? m)).join("、") || "未测"}</dd>
+            <dt>适用规则项</dt>
             <dd className="font-data">
               {(cov.control_points_applied ?? []).join("、") || "无"}
             </dd>
@@ -571,7 +560,7 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           <h2>证据链</h2>
           <SpecSeamNote disputeCount={disputeCount} />
           {(ir.findings ?? []).length === 0 ? (
-            <p className="hint">无 finding。</p>
+            <p className="hint">未发现违规或风险项。</p>
           ) : (
             <ol className="evidence">
               {(ir.findings ?? []).map((f, i) => (
@@ -616,22 +605,18 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           <div className="actions" data-action-bar="">
             <h2>复核动作</h2>
             <dl className="facts">
-              <dt>台账状态</dt>
-              <dd>{review?.status ?? "未读取"}</dd>
-              <dt>负责人</dt>
+              <dt>处理状态</dt>
+              <dd>{({ unassigned: "待认领", claimed: "处理中", submitted: "已提交结论" } as Record<string, string>)[review?.status ?? ""] ?? review?.status ?? "待认领"}</dd>
+              <dt>当前负责人</dt>
               <dd>{review?.assignee ?? "未认领"}</dd>
-              <dt>台账版本</dt>
-              <dd className="font-data">{review?.version ?? "未读取"}</dd>
-              <dt>租约</dt>
-              <dd>
-                {review?.lease_expires
-                  ? `${leaseActive ? "有效至" : "已过期于"} ${new Date(review.lease_expires * 1000).toLocaleString()}`
-                  : "无"}
-              </dd>
-              <dt>主草稿</dt>
-              <dd className="font-data">{review?.primary_draft_id ?? "无"}</dd>
-              <dt>正式记录</dt>
-              <dd>当前 GET 不返回 formal 摘要</dd>
+              {review?.lease_expires ? (
+                <>
+                  <dt>锁定有效期</dt>
+                  <dd>
+                    {`${leaseActive ? "有效至" : "已过期于"} ${new Date(review.lease_expires * 1000).toLocaleString()}`}
+                  </dd>
+                </>
+              ) : null}
             </dl>
             {__REVIEW_DEV_IDENTITY__ ? (
               __REVIEW_WRITE_ENABLED__ && DevReviewActions ? (

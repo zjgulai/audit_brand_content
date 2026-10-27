@@ -55,8 +55,7 @@ export default function ReportsIndexPage() {
         <div>
           <h1 id="reports-index-title">报告索引</h1>
           <p className="hint">
-            静态报告为不可变存档（含结论、问题明细、覆盖证明、依据清单、未审说明、执行回执六区块）；
-            IR 变更会产生新报告文件，旧存档永不原地修改。
+            归档已生成的合规审查报告。
           </p>
         </div>
         <span className="font-data hint">共 {(rows ?? []).length} 份报告</span>
@@ -75,9 +74,9 @@ export default function ReportsIndexPage() {
               <tr>
                 <th scope="col">报告编号</th>
                 <th scope="col">关联案件</th>
-                <th scope="col">IR 版本标识</th>
+                <th scope="col">审查单号</th>
                 <th scope="col">发布时刻</th>
-                <th scope="col">静态存档链接</th>
+                <th scope="col">存档文件</th>
                 <th scope="col">操作</th>
               </tr>
             </thead>
@@ -114,7 +113,7 @@ export default function ReportsIndexPage() {
                       to={`/reports/${encodeURIComponent(r.report_id)}`}
                       className="btn"
                     >
-                      查看六区块报告 <Icon name="arrow-up-right" size={11} />
+                      查看报告 <Icon name="arrow-up-right" size={11} />
                     </Link>
                   </td>
                 </tr>

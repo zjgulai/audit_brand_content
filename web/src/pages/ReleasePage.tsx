@@ -212,8 +212,7 @@ export default function ReleasePage() {
           <div>
             <h1 id="release-center-title">合规签发</h1>
             <p className="hint">
-              全系统唯一允许改变 <code>release_status</code> 的受控入口。
-              执行人级 allowlist + 租户/品线 scope + 职责分离（SoD：提交人与最终复核人不得自签）+ 飞书 SSO Step-Up 二次认证。
+              复核完成后在此正式签发放行。提交人与复核人本人不可自签。
             </p>
           </div>
           <span className="font-data hint">
@@ -242,7 +241,7 @@ export default function ReleasePage() {
                   <th scope="col">审查标签</th>
                   <th scope="col">产品线</th>
                   <th scope="col">当前放行状态</th>
-                  <th scope="col">SoD 职责分离预检</th>
+                  <th scope="col">签发资格</th>
                   <th scope="col">操作</th>
                 </tr>
               </thead>
@@ -275,17 +274,16 @@ export default function ReleasePage() {
                             className="badge badge--warn"
                             data-status-badge=""
                           >
-                            SoD 限制：
                             {isSelfSub
-                              ? "本人提交 (self_submission)"
-                              : "本人复核 (self_review)"}
+                              ? "不可自签（本人提交）"
+                              : "不可自签（本人复核）"}
                           </span>
                         ) : (
                           <span
                             className="badge badge--pass"
                             data-status-badge=""
                           >
-                            SoD 可签核
+                            可签发
                           </span>
                         )}
                       </td>
@@ -294,7 +292,7 @@ export default function ReleasePage() {
                           to={`/release/${encodeURIComponent(item.case_id)}`}
                           className="btn"
                         >
-                          进入签发核验台 <Icon name="arrow-up-right" size={11} />
+                          进入签发核验 <Icon name="arrow-up-right" size={11} />
                         </Link>
                       </td>
                     </tr>
@@ -316,11 +314,11 @@ export default function ReleasePage() {
   return (
     <section className="case case--dual" aria-labelledby="release-detail-title">
       <div className="case__head">
-        <h1 id="release-detail-title">签发核验台 G-1</h1>
+        <h1 id="release-detail-title">签发核验</h1>
         <span className="font-data">{caseId}</span>
         {ir && <StatusBadge axis="decision" value={ir.decision.state} />}
         <Link to={`/cases/${encodeURIComponent(caseId)}`} className="btn">
-          查看案件证据链
+          查看案件详情
         </Link>
       </div>
 
@@ -336,7 +334,7 @@ export default function ReleasePage() {
         <div className="case__workspace">
           {/* 左栏：四前置就绪度 + 18 项签名绑定清单（SB-1…SB-11） */}
           <div className="unit-pane">
-            <h2>1. 四前置与处置义务就绪度（release-readiness）</h2>
+            <h2>放行前置条件</h2>
             <dl className="facts">
               <dt>就绪状态</dt>
               <dd>
@@ -350,71 +348,59 @@ export default function ReleasePage() {
                     : "需核对下方前置条件与人工理由"}
                 </span>
               </dd>
-              <dt>1. 审查记录完整</dt>
-              <dd>{ir.ir_id}，回执 {ir.receipt_ref ?? "未测"}</dd>
-              <dt>2. 标签处置前置</dt>
+              <dt>审查单号</dt>
+              <dd className="font-data">{ir.ir_id}</dd>
+              <dt>当前结论与状态</dt>
               <dd>
-                当前标签 <strong>{ir.decision.state}</strong>，台账状态{" "}
-                <code>{detail.review?.status ?? "unassigned"}</code>
+                <strong>{ir.decision.state}</strong>（{({ unassigned: "待认领", claimed: "处理中", submitted: "已提交结论" } as Record<string, string>)[detail.review?.status ?? ""] ?? detail.review?.status ?? "待认领"}）
               </dd>
-              <dt>3. 并行义务与冲突</dt>
+              <dt>附加义务与待裁项</dt>
               <dd>
-                义务：{(ir.decision.obligations ?? []).join("、") || "无"}
-                未裁冲突：
+                义务：{(ir.decision.obligations ?? []).join("、") || "无"}；未裁冲突：
                 {(ir.findings ?? []).filter((f) => f.rule_conflict).length} 项
               </dd>
-              <dt>4. 双指纹一致性</dt>
+              <dt>内容校验</dt>
               <dd className="font-data">
-                text_sha256={unit?.fingerprint?.text_sha256?.slice(0, 16) ?? "待核"}…
+                {unit?.fingerprint?.text_sha256 ? `已校验（${unit.fingerprint.text_sha256.slice(0, 12)}…）` : "待核"}
               </dd>
             </dl>
 
-            <h2>2. 18 项不可变签名绑定清单（Signature Binding）</h2>
+            <h2>签发绑定存证</h2>
             <p className="hint">
-              签发后以下任一已使用依据、规则/知识库快照或内容指纹发生变化，签名将自动转为{" "}
-              <code>invalidated</code> 并入队全量重审（无人工 Override，IA-1…IA-3）。
+              签发后若内容或所依据的规则发生变更，原签发自动失效并重新进入审查。
             </p>
-            <dl className="facts font-data">
-              <dt>case_version</dt>
-              <dd>{detail.review?.version ?? 0}</dd>
-              <dt>ir_id / ir_version</dt>
-              <dd>
-                {ir.ir_id} / {ir.ir_version}
+            <dl className="facts">
+              <dt>记录版本</dt>
+              <dd className="font-data">{detail.review?.version ?? 0}</dd>
+              <dt>审查单版本</dt>
+              <dd className="font-data">
+                {ir.ir_id}（{ir.ir_version}）
               </dd>
-              <dt>raw_sha256</dt>
-              <dd>{unit?.fingerprint?.raw_sha256 ?? "未内嵌"}</dd>
-              <dt>text_sha256</dt>
-              <dd>{unit?.fingerprint?.text_sha256 ?? "未内嵌"}</dd>
-              <dt>rule_snapshot</dt>
-              <dd>{ir.rule_snapshot ?? "未测"}</dd>
-              <dt>kb_snapshot</dt>
-              <dd>{ir.kb_snapshot ?? "未测"}</dd>
-              <dt>control_points_ver</dt>
-              <dd>{ir.control_points_version ?? "未测"}</dd>
-              <dt>used_authority_refs</dt>
-              <dd>
+              <dt>引用依据</dt>
+              <dd className="font-data">
                 {[
                   ...new Set(
                     (ir.findings ?? []).flatMap((f) =>
                       (f.authority_ref ?? []).map((r) => r.ref_id),
                     ),
                   ),
-                ].join(", ") || "无"}
+                ].join("、") || "无"}
               </dd>
-              <dt>media_root_hash</dt>
-              <dd>RFC 8785 JCS SHA-256（后端 ReleaseGate 实时计算）</dd>
+              <dt>规则与知识库版本</dt>
+              <dd className="font-data">
+                {ir.rule_snapshot ?? "未测"} / {ir.kb_snapshot ?? "未测"}
+              </dd>
             </dl>
           </div>
 
           {/* 右栏：Step-Up 重新认证与签发/拒绝/撤回执行面板 */}
           <div className="case__inspector">
             <div className="actions">
-              <h2>3. 飞书 SSO Step-Up 二次认证与受控签发</h2>
+              <h2>二次认证与签发确认</h2>
               {isSelfReview && (
                 <div className="state state--warn" role="alert">
-                  <strong>SoD 职责分离警告（self_review）</strong>：当前身份（
-                  <code>{current?.id}</code>）是本案件的复核负责人，提交签发将被服务端{" "}
-                  <code>ReleaseGate</code> 以 403 <code>SoDViolation</code> 拒绝。
+                  <strong>不可自签提醒</strong>：当前账号（
+                  <code>{current?.id}</code>）是本案的复核负责人，须由其他授权签发人放行。
                 </div>
               )}
 
@@ -445,7 +431,7 @@ export default function ReleasePage() {
                       checked={actionMode === "sign"}
                       onChange={() => setActionMode("sign")}
                     />
-                    <span>签发放行（sign → 已放行）</span>
+                    <span>准予放行</span>
                   </label>
                   <label className="verdict-radio">
                     <input
@@ -454,7 +440,7 @@ export default function ReleasePage() {
                       checked={actionMode === "reject"}
                       onChange={() => setActionMode("reject")}
                     />
-                    <span>拒绝放行（reject → 已拒绝）</span>
+                    <span>不予放行</span>
                   </label>
                   <label className="verdict-radio">
                     <input
@@ -463,13 +449,13 @@ export default function ReleasePage() {
                       checked={actionMode === "revoke"}
                       onChange={() => setActionMode("revoke")}
                     />
-                    <span>撤回历史签名（revoke → 已撤回）</span>
+                    <span>撤回已放行签名</span>
                   </label>
                 </div>
 
                 <div className="submit-field">
                   <label htmlFor="release-reason">
-                    签发 / 拒绝 / 撤回书面理由（必填，记入不可变签名台账）
+                    签发意见或撤回理由（必填）
                   </label>
                   <textarea
                     id="release-reason"
@@ -481,7 +467,7 @@ export default function ReleasePage() {
 
                 <div className="submit-grid">
                   <div>
-                    <label htmlFor="release-nonce">绑定随机挑战值（nonce）</label>
+                    <label htmlFor="release-nonce">签发校验码</label>
                     <input
                       id="release-nonce"
                       type="text"
@@ -492,7 +478,7 @@ export default function ReleasePage() {
                   </div>
                   <div>
                     <label htmlFor="release-stepup">
-                      一次性 Step-Up Token（TTL 5m，single-use）
+                      二次认证口令（5 分钟内有效）
                     </label>
                     <input
                       id="release-stepup"
@@ -510,7 +496,7 @@ export default function ReleasePage() {
                     variant="secondary"
                     onClick={() => void handleStartReauth()}
                   >
-                    <Icon name="user-check" size={12} /> 发起飞书 SSO Step-Up 重认证
+                    <Icon name="user-check" size={12} /> 飞书二次认证
                   </Button>
                   <Button
                     type="submit"

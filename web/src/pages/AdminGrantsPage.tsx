@@ -162,8 +162,7 @@ export default function AdminGrantsPage() {
         <div>
           <h1 id="admin-grants-title">授权治理</h1>
           <p className="hint">
-            三权分立（SoD）：提案人（Proposer） ≠ 执行人（IT Executor） ≠ 第二审批人（Approver）。
-            人级 allowlist，无默认 wildcard；撤销授权后既有历史签名保持有效，原签发人仍保留撤回自己历史签名的权利（GR-11 / GR-12）。
+            管理合规签发与违规下架的操作权限。权限变更需经提案、执行与审批三方确认。
           </p>
         </div>
         <div className="queue__filters" role="tablist" aria-label="授权类别切换">
@@ -178,7 +177,7 @@ export default function AdminGrantsPage() {
               setCapability("release.sign");
             }}
           >
-            签发类授权（signer-grants）
+            签发权限
           </button>
           <button
             type="button"
@@ -191,7 +190,7 @@ export default function AdminGrantsPage() {
               setCapability("takedown.execute");
             }}
           >
-            下线类授权（takedown-grants）
+            下架权限
           </button>
         </div>
       </div>
@@ -213,11 +212,11 @@ export default function AdminGrantsPage() {
       )}
 
       <div className="actions">
-        <h2>发起新授权提案（Propose）</h2>
+        <h2>新增权限申请</h2>
         <form className="submit-form" onSubmit={(e) => void handlePropose(e)}>
           <div className="submit-grid">
             <div>
-              <label htmlFor="grant-user">目标主体账号（user_id）</label>
+              <label htmlFor="grant-user">被授权人账号</label>
               <input
                 id="grant-user"
                 type="text"
@@ -228,7 +227,7 @@ export default function AdminGrantsPage() {
               />
             </div>
             <div>
-              <label htmlFor="grant-cap">授权能力（capability）</label>
+              <label htmlFor="grant-cap">权限类型</label>
               <select
                 id="grant-cap"
                 value={capability}
@@ -254,7 +253,7 @@ export default function AdminGrantsPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="grant-line">产品线范围（product_line）</label>
+              <label htmlFor="grant-line">适用产品线</label>
               <select
                 id="grant-line"
                 value={productLine}
@@ -268,7 +267,7 @@ export default function AdminGrantsPage() {
             </div>
             {tab === "takedown" && (
               <div>
-                <label htmlFor="grant-platform">投放平台范围（platform）</label>
+                <label htmlFor="grant-platform">适用投放渠道</label>
                 <select
                   id="grant-platform"
                   value={platform}
@@ -288,7 +287,7 @@ export default function AdminGrantsPage() {
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="说明新增授权或扩大 scope 的业务依据…"
+              placeholder="说明新增或调整权限的业务原因…"
             />
           </div>
           <div className="actions__row">
@@ -308,7 +307,7 @@ export default function AdminGrantsPage() {
         <p className="hint">{error ? "无可读数据。" : "加载中…"}</p>
       ) : activeRows.length === 0 ? (
         <div className="state">
-          <p className="hint">当前投影下该授权台账为空（0 条记录）。</p>
+          <p className="hint">暂无授权记录。</p>
         </div>
       ) : (
         <div className="cases-table-wrap">
@@ -317,7 +316,7 @@ export default function AdminGrantsPage() {
               <tr>
                 <th scope="col">授权 ID</th>
                 <th scope="col">被授权人</th>
-                <th scope="col">能力与 Scope</th>
+                <th scope="col">权限与适用范围</th>
                 <th scope="col">提案 / 执行 / 二次审批</th>
                 <th scope="col">状态</th>
               </tr>

@@ -164,9 +164,9 @@ export default function ReportPage() {
       />
 
       <dl className="facts">
-        <dt>report_id</dt>
+        <dt>报告编号</dt>
         <dd className="font-data">{report.report_id}</dd>
-        <dt>case_id</dt>
+        <dt>关联案件</dt>
         <dd className="font-data">
           {report.case_id ? (
             <Link to={`/cases/${encodeURIComponent(report.case_id)}`}>
@@ -176,26 +176,21 @@ export default function ReportPage() {
             "未登记"
           )}
         </dd>
-        <dt>ir_id</dt>
+        <dt>审查单号</dt>
         <dd className="font-data">{report.ir_id ?? "未登记"}</dd>
         <dt>发布时刻</dt>
         <dd className="font-data">{report.published_at ?? "未发布"}</dd>
-        <dt>静态报告</dt>
+        <dt>存档文件</dt>
         <dd>
           {report.url ? (
             <a href={report.url} target="_blank" rel="noreferrer">
-              {report.url}
+              查看存档文件
             </a>
           ) : (
             "未生成"
           )}
         </dd>
       </dl>
-
-      <p className="hint">
-        报告是不可变静态存档；本页只展示后端返回的元信息与关联 IR 快照，不编辑、不重算。
-        IR 变更会产生新报告文件，旧文件不改不删。
-      </p>
 
       {/* 内嵌六区块只读报告视图（G-06 / UX-03） */}
       {ir ? (
@@ -204,20 +199,19 @@ export default function ReportPage() {
           <dl className="facts">
             <dt>对外标签</dt>
             <dd>
-              <StatusBadge axis="decision" value={ir.decision.state} />（处置层{" "}
-              <span className="font-data">{ir.decision.layer}</span>）
+              <StatusBadge axis="decision" value={ir.decision.state} />
             </dd>
             <dt>放行状态</dt>
             <dd>
-              {ir.decision.release_status}（五标签均不等于自动放行）
+              {ir.decision.release_status}
             </dd>
-            <dt>并行义务</dt>
-            <dd>{(ir.decision.obligations ?? []).join("、") || "无"}</dd>
+            <dt>附加要求</dt>
+            <dd>{(ir.decision.obligations ?? []).map((o) => ({ partial_coverage: "需补充核查未覆盖部分" }[o] ?? o)).join("、") || "无"}</dd>
           </dl>
 
           <h2>命中的问题（共 {findings.length} 项）</h2>
           {findings.length === 0 ? (
-            <p className="hint">本次运行未记录命中 finding。</p>
+            <p className="hint">本次审查未发现违规项。</p>
           ) : (
             <ol className="evidence">
               {findings.map((f, idx) => {
@@ -232,7 +226,7 @@ export default function ReportPage() {
                       </span>
                       <span className="font-data hint">{f.finding_id}</span>
                       <StatusBadge axis="severity" value={f.severity} />
-                      <span className="hint">{f.status}</span>
+                      <span className="hint">{({ confirmed: "已确认违规", candidate: "待人工确认", rejected: "已驳回" } as Record<string, string>)[f.status ?? ""] ?? f.status}</span>
                     </div>
                     <div className="evidence__quote">
                       {f.quote ?? "无原文引用"}
@@ -258,55 +252,55 @@ export default function ReportPage() {
                 <strong> 仅已覆盖部分可判</strong>
               )}
             </dd>
-            <dt>已评估模态</dt>
-            <dd>{(ir.coverage.modalities_evaluated ?? []).join("、") || "未测"}</dd>
-            <dt>已跑控制点</dt>
+            <dt>已核查类型</dt>
+            <dd>{(ir.coverage.modalities_evaluated ?? []).map((m) => ({ free_text: "文本", product_listing: "商品页", image: "图片", video: "视频" }[m] ?? m)).join("、") || "未测"}</dd>
+            <dt>已核查规则项</dt>
             <dd className="font-data">
               {(ir.coverage.control_points_applied ?? []).join("、") || "无"}
             </dd>
           </dl>
 
-          <h2>依据清单与快照</h2>
+          <h2>依据与规则版本</h2>
           <dl className="facts">
-            <dt>规则快照</dt>
+            <dt>规则版本</dt>
             <dd className="font-data">{ir.rule_snapshot ?? "未测"}</dd>
-            <dt>知识库快照</dt>
+            <dt>知识库版本</dt>
             <dd className="font-data">{ir.kb_snapshot ?? "未测"}</dd>
-            <dt>控制点版本</dt>
+            <dt>规则项版本</dt>
             <dd className="font-data">{ir.control_points_version ?? "未测"}</dd>
           </dl>
 
           <h2>未查的部分</h2>
           {notEvaluated.length === 0 ? (
-            <p className="hint">无未评估项（所有适用控制点均已评估）。</p>
+            <p className="hint">全部适用规则项均已核查。</p>
           ) : (
             <ul className="notrun">
               {notEvaluated.map((it, i) => (
                 <li key={i}>
                   <span>{it.what ?? "未命名控制点"}</span>
                   <span className="notrun__why">
-                    {it.label ?? it.why ?? "未说明"}
+                    {String(it.label ?? it.why ?? "未说明").replace(/·/g, "，")}
                   </span>
                 </li>
               ))}
             </ul>
           )}
 
-          <h2>执行回执与指纹锚点</h2>
+          <h2>存证与校验信息</h2>
           <dl className="facts">
-            <dt>回执编号</dt>
+            <dt>受理单号</dt>
             <dd className="font-data">{ir.receipt_ref ?? "未测"}</dd>
-            <dt>IR 版本</dt>
+            <dt>审查单号</dt>
             <dd className="font-data">
               {ir.ir_id}（{ir.ir_version}）
             </dd>
-            <dt>原件指纹 raw_sha256</dt>
+            <dt>原件校验码</dt>
             <dd className="font-data">
-              {unit?.fingerprint?.raw_sha256 ?? "未内嵌原件指纹"}
+              {unit?.fingerprint?.raw_sha256 ?? "未记录"}
             </dd>
-            <dt>正文指纹 text_sha256</dt>
+            <dt>正文校验码</dt>
             <dd className="font-data">
-              {unit?.fingerprint?.text_sha256 ?? "未内嵌正文指纹"}
+              {unit?.fingerprint?.text_sha256 ?? "未记录"}
             </dd>
           </dl>
         </div>

@@ -69,8 +69,12 @@ const taxonomy = taxonomyJson as unknown as Taxonomy;
 
 const PENDING = "待规范文档";
 
+function cleanMd(text: string): string {
+  return text.replace(/^[#*\s]+/, "").replace(/\*\*/g, "").replace(/`/g, "");
+}
+
 function textOrPending(value: string | null | undefined) {
-  return value && value.trim() ? value : PENDING;
+  return value && value.trim() ? cleanMd(value) : PENDING;
 }
 
 function ListOrPending({ items, empty = PENDING }: { items: string[]; empty?: string }) {
@@ -78,7 +82,7 @@ function ListOrPending({ items, empty = PENDING }: { items: string[]; empty?: st
   return (
     <ul className="taxonomy-list">
       {items.map((item) => (
-        <li key={item}>{item.replace(/^[#*\s]+/, "")}</li>
+        <li key={item}>{cleanMd(item)}</li>
       ))}
     </ul>
   );
@@ -242,25 +246,24 @@ export default function TaxonomyPage() {
         <>
           {(!internal || internal.ruleExamples.length === 0) && (
             <p className="hint">
-              生产构建不包含内部规则示例与欠定边界登记；判定依据以案件 findings 为准。
+              以下为七大审核维度的判定标准，具体案件的命中依据可在案件详情中查看。
             </p>
           )}
 
           {disputes.length > 0 && (
             <>
-              <h2>已登记欠定边界（{disputes.length} 条）</h2>
+              <h2>待明确边界条目（{disputes.length} 条）</h2>
               <p className="hint">
-                这些规则的边界<b>规范确实定不住</b>，不是判读者错。界面展示
-                <code>underdetermined</code> 而不强行给一个轴 ——
-                其中 <code>axis_code</code> 为空的条目是<b>多轴争议</b>。
+                以下条目处于规则边界修订中，涉及跨维度判定（标记为{" "}
+                <code>underdetermined</code>）。
               </p>
               <ul className="notrun">
                 {disputes.map((d) => (
                   <li key={d.rule_id}>
                     <span className="font-data">{d.section}</span>
                     <span>
-                      {d.dispute}
-                      {d.axis_code === null && <b>多轴争议</b>}
+                      {cleanMd(d.dispute)}{" "}
+                      {d.axis_code === null && <b>（跨维度争议）</b>}
                     </span>
                     <span className="notrun__why">
                       {d.status}
@@ -442,10 +445,10 @@ export default function TaxonomyPage() {
         <div className="state">
           <h2>
             {activeTab === "rules"
-              ? "规则库只读投影（/api/v1/rules）"
+              ? "规则库"
               : activeTab === "control-points"
-                ? "控制点名册只读投影（/api/v1/control-points）"
-                : "处置路由表只读投影（/api/v1/routing）"}
+                ? "规则项名册"
+                : "处置路由表"}
           </h2>
           {apiErr ? (
             <p className="error" role="alert">
@@ -463,7 +466,7 @@ export default function TaxonomyPage() {
               if (list.length === 0) {
                 return (
                   <p className="hint">
-                    当前投影目录下该集合为空（0 条记录）。变更只在飞书 Base 或本地治理 JSON 权威源完成。
+                    当前分类下暂无记录。
                   </p>
                 );
               }

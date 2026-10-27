@@ -252,8 +252,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
       {showHandoff && drafts.length > 0 && (
         <div className="handoff-drawer" role="region" aria-label="历史草稿交接对比">
           <p className="hint">
-            原稿不可变（Immutable）。系统仅视觉标记最新主草稿（Recommended: Latest），不自动预选或自动合并：
-            主草稿须<strong>显式 Adopt</strong>以生成新派生草稿（记录 <code>derived_from</code>）；其余历史快照可<strong>引用片段（Reference）</strong>。
+            历史草稿仅供对照。可采用最新草稿继续编辑，或将某次备注插入下方输入框。
           </p>
           <ul className="handoff-list">
             {drafts.map((d) => {
@@ -269,7 +268,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
                     </span>
                     {isPrimary && (
                       <span className="badge badge--pending" data-status-badge="">
-                        Recommended: Latest (Primary)
+                        最新草稿
                       </span>
                     )}
                     {d.derived_from && (
@@ -300,7 +299,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
                           })
                         }
                       >
-                        显式采纳为主草稿（Adopt）
+                        采用此草稿
                       </Button>
                     ) : (
                       <Button
@@ -331,7 +330,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
                           })
                         }
                       >
-                        引用备注片段（Reference）
+                        插入备注片段
                       </Button>
                     )}
                   </div>
@@ -523,7 +522,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
 
       {candidates.length > 0 && (
         <p className="hint">
-          提示：上方「证据链」每条候选 finding 卡片内已支持直接点击「确认 / 驳回」就地裁决（共 {candidates.length} 条待裁）。
+          提示：上方每条待核问题可直接点击「确认违规」或「驳回候选」逐条处理（共 {candidates.length} 条）。
         </p>
       )}
 
