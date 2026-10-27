@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import LoadingRows from "../components/LoadingRows";
 import {
   ApiError,
-  request,
   reviewApi,
   type CaseSummary,
   type NotificationItem,
@@ -59,18 +58,7 @@ export default function InboxPage() {
   const handleNotifAction = async (id: string, kind: "read" | "ack") => {
     setActionFlash(null);
     try {
-      await request(`/notifications/${encodeURIComponent(id)}/${kind}`, {
-        method: "POST",
-        // ★ 必须带 `notification_id`：后端 `NotificationItemBody` 把它列为必填
-        //   （`api/write_api.py` 的 `_notification_command`）。改前这里发的是
-        //   `body: {}` —— 于是每次点「标记已读」都拿到 **422 Unprocessable
-        //   Entity**，而页面把非 501 的失败吞进 catch 后**什么都没变**：
-        //   通知还是未读、也没有报错条，读起来像「按钮没反应」。
-        //   这是浏览器联调抓到的第一个真实接线缺陷（`pairing_check.mjs`
-        //   的 `--expect-write` 与 dev-up 的 [8/11] 都会命中它）。
-        body: { notification_id: id },
-        idempotencyKey: crypto.randomUUID(),
-      });
+      await reviewApi.markNotification(id, kind, crypto.randomUUID());
       setActionFlash(`通知 ${id} 已标记为 ${kind}`);
       await loadAll();
     } catch (e: unknown) {

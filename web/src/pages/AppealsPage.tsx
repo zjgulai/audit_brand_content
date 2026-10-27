@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import LoadingRows from "../components/LoadingRows";
-import { ApiError, request } from "../api/client";
+import { ApiError, reviewApi } from "../api/client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
@@ -18,27 +18,9 @@ import Icon from "../ui/icon";
  *   - `resolved`：终态。
  */
 
-export interface AppealItem {
-  appeal_id: string;
-  case_id: string;
-  appellant: string;
-  reason: string;
-  state:
-    | "open"
-    | "paused_version_invalidated"
-    | "migrated"
-    | "stale"
-    | "withdrawn"
-    | "resolved"
-    | string;
-  opened_at?: string;
-  paused_at?: string | null;
-  pause_reason?: string | null;
-  migrated_at?: string | null;
-  stale_at?: string | null;
-  withdrawn_at?: string | null;
-  withdraw_reason?: string | null;
-}
+import type { AppealItem } from "../api/client";
+// ★ 保留对外再导出：既有 import { type AppealItem } from "./AppealsPage" 的调用方不受影响。
+export type { AppealItem };
 
 export default function AppealsPage() {
   const { appealId } = useParams<{ appealId: string }>();
@@ -57,7 +39,7 @@ export default function AppealsPage() {
 
   const loadAppeals = useCallback(async () => {
     try {
-      const data = await request<AppealItem[]>("/appeals");
+      const data = await reviewApi.listAppeals();
       setRows(Array.isArray(data) ? data : []);
       setError(null);
     } catch (e: unknown) {
@@ -80,14 +62,10 @@ export default function AppealsPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const created = await request<AppealItem>("/appeals", {
-        method: "POST",
-        body: {
-          case_id: newCaseId.trim(),
-          reason: newReason.trim(),
-        },
-        idempotencyKey: crypto.randomUUID(),
-      });
+      const created = await reviewApi.createAppeal(
+        { case_id: newCaseId.trim(), reason: newReason.trim() },
+        crypto.randomUUID(),
+      );
       setRows((prev) => [created, ...(prev ?? [])]);
       setNewCaseId("");
       setNewReason("");
@@ -111,13 +89,9 @@ export default function AppealsPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const updated = await request<AppealItem>(
-        `/appeals/${encodeURIComponent(item.appeal_id)}/migrate`,
-        {
-          method: "POST",
-          body: {},
-          idempotencyKey: crypto.randomUUID(),
-        },
+      const updated = await reviewApi.migrateAppeal(
+        item.appeal_id,
+        crypto.randomUUID(),
       );
       setRows((prev) =>
         (prev ?? []).map((x) =>
@@ -144,13 +118,10 @@ export default function AppealsPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const updated = await request<AppealItem>(
-        `/appeals/${encodeURIComponent(item.appeal_id)}/withdraw`,
-        {
-          method: "POST",
-          body: { reason: withdrawReason.trim() },
-          idempotencyKey: crypto.randomUUID(),
-        },
+      const updated = await reviewApi.withdrawAppeal(
+        item.appeal_id,
+        withdrawReason.trim(),
+        crypto.randomUUID(),
       );
       setRows((prev) =>
         (prev ?? []).map((x) =>

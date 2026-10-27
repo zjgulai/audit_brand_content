@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { ApiError, request } from "../api/client";
+import { ApiError } from "../api/client";
+import { adminApi } from "../api/admin-client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import LoadingRows from "../components/LoadingRows";
 import Button from "../ui/Button";
@@ -14,28 +15,8 @@ import FieldState from "../ui/FieldState";
  * 3. 明确标注历史签名保留原则（GR-10…GR-12）：撤销授权后既有签名仍有效，且原签发人仍可撤回自己的历史签名。
  */
 
-export interface GrantRecord {
-  grant_id?: string;
-  id?: string;
-  tenant?: string;
-  product_line?: string;
-  platform?: string;
-  user_id?: string;
-  capability?: string;
-  status?: string;
-  // T-314d：三态走 state（reducer 的真相源）；status 仅为旧数据兜底。
-  state?: "proposed" | "executed" | "approved" | "revoked" | string;
-  proposed_at?: string;
-  executed_at?: string;
-  approved_at?: string;
-  revoked_by?: string;
-  revoked_at?: string;
-  revoke_reason?: string;
-  proposed_by?: string;
-  executed_by?: string;
-  approved_by?: string;
-  reason?: string;
-}
+import type { GrantRecord } from "../api/admin-client";
+export type { GrantRecord };
 
 /**
  * 授权状态徽标（ADR-0021 · W-2）。
@@ -94,8 +75,8 @@ export default function AdminGrantsPage() {
   const loadGrants = useCallback(async () => {
     try {
       const [sg, tg] = await Promise.all([
-        request<GrantRecord[]>("/admin/signer-grants"),
-        request<GrantRecord[]>("/admin/takedown-grants"),
+        adminApi.listGrants("signer"),
+        adminApi.listGrants("takedown"),
       ]);
       setSignerGrants(Array.isArray(sg) ? sg : []);
       setTakedownGrants(Array.isArray(tg) ? tg : []);
@@ -122,20 +103,18 @@ export default function AdminGrantsPage() {
     if (!targetUser.trim() || !reason.trim() || busy) return;
     setBusy(true);
     setFlash(null);
-    const path =
-      tab === "signer" ? "/admin/signer-grants" : "/admin/takedown-grants";
     try {
-      await request(path, {
-        method: "POST",
-        body: {
+      await adminApi.proposeGrant(
+        tab,
+        {
           user_id: targetUser.trim(),
           capability,
           product_line: productLine,
           ...(tab === "takedown" ? { platform } : {}),
           reason: reason.trim(),
         },
-        idempotencyKey: crypto.randomUUID(),
-      });
+        crypto.randomUUID(),
+      );
       setFlash({
         ok: true,
         text: "授权提案已提交，等待独立执行人与第二审批人完成三权分立核准。",
@@ -164,11 +143,7 @@ export default function AdminGrantsPage() {
     setFlash(null);
     const gid = String(grant.grant_id ?? grant.id);
     try {
-      await request(`/admin/grants/${encodeURIComponent(gid)}/${action}`, {
-        method: "POST",
-        body: { note: `${action === "execute" ? "执行" : "审批"}自 P-11` },
-        idempotencyKey: crypto.randomUUID(),
-      });
+      await adminApi.transitionGrant(gid, action, crypto.randomUUID());
       setFlash({
         ok: true,
         text:

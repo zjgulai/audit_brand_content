@@ -15,6 +15,23 @@ export type FindingMutation = LedgerMutation & { finding?: Record<string, unknow
  * 每个方法都要求调用方显式给 Idempotency-Key。这里不偷偷生成 key，
  * 因为只有页面知道「这是不是同一个用户意图的重试」。
  */
+/** `POST /submissions` 的响应。
+ *
+ *  ★ `case_id` 是**分支依据**：有它 → 显示真判定（内嵌 CaseDetailPage）；
+ *    没有它（如 501 未开写库）→ 显示本地预检。所以它必须是可选且显式的，
+ *    不许用 `Record<string, unknown>` 糊过去。
+ */
+export interface SubmitResult {
+  case_id?: string;
+  submission_id?: string;
+  http_status?: number;
+  replayed?: boolean;
+  authority_snapshot?: Record<string, unknown>;
+  reconcile_token?: string;
+  result?: Record<string, unknown>;
+  [k: string]: unknown;
+}
+
 export const reviewWriteApi = {
   claim: (caseId: string, idempotencyKey: string) =>
     request<LedgerMutation>(`/cases/${encodeURIComponent(caseId)}/claim`, {
@@ -129,6 +146,21 @@ export const reviewWriteApi = {
         finding_id: findingId,
         ...(reason.trim() ? { reason: reason.trim() } : {}),
       },
+      idempotencyKey,
+    }),
+
+  /**
+   * 内容入库（提交送审）。
+   *
+   * ★ 原本是 SubmitPage 里的一处裸 `request<Record<string, unknown>>("/submissions")`。
+   *   搬进来的同时**把返回类型从 `Record<string, unknown>` 收紧**成
+   *   `SubmitResult` —— 页面拿它读 `case_id` 来决定「显示真判定还是本地预检」，
+   *   而 `Record<string, unknown>` 让这个判断在类型层面完全不受保护。
+   */
+  submit: (body: Record<string, unknown>, idempotencyKey: string) =>
+    request<SubmitResult>("/submissions", {
+      method: "POST",
+      body,
       idempotencyKey,
     }),
 

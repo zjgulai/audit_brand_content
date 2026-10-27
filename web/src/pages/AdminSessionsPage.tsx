@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, request } from "../api/client";
+import { ApiError } from "../api/client";
+import { adminApi } from "../api/admin-client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import LoadingRows from "../components/LoadingRows";
 
@@ -19,9 +20,7 @@ export default function AdminSessionsPage() {
 
   const loadSessions = useCallback(async () => {
     try {
-      const data = await request<Array<Record<string, unknown>>>(
-        "/admin/sessions",
-      );
+      const data = await adminApi.listSessions();
       setSessions(Array.isArray(data) ? data : []);
       setError(null);
     } catch (e: unknown) {

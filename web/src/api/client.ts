@@ -334,6 +334,30 @@ export function splitQueue(rows: CaseSummary[]): {
   return { queued, offQueue };
 }
 
+/** 申诉。★ 六个时间字段前端一个都没渲染（ADR-0021 C 级待办），
+ *  但类型要留着 —— 删掉类型会让「有哪些状态可读」这件事消失。 */
+export interface AppealItem {
+  appeal_id: string;
+  case_id: string;
+  appellant: string;
+  reason: string;
+  state:
+    | "open"
+    | "paused_version_invalidated"
+    | "migrated"
+    | "stale"
+    | "withdrawn"
+    | "resolved"
+    | string;
+  opened_at?: string;
+  paused_at?: string | null;
+  pause_reason?: string | null;
+  migrated_at?: string | null;
+  stale_at?: string | null;
+  withdrawn_at?: string | null;
+  withdraw_reason?: string | null;
+}
+
 export const reviewApi = {
   listCases: () => request<CaseSummary[]>("/cases"),
 
@@ -355,4 +379,68 @@ export const reviewApi = {
 
   /** 登出：POST（带 CSRF），后端撤销 session 并清 cookie。 */
   logout: () => request<{ logged_out: boolean }>("/logout", { method: "POST" }),
+
+  // ── 以下为 ADR-0021 · W-1 收纳的裸调用 ────────────────────────────────
+  //
+  // ★ 这些方法原本散在 12 个页面的 `request(...)` 里。搬进来**只搬不改语义**，
+  //   目的是让「路径」只在 `api/` 下出现一次 —— 两处拼 URL 就有一处写错的机会。
+
+  /** 申诉列表。 */
+  listAppeals: () => request<AppealItem[]>("/appeals"),
+
+  /** 发起申诉。 */
+  createAppeal: (body: { case_id: string; reason: string }, idempotencyKey: string) =>
+    request<AppealItem>("/appeals", { method: "POST", body, idempotencyKey }),
+
+  /** 原申诉人确认迁移。 */
+  migrateAppeal: (appealId: string, idempotencyKey: string) =>
+    request<AppealItem>(`/appeals/${encodeURIComponent(appealId)}/migrate`, {
+      method: "POST",
+      body: {},
+      idempotencyKey,
+    }),
+
+  /** 撤销申诉（需理由）。 */
+  withdrawAppeal: (appealId: string, reason: string, idempotencyKey: string) =>
+    request<AppealItem>(`/appeals/${encodeURIComponent(appealId)}/withdraw`, {
+      method: "POST",
+      body: { reason },
+      idempotencyKey,
+    }),
+
+  /** 规则库（只读投影）。★ 响应是原始行，形状未定 —— 见 W-2 的三态口径。 */
+  listRules: () => request<Array<Record<string, unknown>>>("/rules"),
+
+  /** 控制点（只读投影）。 */
+  listControlPoints: () => request<Array<Record<string, unknown>>>("/control-points"),
+
+  /** 处置路由表（只读投影）。 */
+  listRouting: () => request<Array<Record<string, unknown>>>("/routing"),
+
+  /**
+   * 通知标已读 / 已确认。
+   *
+   * ★ body **必须带 `notification_id`** —— 后端 `NotificationItemBody` 把它列为必填
+   *   （`api/write_api.py` 的 `_notification_command`）。改前页面发的是 `body: {}`，
+   *   于是每次点「标记已读」都拿到 **422**，而页面把非 501 的失败吞进 catch 后
+   *   **什么都没变**：通知还是未读、也没有报错条，读起来像「按钮没反应」。
+   *   这是浏览器联调抓到的第一个真实接线缺陷。
+   */
+  markNotification: (
+    notificationId: string,
+    kind: "read" | "ack",
+    idempotencyKey: string,
+  ) =>
+    request<Record<string, unknown>>(
+      `/notifications/${encodeURIComponent(notificationId)}/${kind}`,
+      { method: "POST", body: { notification_id: notificationId }, idempotencyKey },
+    ),
+
+  /** 重签报告：返回新链接（旧链接作废）。 */
+  resignReport: (reportId: string, idempotencyKey: string) =>
+    request<ReportSummary>(`/reports/${encodeURIComponent(reportId)}/resign`, {
+      method: "POST",
+      body: {},
+      idempotencyKey,
+    }),
 };

@@ -73,6 +73,12 @@ if [ "${STAGE}" = "static" ]; then
   #     `src/ui/fieldState.logic.ts`（测真身，不测拷贝）。
   #     忘了带会退 2 → 落「未测」，**不会**假装通过。
   run_rc_check field_state node --experimental-strip-types "${HERE}/check_field_state.mjs"
+  # ★ 2026-10-27（ADR-0021 · W-1）：路径只在 api/ 拼。
+  #   18 处裸 request/fetch 收进 client.ts / admin-client.ts / write-client.ts 之后，
+  #   这一条守住「不许再散回页面里」。
+  #   ★ ReleasePage 的 reauth 是登记过的例外（302 + CSRF + redirect:manual，
+  #     request() 表达不了），逐个点名，不是模糊放行。
+  run_rc_check api_centralization node "${HERE}/check_api_centralization.mjs"
 else
   # build 阶段：dist 必须已经由 `npm run build` 产好（verify:build 的顺序就是这样）
   run_json_check bundle_budget node "${HERE}/check_bundle_budget.mjs" --dir "${WEB}/dist" --json

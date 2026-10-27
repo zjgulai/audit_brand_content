@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ApiError,
-  request,
   reviewApi,
   type CaseDetail,
   type ReportSummary,
@@ -65,11 +64,7 @@ export default function ReportPage() {
     setResigning(true);
     setResignMsg(null);
     try {
-      await request(`/reports/${encodeURIComponent(reportId)}/resign`, {
-        method: "POST",
-        body: {},
-        idempotencyKey: crypto.randomUUID(),
-      });
+      await reviewApi.resignReport(reportId, crypto.randomUUID());
       setResignMsg({
         ok: true,
         text: "已生成新的签名访问链接（旧报告正文保持不可变）。",

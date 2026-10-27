@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import LoadingRows from "../components/LoadingRows";
-import { ApiError, request } from "../api/client";
+import { ApiError } from "../api/client";
+import { takedownApi } from "../api/admin-client";
 import { useIdentity } from "../components/IdentitySwitcher";
 import Button from "../ui/Button";
 import FieldState from "../ui/FieldState";
@@ -18,21 +19,8 @@ import Icon from "../ui/icon";
  *   3. 豁免（waive）强制双人独立审批：Approver 1 !== Approver 2 !== Executor，原签发人不得唯一（TF-10…TF-14）。
  */
 
-export interface TakedownTaskItem {
-  task_id: string;
-  case_id: string;
-  platform: string;
-  tenant?: string;
-  product_line?: string;
-  assignee?: string | null;
-  state: "pending" | "in_progress" | "completed" | "failed" | "waived" | string;
-  created_at?: string;
-  reminder_count?: number;
-  last_reminded_at?: string | null;
-  version?: number;
-  evidence?: Record<string, unknown> | null;
-  waived?: Record<string, unknown> | null;
-}
+import type { TakedownTaskItem } from "../api/admin-client";
+export type { TakedownTaskItem };
 
 // T-312d：任务年龄只有一个口径 —— 后端 metrics_view（北京日期）算好随列表
 // 下发，前端只做**格式化**（天/小时）；客户端时钟不参与年龄计算
@@ -83,10 +71,7 @@ export default function TakedownPage() {
   const loadTasks = useCallback(async () => {
     try {
       // T-312d：响应形状 {tasks, metrics}；年龄一律读 metrics.ages。
-      const data = await request<{
-        tasks: TakedownTaskItem[];
-        metrics: { ages: { task_id: string; age_days: number }[] };
-      }>("/takedown-tasks");
+      const data = await takedownApi.list();
       const list = Array.isArray(data?.tasks) ? data.tasks : [];
       setTasks(list);
       setAgeByTask(new Map(
@@ -115,14 +100,7 @@ export default function TakedownPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const updated = await request<TakedownTaskItem>(
-        `/takedown-tasks/${encodeURIComponent(taskId)}/${action}`,
-        {
-          method: "POST",
-          body: {},
-          idempotencyKey: crypto.randomUUID(),
-        },
-      );
+      const updated = await takedownApi.act(taskId, action, {}, crypto.randomUUID());
       setTasks((prev) =>
         (prev ?? []).map((t) => (t.task_id === taskId ? updated : t)),
       );
@@ -147,21 +125,19 @@ export default function TakedownPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const updated = await request<TakedownTaskItem>(
-        `/takedown-tasks/${encodeURIComponent(activeTaskId)}/complete`,
-        {
-          method: "POST",
-          body: {
-            evidence: {
-              platform: evPlatform.trim(),
-              executed_by: evExecutedBy.trim() || current?.id || "",
-              executed_at: evExecutedAt.trim(),
-              ...(evReceiptId.trim() ? { receipt_id: evReceiptId.trim() } : {}),
-              ...(evResultUrl.trim() ? { result_url: evResultUrl.trim() } : {}),
-            },
+      const updated = await takedownApi.act(
+        activeTaskId,
+        "complete",
+{
+          evidence: {
+            platform: evPlatform.trim(),
+            executed_by: evExecutedBy.trim() || current?.id || "",
+            executed_at: evExecutedAt.trim(),
+            ...(evReceiptId.trim() ? { receipt_id: evReceiptId.trim() } : {}),
+            ...(evResultUrl.trim() ? { result_url: evResultUrl.trim() } : {}),
           },
-          idempotencyKey: crypto.randomUUID(),
         },
+        crypto.randomUUID(),
       );
       setTasks((prev) =>
         (prev ?? []).map((t) => (t.task_id === activeTaskId ? updated : t)),
@@ -188,28 +164,26 @@ export default function TakedownPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const updated = await request<TakedownTaskItem>(
-        `/takedown-tasks/${encodeURIComponent(activeTaskId)}/waive`,
-        {
-          method: "POST",
-          body: {
-            approvers: [
-              {
-                actor: approver1.trim(),
-                scopes: ["takedown.waive"],
-                scope_match: true,
-              },
-              {
-                actor: approver2.trim(),
-                scopes: ["takedown.waive"],
-                scope_match: true,
-              },
-            ],
-            reason: waiveReason.trim(),
-            evidence: { note: waiveEvidence.trim() },
-          },
-          idempotencyKey: crypto.randomUUID(),
+      const updated = await takedownApi.act(
+        activeTaskId,
+        "waive",
+{
+          approvers: [
+            {
+              actor: approver1.trim(),
+              scopes: ["takedown.waive"],
+              scope_match: true,
+            },
+            {
+              actor: approver2.trim(),
+              scopes: ["takedown.waive"],
+              scope_match: true,
+            },
+          ],
+          reason: waiveReason.trim(),
+          evidence: { note: waiveEvidence.trim() },
         },
+        crypto.randomUUID(),
       );
       setTasks((prev) =>
         (prev ?? []).map((t) => (t.task_id === activeTaskId ? updated : t)),
@@ -236,13 +210,11 @@ export default function TakedownPage() {
     setBusy(true);
     setFlash(null);
     try {
-      const updated = await request<TakedownTaskItem>(
-        `/takedown-tasks/${encodeURIComponent(activeTaskId)}/reassign`,
-        {
-          method: "POST",
-          body: { assignee: newAssignee.trim() },
-          idempotencyKey: crypto.randomUUID(),
-        },
+      const updated = await takedownApi.act(
+        activeTaskId,
+        "reassign",
+        { assignee: newAssignee.trim() },
+        crypto.randomUUID(),
       );
       setTasks((prev) =>
         (prev ?? []).map((t) => (t.task_id === activeTaskId ? updated : t)),

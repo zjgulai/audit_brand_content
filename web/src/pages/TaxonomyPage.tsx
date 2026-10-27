@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { request } from "../api/client";
+import { reviewApi } from "../api/client";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
 import taxonomyJson from "../data/taxonomy.json";
@@ -143,14 +143,13 @@ export default function TaxonomyPage() {
     const loadTab = async () => {
       try {
         if (activeTab === "rules" && rulesList === null) {
-          const data = await request<Array<Record<string, unknown>>>("/rules");
+          const data = await reviewApi.listRules();
           if (alive) setRulesList(Array.isArray(data) ? data : []);
         } else if (activeTab === "control-points" && cpList === null) {
-          const data =
-            await request<Array<Record<string, unknown>>>("/control-points");
+          const data = await reviewApi.listControlPoints();
           if (alive) setCpList(Array.isArray(data) ? data : []);
         } else if (activeTab === "routing" && routingList === null) {
-          const data = await request<Array<Record<string, unknown>>>("/routing");
+          const data = await reviewApi.listRouting();
           if (alive) setRoutingList(Array.isArray(data) ? data : []);
         }
       } catch (e: unknown) {

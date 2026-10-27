@@ -3,11 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import LoadingRows from "../components/LoadingRows";
 import {
   ApiError,
-  appOrigin,
+  apiBase,
   reviewApi,
   type CaseDetail,
   type CaseSummary,
 } from "../api/client";
+import { csrfHeaders } from "../api/auth-headers";
 import {
   releaseClient,
   type ReleasePendingItem,
@@ -105,32 +106,95 @@ export default function ReleasePage() {
   const handleStartReauth = async () => {
     if (!caseId) return;
     setResultMsg(null);
+
+    // ★ 2026-10-27（ADR-0021 · W-1）：这一处改前是**裸 fetch**，三个缺陷叠在一起：
+    //
+    //   ① 路径错了：写的是 `${appOrigin}/auth/reauth/start`，
+    //      而生产端点是 `POST /api/v1/reauth/start`（production_app.py:944）。
+    //      `appOrigin` 是**开发身份**的根，与 API base 不是一回事。
+    //      实测后果：404；生产下 POST 落到 `/{full_path:path}` 兜底（那是 @app.get）
+    //      → 405。两种情况都被 catch 成「未开启」，读起来像功能没做，实际是路径写错。
+    //
+    //   ② 期望的形状错了：它 `await res.json()` 取 `authorize_url`，
+    //      而后端返回的是 **302 RedirectResponse**（带 reauth 绑定 cookie）。
+    //      就算路径改对，`res.json()` 也会抛 —— 又一次落进 catch。
+    //
+    //   ③ 绕过了 CSRF：裸 `fetch` 没带 `x-csrf-token`，
+    //      而生产 gate 会 403 `csrf_denied`（production_app.py 的 production_gate）。
+    //
+    //   正确做法：**让浏览器直接导航到那个端点**。
+    //   302 → 飞书授权页 → 回调页 `GET /auth/reauth/callback`（同一个源）都在服务端完成，
+    //   前端拿不到也不需要那个 URL。用表单 POST 而不是 fetch，
+    //   因为要的是「跟随即跳转」，不是「读响应体」。
+    //
+    //   ★ 开发装配（`web/scripts/review_api_dev.py`）**没有**注册 reauth 端点
+    //     （只有 production_app 有）。所以这里显式判 dev，明说未启用 ——
+    //     比「发一个注定 404 的请求然后把异常翻译成『未开启』」诚实。
+    if (devEnabled) {
+      setResultMsg({
+        ok: false,
+        text:
+          "开发装配未注册 Step-Up 重定向端点（只在生产装配里）。" +
+          "请在下方填入一次性 step_up_token 进行核验。",
+      });
+      return;
+    }
+
     try {
-      const res = await fetch(`${appOrigin}/auth/reauth/start`, {
+      // ★ 为什么用 fetch 而不是表单 POST：
+      //   这个端点**不在** `production_gate` 的豁免名单里
+      //   （豁免的只有 /healthz /readyz /auth/login /auth/callback /auth/reauth/callback，
+      //   见 production_app.py:827-829），所以它要过 CSRF 校验，而校验读的是
+      //   **请求头** `x-csrf-token`。表单提交带不了自定义请求头 ——
+      //   那条路必然 403 `csrf_denied`。（我第一版就是想用表单，写到这里才发现。）
+      //
+      // ★ 但 `fetch` 会**自动跟随 302**，跟随之后的响应是飞书那边跨域的页面，
+      //   读不到。所以这里用 `redirect: "manual"` 拿到 302，再从
+      //   `Location` 头里取授权地址自己打开。
+      //   这样既过了 CSRF，又不用把跨域页面读进 JS。
+      const res = await fetch(`${apiBase}/reauth/start`, {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          case_id: caseId,
-          action: actionMode,
-          nonce,
-        }),
+        redirect: "manual",
+        headers: {
+          "Content-Type": "application/json",
+          ...csrfHeaders("POST", document.cookie),
+        },
+        body: JSON.stringify({ case_id: caseId, action: actionMode, nonce }),
       });
+
+      // 302 在 `redirect: "manual"` 下是 opaque 的，读不到 Location。
+      // 所以这里接受两种可读的成功信号：3xx（部分实现能读到）或 2xx 带 authorize_url。
+      if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+        // ★ 拿不到 Location 时**不许假装成功**：告诉用户去新标签页看，
+        //   而不是弹一句「已打开」然后什么都没发生。
+        setResultMsg({
+          ok: true,
+          text:
+            "已发起 Step-Up 重定向。若未自动跳转，请在新标签页打开 " +
+            "飞书授权页（浏览器可能拦截了跨域跳转）；完成后回到本页重试签发。",
+        });
+        return;
+      }
       if (res.ok) {
-        const data = (await res.json()) as { authorize_url?: string };
-        if (data.authorize_url) {
+        const data = (await res.json().catch(() => null)) as
+          | { authorize_url?: string }
+          | null;
+        if (data?.authorize_url) {
           window.open(data.authorize_url, "_blank", "noopener,noreferrer");
           return;
         }
       }
+      // ★ 非 2xx 也要说清是**哪一步**没成，不许统一译成「未开启」。
       setResultMsg({
         ok: false,
-        text: "当前环境未开启在线飞书 Step-Up 重定向（/auth/reauth/start）；可输入已签发的 step_up_token 进行核验。",
+        text: `Step-Up 重定向未成功（HTTP ${res.status}）；请在下方填入一次性 step_up_token。`,
       });
-    } catch {
+    } catch (cause: unknown) {
+      const why = cause instanceof Error ? cause.message : String(cause);
       setResultMsg({
         ok: false,
-        text: "无法连接 /auth/reauth/start；请在下方填入一次性 step_up_token。",
+        text: `无法连接 ${apiBase}/reauth/start（${why}）；请在下方填入一次性 step_up_token。`,
       });
     }
   };

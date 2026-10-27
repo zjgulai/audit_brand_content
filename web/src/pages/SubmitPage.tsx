@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { ApiError, request } from "../api/client";
+import { ApiError } from "../api/client";
+import { reviewWriteApi } from "../api/write-client";
 import StatusBadge from "../components/StatusBadge";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
@@ -274,11 +275,7 @@ export default function SubmitPage() {
     }
 
     try {
-      const res = await request<Record<string, unknown>>("/submissions", {
-        method: "POST",
-        body: payload,
-        idempotencyKey: crypto.randomUUID(),
-      });
+      const res = await reviewWriteApi.submit(payload, crypto.randomUUID());
       setReceipt({ submission_id: submissionId, ...res });
     } catch (cause: unknown) {
       if (cause instanceof ApiError) {
