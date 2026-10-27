@@ -1,0 +1,21 @@
+[
+  {
+    "事项名称": "全站精细化打磨：统一骨架屏 + 一条左线对齐 + 逐页交互精修",
+    "关联执行票": "T-447",
+    "功能一级分类": "跨页面公共能力",
+    "功能二级分类": "外壳",
+    "功能三级分类": "导航/快捷提交/登出",
+    "工作类型": [
+      "前端"
+    ],
+    "完成状态": "待验收",
+    "验收结论": "通过",
+    "上线状态": "已上线",
+    "阻塞状态": "无阻塞",
+    "页面路由": "全站",
+    "事项明细": "按方案（PMO/implement/精细化打磨方案-20261027.md）执行三板斧：① 新建全站统一加载骨架组件 LoadingRows，替换 inbox/release/cases/reports/appeals/takedown/admin-grants/admin-sessions 共 9 处「加载中…」孤行灰字（aria-busy + role=status）；② 一条左线对齐：头部横幅卡、表格卡、面板卡左右内距统一 var(--space-5)，表格首末列 padding 对齐容器，标题/按钮/表格共享同一条左线，.case h2 垂直节奏统一 24px/8px；③ 逐页交互精修：queue 空详情态加「打开审核工作台」入口、submit 加提交预期说明、inbox 加载态移出标题/通知 ID 截短/已读行隐藏动作、release 徽标精简、takedown 开单时长与提醒合并一行、taxonomy 待明确边界收进折叠面板（七轴卡回首屏，below-fold 消除）、admin-grants 三步流转改可读句。",
+    "验收标准": "dev-up 11/11 全过（page.ok=true、复核切片 19/19、a11y 15 路由×2 视口 0 违规）；DT-1…DT-8 全绿；生产包 14/14；tsc 0 错误；inspect 12 页 0 FAIL 且 below-fold 消除。",
+    "状态依据": "devup_polish5.log rc=0；最新数据态截图核验 taxonomy 七轴卡全部回首屏、case 右栏一体白卡左线对齐；提交 f7f828e 已部署 ca.luteos.com，readyz 200。",
+    "下一步行动": "等待委托方在线体验确认"
+  }
+]
