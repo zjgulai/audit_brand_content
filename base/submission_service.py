@@ -169,6 +169,70 @@ def _nonempty(value, name):
     return value.strip()
 
 
+def apply_stage_inference(submission, *, known_inference=None):
+    """`content_stage` 缺失时补一个**推断出的建议值**。返回 `(新 submission, 观察)`。
+
+    ## ★★ 为什么它必须是一个**共用**的纯函数，而不是写在 `prepare()` 里
+
+    第一版写在 `prepare()` 里，随即撞上一个真缺陷：
+    `base/review_command_service.py` 在调 `prepare()` **之前**就用
+    `ingestor.submission_hash(submission)` 算了幂等哈希，而哈希里包含
+    `content_stage`（`submission_hash()` 的 body 里就有它）。
+
+    于是同一个请求：
+
+        重放时 service 侧算的哈希 = 65d53ca4…（原始，缺 stage）
+        payload 里存的哈希       = 2ef748f6…（已补 stage）
+
+    两个值不同 → `authority.idempotent()` 那条比对判为不一致 →
+    **误报 `idempotency_conflict`**。实测确认过（见 T-455 提交说明）。
+
+    修法只有一条：补值必须发生在**算哈希之前**，且**两处走同一个函数**。
+    各自补一次必然分叉（AGENTS.md §2.4.8「同一个量两个口径」）。
+
+    ## ★ `known_inference`：为什么需要它
+
+    上游补过之后，`prepare()` 再跑一次时看到 `content_stage='brief'`，
+    会误以为「这是调用方申报的」，返回 `status=absent` —— 于是
+    **推断这件事在案件记录里消失了**，下游看到 stage 有值就当成是人填的。
+
+    所以上游把自己那次推断通过 `known_inference=` 传下来：
+    检测到「传下来的值就是我上次推断的那个」时，复用那份观察而
+    **不重新判定**为 absent。两处仍然只判定一次。
+
+    ## 口径（三条不许破）
+
+    ① 调用方给了值 → **一律采信**，不推断。`content_stage` 是调用方申报的事实
+       （这条内容是什么阶段），不是模型可以改写的判断。
+    ② 推断不出 → **不补**，让四维校验照原样报 422（缺字段）。
+       绝不许默认成某一档：默认 `final_content` 会让 brief 文案按终稿标准判，
+       默认 `brief` 会让终稿被当草稿放过。两个方向都错，所以不选。
+    ③ 观察必须**随案件走**（落 `intent_inference`），否则下游看到 stage 有值
+       就以为是人填的。
+    """
+    from base import intent_infer as _II
+
+    if not isinstance(submission, dict):
+        return submission, _II.infer_stage(None)
+
+    declared = submission.get("content_stage")
+
+    # ★ 上游已经补过：认出来，别把它当成「调用方申报的」。
+    if (isinstance(known_inference, dict)
+            and known_inference.get("status") == _II.STATUS_INFERRED
+            and known_inference.get("value")
+            and declared == known_inference.get("value")):
+        return submission, known_inference
+
+    inference = _II.infer_stage(submission.get("text"), declared=declared)
+    if (inference.get("status") == _II.STATUS_INFERRED
+            and inference.get("value")
+            and declared in (None, "")):
+        # `dict(...)` 而不是原地改：调用方传进来的对象不该被这个函数改写。
+        return dict(submission, content_stage=inference["value"]), inference
+    return submission, inference
+
+
 class SubmissionIngestor:
     def __init__(self, *, authority_query=None, judge_fn=None, kb_path=None,
                  max_text_chars=MAX_TEXT_CHARS, clock=None, media_roots=None):
@@ -348,12 +412,24 @@ class SubmissionIngestor:
                 % (unit.get("parse_status"),))
         return unit
 
-    def prepare(self, submission, *, principal):
-        """返回 `{case_id, payload}`；任何失败都不产生 authority 写入。"""
+    def prepare(self, submission, *, principal, known_inference=None):
+        """返回 `{case_id, payload}`；任何失败都不产生 authority 写入。
+
+        `known_inference`：上游（`review_command_service.execute_submission`）
+        在算幂等哈希之前已经补过一次 stage 时，把它那次推断传下来 ——
+        否则这里会把它误判成「调用方申报的」，推断记录就丢了。
+        """
         if not isinstance(submission, dict):
             raise SubmissionRejected("bad_submission", 422, "submission 必须是对象")
         if not isinstance(principal, dict):
             raise SubmissionRejected("bad_principal", 403, "principal 必须是对象")
+        # ★ T-455：`content_stage` 缺失时先推断再校验。
+        #   `classify_submission()` 会因为它缺失而 422（四维校验必填），
+        #   所以推断必须在校验**之前** —— 放在之后等于永远跑不到。
+        #   口径与「为什么必须是共用函数」写在 `apply_stage_inference()` 的文档里。
+        submission, stage_inference = apply_stage_inference(
+            submission, known_inference=known_inference)
+
         verdict = SR.classify_submission(submission)
         if verdict["outcome"] != "accepted":
             raise SubmissionRejected(
@@ -423,6 +499,11 @@ class SubmissionIngestor:
             "kb_snapshot_hash": kb_snapshot_hash,
             "conflict_table_version": ir.get("control_points_version"),
             "media_fingerprints": ir.get("media_fingerprints") or {},
+            # ★ T-455：内容阶段的推断观察。**必须随案件走** ——
+            #   若只留在 prepare() 的局部变量里，出了这个函数就没了，
+            #   而「这个 stage 是人填的还是推断的」恰恰是下游最需要知道的事。
+            #   三态原样保留（inferred / untested / absent），不压成布尔。
+            "intent_inference": stage_inference,
             # T-316b: the frozen render input for the report.
             #
             # Deliberately carries whatever judge_entry returned, including None.

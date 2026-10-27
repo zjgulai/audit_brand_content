@@ -281,6 +281,15 @@ class ReviewCommandService:
                        for v in (principal_id, tenant)):
                 raise AuthorityConflict("actor_missing", "principal id/tenant 必填")
             actor = {"principal_id": principal_id.strip(), "tenant_id": tenant.strip()}
+            # ★ T-455：**在算幂等哈希之前**补 content_stage。
+            #   `submission_hash()` 的 body 里含 `content_stage`，而下面的
+            #   `prepare()` 也会补同一个值。若只在 `prepare()` 里补：
+            #     重放时 service 侧算的哈希（原始，缺 stage）
+            #     ≠ payload 里存的哈希（已补 stage）
+            #   → 同 key 重放被误判成 `idempotency_conflict`（实测确认过）。
+            #   所以补值必须发生在这里，且与 prepare() 走**同一个**函数。
+            from base.submission_service import apply_stage_inference
+            submission, _stage_inference = apply_stage_inference(submission)
             incoming = ingestor.submission_hash(submission, principal=principal)
             existing = self.authority.idempotent(actor, idempotency_key)
             if existing is not None:
@@ -291,7 +300,11 @@ class ReviewCommandService:
                         "idempotency_conflict",
                         "同 key 已绑定不同的 submission")
                 return self._respond(existing, True)
-            prepared = ingestor.prepare(submission, principal=principal)
+            # ★ 把上面那次推断传下去 —— 否则 prepare() 会把补上的值
+            #   当成「调用方申报的」（status=absent），推断记录就丢了。
+            prepared = ingestor.prepare(
+                submission, principal=principal,
+                known_inference=_stage_inference)
             committed = self.authority.execute(
                 aggregate_id=prepared["case_id"], command="ingest_submission",
                 actor=actor, expected_version=0, payload=prepared["payload"],

@@ -1162,6 +1162,16 @@
         "base/change_detect.py",
         "tools/verify_openapi_spec.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_intent_infer.py",
+      "asserts": "T-455 content_stage 建议值推断 · A 三态（inferred/absent/untested 互不相同）· ★★★ B 不覆盖：调用方给值一律采信、只在缺失时补、**不许原地改入参**（上游要用原对象算幂等哈希）· ★★★ C 不默认：两边都没命中 → untested，**不许**默认成 brief 或 final_content（默认 final_content 会让 brief 文案按终稿判，默认 brief 会让终稿被放过）· ★★★ D 幂等：补值必须发生在算哈希之前 —— D4 用真实 BusinessEventStore + WriterLease 真跑两次 execute_submission，同 key 重放不许报 idempotency_conflict（删掉 service 里那行补值，D4 立刻红）· E 证据：每条推断都指得出 pattern/hit/why，hit 必须逐字出现在正文里 · F compare 三态（一致/分歧/无法比较）· ★★★ G 如实报出：36 条规则里 content_stage/brief/final_content 各出现 0 次，**没有任何规则消费 content_stage**，推断值今天不改变任何判定；带正向对照（severity=39/layer=38）与正反两组读数的判定翻转",
+      "subjects": [
+        "base/intent_infer.py",
+        "base/submission_service.py",
+        "base/review_command_service.py",
+        "research/governance/skeleton/rules-v1.json"
+      ]
     }
   ],
   "exempt": [
