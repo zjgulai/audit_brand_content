@@ -372,7 +372,7 @@ try {
 
   // 4) P-01 提交审查页（/submit）：真实填写正文并点击提交审查单
   await spaGoto("/submit");
-  await waitText("提交内容审查");
+  await waitText("审核工作台");
   await fillInput("#submit-text", "Momcozy 穿戴式吸奶器日常护理说明");
   await click("提交审查单");
   await waitEval(

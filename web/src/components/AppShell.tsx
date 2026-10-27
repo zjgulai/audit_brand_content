@@ -1,11 +1,10 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useIdentity } from "./IdentitySwitcher";
 import Button from "../ui/Button";
 import Icon, { type IconName } from "../ui/icon";
 import { reviewApi } from "../api/client";
 
-const SubmitPage = lazy(() => import("../pages/SubmitPage"));
 
 /**
  * 全局外壳（2026-10-26 重做：横向顶栏 → 左侧可折叠侧边栏）。
@@ -67,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     caption: "日常工作",
     items: [
+      { to: "/submit", label: "审核工作台", icon: "sparkles" },
       { to: "/inbox", label: "待办收件箱", icon: "inbox" },
       { to: "/queue", label: "待人工复核", icon: "clock" },
       { to: "/cases", label: "审核全景", icon: "search" },
@@ -116,7 +116,7 @@ const PAGE_META: { match: (p: string) => boolean; icon: IconName; title: string;
   { match: (p) => p === "/taxonomy", icon: "layers", title: "规则词典", sub: "查一条规则管什么、依据是什么" },
   { match: (p) => p === "/admin/grants", icon: "user-check", title: "授权治理", sub: "谁能审哪些品线、谁批的" },
   { match: (p) => p === "/admin/sessions", icon: "history", title: "安全审计", sub: "登录与高风险动作的流水" },
-  { match: (p) => p === "/submit", icon: "plus", title: "提交送审", sub: "把一段内容送进审核流程" },
+  { match: (p) => p === "/submit", icon: "sparkles", title: "审核工作台", sub: "上传文件或输入文案，即刻生成合规审查结果" },
 ];
 
 function metaFor(pathname: string): { icon: IconName; title: string; sub: string } {
@@ -177,7 +177,6 @@ export default function AppShell() {
     switchTo,
   } = useIdentity();
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem("review-workbench.sidebar-collapsed") === "1";
@@ -355,33 +354,8 @@ export default function AppShell() {
                 <Icon name="bell" size={13} /> {unreadCount}
               </NavLink>
             )}
-            <Button
-              variant="secondary"
-              aria-expanded={drawerOpen}
-              onClick={() => setDrawerOpen(!drawerOpen)}
-            >
-              <Icon name="plus" size={12} /> 提交送审
-            </Button>
           </div>
         </header>
-
-        {drawerOpen && (
-          <div
-            className="submit-drawer-backdrop"
-            role="dialog"
-            aria-modal="false"
-            aria-label="快速提交内容审查抽屉"
-          >
-            <div className="submit-drawer-panel">
-              <Suspense fallback={<p className="hint">加载提交单…</p>}>
-                <SubmitPage
-                  embeddedInDrawer
-                  onCloseDrawer={() => setDrawerOpen(false)}
-                />
-              </Suspense>
-            </div>
-          </div>
-        )}
 
         <main id="main" className="shell__main" tabIndex={-1}>
           {__REVIEW_DEV_IDENTITY__ && switching ? (
