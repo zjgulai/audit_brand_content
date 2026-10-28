@@ -41,7 +41,22 @@ class SubmissionBody(BaseModel):
     """内容入库请求；四维字段与 base.contract / submission_router 同一取值域。"""
     submission_id: str
     content_type: str
-    content_stage: str
+    # ★★ 2026-10-28 改成**可选**：这是 T-455 那条推断唯一能活过来的方式。
+    #
+    #   改前是 `content_stage: str`（必填），而 `apply_stage_inference()`
+    #   只在它**缺失**时才推断 —— 于是网页提交永远带值，
+    #   `intent_inference` 永远落 `absent`，**这条推断在 HTTP 路径上从未触发过**。
+    #   （实测：schema 必填 → 不做 stage 的请求在 422 就被拦下，到不了 reducer。
+    #     T-455 的 D 组全绿，因为它走的是 `ingestor.prepare()` 而不是 HTTP。）
+    #
+    #   ★ 「缺了」与「给了」是两件不同的事，这个字段现在必须能表达前者：
+    #     用户从群消息转过来一段文案时，**确实可能不知道**那是提纲还是成稿。
+    #
+    #   ★ 缺了不一定能推断出来。三条口径见 `apply_stage_inference()`：
+    #     推断不出 → **不补**，让四维校验照原样报 422（缺字段），
+    #     绝不默认成某一档（默认 final_content 会让 brief 按终稿判，
+    #     默认 brief 会让终稿被当草稿放过 —— 两个方向都错）。
+    content_stage: Optional[str] = None
     entry_channel: str
     source: Dict[str, Any]
     text: Optional[str] = None

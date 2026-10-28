@@ -1163,6 +1163,19 @@ def _ingest_submission(state, actor, payload, now):
         #   于是 payload 里带了也会被 reducer 丢掉 —— 与 T-455 的
         #   `intent_inference` 是同一个形状（payload 有、state 没有）。
         "multimodal_note": (payload.get("multimodal_note") or None),
+        # ★★ 2026-10-28：`intent_inference` 补进 state。
+        #
+        #   上面那行注释当时点的就是它 —— 但只修了 `multimodal_note`，
+        #   这一处留到了现在。实测（本票）：`prepare()` 的 payload 里
+        #   `intent_inference` 有值，而 `BusinessEventStore.state()` 的
+        #   顶层键里**没有**它，于是案件详情读不到
+        #   「这个 content_stage 是人填的还是推断的」。
+        #
+        #   ★ 三态原样保留（inferred / untested / absent），**不压成布尔** ——
+        #     「推断出来的」与「没推断」对审核员含义不同：前者要提示
+        #     「阶段是猜的」，后者要说「没有可推断的信号」。
+        #     压成布尔就把「没测」与「不是推断的」混成一个 false。
+        "intent_inference": copy.deepcopy(payload.get("intent_inference") or None),
         "tenant": _nonempty(payload.get("tenant"), "tenant"),
         "product_line": _nonempty(payload.get("product_line"), "product_line"),
         "submitter_id": _nonempty(payload.get("submitter_id"), "submitter_id"),

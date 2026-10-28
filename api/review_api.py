@@ -160,6 +160,25 @@ class CaseDetail(BaseModel):
     #: ★ 取不到时给 None 而不是 `{"total_ms": 0}` —— 「没测」不许长得像
     #:   「跑得极快」（AGENTS.md §2.4.1）。
     workflow_timing: Optional[Dict[str, Any]] = None
+    #: ★★ 2026-10-28（T-455 补完）：内容阶段的**推断观察**。
+    #:
+    #: 三态原样透出（`inferred` / `untested` / `absent`），**不压成布尔**：
+    #: · inferred → 阶段是推断出来的，界面要提示「这是猜的」；
+    #: · untested → 没有可推断的信号，界面说「未能判断」；
+    #: · absent   → 调用方已明确给出阶段，无需推断。
+    #: 压成布尔会把后两者混成一个 false，而它们对审核员含义完全不同。
+    #:
+    #: ★ 改前的实测：`prepare()` 的 payload 里**有**这个键，而 reducer 的
+    #:   `state.update()` 里没有它 —— 于是它从来没进过 state，
+    #:   详情接口也就无从透出。这是「payload 有、state 没有」的第三例。
+    intent_inference: Optional[Dict[str, Any]] = None
+    #: 判定回执（**只透出报告要用的那几段**，不是整份回执）。
+    #:
+    #: ★ 为什么不直接透整份 receipt：回执里有 skill 指纹、跳过的步骤、
+    #:   内部 run_state —— 整份塞进详情响应会把「工作台能看到的字段」
+    #:   变成「回执里有什么就有什么」，将来回执加一个内部字段就悄悄变成公开字段。
+    #:   这里逐个点名（`skill` / `steps` / `workflow_timing`），加字段要改这里。
+    receipt: Optional[Dict[str, Any]] = None
 
 
 class VersionDiffRequest(BaseModel):
@@ -322,6 +341,18 @@ class AuthorityCaseSource:
             #   ★ 只在快照是对象时透传（坏数据不透传，避免把坏形状往下喂）。
             "report_snapshot": (state.get("report_snapshot")
                                 if isinstance(state.get("report_snapshot"), dict) else None),
+            # ★★ 2026-10-28：同一张投影表里的**第二处**遗漏。
+            #
+            #   reducer 现在会把 `intent_inference` 写进 state（本票刚补），
+            #   但投影这里不透传的话，详情接口照样读不到 ——
+            #   与 `workflow_timing` 那个病完全同形，只是换了一层。
+            #
+            #   ★ 三态（inferred / untested / absent）**原样透传**，不在这里
+            #     压成布尔或过滤成「只有 inferred 才带」。理由同 `CaseDetail`
+            #     的注释：压成布尔会把「没测」与「不是推断的」混成一个 false。
+            "intent_inference": (state.get("intent_inference")
+                                 if isinstance(state.get("intent_inference"), dict)
+                                 else None),
         }
 
     def get_case(self, case_id):
@@ -777,10 +808,20 @@ def create_app(*, session_store=None, repository=None, principals=None,
         #   所以工作台与报告显示的是同一个数。
         #   取不到 → None（不是 {"total_ms": 0}）：没测不许冒充很快。
         timing = None
+        receipt_out = None
         if isinstance(case.get("report_snapshot"), dict):
             rc = case["report_snapshot"].get("receipt")
             if isinstance(rc, dict) and isinstance(rc.get("workflow_timing"), dict):
                 timing = rc["workflow_timing"]
+            # ★ 回执**逐字段点名**透出（见 `CaseDetail.receipt` 的注释）：
+            #   报告页要显示「用了哪几个 skill、各步耗时、跳过哪些步骤」，
+            #   但它不该看见回执里的内部字段。
+            if isinstance(rc, dict):
+                receipt_out = {
+                    k: rc.get(k) for k in ("skill", "steps", "workflow_timing",
+                                            "skipped", "source")
+                    if rc.get(k) is not None
+                } or None
         return {
             "case_id": id,
             "ir": case["ir"],
@@ -789,6 +830,11 @@ def create_app(*, session_store=None, repository=None, principals=None,
             "multimodal_observations": observations if isinstance(observations, list) else [],
             "multimodal_note": note,
             "workflow_timing": timing,
+            # ★ 2026-10-28：`intent_inference` 从 case 顶层读（reducer 现在写了）；
+            #   旧案件没有这个键 → None，界面按「无此信息」处理，不猜。
+            "intent_inference": (case.get("intent_inference")
+                                 if isinstance(case.get("intent_inference"), dict) else None),
+            "receipt": receipt_out,
         }
 
     @app.post("/api/v1/version-diff")

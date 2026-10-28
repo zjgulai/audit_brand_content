@@ -584,6 +584,7 @@ metrics_snapshots, control_points, routing, rule_class_switches, authority_confl
 | 方法 | 路径 | 用途 |
 |---|---|---|
 | POST | `/api/v1/submissions` | 提交（群/表/Web 同路由） |
+| POST | `/api/v1/uploads` | 媒体上传（字节直传 + `X-Filename` 头；落盘受 `REVIEW_MEDIA_ROOTS` 约束） |
 | GET | `/api/v1/cases` | 案件列表 |
 | GET | `/api/v1/cases/{id}` | 案件详情 |
 | POST | `/api/v1/cases/{id}/claim` | 原子 claim |

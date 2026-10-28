@@ -390,6 +390,167 @@ def group_f():
            "F5 ★ 有分歧时明说「以调用方为准」（不阻断、不覆盖）", b["note"][:40])
 
 
+# ────────────────────────────────── H 三跳不断：payload → state → 投影 → 详情
+
+def group_h():
+    """H 组（2026-10-28）：推断记录要**真的走到界面**，不是只到 payload。
+
+    ## 为什么单开一组
+
+    D2 验的是「`prepare()` 的 payload 里有 `intent_inference`」——
+    实测那一刻它是绿的，而**界面上一片空白**。因为后面还有三跳：
+
+        payload → state（reducer）→ 投影（AuthorityCaseSource）→ 详情（GET /cases/{id}）
+
+    实测断在两跳：reducer 的 `state.update()` 里没有这个键（§2.4.1 的
+    「payload 有、state 没有」，与 `multimodal_note` 同一个形状），
+    补上之后**投影那一层**又不透传（同一个病高了一层）。
+
+    ★ 这正是 AGENTS.md §2.4.2 那句话：判据有了，还要有**跑它的东西**。
+      只断言 payload 有值，等于断言「第一跳之后就没问题了」。
+
+    ## 判据为什么落在「详情接口」而不是「state」
+
+    因为那才是界面读的东西。断言 state 有值仍然会漏掉投影那一层。
+    """
+    import json as _json
+    import shutil
+    import tempfile
+    import time as _time
+    from pathlib import Path as _P
+
+    try:
+        from fastapi.testclient import TestClient
+
+        from api.review_api import create_app
+        from base.auth_session import SessionStore
+        from base.business_event_store import BusinessEventStore, WriterLease
+        from base.finding_store import FindingStore
+        from base.projection_store import ProjectionStore
+        from base.review_command_service import ReviewCommandService
+        from base.submission_service import SubmissionIngestor
+    except Exception as exc:  # noqa: BLE001
+        untested("H 导入装配部件", "%s: %s" % (type(exc).__name__, exc))
+        return
+
+    root = _P(tempfile.mkdtemp(prefix="intent-three-hop-"))
+    lease = None
+    try:
+        state_dir = root / "runtime"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        lease = WriterLease(state_dir / "authority" / "writer.lock")
+        lease.acquire()
+        authority = BusinessEventStore(state_dir / "authority", lease=lease)
+        projection = ProjectionStore(state_dir / "projection.sqlite")
+        service = ReviewCommandService(authority, projection)
+        ingestor = SubmissionIngestor(media_roots=[str(state_dir / "media")])
+
+        store = SessionStore(str(state_dir / "sessions.sqlite"))
+        # ★ principal 的字段是 `open_id` / `tenant_id`（不是 `tenant`）——
+        #   实测第一版写成 `tenant`，于是 session 建得出来、请求却 401
+        #   「身份缺少 open_id/tenant_id」。这与开发装配 `PRINCIPALS` 同形。
+        app = create_app(
+            session_store=store,
+            repository=_FakeRepo(),
+            finding_store=FindingStore(state_dir / "findings"),
+            principals={
+                "u_hop": {
+                    "open_id": "ou_dev_hop",
+                    "tenant_id": "t1",
+                    "roles": ["dp3"],
+                    "product_lines": ["pump"],
+                    "product_line": "pump",
+                },
+            },
+            app_env="dev",
+            review_command_service=service,
+            submission_ingestor=ingestor,
+            case_source=_AuthoritySource(authority),
+        )
+        client = TestClient(app, base_url="https://ca.example")
+        tok = store.create_session("u_hop", tenant="t1", now=_time.time())
+        headers = {"Cookie": "session=" + tok, "Origin": "https://ca.example"}
+
+        # H1 ★★★ 提交一份**没给 content_stage** 的提纲正文 → 必然 inferred
+        resp = client.post("/api/v1/submissions",
+                           headers={**headers, "Idempotency-Key": "hop-1"},
+                           json={"submission_id": "hop-1", "content_type": "文本",
+                                 "entry_channel": "群消息",
+                                 "source": {"kind": "free_text"},
+                                 "product_line": "pump", "text": BRIEF_TEXT})
+        if resp.status_code != 200:
+            report(False, "H1 提交成功（否则后面全是恒红）",
+                   "%s %s" % (resp.status_code, resp.text[:120]))
+            return
+        case_id = resp.json()["case_id"]
+
+        state = authority.state(case_id) or {}
+        in_state = state.get("intent_inference")
+        report(isinstance(in_state, dict) and in_state.get("status") == "inferred",
+               "H1 ★★★ reducer 把 intent_inference 写进 state"
+               "（不写 → 后面两跳全断，而 D2 仍会绿）",
+               repr((in_state or {}).get("status") if isinstance(in_state, dict) else in_state))
+
+        detail = client.get("/api/v1/cases/%s" % case_id, headers=headers)
+        report(detail.status_code == 200, "H2 详情可读", str(detail.status_code))
+        got = (detail.json() or {}).get("intent_inference")
+        report(isinstance(got, dict) and got.get("status") == "inferred",
+               "H2 ★★★ 详情接口透出 intent_inference"
+               "（投影不透传 → state 有值、界面空白）",
+               repr((got or {}).get("status") if isinstance(got, dict) else got))
+        report(isinstance(got, dict) and got.get("value") == "brief",
+               "H3 ★★★ 透出的是**推断值** brief，不是空壳",
+               repr((got or {}).get("value") if isinstance(got, dict) else got))
+        report(isinstance(got, dict) and bool(got.get("evidence")),
+               "H4 ★★ 证据也一起到界面（不然「为什么判成 brief」说不出来）",
+               "证据 %d 条" % len((got or {}).get("evidence") or []))
+
+        # H5 ★★★ 反向对照：给了 content_stage 时必须是 absent，**不许**压成 False/None
+        resp2 = client.post("/api/v1/submissions",
+                            headers={**headers, "Idempotency-Key": "hop-2"},
+                            json={"submission_id": "hop-2", "content_type": "文本",
+                                  "content_stage": "final_content",
+                                  "entry_channel": "群消息",
+                                  "source": {"kind": "free_text"},
+                                  "product_line": "pump", "text": BRIEF_TEXT})
+        if resp2.status_code == 200:
+            d2 = client.get("/api/v1/cases/%s" % resp2.json()["case_id"],
+                            headers=headers).json()
+            got2 = d2.get("intent_inference") or {}
+            report(got2.get("status") == "absent",
+                   "H5 ★★★ 已给阶段时落 absent（三态不许压成布尔："
+                   "「没推断」与「不是推断的」不能混）", repr(got2.get("status")))
+        else:
+            untested("H5 第二份提交", "%s" % resp2.status_code)
+    finally:
+        try:
+            if lease is not None:
+                lease.release()
+        except Exception:  # noqa: BLE001
+            pass
+        shutil.rmtree(root, ignore_errors=True)
+
+
+class _FakeRepo:
+    """最小只读仓库：H 组只关心写路径与详情，不关心既有冻结数据。"""
+
+    def get_case(self, case_id):  # noqa: D401
+        return None
+
+    def list_cases(self):
+        return []
+
+
+def _AuthoritySource(authority):
+    """用**真**的 `AuthorityCaseSource`。
+
+    ★ 不用替身：本组要证的正是「投影那一层有没有透传」，
+      替身会把这件事变成一个我自己写的实现，于是断言的就不是产品代码。
+    """
+    from api.review_api import AuthorityCaseSource
+    return AuthorityCaseSource(authority)
+
+
 def _verdict_from_counts(counts, controls, rule_count=36):
     """转调 `intent_infer` 里**唯一**的判定函数。
 
@@ -476,6 +637,7 @@ def main():
     group_e()
     group_f()
     group_g()
+    group_h()
     print("-" * 74)
     if FAILED:
         print("❌ %d 过 · %d 红 · %d 未测" % (PASSED, FAILED, UNTESTED))
