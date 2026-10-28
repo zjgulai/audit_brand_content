@@ -213,9 +213,12 @@ def group_c():
     }]
     s = E._summarize(rows)
 
-    report(s["system"]["saw_nothing"] == 1,
-           "C1 ★★★ 「什么都没看见」被单独计数（否则 0 条会被读成判得准）",
-           repr(s["system"]["saw_nothing"]))
+    # ★ 字段名是 `no_vision`（2026-10-28 更正）：它只指「画面没看」，
+    #   **不含** OCR —— 实测 OCR 是好的。原来的名字 `saw_nothing`
+    #   建立在「OCR 也不可用」这个错误前提上。
+    report(s["system"]["no_vision"] == 1,
+           "C1 ★★★ 「画面没看」被单独计数（否则 0 条会被读成判得准）",
+           repr(s["system"]["no_vision"]))
     report(s["system"]["findings_total"] == 0
            and s["baseline"]["findings_total"] == 1,
            "C2 两侧产出量分开报（不合并成一个数）",
@@ -229,13 +232,101 @@ def group_c():
     seen[0] = {**rows[0], "system": {**rows[0]["system"],
                                      "observations": 3,
                                      "multimodal_note": ""}}
-    report(E._summarize(seen)["system"]["saw_nothing"] == 0,
-           "C3 ★★★ 反向对照：真看见东西时 saw_nothing=0（证明 C1 不是恒真）")
+    report(E._summarize(seen)["system"]["no_vision"] == 0,
+           "C3 ★★★ 反向对照：真看了画面时 no_vision=0（证明 C1 不是恒真）")
 
     # C4 ★★ baseline 侧不报这个字段（它是 system 独有的能力读数）
-    report(E._summarize(rows)["baseline"]["saw_nothing"] is None,
-           "C4 ★ baseline 侧 saw_nothing 是 None（它没有这个概念）",
-           repr(E._summarize(rows)["baseline"]["saw_nothing"]))
+    report(E._summarize(rows)["baseline"]["no_vision"] is None,
+           "C4 ★ baseline 侧 no_vision 是 None（它没有这个概念）",
+           repr(E._summarize(rows)["baseline"]["no_vision"]))
+
+    # C5 ★★★ 旧字段名必须**真的不在了** —— 否则「改名」只改了一半，
+    #   而读到旧名的地方会静默拿到 KeyError 或 None。
+    report("saw_nothing" not in E._summarize(rows)["system"],
+           "C5 ★★★ 旧字段名 saw_nothing 已不存在（改名不留半截）",
+           repr(sorted(E._summarize(rows)["system"])))
+
+
+# ─────────────────────────── C2 真实进件链（不许手工拼空正文）
+
+def group_c2():
+    """★★★ 这一组防的是本文件历史上最严重的一个错。
+
+    `run_system()` 第一版手工拼了 `{"text": "", "has_text": False}` 的 unit
+    直接喂给 `judge_unit` —— 等于**跳过 OCR**。症状是 `ocr_chars` 恒为 0，
+    而真跑 `image_file_row()` 明明读出 285 字。
+
+    它的危害不只是评测失真：它把「OCR 可用」测成了「OCR 不可用」，
+    于是后续所有结论（包括我在文档里写下的「本系统什么都看不见」）
+    都建立在一个错误前提上。
+
+    ★ 判据打在**行为**上：给一张真有字的图，`run_system()` 返回的
+      `ocr_chars` 必须 > 0。手工拼空 unit 的实现必然给 0。
+    """
+    from tools import eval_media_vs_llm as E
+
+    # 找一张真有字的图（gold 目录；找不到就退未测，不硬编码路径）
+    imgs = []
+    for rec in (E._load_gold().get("records") or []):
+        imgs.extend(E._images_of(rec))
+    if not imgs:
+        untested("H 找一张带文字的图", "gold 目录里没有可用图片")
+        return
+
+    # 逐张试，直到找到一张 OCR 读得出字的（有些图本身没文字）
+    per_image = []
+    for img in imgs[:6]:
+        r = E.run_system(img)
+        per_image.append((img.name, r.get("ocr_chars"), r.get("status")))
+        if (r.get("ocr_chars") or 0) > 0:
+            break
+
+    got = [p for p in per_image if (p[1] or 0) > 0]
+    if not got:
+        # ★★ 这里必须是**红**，不是未测。
+        #
+        #   区别在于「是谁的问题」：
+        #   · 未测 = 环境缺东西（gold 不在盘上、OCR 二进制编不出来）；
+        #   · 红   = 代码本身跳过了 OCR —— 而 OCR **在本机是可用的**
+        #            （同一张图手工调 `image_file_row()` 能读出 285 字）。
+        #
+        #   第一版这里报未测，于是「跳过 OCR」这个真缺陷会以「⚠ 未测」
+        #   的身份收场 —— 而「未测不是通过」这条规定，一旦用来装真缺陷，
+        #   就成了免死金牌。
+        report(False,
+               "H1 ★★★ run_system 必须走真实进件链（OCR 读到了字）",
+               "试的 %d 张图都没读出文字 —— 而手工调 image_file_row() 能读出来，"
+               "说明是 run_system 跳过了 OCR：%r" % (len(per_image), per_image[:3]))
+        return
+
+    name, chars, status = got[0]
+    report(status == "ok" and chars > 0,
+           "H1 ★★★ run_system 走**真实进件链**（OCR 读到了字，不是手工塞空正文）",
+           "%s → %d 字" % (name, chars))
+
+    # C3 ★★★ 规则条数必须非 0 —— 证明它真的进了规则引擎，不是空转
+    r = E.run_system(imgs[0])
+    report((r.get("rules_applied") or 0) > 0,
+           "H2 ★★★ 规则引擎真的跑了（control_points_applied 非空）",
+           repr(r.get("rules_applied")))
+
+    # C4 ★★ 语言占比有值 —— 它是「0 条 finding」的解释字段
+    report(r.get("cjk_ratio") is not None,
+           "H3 ★★★ 读到字时必须给出中文占比（否则「0 条」无法解释）",
+           repr(r.get("cjk_ratio")))
+
+    # C5 ★★★ 反向对照：空正文时 cjk_ratio 必须是 None，不是 0.0
+    #
+    #   「没有字可判」与「有字但一个中文都没有」是两件事。
+    #   只验 C4 会让一个「恒返回 0.0」的实现也绿。
+    report(E._cjk_ratio("") is None,
+           "H4 ★★★ 空正文 → None（不是 0.0：「没字可判」≠「没中文」）",
+           repr(E._cjk_ratio("")))
+    report(E._cjk_ratio("Dein korper braucht") == 0.0,
+           "H5 ★★★ 纯拉丁文 → 0.0（证明 C5 的 None 不是恒真）",
+           repr(E._cjk_ratio("Dein korper braucht")))
+    report(E._cjk_ratio("家纺线下试衣镜选品") == 1.0,
+           "H6 ★ 纯中文 → 1.0", repr(E._cjk_ratio("家纺线下试衣镜选品")))
 
 
 # ─────────────────────────────────────────────── D 速度快照
@@ -327,6 +418,7 @@ def main():
     group_a()
     group_b()
     group_c()
+    group_c2()
     group_d()
     group_e()
     print("-" * 74)

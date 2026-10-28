@@ -33,21 +33,40 @@
 
 ## ★ 先说清楚本系统今天对图片能做到什么（否则读数会被误读）
 
-2026-10-28 实测，**两条能力都不可用**：
+2026-10-28 实测：
 
 | 能力 | 状态 | 实测读数 |
 |---|---|---|
-| 图内文字（OCR） | ❌ | `DEFAULT_OCR_ENGINE = "host_vision"`，而它依赖的 `base/media_vision.py` **不存在**（ImportError）。`image_file_row()` 产出的 `ocr_text` 恒为空串 —— 不是「识别出 0 个字」，是**没有识别这回事**。 |
-| 画面语义（多模态） | ❌ 未配凭据 | `MULTIMODAL_*` 四个环境变量全空 → `readiness()` 落 `untested` → `judge_entry` 收到 `multimodal_analyze=None` → `multimodal_note = "未接入多模态分析"`。 |
+| 图内文字（OCR） | ✅ **可用** | `ensure_ocr()` 会编译/复用 `.tools/bin/ocr`（`base/ocr_vision.m` + `base/build_ocr.sh` 都在）。真图实测：285 字 / 15 段 / `mean_conf=0.667` / 420ms。 |
+| 画面语义（多模态） | ❌ 未配凭据 | `MULTIMODAL_*` 四个环境变量全空 → `readiness()` 落 `untested` → `multimodal_note = "未接入多模态分析"`。 |
 
-合起来：**本系统今天审一张图，什么也看不见。** 所以：
+### ★★★ 真正的边界：**语言**，不是 OCR
 
-- 它在这批 gold 图上的 findings 恒为 0 —— 这不是「判得准」，是**没看**；
-- 判定仍是 `REVIEW`（覆盖 partial，三族没有控制点），**看起来像在正常工作**。
+gold 的 24 张有字图里，**22 张是拉丁文（德/英），只有 2 张中文**
+（`reczz28NIkGoVgYG__s2_*`，而且是设计需求稿、本身不含违规文案）。
 
-★ 这正是本项目反复记的那个病（AGENTS.md §2.4.1）：**产出看起来正常，没有任何东西会红。**
-所以本工具的输出必须把「0 条 finding」与 `multimodal_note` 一起打出来，
-不许只报一个数字。
+而规则库是**中文关键词表**。所以在 22 张拉丁文图上：
+
+    19 条规则全部跑过（control_points_applied 有 19 项）
+    findings = 0
+    label = REVIEW（覆盖 partial）
+
+**这不是「判得准」，是「规则不认识这些字」。** 这正是本项目反复记的那个病
+（AGENTS.md §2.4.1）：**产出看起来正常，没有任何东西会红。**
+
+★ 所以本工具的输出必须把「0 条 finding」与下面这些一起打：
+  `ocr_chars`（有没有读到字）、`cjk_ratio`（读到的字是不是中文）、
+  `multimodal_note`（有没有看画面）。只报一个数字会被读成「误报少」。
+
+### 更正过一次，两个版本都留着
+
+第一版这里写的是「OCR 引擎依赖的 `base/media_vision.py` 不存在（ImportError）」，
+并据此断言「本系统审图什么也看不见」。**那是错的** —— 我当时按文件名猜了一个
+不存在的模块（`media_vision`），而真身是 `base/ocr_vision.m` + 编译出的
+`.tools/bin/ocr`，它工作正常。
+
+★ 教训：**「我在 import 里没看到它」不等于「它不存在」**。
+判据必须是真跑一次（`ocr_file()` 返回什么），不是读一遍 import 列表。
 
 ## ★ 三态（不是二态）
 
@@ -75,6 +94,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -160,29 +180,58 @@ def check_env() -> Dict[str, Any]:
 
 # ─────────────────────────────────────────────── 两条路径
 
-def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
-    """本系统：规则引擎 + 多模态观察全链路。返回产出与墙钟毫秒。"""
-    from base import judge_entry
+def _cjk_ratio(text: str) -> Optional[float]:
+    """中文字符占「有意义的字」的比例。★ 空格/标点/数字不计入分母。
 
-    raw = image.read_bytes()
-    import hashlib
-    sha = hashlib.sha256(raw).hexdigest()
-    unit = {
-        "unit_id": "u-" + sha[:12],
-        "kind": "image",
-        "text": "",
-        "has_text": False,
-        "source": {"kind": "image", "uri": str(image)},
-        "fingerprint": {"raw_sha256": sha, "text_sha256": sha},
-        "_media_local_path": str(image),
-    }
+    为什么需要它：规则库是**中文关键词表**。一段德语文案照样能读出 285 个字，
+    OCR 是成功的、规则也全跑了，但一个词都命不中 —— 那时「0 条 finding」
+    与「合规通过」长得一模一样。这个比例就是用来分开这两者的。
+
+    ★ 分母为 0（读不到字）时返回 None，不是 0.0 ——
+      「没有字可判」与「有字但一个中文都没有」是两件事。
+    """
+    if not isinstance(text, str):
+        return None
+    cjk = len(re.findall(r"[\u4e00-\u9fff]", text))
+    latin = len(re.findall(r"[A-Za-z]", text))
+    total = cjk + latin
+    if total == 0:
+        return None
+    return round(cjk / total, 3)
+
+
+def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
+    """本系统：**真实进件链**（OCR → unit → 规则引擎 → 判定）。
+
+    ★★ 第一版这里手工拼了一个 `{"text": "", "has_text": False}` 的 unit
+      直接喂给 `judge_unit` —— 那等于**跳过 OCR**，测出来的是
+      「本系统在空正文上判得如何」，不是「本系统审这张图判得如何」。
+      实测症状：`ocr_chars` 恒为 0，而真跑 `image_file_row()` 明明读出 285 字。
+
+      这不只是评测失真：它把「OCR 可用」这件事测成了不可用，
+      会让后续所有结论建立在错误前提上。
+
+    ★ 现在走 `row_to_unit(image_file_row(...))` —— 与生产进件**同一条路**。
+      OCR 的耗时也算进本系统的墙钟里（否则速度对比对本系统有利而无理）。
+    """
+    from base import judge_entry, media as M
+
     t0 = clock()
+    try:
+        row = M.image_file_row(image, uri=str(image))
+        unit = M.row_to_unit(row, str(image))
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error",
+                "reason": "进件失败：%s: %s" % (type(exc).__name__, exc),
+                "ms": None, "findings": [], "decision": None,
+                "ocr_chars": 0, "cjk_ratio": None, "rules_applied": 0}
     try:
         out = judge_entry.judge_unit(unit, clock=time.time)
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "reason": "%s: %s" % (type(exc).__name__, exc),
                 "ms": None, "findings": [], "decision": None}
     ms = (clock() - t0) * 1000.0
+    text = unit.get("text") or ""
     return {
         "status": "ok",
         "reason": "",
@@ -195,6 +244,13 @@ def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
         "decision": out.get("label"),
         "observations": len(out.get("multimodal_observations") or []),
         "multimodal_note": out.get("multimodal_note"),
+        # ★★ 下面三个是「0 条 finding」的**解释字段**，不是装饰。
+        #    OCR 读到多少字、其中多少是中文、规则跑了几条 ——
+        #    缺了它们，「0 条」会被读成「判得准」。
+        "ocr_chars": len(text.strip()),
+        "cjk_ratio": _cjk_ratio(text),
+        "rules_applied": len(
+            (out.get("ir") or {}).get("coverage", {}).get("control_points_applied") or []),
     }
 
 
@@ -340,12 +396,33 @@ def _summarize(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
             "findings_total": sum(n_findings) if n_findings else None,
             "findings_per_image": (
                 round(statistics.fmean(n_findings), 2) if n_findings else None),
-            # ★ 只有 system 侧有：它「有没有真的看见东西」。
+            # ★ 只有 system 侧有：**画面**有没有被看过（OCR 是另一件事）。
             #   缺这一个字段，读数的读者会以为 0 条 finding = 判得准。
-            "saw_nothing": (
+            #
+            #   ★ 2026-10-28 更正：这个字段原来叫「什么都没看见」，
+            #     而那时我误以为 OCR 也不可用。实测 OCR 是好的
+            #     （285 字 / 15 段 / 420ms），所以它现在精确地只指
+            #     **画面语义没看**（多模态未接入）。文字是看得到的。
+            "no_vision": (
                 sum(1 for r in ok_rows
                     if not (r[key].get("observations") or 0)
                     and "未接入" in (r[key].get("multimodal_note") or ""))
+                if key == "system" else None),
+            # ★ 规则命中不了却又**读到了字**的张数 —— 即「有字但判不了」。
+            #   它才是「0 条 finding」最危险的那一格的读数：
+            #   OCR 成功、规则全跑、一条不中（因为语言或词表不覆盖）。
+            "read_but_no_match": (
+                sum(1 for r in ok_rows
+                    if (r[key].get("ocr_chars") or 0) > 0
+                    and not (r[key].get("findings") or []))
+                if key == "system" else None),
+            # ★ 读到的字里，中文占比的均值。低 = 规则库不认识这些字。
+            "cjk_ratio_mean": (
+                round(statistics.fmean(
+                    [r[key]["cjk_ratio"] for r in ok_rows
+                     if isinstance(r[key].get("cjk_ratio"), (int, float))]), 3)
+                if any(isinstance(r[key].get("cjk_ratio"), (int, float))
+                       for r in ok_rows) else None
                 if key == "system" else None),
         }
 
@@ -444,14 +521,25 @@ def main() -> int:
           % (summary["system"]["findings_total"], summary["baseline"]["findings_total"]))
 
     # ★★ 必须单独说：本系统的 0 条 finding **不是「判得准」**。
-    #   实测原因是两条能力都不可用（OCR 引擎依赖的模块不存在 + 多模态未配凭据）。
-    #   不说这一句，「本系统 0 条 / 裸模型 N 条」会被读成「本系统更少误报」。
-    saw_nothing = summary["system"].get("saw_nothing")
-    if saw_nothing:
-        print("\n★★★ 本系统在 %d 张图上**什么都没看见**"
-              "（multimodal_note = 「未接入多模态分析」，且 OCR 引擎不可用）。" % saw_nothing)
-        print("    所以它的 0 条 finding 不是「判得准」，是「没看」。")
-        print("    这一格的对比**不成立** —— 要先配好多模态凭据才谈得上比。")
+    #   两件不同的事都要报：画面没看 / 读到了字但规则不认。
+    no_vision = summary["system"].get("no_vision")
+    read_no_match = summary["system"].get("read_but_no_match")
+    cjk = summary["system"].get("cjk_ratio_mean")
+    if no_vision:
+        print("\n★ 本系统在 %d 张图上**没看画面**"
+              "（multimodal_note = 「未接入多模态分析」）。" % no_vision)
+        print("  画面类问题（构图、暗示疗效、品牌调性）它答不了 —— 说话的是 OCR 正文那一路。")
+    if read_no_match:
+        print("\n★★★ 本系统在 %d 张图上**读到了字、规则也全跑了，却一条都没命中**。"
+              % read_no_match)
+        if isinstance(cjk, (int, float)):
+            print("    这些图读到文字的中文占比均值 = %.3f"
+                  "（规则库是**中文关键词表**）。" % cjk)
+            if cjk < 0.5:
+                print("    → 主因是**语言**：读出来的字大部分不是中文，规则表不覆盖。")
+                print("      这不是「判得准」，是「规则不认识这些字」。")
+        print("    ★ 这一格的对比**不成立** —— 除非把规则表扩到对应语言，")
+        print("      或者只在中文字样上比。")
 
     if summary["system"]["tested"] == 0 and summary["baseline"]["tested"] == 0:
         print("\n⚠ 未测：两侧一条都没测成。")
