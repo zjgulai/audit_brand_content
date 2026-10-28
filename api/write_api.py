@@ -255,6 +255,10 @@ IMPLEMENTED_WRITE_PATHS = {
     # T-313d：通知 read/ack（写自己的收件箱；GET 的 authority 分支在 review_api）。
     "/api/v1/notifications/{id}/read",
     "/api/v1/notifications/{id}/ack",
+    # ★ 2026-10-28（ADR-0021 主线）：媒体上传。
+    #   它是**写**（落盘到 REVIEW_MEDIA_ROOTS），所以必须在这张表里 ——
+    #   否则 S8 会报「没人认领的写端点」，而那正是它该报的。
+    "/api/v1/uploads",
 }
 
 
@@ -436,6 +440,92 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
             "replayed": outcome["replayed"],
         })
         return JSONResponse(content=response, status_code=outcome["http_status"])
+
+    @app.post("/api/v1/uploads")
+    async def upload_media(request: Request,
+                           principal=Depends(principal_dep),
+                           idempotency_key: Optional[str] = Header(
+                               None, alias="Idempotency-Key")):
+        """媒体上传：浏览器文件 → 落盘 → 返回可进件的本地路径。
+
+        ## 为什么这个协议是「字节直传 + X-Filename 头」而不是 multipart
+
+        `pyproject.toml` 只声明了 fastapi / pydantic / uvicorn，
+        **没有 python-multipart** —— 而 FastAPI 的 `UploadFile` 靠它，
+        不装会在 import 期就报错。为上传这一个端点把依赖塞进生产镜像，
+        风险大于收益（本项目 P0-A / P0-C 两次事故都是漏装依赖）。
+        所以：请求体就是文件字节，文件名走 `X-Filename` 头。
+
+        ## 返回什么
+
+            {"path": 服务端绝对路径, "kind": "image"|"video",
+             "byte_size": n, "sha256": "...", "display_name": "...",
+             "stored_name": "..."}
+
+        前端把它填进 `submission.source.uri` 即可走既有进件链。
+
+        ★ **不接受客户端给的落盘路径。** 落盘位置只由服务端决定
+          （`media_roots[0]/_uploads/`），客户端只提供一个「显示名」。
+        """
+        require_enabled("/api/v1/uploads")
+
+        from base import media_upload as MU
+
+        filename = (request.headers.get("x-filename") or "").strip()
+        if not filename:
+            raise HTTPException(
+                400, "缺 X-Filename 头（上传必须带文件名，用它判后缀白名单）")
+
+        # 从应用配置里读素材根。★ 用 `getattr` 而不是硬取：
+        # 开发装配可能没有 settings，那时应当拒（未配根 = 不收上传）。
+        settings = getattr(app.state, "production_settings", None)
+        roots = tuple(getattr(settings, "media_roots", ()) or ())
+        if not roots:
+            raise HTTPException(
+                503, "未配置 REVIEW_MEDIA_ROOTS —— 不配根目录就不收上传")
+
+        declared = request.headers.get("content-length")
+        try:
+            declared_size = int(declared) if declared else None
+        except ValueError:
+            declared_size = None
+
+        # ★ 先按声明的长度拦一次：超限时**连读都不读**。
+        #   这一步在 `save_upload()` 里也有一道（它要先知道上限才知道该不该读），
+        #   这里提前拦是为了不让一个 1GB 的请求进到 body 解析。
+        suffix_kind = MU.ALLOWED_SUFFIXES.get(
+            __import__("os").path.splitext(filename)[1].lower())
+        limit = (MU.MAX_VIDEO_BYTES if suffix_kind == "video"
+                 else MU.MAX_IMAGE_BYTES)
+        if declared_size is not None and declared_size > limit:
+            raise HTTPException(
+                413, "upload_too_large: 声明 %d 字节，上限 %d" % (declared_size, limit))
+
+        # ★ 用 `await request.body()` 而不是流式：FastAPI 的 `Request.stream()`
+        #   是 async 生成器，而 `save_upload()` 要的是同步 read 流。
+        #   把 async 桥成同步要在同步函数里起事件循环 —— 那会在 uvicorn 的
+        #   线程池里制造第二个 loop，是不稳定来源。
+        #
+        #   代价：整个文件进内存。所以上面**必须**先按 content-length 拦住，
+        #   否则一个没声明长度的 1GB 请求会直接 OOM。
+        #   ★ 若将来要真流式，正确做法是让 `save_upload` 接受 async 流，
+        #     而不是在这里桥接。
+        raw = await request.body()
+        if len(raw) > limit:
+            raise HTTPException(
+                413, "upload_too_large: 实际 %d 字节，上限 %d" % (len(raw), limit))
+
+        try:
+            info = MU.save_upload(
+                filename=filename,
+                stream=__import__("io").BytesIO(raw),
+                media_roots=roots,
+                declared_size=len(raw),
+            )
+        except MU.UploadRejected as exc:
+            raise HTTPException(exc.status, "%s: %s" % (exc.code, exc.detail)) from exc
+
+        return JSONResponse(content=info, status_code=201)
 
     @app.post("/api/v1/submissions")
     def create_submission(body: SubmissionBody, request: Request,

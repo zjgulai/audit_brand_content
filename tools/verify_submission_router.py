@@ -6,7 +6,7 @@
   C0  四维取值域来自 base/contract.py（5/2/6/7）
   C1  content_type 5 值逐个 accepted
   C2  content_stage 2 值逐个 accepted
-  C3  entry_channel：前四条 accepted；NAS / 上传文件显式 rejected_unsupported
+  C3  entry_channel：五条 accepted（含「上传文件」）；NAS 显式 rejected_unsupported
   C4  source.kind：六类 accepted；文档 rejected_unsupported
   C5  Attempt 字段集合 / 必填 / 互斥字段（accepted 有 ir_id；unsupported 无 ir_id）
   C6  四种 failure_kind 可分别计数；全 0 时四个键仍存在
@@ -19,7 +19,7 @@
   R4  reason 写「其他」「未知错误」→ 红
   R5  其它非法 Attempt（缺字段/多字段/互斥字段）→ 红
   R6  source.kind=文档 的 unsupported 登记被删 → 本项红（结构性断言）
-  R7  「上传文件」的 unsupported 标记被删 → 本项红（结构性断言 + 逐值循环自带清单）
+  R7  unsupported 入口登记双向对齐（NAS 在册、「上传文件」已移出）
   R8  四维越界值（负样本）必须被显式 rejected_unsupported
   SR-ADV3  accepted 不注入 ir_id → ValueError(「accepted attempt 必须有 ir_id」) 原文固定
   S1  若 contracts/attempt-v1.schema.json 已落盘，字段集合必须一致
@@ -72,7 +72,21 @@ def adv3_holds(exc, attempts_before, attempts_after):
 
 # 逐值循环**自带**清单，不 enumerate 合同常量 —— 合同里删掉一个 unsupported
 # 标记，检查项不会跟着消失，而是 R6/R7 的结构性断言红（变异 40/40 → 红）。
-CANON_UNSUPPORTED_ENTRY_CHANNELS = ("NAS", "上传文件")
+# ★ 2026-10-28 改（ADR-0021 主线）：「上传文件」已从 unsupported 移出。
+#
+#   它原来与 NAS 并列，理由是「本仓没有上传能力」—— 那时确实没有。
+#   现在 `POST /api/v1/uploads` 已建成（`base/media_upload.py`，四道安全边界），
+#   再标 unsupported 就是把「能力已经有了」写反。
+#   NAS 仍留在这里，且理由不同：它不是「没做」，是**没有这条数据通路**。
+#
+#   ★ 清单仍然是**自带**的（不 enumerate 合同常量）—— 合同改了这个循环
+#     不会跟着消失，而是 R7 的集合恒等断言红。这是原来那条设计，保留。
+CANON_UNSUPPORTED_ENTRY_CHANNELS = ("NAS",)
+
+#: 已经打开、必须 accepted 的通道。★ 与 UNSUPPORTED 互为补集，
+#: 两边都要有断言 —— 只断言「坏的被拒」会让「好的也被拒」一直绿。
+CANON_SUPPORTED_ENTRY_CHANNELS = ("群消息", "飞书文档链接", "落地页 URL",
+                                  "多维表批量", "上传文件")
 
 
 def unsupported_registration_holds(value, unsupported_coll, domain_coll):
@@ -130,8 +144,10 @@ def controls():
     ok("R6 删掉 source.kind=文档 的 unsupported 登记 → 断言判红",
        unsupported_registration_holds("文档", (), C.SOURCE_KIND_DOMAIN) is False,
        "不在 unsupported 集合仍被判为通过")
-    ok("R7 删掉「上传文件」的 unsupported 标记 → 断言判红",
-       unsupported_registration_holds("上传文件", ("NAS",), C.ENTRY_CHANNELS) is False,
+    # ★ 2026-10-28：例子从「上传文件」换成 NAS —— 上传已经是 supported 了，
+    #   拿它当反例会变成在同义反复。NAS 仍然是 unsupported，机制验证不变。
+    ok("R7 删掉「NAS」的 unsupported 标记 → 断言判红",
+       unsupported_registration_holds("NAS", (), C.ENTRY_CHANNELS) is False,
        "不在 unsupported 集合仍被判为通过")
 
     # R8 反向对照：越界值被放行（accepted / attempt 缺失）→ r8_holds 必须判假。
@@ -185,7 +201,10 @@ def controls():
     ok("R6/R7 真实合同 → 断言判绿",
        unsupported_registration_holds("文档", SR.UNSUPPORTED_SOURCE_KINDS,
                                       SR.SOURCE_KIND_DOMAIN)
-       and unsupported_registration_holds("上传文件",
+       # ★ 2026-10-28：「上传文件」已移到 supported，这里改成断言它
+       #   **不在** unsupported 集合 —— 否则就是「能力有了、契约说没有」。
+       and "上传文件" not in SR.UNSUPPORTED_ENTRY_CHANNELS
+       and unsupported_registration_holds("NAS",
                                           SR.UNSUPPORTED_ENTRY_CHANNELS,
                                           SR.ENTRY_CHANNEL_DOMAIN),
        "SR.UNSUPPORTED_SOURCE_KINDS=%r SR.UNSUPPORTED_ENTRY_CHANNELS=%r"
@@ -297,16 +316,21 @@ def main():
     report(not oob_bad, "R8 四维域外值 → rejected_unsupported（不得静默成功）",
            repr(oob_bad[:1]))
 
-    # C3 entry_channel：前四条 accepted，NAS/上传文件显式 unsupported
+    # C3 entry_channel：五条 accepted（含「上传文件」），NAS 显式 unsupported
+    #
+    # ★ 2026-10-28：「上传文件」从 unsupported 移到 supported。
+    #   它是**上一行清单**里的项，不是这里手写的 —— 两边由
+    #   CANON_SUPPORTED_ENTRY_CHANNELS / CANON_UNSUPPORTED_ENTRY_CHANNELS 各自声明，
+    #   与合同常量做恒等断言（见下面那条）。
     r = new_router()
-    supported = ["群消息", "飞书文档链接", "落地页 URL", "多维表批量"]
+    supported = list(CANON_SUPPORTED_ENTRY_CHANNELS)
     bad = []
     for i, ch in enumerate(supported):
         a = r.submit(base_sub(submission_id="ch-%d" % i,
                               entry_channel=ch), ir_id="ir-ch-%d" % i)
         if a.get("outcome") != "accepted":
             bad.append((ch, a))
-    report(not bad, "C3 前四条入口通道 accepted", repr(bad[:1]))
+    report(not bad, "C3 五条入口通道 accepted（含「上传文件」）", repr(bad[:1]))
     # ★ 逐值循环自带清单（不 enumerate C.UNSUPPORTED_ENTRY_CHANNELS）：
     #   合同里的标记集合被删项时，检查项不会跟着消失（那是变异 3 的假绿形状），
     #   而是下面 R7 的集合恒等断言红。
@@ -332,11 +356,14 @@ def main():
 
     # R1/R6/R7 结构性反向对照：unsupported 登记必须双向对齐（判据在
     # unsupported_registration_holds，--controls 双向喂过它）。
+    # ★ 2026-10-28：这一条改成**双向** ——
+    #   · unsupported 集合里每一项都必须在取值域里（登记不指向不存在的值）；
+    #   · 「上传文件」**不许**再出现在 unsupported 里（能力已经有了）。
     report(unsupported_registration_holds(
                "NAS", SR.UNSUPPORTED_ENTRY_CHANNELS, SR.ENTRY_CHANNEL_DOMAIN)
-           and unsupported_registration_holds(
-               "上传文件", SR.UNSUPPORTED_ENTRY_CHANNELS, SR.ENTRY_CHANNEL_DOMAIN),
-           "R7 删掉 unsupported 入口标记 → 本项红",
+           and "上传文件" not in SR.UNSUPPORTED_ENTRY_CHANNELS
+           and "上传文件" in SR.ENTRY_CHANNEL_DOMAIN,
+           "R7 unsupported 入口登记双向对齐（NAS 在、上传文件不在）",
            "domain=%r unsupported=%r"
            % (tuple(SR.ENTRY_CHANNEL_DOMAIN), tuple(SR.UNSUPPORTED_ENTRY_CHANNELS)))
     report(unsupported_registration_holds(

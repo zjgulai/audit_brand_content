@@ -822,6 +822,12 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
     app.router.lifespan_context = lifespan
     app.state.production_runtime = runtime
     app.state.public_origin = settings.public_origin
+    # ★ 2026-10-28（ADR-0021 主线）：上传端点要读素材根。
+    #   改前 `media_roots` 只活在 `ProductionSettings` 上，`app.state` 里没有 ——
+    #   于是 `POST /api/v1/uploads` 拿不到根目录，只能报 503。
+    #   挂**整个 settings 对象**而不是只挂 `media_roots`：将来上传还要读别的
+    #   （比如单文件上限），挂一个字段就得改一次装配。
+    app.state.production_settings = settings
 
     @app.middleware("http")
     async def production_gate(request: Request, call_next):

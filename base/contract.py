@@ -181,7 +181,23 @@ CONTENT_TYPES = ("文本", "图片", "视频", "文档", "结构化记录")
 CONTENT_STAGES = ("brief", "final_content")
 ENTRY_CHANNELS = ("群消息", "飞书文档链接", "落地页 URL", "多维表批量",
                   "NAS", "上传文件")
-UNSUPPORTED_ENTRY_CHANNELS = ("NAS", "上传文件")
+#: 显式不支持的入口通道。
+#
+# ★ 2026-10-28 改：「上传文件」已从这份名单里移出（ADR-0021 主线）。
+#
+#   原来它与 NAS 并列，理由是「本仓没有上传能力」—— 那时确实没有：
+#   `grep UploadFile|multipart api/` = 0，网页上拖一张图，文件只在浏览器内存里，
+#   后端永远拿不到。所以把它标 unsupported 是诚实的。
+#
+#   现在 `POST /api/v1/uploads` 已建成（落盘到 `REVIEW_MEDIA_ROOTS`，
+#   四道安全边界见 `base/media_upload.py`），上传是真的能发生了。
+#   再标 unsupported 就等于：**能力已经有了，契约还说没有** ——
+#   那会让「网页上传」这件事在记录里被迫写成别的通道（前端曾借用「群消息」），
+#   于是来源统计从源头就是错的。
+#
+# ★ NAS 仍然不支持，而且理由与上传不同：它不是「没做」，是**没有这条数据通路**
+#   （本仓不挂 NAS）。两者混在一起会让人以为「NAS 只差一个端点」。
+UNSUPPORTED_ENTRY_CHANNELS = ("NAS",)
 SOURCE_KIND_DOMAIN = SOURCE_KINDS + ("文档",)
 UNSUPPORTED_SOURCE_KINDS = ("文档",)
 OUTCOMES = ("accepted", "rejected_unsupported", "failed")
