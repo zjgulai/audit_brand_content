@@ -245,6 +245,47 @@ class SubmissionIngestor:
         #: 图片进件允许的位图根目录。**默认空 = 不收图**，理由见 _build_image_unit。
         self.media_roots = tuple(media_roots or ())
 
+    def _multimodal_analyze(self, unit):
+        """给媒体载体造一个 `analyze(media_ref, tasks)`；文本载体返回 None。
+
+        ## 三条口径
+
+        ① **只在媒体载体上注入**。文本载体不需要多模态，注入会白跑一遍
+           （而且要建客户端、读凭据、可能发一次请求）。
+        ② **路径从 unit 上取，不从 uri 反推**。进件层在 `_build_image_unit` 里
+           已经把 `_media_local_path` 写进 unit（那是**解析过**的绝对路径）。
+           从 uri 反推会在 media_roots 有多个时猜错根目录，而猜错的表现是
+           「审了另一张图」—— 不报错，只给错结论。
+        ③ **凭据未配 → 返回 None**，让 `judge_entry` 落「未接入多模态分析」。
+           它与「本载体无需多模态」是两种不同原因，**都不许被读成没问题**。
+        """
+        source = (unit.get("source") or {}) if isinstance(unit, dict) else {}
+        kind = source.get("kind")
+        if kind not in ("image", "video"):
+            return None
+
+        local = unit.get("_media_local_path")
+        if not isinstance(local, str) or not local.strip():
+            # ★ 媒体载体却没有本地路径 → 不注入，但**不留空**：
+            #   把原因挂在 unit 上，判定层会把它落成 untested 的 note。
+            unit["_media_local_path_note"] = (
+                "媒体载体 %r 没有已解析的本地路径（进件层未提供）—— 无法做多模态分析"
+                % (kind,))
+            return None
+
+        try:
+            from pathlib import Path as _LocalPath
+
+            from base import media_analyze as MA
+            return MA.build_analyze(
+                resolve_path=lambda ref: _LocalPath(local),
+            )
+        except Exception:  # noqa: BLE001
+            # 接线层自己坏了 → 不注入（判定层会落未接入）。
+            # ★ 这里**不许**把它变成「没有发现违规」：不注入就不会有观察，
+            #   而观察为空时报告写的是「未评」，不是「没有问题」。
+            return None
+
     def _query(self):
         if self._authority_injected:
             if callable(self.authority):
@@ -402,6 +443,17 @@ class SubmissionIngestor:
         if not isinstance(unit, dict):
             raise SubmissionRejected(
                 "image_ingest_failed", 422, "row_to_unit 未返回 ContentUnit")
+        # ★★ ADR-0021 主线：把**已解析的本地绝对路径**随 unit 往下传。
+        #
+        #   为什么不能从 `unit["source"]["uri"]` 反推：
+        #   `uri` 是调用方给的原值，可能是相对路径（按 media_roots[0] 解析）、
+        #   也可能是 `submission:xxx` 这种逻辑标识。反推会在 media_roots 有多个时
+        #   **猜错根目录** —— 而猜错的后果是「审了另一张图」：
+        #   它不会报错，只会给出错误的观察。
+        #
+        #   `_media_local_path` 以下划线开头，表示「这是进件层的私有信息，
+        #   不是契约字段」，`validate()` 也不会因为多这个键而红（已实测）。
+        unit["_media_local_path"] = str(target)
         # ★ 判据 3 的执行点：OCR 失败**不许**产出一个「审过了」的 REVIEW。
         #   `row_to_unit` 已经把失败写成 parse_status=failed + failure_kind，
         #   这里断言它确实这么写了 —— 若有一天它改成返回 ok，这一行先红。
@@ -460,6 +512,20 @@ class SubmissionIngestor:
                 #   现在 `skill_id` 传下去，`skill_version`/`skill_hash` 由注册表算。
                 "skill_id": "content-review",
             }
+            # ★★ ADR-0021 主线：多模态分析接进生产。
+            #
+            #   改前 `judge_entry` 的 `multimodal_analyze` 注入点**生产链路一个参数
+            #   都没传**（实测 grep 0 命中），于是每张图 / 每段视频都落
+            #   「未接入多模态分析」。这是本项目第四次同形：
+            #   due_at / 工作流耗时 / semantic_judge / skill_hash，现在多一个。
+            #
+            #   ★ 只在**媒体载体**上注入：文本载体不需要，注入会白跑一遍。
+            #   ★ 凭据未配时 `build_analyze()` 返回 None → 这里不传 →
+            #     `judge_entry` 落「未接入多模态分析」。**两种原因不同、都不许
+            #     被读成「没问题」**：一个是「没配」，一个是「没这个载体」。
+            analyze = self._multimodal_analyze(unit)
+            if analyze is not None:
+                kwargs["multimodal_analyze"] = analyze
             if self.clock is not None:
                 kwargs["clock"] = self.clock
             judgment = self.judge_fn(unit, **kwargs)
@@ -504,6 +570,12 @@ class SubmissionIngestor:
             #   而「这个 stage 是人填的还是推断的」恰恰是下游最需要知道的事。
             #   三态原样保留（inferred / untested / absent），不压成布尔。
             "intent_inference": stage_inference,
+            # ★ ADR-0021 主线：多模态「为什么没看成」的说明。
+            #   `judge_entry` 早就返回它了（`multimodal_note`），但 payload 顶层
+            #   从来没带上 —— 于是 reducer 读不到，state 里也就没有这个字段。
+            #   后果：报告里「画面语义」那一节只剩空列表，读起来像「画面没问题」。
+            #   「没看成」与「看了没问题」必须长得不一样。
+            "multimodal_note": (judgment.get("multimodal_note") or None),
             # T-316b: the frozen render input for the report.
             #
             # Deliberately carries whatever judge_entry returned, including None.

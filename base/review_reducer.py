@@ -1159,6 +1159,10 @@ def _ingest_submission(state, actor, payload, now):
         "conflict_table_version": ctv,
         "media_fingerprints": copy.deepcopy(media_fp),
         "multimodal_observations": copy.deepcopy(observations),
+        # ★ ADR-0021 主线：「为什么没看成」的说明。改前这里**没有**这个键，
+        #   于是 payload 里带了也会被 reducer 丢掉 —— 与 T-455 的
+        #   `intent_inference` 是同一个形状（payload 有、state 没有）。
+        "multimodal_note": (payload.get("multimodal_note") or None),
         "tenant": _nonempty(payload.get("tenant"), "tenant"),
         "product_line": _nonempty(payload.get("product_line"), "product_line"),
         "submitter_id": _nonempty(payload.get("submitter_id"), "submitter_id"),

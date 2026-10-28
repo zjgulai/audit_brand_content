@@ -1172,6 +1172,17 @@
         "base/review_command_service.py",
         "research/governance/skeleton/rules-v1.json"
       ]
+    },
+    {
+      "verifier": "tools/verify_media_analyze.py",
+      "asserts": "ADR-0021 主线 · 多模态分析的生产接线 · A 就绪读数：两网关**分开报**（image 与 video 覆盖面不同，合并成一个布尔会让「视频不能审」被「图片能审」盖掉）、缺哪个环境变量逐个点名、读数里不含密钥值 · ★★★ B 未配凭据：build_analyze 返回 None（不注入），judge_entry 落「未接入多模态分析」而**不是**空列表；B3/B4 断言那条 note 真的活到 state（reducer 与 payload 两处都要有）· C 注入契约：analyze(media_ref, tasks)，图片 2 任务、视频 3 任务（含 av_alignment）· ★★ D 路径：不从 uri 反推、解析不出 → error 而不是猜（猜错的后果是「审了另一张图」）· ★ E 降级：只配 tokenhub 时 av_alignment 被跳过**且说清原因** · F 观测归因：每条观察带 task；「返回 ok 但零观察」降成 untested · G 反向对照",
+      "subjects": [
+        "base/media_analyze.py",
+        "base/submission_service.py",
+        "base/review_reducer.py",
+        "base/judge_entry.py",
+        "tools/multimodal_client.py"
+      ]
     }
   ],
   "exempt": [
