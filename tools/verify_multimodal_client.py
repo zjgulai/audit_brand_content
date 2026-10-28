@@ -711,6 +711,67 @@ def check_no_secrets():
         report(not pat.search(text), "R1 %s 不含 sk- 形态的凭据" % rel)
 
 
+def check_timeout_covers_scene_semantics():
+    """T 组（2026-10-28）：默认超时必须够 `scene_semantics` 跑完。
+
+    ## 它守的是什么
+
+    实测（tokenhub / glm-5.3-flash / 真图）：
+
+        一句话描述                 ~40 字符   5–7 s
+        scene_semantics（JSON 数组） 878 字符   **83 s**
+        mark_symbol                短          11 s
+
+    而原默认超时是 **60 s** —— 于是生产链路
+    （`media_analyze._make_client()` → `from_env()` 不传 timeout）
+    对 `scene_semantics` **每一次都超时**，落成「未接入多模态分析」。
+
+    ★ 这个缺陷不崩、不报错，只是**降级**。报告上写「未接入多模态分析」
+      读起来像「这项能力还没做」，而实际是做了、凭据也配了、每次都被掐断。
+
+    ## 判据
+
+    · TO1 默认超时 >= 实测值的两倍余量（83 × 2 ≈ 166，取 180）
+    · TO2 `from_env()` 的默认参数**真的是**那个常量（不是两处各写一个数）
+    · TO3 `dataclass` 字段默认值也是它
+
+    ★ TO2/TO3 是必须的：只断言常量值，而 `from_env(timeout=60.0)` 还写着
+      硬编码 —— 那等于常量改了、真正生效的默认值没改（§2.4.8 两个口径）。
+    """
+    import inspect
+
+    from tools import multimodal_client as MC
+
+    #: `scene_semantics` 的实测耗时（秒）。★ 这是**某时某刻的读数**，
+    #: 不是常量上界 —— 见本函数 docstring。改动它要写清新读数与日期。
+    MEASURED_SCENE_SEMANTICS_S = 83.0
+
+    report(MC.DEFAULT_TIMEOUT_SECONDS >= MEASURED_SCENE_SEMANTICS_S * 2,
+           "TO1 ★★★ 默认超时 >= scene_semantics 实测耗时的两倍"
+           "（留余量：83s 是一次读数不是上界）",
+           "%.0fs vs 实测 %.0fs" % (MC.DEFAULT_TIMEOUT_SECONDS,
+                                    MEASURED_SCENE_SEMANTICS_S))
+
+    sig = inspect.signature(MC.GatewayClient.from_env)
+    default = sig.parameters["timeout"].default
+    report(default == MC.DEFAULT_TIMEOUT_SECONDS,
+           "TO2 ★★★ `from_env()` 的 timeout 默认值就是那个常量"
+           "（两处各写一个数必然漂移）",
+           repr(default))
+
+    field_default = MC.GatewayClient.__dataclass_fields__["timeout"].default
+    report(field_default == MC.DEFAULT_TIMEOUT_SECONDS,
+           "TO3 ★★ dataclass 字段默认值也是那个常量", repr(field_default))
+
+    # T4 ★★ 反向对照：把常量压回 60，TO1 必须判假
+    #
+    #   ★ 这一条证明 TO1 不是恒真：60 就在源码里出现过（它是旧值），
+    #     一个 `>= 0` 式的判据会永远绿。
+    report(not (60.0 >= MEASURED_SCENE_SEMANTICS_S * 2),
+           "TO4 ★★★ 反向对照：旧值 60s 会被 TO1 判红（证明 TO1 不是恒真）",
+           "60 < 166")
+
+
 def main(argv):
     if "--controls" in argv:
         return run_controls()
@@ -729,6 +790,7 @@ def main(argv):
         check_fallback(td)
     check_no_secrets()
     check_adr_alignment()
+    check_timeout_covers_scene_semantics()
     print("-" * 78)
     if FAILED:
         print("❌ %d passed, %d failed" % (PASSED, FAILED))

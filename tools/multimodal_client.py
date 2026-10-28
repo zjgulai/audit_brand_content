@@ -302,6 +302,37 @@ RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 RETRY_BACKOFF_SECONDS = 1.0
 RETRY_ATTEMPTS = 3
 
+#: 单次请求超时（秒）。
+#:
+#: ## ★★ 2026-10-28 从 60 改成 180：60 秒让 `scene_semantics` **100% 超时**
+#:
+#: 实测（tokenhub / glm-5.3-flash，真图，不是探针）：
+#:
+#: | 提示词 | 输出长度 | 耗时 |
+#: |---|---|---|
+#: | 一句话描述 | ~40 字符 | 5–7 s |
+#: | `scene_semantics`（4 字段 × N 条的 JSON 数组） | 878 字符 | **83 s** |
+#: | `mark_symbol` | 短 | 11 s |
+#:
+#: 而原默认值是 60 s —— 也就是说生产链路
+#: （`media_analyze._make_client` → `from_env()` 不传 timeout）
+#: 对 `scene_semantics` **每一次都会超时**，落成「未接入多模态分析」。
+#:
+#: ★ 这个缺陷的形状很坏：它不是崩，是**降级**。报告上写的是
+#:   「未接入多模态分析」——读起来像「这项能力还没做」，
+#:   而实际是做了、配了凭据、每次都在 60 秒被掐断。
+#:
+#: ## 为什么是 180 而不是「刚好 90」
+#:
+#: 83 s 是一次实测值，不是上界。图片体积、网关排队、模型版本都会推高它。
+#: 留一倍余量（180 = 83 × 2.2）比「压着实测值调」稳 —— 后者会让
+#: 「某天慢了一点」变成「某天这个能力悄悄没了」。
+#:
+#: ★ 代价照实说：一次 `scene_semantics` 真要等 1–2 分钟。
+#:   这是**模型选择**的代价（glm-5.3-flash 输出 878 字符就要 83 秒），
+#:   不是超时设错了。要更快只能换模型或缩短输出，那是另一件事。
+DEFAULT_TIMEOUT_SECONDS = 180.0
+
 
 @dataclass
 class GatewayClient:
@@ -311,7 +342,7 @@ class GatewayClient:
     base_url: str
     api_key: str
     model: str
-    timeout: float = 60.0
+    timeout: float = DEFAULT_TIMEOUT_SECONDS
     transport: Transport = urllib_transport
     max_media_bytes: int = 24 * 1024 * 1024
     #: 同一模型最多试几次（含首次）。★ 可配，因为测试要能把它压到 1。
@@ -323,7 +354,7 @@ class GatewayClient:
     def from_env(cls, gateway: str = DEFAULT_GATEWAY, *, model: str,
                  env: Optional[Mapping[str, str]] = None,
                  transport: Optional[Transport] = None,
-                 timeout: float = 60.0,
+                 timeout: float = DEFAULT_TIMEOUT_SECONDS,
                  retry_attempts: int = RETRY_ATTEMPTS,
                  retry_backoff: float = RETRY_BACKOFF_SECONDS) -> "GatewayClient":
         env = os.environ if env is None else env

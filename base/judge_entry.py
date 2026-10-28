@@ -67,7 +67,28 @@ def _local_authority_query(_ref):
 
 #: 图片/视频单元默认请求的多模态任务。视频的 av_alignment 要 provider 声明
 #: audio+video 才谈得上，所以它不在这里 —— 由调用方按 provider 能力追加。
-DEFAULT_MEDIA_TASKS = ("scene_semantics",)
+#:
+#: ## ★★ 2026-10-28 加 `mark_symbol`：它此前**从未在生产链路上被请求过**
+#:
+#: 原值是 `("scene_semantics",)` 一个任务。实测（tokenhub / glm-5.3-flash / 真图）：
+#:
+#: | 请求 | 观察条数 | 耗时 |
+#: |---|---|---|
+#: | 只 `scene_semantics` | 1–3 条 | ~83 s |
+#: | 两个任务都请求 | **9 条** | ~95 s |
+#:
+#: 也就是说：审一张图时，**认证标志与资质图标从来没有被识别过**。
+#: 而这类问题在母婴广告里很常见（gold 的「原则性错误」「品牌一致性」两类
+#: 大量涉及资质、认证图案），`mark_symbol` 在 provider 层已建好、
+#: 能力声明里也有 —— 只是生产链路一次都没请求它。
+#:
+#: ★ 这又是那个病的同形：**能力建好了、接线没接**。
+#:   而且它不报错：观察列表里有 1–3 条真实观察，「画面语义」那一节看着有内容，
+#:   没人会去数「标志识别那一路是不是从来没跑过」。
+#:
+#: ★ 代价：每张图多一次调用（`mark_symbol` 实测约 11 s，
+#:   比 `scene_semantics` 的 83 s 小得多），总耗时从 ~83 s 到 ~95 s。
+DEFAULT_MEDIA_TASKS = ("scene_semantics", "mark_symbol")
 
 
 def _collect_multimodal_observations(unit, analyze, *, clock=None):
@@ -127,6 +148,73 @@ def _observations_from_result(raw, tasks, *, clock=None):
     overall = raw.get("status")
     entries = []
     per_task = raw.get("tasks") if isinstance(raw.get("tasks"), dict) else {}
+
+    # ★★★ 2026-10-28：接受**两种**返回形状。
+    #
+    #   实测发现生产链路的多模态观察**从来没成功过一次**，根因是两个接口
+    #   各说各的形状：
+    #
+    #   · `base/media_analyze._flatten()`（生产唯一在用的那条）产出的是
+    #     **扁平列表** `{status, observations: [{task, statement, ...}]}`
+    #     —— 它自己的 docstring 明说「摊平成 judge_entry 期望的」；
+    #   · 而这里（`judge_entry`）读的是**嵌套** `raw["tasks"][task]["observations"]`。
+    #
+    #   两边对不上，于是 `per_task` 恒为空 → 每个任务都判 `untested`
+    #   → 「provider 未返回该任务的结果」。而 `media_analyze` 明明给了 11 条
+    #   真实观察，全被丢掉。
+    #
+    #   ★ 症状极其隐蔽：`status` 是 `ok`、note 是空串、观察列表有 2 条
+    #     （每个任务一条 untested 占位）—— 「画面语义」那一节看起来有内容，
+    #     没人会去数「这 2 条其实是『没跑到』而不是『看到了什么』」。
+    #
+    #   ★ 修法是**这里两种都认**，而不是去改 `media_analyze` 的产出：
+    #     那个形状已经是契约（`verify_media_analyze` 按它断言），
+    #     改它会打断已通过的验收；而这里是消费端，多认一种形状是向后兼容。
+    flat_observations = []
+    flat_reasons = {}
+    # ★ 形状判据用「有没有 `observations` 这个键」，而不是「列表非空」——
+    #   `media_analyze` 在「ok 但零观察」时会把它降成 untested 并留 reason，
+    #   此时 `observations` 是空列表。若按「非空」判，就会掉进嵌套分支，
+    #   于是 reason（真正的原因）被换成一句笼统的「provider 未返回该任务」。
+    if isinstance(raw.get("observations"), list):
+        flat_observations = [o for o in raw["observations"] if isinstance(o, dict)]
+        flat_reasons = (raw.get("task_reasons")
+                        if isinstance(raw.get("task_reasons"), dict) else {})
+
+    def _emit_flat() -> list:
+        """扁平形状 → 观察条目。**与下面嵌套那条走同一份字段映射**。"""
+        flat_entries = []
+        for obs in flat_observations:
+            statement = str(obs.get("statement") or "").strip()
+            if not statement:
+                continue
+            conf = obs.get("confidence")
+            flat_entries.append({
+                "status": "ok", "task": obs.get("task"),
+                "statement": statement, "reason": "",
+                "model": model, "model_version": model,
+                "ts": obs.get("timecode"), "bbox": obs.get("region"),
+                "confidence": float(conf) if isinstance(conf, (int, float))
+                and not isinstance(conf, bool) else None,
+                "egress_status": "authorized", "created_at": created,
+            })
+        # ★ 某个任务整体失败时也要落条目 —— 否则「这个任务没成」
+        #   会从观察列表里彻底消失（那是「没看成」，不是「没问题」）。
+        for task, reason in flat_reasons.items():
+            flat_entries.append({
+                "status": "untested", "task": task, "statement": "",
+                "reason": str(reason) or "未说明",
+                "model": model, "model_version": model, "ts": None, "bbox": None,
+                "confidence": None, "egress_status": "authorized",
+                "created_at": created,
+            })
+        return flat_entries
+
+    # ★ 只要拿到了扁平形状（哪怕零观察、有失败原因）就走那条。
+    #   `media_analyze` 一定会带 `observations` 键，所以这里等价于
+    #   「调用方是 media_analyze」。
+    if isinstance(raw.get("observations"), list):
+        return _emit_flat(), ""
     for task in tasks:
         item = per_task.get(task)
         if not isinstance(item, dict):

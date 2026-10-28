@@ -110,6 +110,9 @@ GOLD_DIR = Path(os.path.expanduser("~/audit-data/gold/pilot"))
 #: 不写一个「听起来最强」但没探过的 id —— 那样的基线挂了会被读成「大模型不行」。
 BASELINE_MODELS = ("glm-5.3-flash",)
 
+#: 基线单次请求超时（秒）。实测依据见 `run_baseline` 里的注释。
+BASELINE_TIMEOUT_S = 120.0
+
 #: 给裸模型的提示词。
 #:
 #: ★ 关键设计：**不给规则库、不给控制点编号**。给了就成了「本系统的规则 + 模型的眼看」，
@@ -200,6 +203,61 @@ def _cjk_ratio(text: str) -> Optional[float]:
     return round(cjk / total, 3)
 
 
+#: 评测用 principal。★ 只用于 `prepare()` 的权限上下文，不写入任何存储。
+EVAL_PRINCIPAL = {
+    "id": "eval-runner", "tenant": "t1", "roles": ["dp3"],
+    "product_lines": ["pump", "wearable", "feeding", "skincare"],
+}
+
+_INGESTOR = None
+
+
+def _ingestor():
+    """评测用的 `SubmissionIngestor`（单例）。
+
+    ★ `media_roots` 设成 gold 图片目录：进件层会校验「路径在允许根内」，
+      不设就会拒（那是安全边界，不是可选项）。
+      这也让评测走上与生产**完全一致**的路径校验。
+    """
+    global _INGESTOR
+    if _INGESTOR is None:
+        from base.submission_service import SubmissionIngestor
+
+        roots = sorted({str(p.parent) for rec in (_load_gold().get("records") or [])
+                        for p in _images_of(rec)})
+        # ★ 媒体进件开关必须显式打开。生产里它由 `REVIEW_MEDIA_INGEST` 控制，
+        #   而判据**只读环境变量**（`ingest_media_enabled()`，不设模块常量 ——
+        #   那种写法下「自证测的开关」与「生产读的开关」会变成两个东西）。
+        #
+        #   ★ 本工具在这里 setdefault 而不是硬设：如果调用方显式关了它，
+        #     那应当尊重（评测跑不了媒体，会带着原因落 untested）。
+        #     但评测**本来就要审图片**，不打开就什么都测不了，
+        #     所以缺省打开是这里唯一合理的行为。
+        os.environ.setdefault("REVIEW_MEDIA_INGEST", "1")
+        _INGESTOR = SubmissionIngestor(media_roots=roots)
+    return _INGESTOR
+
+
+def _multimodal_for(unit: Dict[str, Any]):
+    """给 unit 造多模态注入点。**与生产同一条路**（`media_analyze.build_analyze`）。
+
+    ★ 不在本文件里判断「凭据配没配」—— 那是 `build_analyze` 的职责。
+      它未配时返回 None，`judge_entry` 据此落「未接入多模态分析」；
+      这里若再判一次，就成了两个判据（改一处必漂另一处）。
+    """
+    try:
+        from base import media_analyze as MA
+
+        local = unit.get("_media_local_path")
+        if not isinstance(local, str) or not local.strip():
+            return None
+        return MA.build_analyze(resolve_path=lambda ref: Path(local))
+    except Exception:  # noqa: BLE001
+        # 接线层自己坏了 → 不注入。判定层会落未接入，
+        # **不会**被读成「没有问题」。
+        return None
+
+
 def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
     """本系统：**真实进件链**（OCR → unit → 规则引擎 → 判定）。
 
@@ -218,15 +276,51 @@ def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
 
     t0 = clock()
     try:
-        row = M.image_file_row(image, uri=str(image))
-        unit = M.row_to_unit(row, str(image))
+        # ★★★ 走**完整**进件链，不是「row_to_unit 拼一半」。
+        #
+        #   实测踩过两次，都栽在这里：
+        #   ① 第一版手工拼 `{"text": "", "has_text": False}` → 跳过 OCR；
+        #   ② 第二版改用 `row_to_unit(image_file_row(...))` → OCR 对了，
+        #      但 `_media_local_path` 是 None（那个字段由
+        #      `SubmissionIngestor._build_media_unit` 写），于是多模态
+        #      **永远注入不进去**，`multimodal_note` 恒为「未接入多模态分析」——
+        #      而凭据明明配好了。
+        #
+        #   `prepare()` 是生产的完整进件链：OCR → unit → 回填本地路径 →
+        #   校验 → 组装 payload。它**不写 authority**（那是 execute 的事），
+        #   所以拿它做评测不会污染数据。
+        ing = _ingestor()
+        prepared = ing.prepare(
+            {
+                "submission_id": "eval-" + image.stem,
+                "content_type": "图片",
+                "content_stage": "final_content",
+                "entry_channel": "上传文件",
+                "source": {"kind": "image", "uri": str(image)},
+                "product_line": "pump",
+            },
+            principal=EVAL_PRINCIPAL,
+        )
+        unit = prepared["payload"]["content"]
+        # ★★ 必须注入多模态 —— 否则测的是**降级版系统**。
+        #
+        #   实测踩过：第一版没有这一行，于是 `multimodal_note` 全是
+        #   「未接入多模态分析」，而凭据明明是配好的。症状读起来像
+        #   「系统能力不行」，实际是**评测工具少传了一个参数**。
+        #
+        #   ★ 与生产同一条路（`submission_service._multimodal_analyze` 也是
+        #     `MA.build_analyze(resolve_path=...)`），不另写一套。
+        #   ★ 不在这里判断凭据 —— `build_analyze` 未配时返回 None，
+        #     `judge_entry` 据此落「未接入多模态分析」。两个判据必然漂移。
+        analyze = _multimodal_for(unit)
     except Exception as exc:  # noqa: BLE001
         return {"status": "error",
                 "reason": "进件失败：%s: %s" % (type(exc).__name__, exc),
                 "ms": None, "findings": [], "decision": None,
                 "ocr_chars": 0, "cjk_ratio": None, "rules_applied": 0}
     try:
-        out = judge_entry.judge_unit(unit, clock=time.time)
+        out = judge_entry.judge_unit(
+            unit, multimodal_analyze=analyze, clock=time.time)
     except Exception as exc:  # noqa: BLE001
         return {"status": "error", "reason": "%s: %s" % (type(exc).__name__, exc),
                 "ms": None, "findings": [], "decision": None}
@@ -264,7 +358,21 @@ def run_baseline(image: Path, *, model: str, env=None,
                 "ms": None, "findings": [], "raw": ""}
 
     try:
-        client = GatewayClient.from_env("tokenhub", model=model, env=env)
+        # ★ 超时与重试必须按**图片**调，不能用客户端默认值。
+        #
+        #   实测（2026-10-28，tokenhub + glm-5.3-flash）：
+        #     · 纯文本请求      2.4s
+        #     · 缩到 36KB 的图  6.9s
+        #     · 原图 2.3MB     10.4s
+        #   而 gold 里有 4.8MB 的图，base64 后近 5MB。
+        #   默认 60s × 3 次重试 = 最长 180s/张，25 张就是 75 分钟，
+        #   而超时后**拿不到任何读数** —— 那比慢更糟。
+        #
+        #   所以：单次 120s（够 5MB 图 + 抖动），重试 1 次（失败就是失败，
+        #   重试一次仍失败说明不是抖动）。总上界 240s/张。
+        client = GatewayClient.from_env(
+            "tokenhub", model=model, env=env,
+            timeout=BASELINE_TIMEOUT_S, retry_attempts=1)
     except Exception as exc:  # noqa: BLE001
         return {"status": "untested", "reason": "凭据未配：%s" % (exc,),
                 "ms": None, "findings": [], "raw": ""}

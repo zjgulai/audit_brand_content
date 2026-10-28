@@ -326,6 +326,103 @@ def group_g():
            "G4 ★★ reason 里不含任何密钥值")
 
 
+def group_h():
+    """H 组（2026-10-28）：**形状契约两端必须真的接上**。
+
+    ## 它守的是什么
+
+    实测发现生产链路的多模态观察**从来没成功过一次**：
+
+    · `base/media_analyze._flatten()` 产出**扁平** `{status, observations:[...]}`，
+      它自己的 docstring 明说「摊平成 judge_entry 期望的」；
+    · 而 `base/judge_entry._observations_from_result()` 读的是**嵌套**
+      `raw["tasks"][task]["observations"]`。
+
+    两边对不上 → `per_task` 恒空 → 每个任务判 `untested`
+    → 「provider 未返回该任务的结果」。`media_analyze` 给了 11 条真观察，全丢。
+
+    ★ 症状隐蔽：`status=ok`、`note=""`、观察列表里有 2 条（每任务一条 untested
+      占位）——「画面语义」那一节看着有内容，没人会去数那 2 条其实是
+      「没跑到」而不是「看到了什么」。
+
+    ★ 判据必须跨模块：单测 `media_analyze` 或单测 `judge_entry` 都测不到它。
+      所以这里把前者的**真实产出**喂给后者的**真实消费函数**。
+    """
+    from base import judge_entry as J
+    from base import media_analyze as MA
+
+    # 造一份 `_flatten` 会产出的形状（等价于真跑一次 media_analyze）
+    flat = {
+        "status": "ok",
+        "observations": [
+            {"statement": "画面有一位女性抱着婴儿", "confidence": 0.9,
+             "region": "中上部", "task": "scene_semantics"},
+            {"statement": "画面有 momcozy 品牌标识", "confidence": 0.8,
+             "region": "底部", "task": "scene_semantics"},
+            {"statement": "未发现认证徽章", "confidence": 0.7,
+             "region": "全图", "task": "mark_symbol"},
+        ],
+    }
+    entries, note = J._observations_from_result(
+        flat, ["scene_semantics", "mark_symbol"], clock=lambda: 0.0)
+
+    ok_entries = [e for e in entries if e.get("status") == "ok"]
+    report(len(ok_entries) == 3,
+           "H1 ★★★ 扁平形状（media_analyze 的产出）必须被 judge_entry 认",
+           "%d 条 ok / 共 %d 条" % (len(ok_entries), len(entries)))
+    report(note == "", "H2 ★ note 应为空（有观察时不该有说明）", repr(note))
+    report({e.get("task") for e in ok_entries}
+           == {"scene_semantics", "mark_symbol"},
+           "H3 ★★ task 名保留（否则报告分不清观察来自哪一路）",
+           repr({e.get("task") for e in ok_entries}))
+
+    # H4 ★★★ 反向对照：嵌套形状**仍然**要能用（不能为修扁平而把嵌套弄坏）
+    nested = {
+        "status": "ok", "model": "m1",
+        "tasks": {"scene_semantics": {"status": "ok", "observations": [
+            {"statement": "嵌套形状的观察", "confidence": 0.5}]}},
+    }
+    n_entries, _ = J._observations_from_result(
+        nested, ["scene_semantics"], clock=lambda: 0.0)
+    report(len([e for e in n_entries if e.get("status") == "ok"]) == 1,
+           "H4 ★★★ 嵌套形状仍然可用（修扁平不许把嵌套弄坏）",
+           "%d 条" % len(n_entries))
+
+    # H5 ★★★ `task_reasons` 必须落成观察条目，不许消失
+    #
+    #   「这个任务没成」是**没看成**，不是「没问题」。
+    #   丢掉它等于把失败读成通过。
+    flat_fail = {"status": "ok", "observations": [],
+                 "task_reasons": {"scene_semantics": "网络层失败：timeout"}}
+    f_entries, _ = J._observations_from_result(
+        flat_fail, ["scene_semantics"], clock=lambda: 0.0)
+    report(len(f_entries) == 1 and f_entries[0].get("status") == "untested",
+           "H5 ★★★ 任务级失败要落 untested 条目（不许从列表里消失）",
+           repr([(e.get("status"), e.get("reason", "")[:20]) for e in f_entries]))
+    report("timeout" in str(f_entries[0].get("reason") or ""),
+           "H6 ★★ 失败原因要原样带出（不许换成笼统一句）",
+           str(f_entries[0].get("reason") or "")[:40])
+
+    # H7 ★★ 空观察 + 无失败原因 → 空列表，不是伪造一条
+    empty = {"status": "ok", "observations": []}
+    e_entries, _ = J._observations_from_result(
+        empty, ["scene_semantics"], clock=lambda: 0.0)
+    report(e_entries == [],
+           "H7 ★★ 真的没有观察时返回空列表（不伪造）", repr(e_entries))
+
+    # H8 ★★★ 默认任务必须**含 mark_symbol**
+    #
+    #   实测：原值是 `("scene_semantics",)` —— 审一张图时认证标志/资质图标
+    #   **从来没有被识别过**，而 mark_symbol 在 provider 层已建好。
+    #   这是「能力建好了、接线没接」的又一例。
+    report("mark_symbol" in J.DEFAULT_MEDIA_TASKS,
+           "H8 ★★★ 默认任务含 mark_symbol（否则标志/资质图标永远不识别）",
+           repr(J.DEFAULT_MEDIA_TASKS))
+    report("scene_semantics" in J.DEFAULT_MEDIA_TASKS,
+           "H9 ★ scene_semantics 仍在（另一半：别为了加一个删另一个）",
+           repr(J.DEFAULT_MEDIA_TASKS))
+
+
 def main():
     print("=" * 74)
     print("media_analyze · ADR-0021 主线（多模态生产接线）")
@@ -337,6 +434,7 @@ def main():
     group_e()
     group_f()
     group_g()
+    group_h()
     print("-" * 74)
     if FAILED:
         print("❌ %d 过 · %d 红 · %d 未测" % (PASSED, FAILED, UNTESTED))
