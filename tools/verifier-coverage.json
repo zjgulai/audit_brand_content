@@ -1215,6 +1215,13 @@
         "web/src/pages/CaseDetailPage.tsx",
         "web/src/components/StatusBadge.tsx"
       ]
+    },
+    {
+      "verifier": "tools/verify_eval_media_vs_llm.py",
+      "asserts": "媒体评测工具的**诚实性**自证（离线，不联网）：A 凭据读数只报配没配、**值绝不打印**（行为级：把值塞进环境后搜输出）· B ★★★ 未测时 metrics 必须是 None 不是 0 · gold 三种读不出各自说得不一样 + 反证 · C ★★★ 「0 条 finding」必须与「什么都没看见」一起报（saw_nothing），并反证「真看见时该为 0」· D 聚合器分母为 0 时给 None · E 裸模型产出解析（没 JSON → 空列表，不伪造也不崩）+ 失败原因必须从 `HttpResult.error` 读（否则失败被渲染成空白）。★ 两个变异已验证会红：未测给 0 指标 → B2；saw_nothing 恒 0 → C1。",
+      "subjects": [
+        "tools/eval_media_vs_llm.py"
+      ]
     }
   ],
   "exempt": [
