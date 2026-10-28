@@ -78,7 +78,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "[1/11] smoke 生成临时投影（不写仓内）"
+echo "[1/12] smoke 生成临时投影（不写仓内）"
 SMOKE_DUMP_IR="${DATA}" python3 "${ROOT}/tools/smoke_end_to_end.py" \
   > "${RUN_DIR}/smoke.log" 2>&1
 test -s "${DATA}/cases.json"
@@ -93,7 +93,7 @@ test -s "${DATA}/reports.json"
   >> "${RUN_DIR}/seed.log" 2>&1
 grep -q '"sample": true' "${DATA}/cases.json"
 
-echo "[2/11] 构建生产包 + 开发入口 fail-closed 自证"
+echo "[2/12] 构建生产包 + 开发入口 fail-closed 自证"
 ( cd "${WEB}" && npm run build ) > "${RUN_DIR}/build.log" 2>&1
 test -d "${WEB}/dist"
 "${PY}" "${WEB}/scripts/review_api_dev_selftest.py" \
@@ -108,12 +108,31 @@ node "${WEB}/scripts/check_production_bundle.mjs" \
   --dir "${RUN_DIR}/hostile-build" \
   > "${RUN_DIR}/hostile-bundle-check.log" 2>&1
 
-echo "[3/11] 创建队列口径检查 session（u_dp3 / t1）"
+echo "[3/12] 创建队列口径检查 session（u_dp3 / t1）"
+# ★ 2026-10-28：这条会话 cookie 是后面**四步**（队列口径 / 写动作建案 /
+#   浏览器断言）的身份来源。实测过一次它返回空 —— 而 `test -n` 的失败
+#   信息只有一个退出码，读起来像「脚本坏了」，实际是「一次会话没建出来」。
+#   所以这里把取不到时的诊断打出来。
+# ★ stderr 单独落文件，**不并进 stdout** —— 并进去就会让「一行 traceback」
+#   变成一个非空字符串被当成 cookie 传下去，然后在更深的地方以 401 出现，
+#   那时报的是「身份不足」，指向完全不同的方向。
+#   （这是自证里最容易写错的一处：想看到错误，就把错误变成了数据。）
 QUEUE_COOKIE="$("${PY}" "${WEB}/scripts/make_session.py" \
-  --db "${RUN_DIR}/sessions.db" --principal u_dp3 --tenant t1)"
-test -n "${QUEUE_COOKIE}"
+  --db "${RUN_DIR}/sessions.db" --principal u_dp3 --tenant t1 \
+  2> "${RUN_DIR}/session.err")"
+if [ -z "${QUEUE_COOKIE}" ] || [ "${#QUEUE_COOKIE}" -lt 20 ]; then
+  echo "建队列会话失败（拿到的不是 cookie）："
+  echo "  [${QUEUE_COOKIE}]"
+  echo "  stderr:"; sed 's/^/    /' "${RUN_DIR}/session.err" 2>/dev/null | tail -5
+  echo "这不是「跳过」—— 后面四步都要用它，没有身份就没法验。"
+  exit 1
+fi
+# ★ 长度检查不是洁癖：cookie 是 43 字符的 urlsafe token，
+#   而错误信息（如 traceback 一行）也能是「非空」。只查 -n 会把
+#   「一行报错」当成 cookie 传下去，然后在更深的地方以 401 出现 ——
+#   那时报的是「身份不足」，指向完全不同的方向。
 
-echo "[4/11] 启动 review-api :${API_PORT}"
+echo "[4/12] 启动 review-api :${API_PORT}"
 APP_ENV=dev \
 REVIEW_DEV_IDENTITY=1 \
 REVIEW_API_DATA_ROOT="${DATA}" \
@@ -123,7 +142,7 @@ REVIEW_API_SESSION_DB="${RUN_DIR}/sessions.db" \
   > "${RUN_DIR}/api.log" 2>&1 &
 API_PID=$!
 
-echo "[5/11] 启动 Vite dev :${WEB_PORT}（/review-api 代理到 :${API_PORT}）"
+echo "[5/12] 启动 Vite dev :${WEB_PORT}（/review-api 代理到 :${API_PORT}）"
 ( cd "${WEB}" && APP_ENV=dev REVIEW_DEV_IDENTITY=1 REVIEW_API_PROXY="http://127.0.0.1:${API_PORT}" \
   exec ./node_modules/.bin/vite --host 127.0.0.1 --port "${WEB_PORT}" --strictPort ) \
   > "${RUN_DIR}/web.log" 2>&1 &
@@ -155,7 +174,7 @@ if [ "${ready}" -ne 1 ]; then
   exit 1
 fi
 
-echo "[6/11] curl /api/v1/queue"
+echo "[6/12] curl /api/v1/queue"
 HTTP_STATUS="$(curl --max-time 5 -s -o "${RUN_DIR}/queue.json" \
   -w '%{http_code}' \
   -H "Cookie: session=${QUEUE_COOKIE}" \
@@ -194,7 +213,7 @@ pick=next((r for r in rows if r.get('tenant')=='t1' and r.get('assignee_id')=='u
 print(pick['case_id'])" "${RUN_DIR}/queue.json")"
 echo "队列 ${QUEUE_N} 条 · 详情页取样：${FIRST_CASE}"
 
-echo "[7/11] 页面断言：队列 → 案件详情 → 报告 → 分类规范"
+echo "[7/12] 页面断言：队列 → 案件详情 → 报告 → 分类规范"
 node "${WEB}/scripts/check_pages.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --enable-dev-identity 1 \
@@ -222,7 +241,7 @@ if [ -z "${WRITE_CASE}" ]; then
 fi
 echo "写动作测试案件（真实新建）：${WRITE_CASE}"
 
-echo "[8/11] 复核写动作：显式身份 → claim → draft → submit → GET 回读"
+echo "[8/12] 复核写动作：显式身份 → claim → draft → submit → GET 回读"
 node "${WEB}/scripts/check_review_actions.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --api "http://127.0.0.1:${API_PORT}" \
@@ -230,7 +249,22 @@ node "${WEB}/scripts/check_review_actions.mjs" \
   > "${RUN_DIR}/actions.json" 2> "${RUN_DIR}/actions.err"
 cat "${RUN_DIR}/actions.json"
 
-echo "[9/11] 无障碍自动检查（全部工作台页面 15 条路由扫描 + 1280x720 + 320px Reflow）"
+echo "[9/12] 样例矩阵：不同内容形态在浏览器里的判定与显示是否一致"
+node "${WEB}/scripts/verify_sample_matrix.mjs" \
+  --base "http://127.0.0.1:${WEB_PORT}" \
+  --api "http://127.0.0.1:${API_PORT}" \
+  --screenshots "${RUN_DIR}" \
+  > "${RUN_DIR}/matrix.stdout" 2> "${RUN_DIR}/matrix.err"
+MATRIX_RC=$?
+cat "${RUN_DIR}/matrix.stdout"
+if [ "${MATRIX_RC}" -ne 0 ]; then
+  # ★ 2 是「未测」，同样不算通过（AGENTS.md §2.4：未测必须与通过/红长得不一样）。
+  echo "样例矩阵未通过（rc=${MATRIX_RC}；2=有未测，同样不算通过）"
+  cat "${RUN_DIR}/matrix.err" | tail -5
+  exit "${MATRIX_RC}"
+fi
+
+echo "[10/12] 无障碍自动检查（全部工作台页面 15 条路由扫描 + 1280x720 + 320px Reflow）"
 node "${WEB}/scripts/a11y_check.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --enable-dev-identity 1 \
@@ -239,7 +273,7 @@ node "${WEB}/scripts/a11y_check.mjs" \
   > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
 cat "${RUN_DIR}/a11y.stdout"
 
-echo "[10/11] 复核切片断言（A1–A9，含反向对照与边界夹具）"
+echo "[11/12] 复核切片断言（A1–A9，含反向对照与边界夹具）"
 node "${WEB}/scripts/check_review_slice.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --api "http://127.0.0.1:${API_PORT}" \
@@ -252,7 +286,7 @@ if [ "${SLICE_RC}" -ne 0 ]; then
   exit "${SLICE_RC}"
 fi
 
-echo "[11/11] 开发身份切换隔离"
+echo "[12/12] 开发身份切换隔离"
 node "${WEB}/scripts/check_identity_switch.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --api "http://127.0.0.1:${API_PORT}" \

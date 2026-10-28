@@ -2470,3 +2470,23 @@ code {
   padding-left: var(--space-3);
   margin: var(--space-2) 0 0;
 }
+
+/* ── 「为什么没命中还是待复核」的解释（2026-10-28）─────────────────────
+ *
+ * 这条说明出现在**最容易被误读的那一格**：findings 为空、判定却是 REVIEW。
+ * 所以它要有存在感，但不能抢「证据链」的位置 ——
+ * 用左侧一道语义色细线 + 淡底，读起来是「附注」，不是「又一条结论」。
+ *
+ * ★ 颜色用 --info（待检测/信息），**不是** --warn：
+ *   这不是警告，是一次口径解释。用 warn 会让人以为又出了个问题。
+ */
+.coverage-reason {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--info-surface);
+  border-left: 2px solid var(--info);
+  border-radius: var(--radius-control);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--text);
+}

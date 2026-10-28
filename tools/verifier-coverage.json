@@ -1206,6 +1206,15 @@
         "web/a11y-manual-v1.json"
       ],
       "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
+    },
+    {
+      "verifier": "web/scripts/verify_sample_matrix.mjs",
+      "asserts": "样例矩阵的**浏览器级**判定一致性（5 条不同内容形态：极限词 / 临床宣称 / 权威背书 / 完全合规 / 无诉求记录）：每条同时核对 ①后端 decision.state ②界面显示的对应标签 ③未评估部分的可见性。★ 方向是「界面 ≤ 后端」——后端 0 条 finding 时界面**不许**显示「违规拦截」（那叫编造结论）。★ 标签映射从 `StatusBadge.tsx` 源码读取，不在测试里抄一份（抄了就会两边漂移）。★ 两个变异已验证会红：删掉「没命中却仍待复核」的解释 → clean/neutral 红；顶栏徽标写死 BLOCK → clean/neutral 的「不许更强」红。",
+      "subjects": [
+        "web/scripts/verify_sample_matrix.mjs",
+        "web/src/pages/CaseDetailPage.tsx",
+        "web/src/components/StatusBadge.tsx"
+      ]
     }
   ],
   "exempt": [

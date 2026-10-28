@@ -564,6 +564,30 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
           <h2>未评估的部分</h2>
           <NotEvaluatedList items={notEvaluated} />
 
+          {/* ★★ 2026-10-28：把「未查」与「结论」之间的因果关系说出来。
+          
+              改前这里有两条互不相连的信息：
+                · 「未发现违规或风险项」（下一节，证据链）
+                · 「未做·无控制点 × 3」（上一节，未评估）
+              而判定是 REVIEW。看的人自然会问：**什么都没查出来，为什么还要人看？**
+              实测（本轮跑的五条样例）：一段完全合规的产品说明
+              （「本品为硅胶材质，可高温消毒…」）同样判 REVIEW，findings 为空 ——
+              因为场景/权利/渠道三族还没有控制点，覆盖只能是 partial，
+              而 partial 按设计**不许判 PASS**（没审的部分不许当审过）。
+
+              这句话就是那条规则本身。不写它，界面在讲一件自相矛盾的事；
+              用户会以为系统在瞎报，或者去点「确认」把自己没看过的部分放行。 */}
+          {cov.coverage_state === "partial"
+            && (ir.findings ?? []).length === 0
+            && notEvaluated.length > 0 ? (
+            <p className="coverage-reason">
+              本条<b>没有命中任何规则</b>，但仍不能判「通过」：
+              上面 {notEvaluated.length} 项还没审。按项目口径 ——
+              <b>没审的部分不许当作审过</b>，所以判定停在「待人工复核」，
+              由人确认这些部分是否适用。这不是误报。
+            </p>
+          ) : null}
+
           <h2>证据链</h2>
           <SpecSeamNote disputeCount={disputeCount} />
           {(ir.findings ?? []).length === 0 ? (
