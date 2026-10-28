@@ -415,7 +415,13 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
             if command == "ingest_submission" and code == "version_conflict":
                 raise HTTPException(409, "already_ingested: 该 submission 已建案")
             raise HTTPException(409, "%s: %s" % (code, getattr(exc, "detail", "")))
-        if code in ("draft_not_found", "finding_not_found"):
+        if code in ("draft_not_found", "finding_not_found",
+                    # ★ 2026-10-28：为「不在 authority 里的案件」做复核动作。
+                    #   它与 finding_not_found 同为 404，但**不是同一件事**：
+                    #   前者是「这个案件不在这里」，后者是「案件在、但那条
+                    #   finding 不在」。混成一个码会让排查走错方向
+                    #   （实测踩过：报 finding_not_found，而去查证据链）。
+                    "case_not_in_authority"):
             raise HTTPException(404, "%s: %s" % (code, getattr(exc, "detail", "")))
         if code == "not_original_signer":
             # SoD 类：撤回只能由原签发人执行（T-315b / #123c）。

@@ -127,6 +127,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_authority_review_reader.py",
+      "asserts": "台账摘要读 authority 的适配器：形状与 `_review_summary` 认得的一致 · **缺失不许装成有值**（不存在→None、缺 version→None、真 0 原样给）· 真写路径 claim 后回读版本前进一格 · drafts 逐项透传 · 反向对照四项",
+      "subjects": [
+        "base/authority_review_reader.py",
+        "web/scripts/review_api_dev.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_backend_recovery.py",
       "asserts": "权威备份/恢复：只收已提交 manifest+事件与长期审计，排除 session/projection/generation，坏 hash/夹带/半行拒绝，空目录恢复后重建 fresh 投影，失败不留半恢复",
       "subjects": [
@@ -150,6 +158,15 @@
         "dsh-browser-ext/panel/assets/index.js",
         "dsh-browser-ext/manifest.json",
         "ADR/ADR-0013-基座接口冻结与仓库入库分级.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_browser_harness.py",
+      "asserts": "前后端接线联调驱动（web/scripts/lib/browser_harness.mjs）的三条硬约束：H1 ★ 无 Chrome 抛 HarnessUntested（调用方据此退 2 不是退 1）；H2 ★ 每个 CDP 调用有超时，且判据双向（elapsed 落在 [100,3000) —— 下界证明超时真触发、上界证明它没把页面里 5000ms 的 Promise 等完）；H3 ★ close 幂等且关闭后调用明确失败；H4 ★ CLI 三态退出码 0/1/2（未测 ≠ 红 ≠ 通过，在进程退出码上的执行点）；H5 goto 等 readyState=complete、页内 JS 抛错变 HarnessFailed；H6 ★ close 后临时 profile 真被删（从 _profileDir 读真实路径，不猜目录）。--controls 2 项：HarnessUntested 改名 → H1 必红；未测退 2 改成退 1 → H4 必红",
+      "subjects": [
+        "web/scripts/lib/browser_harness.mjs",
+        "web/scripts/pairing_check.mjs",
+        "web/scripts/dev-up.sh"
       ]
     },
     {
@@ -300,6 +317,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_egress_manifest.py",
+      "asserts": "T-438 出境清单落盘（送什么·送给谁·留多久）。方案 §五 T-432 判据 4 要求三要素，而**「留多久」此前在任何地方都不存在** —— 「我们只保留 N 天」是一句没有执行点的承诺（§2.4.2）；本票只补第三项与落盘，**不重算清单**（否则是第二套口径，§2.4.8）。S 快照三要素齐备 + **到期时刻 = 生成时刻 + days×86400（算出来，不是抄进去）**，改 days 到期跟着变；T 按任务收窄（只跑静图的部署不该在清单里看到音轨），分任务指纹与注册表同源；H 快照 providers/digest **逐字等于**注册表输出 + 反证「注册面变了指纹就变」；E 到期判定（未到期 False / 已到期 True / **到期时刻读不出 → True，fail-closed** —— 反向默认会让一份损坏的审计件永远有效）；R 落盘（仓内根必须拒 / 相对路径解析到仓内也拒 / 文件 0600 / **append-only 不覆盖历史**）；P 清理（到期删、未到期留、**读不出的文件不删** —— 删一个看不懂的审计件不可逆，并记进 errors）；C 保留期读取（缺省用默认、非整数/零/负/超 10 年必须**抛**，不许退回默认）。5 项反向对照。★ **本票抓到一个真缺陷**：`tools/multimodal_client.py` 的 EGRESS_ITEMS 第一版**没写 `tasks`**，而 `EgressItem.tasks` 为空 = 「适用于全部任务」—— 于是只做画面语义的部署，清单里也会列出音轨与整段视频（审计读到的出境面比实际大）。真变异复测：去掉 audio 项的 tasks → T1 红",
+      "subjects": [
+        "base/multimodal_egress.py",
+        "tools/multimodal_client.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_engine_contract.py",
       "asserts": "引擎契约（V 组闸门）：规则表结构、指纹、未决项唯一书写位置、处置分层",
       "subjects": [
@@ -329,6 +354,14 @@
         "tools/feishu_index.py",
         "research/feishu/资源索引-v1.json",
         "research/feishu/可达清单.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_feishu_materials.py",
+      "asserts": "B 档飞书材料登记表：字段齐（M1）· 落地根仓外且 0700（M2）· **两个口径**（shell stat 与 getsize）都等于登记字节数、sha256 逐份重算（M3）· 入库文件无正文片段（M4）· 抓取脚本仍带去除填充逻辑（M5）；落地根不在盘上退 2。反向对照 5 项",
+      "subjects": [
+        "tools/feishu_content_materials.json",
+        "tools/fetch_feishu_materials.py"
       ]
     },
     {
@@ -377,6 +410,26 @@
       ]
     },
     {
+      "verifier": "tools/verify_image_shape.py",
+      "asserts": "★ 镜像形状 vs 仓内形状（T-410 收尾；既有两套自证都跑在仓内文件系统上，所以盖不住这一类）：I1 扫 base/ 与 api/ 里每一处 `from tools.X`，逐个要求 Dockerfile 有 COPY 且未被 .dockerignore 排除；I3 ★ 在临时目录里**按 Dockerfile 的 COPY 结果**建出最小子树、隔离 PYTHONPATH **真 import 一次**（I1 只证明文本上对得上，而 send_gateway 那条是 import 期失败）；D1 生产 bundle 里不许出现 /review-api（那是 Vite dev 的代理前缀，生产没有那层代理，请求会落到 SPA 兜底返回 200 text/html）。--controls：注释掉 redact 的 COPY → I1 必红",
+      "subjects": [
+        "Dockerfile",
+        ".dockerignore",
+        "base/send_gateway.py",
+        "web/src/api/client.ts"
+      ]
+    },
+    {
+      "verifier": "tools/verify_intent_infer.py",
+      "asserts": "T-455 content_stage 建议值推断 · A 三态（inferred/absent/untested 互不相同）· ★★★ B 不覆盖：调用方给值一律采信、只在缺失时补、**不许原地改入参**（上游要用原对象算幂等哈希）· ★★★ C 不默认：两边都没命中 → untested，**不许**默认成 brief 或 final_content（默认 final_content 会让 brief 文案按终稿判，默认 brief 会让终稿被放过）· ★★★ D 幂等：补值必须发生在算哈希之前 —— D4 用真实 BusinessEventStore + WriterLease 真跑两次 execute_submission，同 key 重放不许报 idempotency_conflict（删掉 service 里那行补值，D4 立刻红）· E 证据：每条推断都指得出 pattern/hit/why，hit 必须逐字出现在正文里 · F compare 三态（一致/分歧/无法比较）· ★★★ G 如实报出：36 条规则里 content_stage/brief/final_content 各出现 0 次，**没有任何规则消费 content_stage**，推断值今天不改变任何判定；带正向对照（severity=39/layer=38）与正反两组读数的判定翻转",
+      "subjects": [
+        "base/intent_infer.py",
+        "base/submission_service.py",
+        "base/review_command_service.py",
+        "research/governance/skeleton/rules-v1.json"
+      ]
+    },
+    {
       "verifier": "tools/verify_job_dispatcher.py",
       "asserts": "job_dispatcher：run_record 14 字段 / 恰好一个合法 ReviewOutput + run_id / 同 case 串行 / 超时 SIGKILL / 坏输出不 commit",
       "subjects": [
@@ -413,6 +466,14 @@
       ]
     },
     {
+      "verifier": "tools/verify_lark_progress.py",
+      "asserts": "T-440 「改动完成即同步飞书事项主表」（AGENTS.md §2.8）这条承诺**没有变成一句空话**。被验对象是 `tools/lark_progress.py`（不叫 verify_*，故不进名册，由本文件管它）。W1/W2 §2.8 真的写着这条约定且点名了执行点、那个文件真的存在；**W5 表坐标（APP_TOKEN / TABLE_ID）与 §2.8 逐字一致**（改表不改文档 → 红）+ W5c 反证不存在的 token 查不到；**W3 `--apply` 是 store_true、写入路径的 dry_run 取反自它**（默认 dry-run）+ W3d 反证 dry-run 下 token=None 也不炸（真的没发请求）；**W4 凭据路径只出现一处、指向仓外 ~/.dsh/credentials、不在仓内**；**W6/W7 真跑一遍工具的 --selftest**（读数由工具自己报，本文件不抄死数），项数 ≥15 且 0 红，并断言它自称「0 网络请求、0 凭据读取」；W7d 反证缺必填时真跑必须退非 0。★ 工具自己的 18 条判据（单选未知选项 / 未测不许标已完成 / 编号取最大号+1 / upsert 幂等）在 `lark_progress.py --selftest`，已用三处真变异验过：删「未测不许标已完成」→2 红、编号改按条数→2 红、单选不校验→2 红",
+      "subjects": [
+        "tools/lark_progress.py",
+        "AGENTS.md"
+      ]
+    },
+    {
       "verifier": "tools/verify_lark_share.py",
       "asserts": "外部标准库分享表：permission_public 三态 / 表存在性 / 条数恒等；离线反向对照",
       "subjects": [
@@ -439,6 +500,24 @@
       ]
     },
     {
+      "verifier": "tools/verify_media_analyze.py",
+      "asserts": "ADR-0021 主线 · 多模态分析的生产接线 · A 就绪读数：两网关**分开报**（image 与 video 覆盖面不同，合并成一个布尔会让「视频不能审」被「图片能审」盖掉）、缺哪个环境变量逐个点名、读数里不含密钥值 · ★★★ B 未配凭据：build_analyze 返回 None（不注入），judge_entry 落「未接入多模态分析」而**不是**空列表；B3/B4 断言那条 note 真的活到 state（reducer 与 payload 两处都要有）· C 注入契约：analyze(media_ref, tasks)，图片 2 任务、视频 3 任务（含 av_alignment）· ★★ D 路径：不从 uri 反推、解析不出 → error 而不是猜（猜错的后果是「审了另一张图」）· ★ E 降级：只配 tokenhub 时 av_alignment 被跳过**且说清原因** · F 观测归因：每条观察带 task；「返回 ok 但零观察」降成 untested · G 反向对照",
+      "subjects": [
+        "base/media_analyze.py",
+        "base/submission_service.py",
+        "base/review_reducer.py",
+        "base/judge_entry.py",
+        "tools/multimodal_client.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_media_ingest.py",
+      "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow） · ★ T-452（2026-10-27）：开关改读环境变量 REVIEW_MEDIA_INGEST（默认关；只认 1/true/0/false，胡话必须报错而不是静默当关）· H 组 7 项：不设变量→关 / 设 1→真打开 / 打开后 supported 含 image / **开关开了但引擎仍是 host_vision → readiness 点名（不许静默）** / 关着时不误报",
+      "subjects": [
+        "base/submission_service.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_media_model_lock.py",
       "asserts": "行 120/121 的**机器半边**：Playbook TS-18/TS-19 仍标「候选」且写着「过门后才锁版本」（出现「已选定/已锁定」即红）；阶段3-准备评估.md 的候选矩阵仍在；**配置里一旦锁定 OCR/ASR 版本，四项（OCR）/五项（ASR）读数必须齐备**，缺一项即红。今天仓内 0 份锁定配置 → 门不适用（打印为事实行，不冒充「门验过了」）。7 项反向对照。**人工实测那一半没有对象**，#120/#121 不映射",
       "subjects": [
@@ -455,58 +534,19 @@
       ]
     },
     {
-      "verifier": "tools/verify_multimodal_client.py",
-      "asserts": "T-432 多模态客户端（`tools/multimodal_client.py`，全仓唯一有网络的地方）与授权闸门（`base/multimodal_provider.py`，一行网络都不许有）的接缝。**全离线，一次网络都不发**：传输层可注入，真实现与打桩走同一套解析与状态映射。N 网络边界（闸门只有 0 条网络 import，**只查 import 行** —— 全文会命中它自己的文档注释，实测 6 处假红；N2 反向证明「没放宽，是没假红」）；T 客户端 TASK_MEDIA 与闸门 _REQUIRED_MEDIA **恒等**；C 配置只读环境变量、两个网关各读自己那对、**代码里没有打开凭据文件的动作**（C7 只查读取动作不查文档里提到的路径）；E 出境清单**按任务收窄**（scene_semantics 不含音轨）、recipient 可指认、registration_for 默认 **authorized 全 False**；A 未授权时 require_authorization 必抛且 provider **一次都没被调用**，已授权时必须放行（闸门不是砖头）；S 状态映射十类失败全都不许落 ok，**S12 是判别用例**：非 2xx 但响应体结构完整（401/403/429/500/503）—— 没有它 S3/S4 是假绿，因为真实网关错误页不是 JSON 会被下一层兜住，实测删掉状态码那行仍全绿；S13 同一结构 2xx 必须 ok（防 S12 恒红）；M 一条 error 不许被另一条 ok 盖成 ok；R 源码不含 sk- 形态凭据。**不证明**模型真的看得懂画面（那要给真素材与真凭据，验的是接缝不是模型质量）",
-      "subjects": [
-        "tools/multimodal_client.py",
-        "base/multimodal_provider.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_multimodal_observation.py",
-      "asserts": "T-433 L1 多模态观察。**核心边界**：finding 三要素是合取（control_code/authority_ref/location，缺一即拒），多模态给不出前两项（知识库产物），所以「先打通 + 落 candidate finding + 知识库慢慢建」三条不能同时成立 —— L1 观察落 `case.multimodal_observations`（进权威、可重放、报告单独成节、标候选待人工确认），L2 候选等 T-434。**L1 不是降级，是照实说**：把观察伪装成 finding 的后果是复核时无法申诉。L1 观察原样进 state、**不进 ir.findings**、缺省是 [] 不是缺字段；L2 三态可分（ok/untested/error），观察状态域与 finding 状态词**不重叠**；L3 reducer 拒坏形状（ok 无 statement / 非 ok 无 reason / status 用了 finding 的词 / 缺 task / 不是对象 / 整体不是数组）；L4 judge_entry 的五种「没看成」都不许被读成「看过没问题」（未注入 analyze → note、非媒体载体 → note、analyze 抛异常 → 落 error 观察、provider 少给任务 → untested、provider 报 ok 但 observations 空 → 落 untested）；L5 报告快照**判定时冻结**（快照观察 == 返回值观察，同源；None 不造壳；不原地改传入快照）；L6 finding 表未被污染（multimodal 仍不在白名单、准入三要素未放宽）。★ 报告成节的措辞判据在 `verify_report_render.mjs` 的 T433-1…11，那里看的是**渲染出来的文本**而非源码。四条真变异已验：删 statement 校验 → L3-1/2 红；未注入 analyze 去 note → L4-1 红；去掉 ok 空观察检查 → L4-5 红；报告标题改「已通过」→ #67 与 T433-5 同时红",
-      "subjects": [
-        "base/review_reducer.py",
-        "base/judge_entry.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_video_ingest.py",
-      "asserts": "T-435 视频抽帧（balanced）+ 音画对齐前提。**分两层自证，缺一层就是「逻辑对但跑不起来」或反之**：E 层用**合成帧**真跑抽帧业务判据（不需要 ffmpeg）；X 层验执行（ffmpeg/ffprobe 在不在），**不在就落未测退 2**，不许用绿的退出码盖住「没跑过」。E1 静止 10 帧去重后 1 帧 / E2 三帧三色全留（不误伤）/ E3b **细渐变（每步差 4 < 阈值 8）留下部分而非全部、也不塌成 1 帧** + E3c 反证「与前一帧比会塌成 1 帧」（第一版用 12 色阶，两种比法都留下全部，E3b/E3c 分不出差别 —— 真变异实测过）/ E3d 空缩略图判大差异并保留（宁可多留不误合）/ E5 `max_frames` 是**硬上限**且在抽帧前截断 / E6 均匀兜底不取两端 / E7 切变点不足回落 uniform + E7b 反证切变够时必须走 scene / E8 V1 五项：无音轨=no（Playbook V1 原文「音轨 ⛔」）、0 帧=no、**完整画面语义永远不是 yes（穷举 20 组合无一 yes）**、**has_audio 不许抬高覆盖声明**（E8-11）+ 它必须影响 audio_note（E8-12，两种成因要分得开）/ E9 音画对齐前提：只有 video 必须拒并点名缺 audio / E10 与 report_render.mjs 的 V1_KEYS **同名同序**、与 verify_report_render.mjs 的 **V1_ENUM 恒等**（第一版指向 V1_KEYS_OUTSIDE 的函数体找字符串，抓到空集恒红；判据要读定义不读消费点）。★ 三处真变异已验：完整画面语义→yes 红 E8-5/E8-9；去重改与前一帧比 红 E3b；切变不够也走 scene 红 E7。**X 层今天未测**：本机无 ffmpeg/ffprobe、盘上 0 个视频文件 —— 判据 1/3/4 需要真素材，换机器或装工具后应转绿",
-      "subjects": [
-        "base/media_ingest.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_egress_manifest.py",
-      "asserts": "T-438 出境清单落盘（送什么·送给谁·留多久）。方案 §五 T-432 判据 4 要求三要素，而**「留多久」此前在任何地方都不存在** —— 「我们只保留 N 天」是一句没有执行点的承诺（§2.4.2）；本票只补第三项与落盘，**不重算清单**（否则是第二套口径，§2.4.8）。S 快照三要素齐备 + **到期时刻 = 生成时刻 + days×86400（算出来，不是抄进去）**，改 days 到期跟着变；T 按任务收窄（只跑静图的部署不该在清单里看到音轨），分任务指纹与注册表同源；H 快照 providers/digest **逐字等于**注册表输出 + 反证「注册面变了指纹就变」；E 到期判定（未到期 False / 已到期 True / **到期时刻读不出 → True，fail-closed** —— 反向默认会让一份损坏的审计件永远有效）；R 落盘（仓内根必须拒 / 相对路径解析到仓内也拒 / 文件 0600 / **append-only 不覆盖历史**）；P 清理（到期删、未到期留、**读不出的文件不删** —— 删一个看不懂的审计件不可逆，并记进 errors）；C 保留期读取（缺省用默认、非整数/零/负/超 10 年必须**抛**，不许退回默认）。5 项反向对照。★ **本票抓到一个真缺陷**：`tools/multimodal_client.py` 的 EGRESS_ITEMS 第一版**没写 `tasks`**，而 `EgressItem.tasks` 为空 = 「适用于全部任务」—— 于是只做画面语义的部署，清单里也会列出音轨与整段视频（审计读到的出境面比实际大）。真变异复测：去掉 audio 项的 tasks → T1 红",
-      "subjects": [
-        "base/multimodal_egress.py",
-        "tools/multimodal_client.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_media_ingest.py",
-      "asserts": "T-431 图片进件（**能力建成 · 生产路径未打开**）。A 组守卫开关键 `MEDIA_INGEST_ENABLED` 的语义：默认 False、只有 `is True` 才算开、字符串 'false' 与整数 1 **不算开**（用真值判会让 'false' 也打开）；B 组两个读数不许混用：`SUPPORTED_SOURCE_KINDS`（声明，ADR-0018 §6.2 之前不动）vs `supported_source_kinds_now()`（此刻，随开关），开时后者=前者∪MEDIA_SOURCE_KINDS 而前者**仍未变**；C 组归因：开关关 → `media_ingest_disabled`（不是混进 `unsupported_source_kind`），video 被挡**不许**借用媒体的码；D 组真跑盘上真实位图 → 合法 image unit，`covers` 只含图内文字、**`covers` 里不许出现「画面语义」**、`does_not_cover` 必须含「画面语义」（T-431 判据 2）、过 contract.validate；E 组路径约束：根外 403（不让端点变成对任意文件做 OCR 的读取器）/ 未配根 503 / 根内不存在 404 / 空 uri 422 / 相对路径按第一个根解析；F 组 OCR 失败不许伪装成已审（parse_status 落 failed 且 failure_kind 属四类、边界声明不因失败而消失）；G 组现有守门读数仍绿（真实支持集不含 image/video，且行为级与常量一致）。6 项反向对照，三处打断各只让对应那几条红、好副本必须全绿。★ 不证明容器内能跑、不打开生产进件：打开它与行 118 必须同时做（T-118-follow） · ★ T-452（2026-10-27）：开关改读环境变量 REVIEW_MEDIA_INGEST（默认关；只认 1/true/0/false，胡话必须报错而不是静默当关）· H 组 7 项：不设变量→关 / 设 1→真打开 / 打开后 supported 含 image / **开关开了但引擎仍是 host_vision → readiness 点名（不许静默）** / 关着时不误报",
-      "subjects": [
-        "base/submission_service.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_lark_progress.py",
-      "asserts": "T-440 「改动完成即同步飞书事项主表」（AGENTS.md §2.8）这条承诺**没有变成一句空话**。被验对象是 `tools/lark_progress.py`（不叫 verify_*，故不进名册，由本文件管它）。W1/W2 §2.8 真的写着这条约定且点名了执行点、那个文件真的存在；**W5 表坐标（APP_TOKEN / TABLE_ID）与 §2.8 逐字一致**（改表不改文档 → 红）+ W5c 反证不存在的 token 查不到；**W3 `--apply` 是 store_true、写入路径的 dry_run 取反自它**（默认 dry-run）+ W3d 反证 dry-run 下 token=None 也不炸（真的没发请求）；**W4 凭据路径只出现一处、指向仓外 ~/.dsh/credentials、不在仓内**；**W6/W7 真跑一遍工具的 --selftest**（读数由工具自己报，本文件不抄死数），项数 ≥15 且 0 红，并断言它自称「0 网络请求、0 凭据读取」；W7d 反证缺必填时真跑必须退非 0。★ 工具自己的 18 条判据（单选未知选项 / 未测不许标已完成 / 编号取最大号+1 / upsert 幂等）在 `lark_progress.py --selftest`，已用三处真变异验过：删「未测不许标已完成」→2 红、编号改按条数→2 红、单选不校验→2 红",
-      "subjects": [
-        "tools/lark_progress.py",
-        "AGENTS.md"
-      ]
-    },
-    {
       "verifier": "tools/verify_media_selection.py",
       "asserts": "T-412 选型契约（ADR-0018 ≡ base/media.py 的 MEDIA_PROVIDERS）。S1 ADR 存在/状态 accepted/日期 2026-10-26；S2 provider_id **集合恒等**（双向：ADR 多点名一个红、代码多注册一个红）；S3 逐字段相等 package/version/license/bundled_models/adapter（版本 3.10.0→3.9.0 即红）；S4 adapter 类必须**在 media.py 里真实存在**（ast 查 ClassDef，不是 grep 名字）；S5 「不选的候选」≥2 且逐条有理由（子标题不提前收尾）；S6 **注册 ≠ 接线**：DEFAULT_OCR_ENGINE 必须仍是 host_vision、DEFAULT_ASR_ENGINE 仍 None、SUPPORTED_SOURCE_KINDS 不含 image/video；S7 宿主原生命中数**不许因本票减少**（<3 红；变多 4 处不误报）—— 堵「靠删 base/ocr_vision.m 让行 118 看起来变绿」；S8 行 118 必须仍被写成 `vacuous_true`，写成 passed/已满足即红。21 项反向对照（含三条真实仓内变异已验：删注册→S2 红、改默认引擎→S6 红、删 .m→S7 红而 verify_media_portability 转绿）。★ 不改造 verify_media_portability.py：那个管「还有没有宿主调用 + 进件开没开」，本条管「选定的是哪个、真的注册了吗」，失败后要查的东西不同，合成一个退出码就分不清该改哪一侧（与 verify_secret_patterns 不并进 DG 同一条理由）。★ 不证明容器内能跑：那是行 118 的另一半，今天仍 untested（素材 0 视频/0 音频、镜像无引擎）",
       "subjects": [
         "ADR/ADR-0018-容器内OCR与ASR选型.md",
         "base/media.py",
         "base/submission_service.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_media_upload.py",
+      "asserts": "上传端点四道安全边界（ADR-0021 主线）：① 落盘只在 REVIEW_MEDIA_ROOTS 内 ② 文件名不用客户端给的 ③ 大小两道拦（声明+实际） ④ 类型按魔数判、不信后缀",
+      "subjects": [
+        "base/media_upload.py"
       ]
     },
     {
@@ -526,10 +566,41 @@
       "dynamic": "清单不是仓内主体：~/.cache/magpie/models.json 与 models/{vod,tokenhub}.json 是 magpie 的本地缓存（5.6MB / 13~23KB，可能被清），运行时按 CACHE_ROOT 拼路径读取，没有可声明的仓内静态子集。清单缺失时本 verifier 判未测退 2，不是绿。"
     },
     {
+      "verifier": "tools/verify_multimodal_client.py",
+      "asserts": "T-432 多模态客户端（`tools/multimodal_client.py`，全仓唯一有网络的地方）与授权闸门（`base/multimodal_provider.py`，一行网络都不许有）的接缝。**全离线，一次网络都不发**：传输层可注入，真实现与打桩走同一套解析与状态映射。N 网络边界（闸门只有 0 条网络 import，**只查 import 行** —— 全文会命中它自己的文档注释，实测 6 处假红；N2 反向证明「没放宽，是没假红」）；T 客户端 TASK_MEDIA 与闸门 _REQUIRED_MEDIA **恒等**；C 配置只读环境变量、两个网关各读自己那对、**代码里没有打开凭据文件的动作**（C7 只查读取动作不查文档里提到的路径）；E 出境清单**按任务收窄**（scene_semantics 不含音轨）、recipient 可指认、registration_for 默认 **authorized 全 False**；A 未授权时 require_authorization 必抛且 provider **一次都没被调用**，已授权时必须放行（闸门不是砖头）；S 状态映射十类失败全都不许落 ok，**S12 是判别用例**：非 2xx 但响应体结构完整（401/403/429/500/503）—— 没有它 S3/S4 是假绿，因为真实网关错误页不是 JSON 会被下一层兜住，实测删掉状态码那行仍全绿；S13 同一结构 2xx 必须 ok（防 S12 恒红）；M 一条 error 不许被另一条 ok 盖成 ok；R 源码不含 sk- 形态凭据。**不证明**模型真的看得懂画面（那要给真素材与真凭据，验的是接缝不是模型质量）",
+      "subjects": [
+        "tools/multimodal_client.py",
+        "base/multimodal_provider.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_multimodal_observation.py",
+      "asserts": "T-433 L1 多模态观察。**核心边界**：finding 三要素是合取（control_code/authority_ref/location，缺一即拒），多模态给不出前两项（知识库产物），所以「先打通 + 落 candidate finding + 知识库慢慢建」三条不能同时成立 —— L1 观察落 `case.multimodal_observations`（进权威、可重放、报告单独成节、标候选待人工确认），L2 候选等 T-434。**L1 不是降级，是照实说**：把观察伪装成 finding 的后果是复核时无法申诉。L1 观察原样进 state、**不进 ir.findings**、缺省是 [] 不是缺字段；L2 三态可分（ok/untested/error），观察状态域与 finding 状态词**不重叠**；L3 reducer 拒坏形状（ok 无 statement / 非 ok 无 reason / status 用了 finding 的词 / 缺 task / 不是对象 / 整体不是数组）；L4 judge_entry 的五种「没看成」都不许被读成「看过没问题」（未注入 analyze → note、非媒体载体 → note、analyze 抛异常 → 落 error 观察、provider 少给任务 → untested、provider 报 ok 但 observations 空 → 落 untested）；L5 报告快照**判定时冻结**（快照观察 == 返回值观察，同源；None 不造壳；不原地改传入快照）；L6 finding 表未被污染（multimodal 仍不在白名单、准入三要素未放宽）。★ 报告成节的措辞判据在 `verify_report_render.mjs` 的 T433-1…11，那里看的是**渲染出来的文本**而非源码。四条真变异已验：删 statement 校验 → L3-1/2 红；未注入 analyze 去 note → L4-1 红；去掉 ok 空观察检查 → L4-5 红；报告标题改「已通过」→ #67 与 T433-5 同时红",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/judge_entry.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_multimodal_provider.py",
       "asserts": "多模态契约：空注册表/空任务落 untested 而非通过 · 先授权后出境 · 出境清单可指认 · 12 条变异对照删守卫必红",
       "subjects": [
         "base/multimodal_provider.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_nmem.py",
+      "asserts": "记忆与知识图谱：space/strict · 身份 · 两条 Space Rules · 四层条数与 SOP 层级映射 · 每条记忆的依据可解析 · Library 全部 indexed · 本体 9+8 且只在本 space 范围 · 来源文件在库且未填充（N0–N9）；nmem 不可达退 2",
+      "subjects": [
+        "tools/mem/corpus/L1.json",
+        "tools/mem/corpus/L2.json",
+        "tools/mem/corpus/L3.json",
+        "tools/mem/corpus/L4.json",
+        "tools/mem/rules/core_persona.md",
+        "tools/mem/rules/repo_boundary.md",
+        "artifacts/audit_content_ontology_patch.json",
+        "tools/mem/distill_to_nmem.py",
+        "tools/mem/ingest_library.py"
       ]
     },
     {
@@ -549,6 +620,16 @@
       ]
     },
     {
+      "verifier": "tools/verify_notification_persistence.py",
+      "asserts": "T-313a/b 通知聚合：aggregate_type_for 单一判定与聚合 ID 形状校验；emit/read/ack 纯函数状态机（ack_without_read、duplicate_notification、inbox 上限归档、未读永不淘汰）；真权威跨重启恒等与幂等重放；投影 list_notifications 按列拼回、不污染 review_cases、删库重建恒等；真 v2 库升 v3 的 notifications 表迁移；未知 aggregate_type 必拒",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/projection_store.py",
+        "base/business_event_store.py",
+        "base/notifications.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_notifications.py",
       "asserts": "TS-22/RL-13 通知契约：invalidation/auto_rereview → inbox、takedown → 飞书；文案只许「已投递/已读」；每日键与状态键独立；去重持久化重启不重复；四条反向对照必红",
       "subjects": [
@@ -560,6 +641,15 @@
       "asserts": "未决项「等了多久、在等谁、沉默会发生什么」：每条 open 项带合法且非未来的 raised_at、带 owner 与 default_if_unanswered；未决项数 ≤ 棘轮",
       "subjects": [
         "research/governance/skeleton/legal-decisions-v1.json"
+      ]
+    },
+    {
+      "verifier": "tools/verify_openapi_spec.py",
+      "asserts": "T-408 / TS-10 OpenAPI 3.1 装配层：两个 spec 入口（/openapi.json 与 /api/openapi.json）逐字节恒等；实现表（定义在 api/write_api.py）/生产表/声明表三个方向都 ⊆ spec；★ 占位端点只许声明 501、只读守卫的写方法只许声明 403 —— spec 不得对它们说 200（改前实测五个占位端点 + 三个只读入口全部声明 200，而它们永远返 501/403）；spec 无自指条目；生产 spec 无无人认领的写端点；API 层不得调用判定引擎。--controls 5 项：占位声明 200 / 只读声明 200 / 实现端点从 spec 消失 / 版本 3.0 四个坏样本各自红，好样本绿 · ★ T-454 加 S8b/S8c：只读 POST 豁免表自己的两个方向 —— 名单里的路径必须真在 prod spec 里（否则是过期豁免）、豁免不许与四张写表重叠（否则被用来夹带真写端点）；--controls 4 项",
+      "subjects": [
+        "api/review_api.py",
+        "api/production_app.py",
+        "api/write_api.py"
       ]
     },
     {
@@ -664,6 +754,17 @@
       ]
     },
     {
+      "verifier": "tools/verify_reaudit_persistence.py",
+      "asserts": "T-317 全量重审：失效检测建 queued job（job_id 确定性、同 change_set 合并、无变化返 None）；run_reaudit 锁外真重判后新 ir_id 与旧不同（#98 ①）、job done 回待放行、ir_prev 指针、旧 IR 事件链逐字节未变（#98 ②）、新报告追加旧报告文件 sha 不变（#98 ③）、重审后再签发 derived_from 接链",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/review_command_service.py",
+        "base/release_gate.py",
+        "base/report_store.py",
+        "api/production_app.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_redact.py",
       "asserts": "redact：必拦（凭据/PII/内部路径/tool_call_id）/ 必放（营销数字/型号/日期）/ 规则承重",
       "subjects": [
@@ -701,10 +802,31 @@
       ]
     },
     {
+      "verifier": "tools/verify_release_binding.py",
+      "asserts": "T-310a 签发绑定字段：真实生产链（真 judge + 真 KB）prepare→ingest 后 state 带齐 kb_snapshot_hash/conflict_table_version/media_fingerprints/release；binding_from_state 输出过 _binding；ctv 与 ir.control_points_version 恒等（两处漂移 ingest 即红）；媒体占位 hash 确定性、非字符串常量；缺字段一律 bad_binding_fields 不补默认值",
+      "subjects": [
+        "base/release_binding.py",
+        "base/submission_service.py",
+        "base/review_reducer.py",
+        "base/release_gate.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_release_gate.py",
       "asserts": "T2-03/RL-1…RL-15 release_gate：状态机/全字段签名/SoD/五类失效/重审 job；step-up 原子单次消费，签名只存不可逆 ref 不存 bearer token；机器不可写 release_status；签名不可变",
       "subjects": [
         "base/release_gate.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_release_persistence.py",
+      "asserts": "T-310b 签发三命令进 reducer：真实生产链到已结案后 release_sign/reject/revoke 的状态机（signed/已放行、rejected/已拒绝、revoked/已撤回）；红线「未结案不许签发」；签名结构/哈希/案件/版本/派生链五类守卫各自必红；撤回只改状态不追加签名且 reason/step_up_ref 必填；真权威跨重启恒等；投影含 release 且删库重建恒等",
+      "subjects": [
+        "base/review_reducer.py",
+        "base/release_binding.py",
+        "base/release_gate.py",
+        "base/business_event_store.py",
+        "base/projection_store.py"
       ]
     },
     {
@@ -733,10 +855,37 @@
       ]
     },
     {
+      "verifier": "tools/verify_report_publishing.py",
+      "asserts": "报告发布进权威（T-316d）：结案→渲染→落盘→report_publish 全链；重启后 report_id/url/sha256 恒等；盘上 .md 的 sha256 与权威一致且含六区块；带 source_ir_fingerprint（可重建）；published_by 记结案人；node 缺失时**结案仍成功**只是报告缺席且带原因；每个案件产出各自报告（id 与 IR id 都不串）；报告 ACL = 案件可读性，且结案人自己读得回；带单数 `role` 的主体一律不认；report_publish 必须已结案、不许覆盖成另一个 report_id、同 id 幂等；report_id/sha256/url/path 形状校验 7 条",
+      "subjects": [
+        "base/report_render_bridge.py",
+        "base/report_store.py",
+        "base/review_command_service.py",
+        "base/review_reducer.py",
+        "api/review_api.py",
+        "api/production_app.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_report_render.mjs",
       "asserts": "report_render：六区块逐字 / 五标签 / L1-6 非法 IR 拒绝 / R1 front matter / 去 AI 味 / V1-V2",
       "subjects": [
         "tools/audit/report_render.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_report_render_bridge.py",
+      "asserts": "报告渲染适配层（T-316c）：真渲染器产出六区块 + R1 指纹；node 缺失返回 node_missing 而**不抛异常**；渲染器缺失；坏快照由渲染器自己拒（桥接层不二次校验）；超时显式且真的会切断；快照走 stdin 且不出现 argv；输出只留三键、`ok` 必须字面 True、空 markdown 判失败、失败不泄漏 markdown；无重试；坏输入（None/list/str/不可序列化）一律返回 ok False 而绝不抛",
+      "subjects": [
+        "base/report_render_bridge.py",
+        "tools/audit/report_render.mjs"
+      ]
+    },
+    {
+      "verifier": "tools/verify_report_resign.py",
+      "asserts": "T-403 / ADR-0017 报告链接的过期签名：R-1 resign 返回带 exp+sig 的 url；R-2 ★ 重签不碰正文（sha256 前后一致）；R-3 重签不写索引（签名是链接属性不是报告属性）；R-4 有效签名 URL 能打开；R-5 ★ 过期 URL 打不开（参与人也不行 —— 过期不是装饰）；R-6 ★ 篡改 sig 一位即失效；R-7 ★ 签名不跨报告（换 report_id 复用即判 bad_signature）；R-8 无签名 URL 仍能读（存量报告没坏）；R-9 ★ 无密钥不返回 url（needs_secret，调用方回 503，不许降级成假成功）；R-9b 非参与人不能重签（签名不替代 ACL）；R-10 TTL 越界与弱密钥均拒；R-11 轮换窗口（旧密钥签的靠 _PREV 仍可验）；R-12 查询串键集合恒等（多一个键即形状非法）。--controls：摘掉 read() 的验签 → 过期/篡改/跨报告三条必红",
+      "subjects": [
+        "base/report_store.py"
       ]
     },
     {
@@ -768,6 +917,15 @@
       "asserts": "T2-02a 复核台账：claim 原子独占与重复拒绝；30 分钟 lease/心跳/版本冲突；draft 全字段快照且 autosave 不产 formal；adopt 派生且原稿不变；PASS/待自决/REVIEW/未审查四层抽样 + BLOCK 全量；五条反向对照",
       "subjects": [
         "base/reviews_ledger.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_rule_change_gate.py",
+      "asserts": "T-411 / GA-08 规则变更门有没有真的接上（★ 不重复验回归集本身，那由 verify_regression_set 8 项 + verify_rule_change_regression 7 项各自覆盖）：G1 存在**独立 job**（判据是它自己的 paths 点了规则文件，不是全文出现过 rules-v1 —— 注释里出现也算的那种是假执行点）；G2 ★ paths **逐个点名**全部规则文件（集合恒等，写宽写窄都红）；G3 门里真跑回归集与规则变更对比两个验证器；G4 ★ 不许 continue-on-error / || true / if: false（只扫代码行不扫注释 —— 被自己解释文字绊倒过两次）；G5 门所在 workflow 挂在 pull_request 上。--controls 5 项：漏一个 path / 删掉跑回归那步 / 加 continue-on-error / 加 || true 四条各自独立红，加一条好样本必须不红（防「一律红」式假判据）",
+      "subjects": [
+        ".github/workflows/acceptance.yml",
+        "tools/verify_regression_set.py",
+        "tools/verify_rule_change_regression.py"
       ]
     },
     {
@@ -842,12 +1000,36 @@
       ]
     },
     {
+      "verifier": "tools/verify_skill_registry.py",
+      "asserts": "T-453 skill 加载器：注册表可读且字段齐 / id 唯一 / 触发词不许重叠 · ★ 双向完整：登记了但文件不在→红 **且** 盘上有规程但没登记→红（两个方向各自能红）· 指纹 = 真实文件字节 sha256（改一个字必须变，证明不是 mtime/size）· ★★★ 回执里的 skill_hash 不再是硬编码的 \"local\"，且生产链路**真的把 skill_id 传给了判定函数**（D7 用 spy 观察入参 —— 只看结果值的 D6 抓不住「删掉那行」的变异，因为默认值恰好相同）",
+      "subjects": [
+        "base/skill_registry.py",
+        "agent-skills/registry.json",
+        "base/judge_entry.py",
+        "base/submission_service.py",
+        "agent-skills/内容合规审查/SKILL.md",
+        "agent-skills/守衡语域/SKILL.md"
+      ]
+    },
+    {
       "verifier": "tools/verify_solution_meta.py",
       "asserts": "技术方案头部数字与文档实况：模块数 / 判据归属 / critical·high / 三方 hash 绑定 / 门状态 / owner 无重复",
       "subjects": [
         "Playbook/技术解决方案-v1.md",
         "Playbook/内容审查Agent-产品Playbook-v1.1.md",
         "PMO/audit/验收表-v3-覆盖全部判据-20261017.md"
+      ]
+    },
+    {
+      "verifier": "tools/verify_stage_gate_d5.py",
+      "asserts": "D5 阶段门：**真实生产装配**（create_production_app + ProductionRuntime.start）而非手工 create_app。提交→判定→领取→结案全链走 HTTP；结案发布报告到 REPORT_ROOT 并进权威；重启（新 runtime 同数据根）后 report_id/sha256/url/字节全等；rbac 名单源由 start() 真实注入；六条下线写路径在生产已开启；release 两条仍 501；心跳 maintain_once 可跑；非能力内写路径答 501 而非 403/500。★ 它抓的是「零件都对、生产接线错」这一类 —— 本轮五个缺陷里三个是这个形状。",
+      "subjects": [
+        "api/production_app.py",
+        "api/review_api.py",
+        "api/write_api.py",
+        "base/review_command_service.py",
+        "base/report_render_bridge.py",
+        "base/rbac.py"
       ]
     },
     {
@@ -891,6 +1073,16 @@
       ]
     },
     {
+      "verifier": "tools/verify_takedown_persistence.py",
+      "asserts": "T-312d 下线任务：真权威落任务与跨重启恒等、跨重启不撞号（len 计数回归形状）、投影重建恒等、GET {tasks,metrics} 形状（空库 [] + open_count==0）、年龄单口径（HTTP == TD.metrics_view 复算、无超时类字段、前端静态扫描无 Date.now/formatTaskAge）、非法迁移拒且 seq 不变、无 deadline 字段",
+      "subjects": [
+        "base/takedown.py",
+        "base/review_reducer.py",
+        "base/review_command_service.py",
+        "api/review_api.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_takedown_registry.py",
       "asserts": "下线任务进权威：create/transition 两条命令、task_id 内容派生、同案同 trigger 未完成不得重复建、trigger 必填且取值域、迁移一律走 TD.transition（history 由 TD 追加、E_ACTION 由 TD 判）、无 deadline 字段、进事件快照、per-task version 递增",
       "subjects": [
@@ -903,6 +1095,15 @@
       "asserts": "`base/taxonomy.py` 的回归与门槛",
       "subjects": [
         "base/taxonomy.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_tenant_isolation.py",
+      "asserts": "T-409 租户边界 + 领取原子性（★ 不含 TS-11，那一半已由 verify_auth_session 47 项覆盖，本文件刻意不重复）：A1 GET /cases 只返回本租户；A2 ★ 跨租户 GET /cases/{id} → 403 且响应体不含任何案件字段（只判状态码的实现会绿）；A3 /queue 同样隔离；A4 正样本「本租户读得到」（防全 403 假绿）；A5 反向 A 读 B；B1 ★ **真线程并发**领取恰一成功（顺序两次 claim 在任何实现下都成立，证不到 TS-31）；B2 失败方是明确 409 不是静默 200；B3 领取后 assignee 唯一（读台账不读投影 —— dev 装配的 claim 只写台账）；C1 ★ lease 到期自动释放；C2 ★ 释放前先存草稿。--controls 3 项：摘掉 _scope_ok → C1 红；摘掉 already_claimed → C2 红；不存草稿 → C3 红（三条独立变红）",
+      "subjects": [
+        "base/reviews_ledger.py",
+        "base/rbac.py",
+        "api/review_api.py"
       ]
     },
     {
@@ -920,6 +1121,22 @@
       "subjects": [
         "web/src/api/client.ts",
         "web/src/pages/CaseDetailPage.tsx"
+      ]
+    },
+    {
+      "verifier": "tools/verify_version_diff.py",
+      "asserts": "T-454 两版比对端点 POST /api/v1/version-diff · A 三值：同版／换版声明未变／声明已变三个结论互不相同（不许混成一档）· B 判据层反向对照：两次完全相同的文本必须判同版（不许因调用时间不同判已变）、空词表必须报错（否则每条都判「声明未变」，一个恒假的判据）· C 端点口径：端点结论与 change_detect 逐字相同（共用 _same_as_local 比较器，不各写一套）、未登录 401、缺字段 422 · ★★★ D 不写：先往 repo 放种子数据再装方法计数器，**先用读接口证明计数器会动**（否则 0 次调用是恒真），再断言三次 version-diff 一次都没碰 repo · D6 差异只出现在 2 万字符之后的正文仍判对（改成 GET 截断会静默判成「声明未变」）+ D6b 反向对照同一段长文本自比必须判同版 · E 比较器既不许恒真也不许恒假（好样本绿／改写措辞红／丢差集红／换判据名红／空返回红）",
+      "subjects": [
+        "api/review_api.py",
+        "base/change_detect.py",
+        "tools/verify_openapi_spec.py"
+      ]
+    },
+    {
+      "verifier": "tools/verify_video_ingest.py",
+      "asserts": "T-435 视频抽帧（balanced）+ 音画对齐前提。**分两层自证，缺一层就是「逻辑对但跑不起来」或反之**：E 层用**合成帧**真跑抽帧业务判据（不需要 ffmpeg）；X 层验执行（ffmpeg/ffprobe 在不在），**不在就落未测退 2**，不许用绿的退出码盖住「没跑过」。E1 静止 10 帧去重后 1 帧 / E2 三帧三色全留（不误伤）/ E3b **细渐变（每步差 4 < 阈值 8）留下部分而非全部、也不塌成 1 帧** + E3c 反证「与前一帧比会塌成 1 帧」（第一版用 12 色阶，两种比法都留下全部，E3b/E3c 分不出差别 —— 真变异实测过）/ E3d 空缩略图判大差异并保留（宁可多留不误合）/ E5 `max_frames` 是**硬上限**且在抽帧前截断 / E6 均匀兜底不取两端 / E7 切变点不足回落 uniform + E7b 反证切变够时必须走 scene / E8 V1 五项：无音轨=no（Playbook V1 原文「音轨 ⛔」）、0 帧=no、**完整画面语义永远不是 yes（穷举 20 组合无一 yes）**、**has_audio 不许抬高覆盖声明**（E8-11）+ 它必须影响 audio_note（E8-12，两种成因要分得开）/ E9 音画对齐前提：只有 video 必须拒并点名缺 audio / E10 与 report_render.mjs 的 V1_KEYS **同名同序**、与 verify_report_render.mjs 的 **V1_ENUM 恒等**（第一版指向 V1_KEYS_OUTSIDE 的函数体找字符串，抓到空集恒红；判据要读定义不读消费点）。★ 三处真变异已验：完整画面语义→yes 红 E8-5/E8-9；去重改与前一帧比 红 E3b；切变不够也走 scene 红 E7。**X 层今天未测**：本机无 ffmpeg/ffprobe、盘上 0 个视频文件 —— 判据 1/3/4 需要真素材，换机器或装工具后应转绿",
+      "subjects": [
+        "base/media_ingest.py"
       ]
     },
     {
@@ -948,6 +1165,16 @@
       ]
     },
     {
+      "verifier": "tools/verify_workflow_timing.py",
+      "asserts": "T-451 工作流耗时读数：总耗时=步骤 duration_ms 求和（**不用 ended_at-started_at** —— `_iso()` 精度只到秒而整链只跑毫秒级，秒差恒为 0）· 最慢三步降序且并列次序可复现 · 空步骤/缺值/负值/bool/非对象一律 untested 并点名 · 未测文案不含「0 ms/很快」· 端到端：真判定 → 快照 → 真渲染器，报告那一行的数必须等于快照里的 total_ms",
+      "subjects": [
+        "base/workflow_timing.py",
+        "base/orchestrator.py",
+        "tools/audit/report_render.mjs",
+        "api/review_api.py"
+      ]
+    },
+    {
       "verifier": "tools/verify_write_api.py",
       "asserts": "T2-02 写端点：legacy review/finding/appeal/takedown/release 编排与错误语义；Idempotency-Key 绑定 actor/path/body 且单进程原子；生产 capability 显式空集不回退全开，首批外写面 fail closed；API 不计算判定",
       "subjects": [
@@ -956,151 +1183,6 @@
         "base/reviews_ledger.py",
         "base/finding_store.py",
         "base/takedown.py"
-      ]
-    },
-    {
-      "verifier": "web/scripts/verify_manual_a11y.mjs",
-      "asserts": "人工无障碍证据门（TS-9 的另一半）：未签收项退 2（未测），不是绿也不是红",
-      "subjects": [
-        "web/a11y-manual-v1.json"
-      ],
-      "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
-    },
-    {
-      "verifier": "tools/verify_report_render_bridge.py",
-      "asserts": "报告渲染适配层（T-316c）：真渲染器产出六区块 + R1 指纹；node 缺失返回 node_missing 而**不抛异常**；渲染器缺失；坏快照由渲染器自己拒（桥接层不二次校验）；超时显式且真的会切断；快照走 stdin 且不出现 argv；输出只留三键、`ok` 必须字面 True、空 markdown 判失败、失败不泄漏 markdown；无重试；坏输入（None/list/str/不可序列化）一律返回 ok False 而绝不抛",
-      "subjects": [
-        "base/report_render_bridge.py",
-        "tools/audit/report_render.mjs"
-      ]
-    },
-    {
-      "verifier": "tools/verify_report_publishing.py",
-      "asserts": "报告发布进权威（T-316d）：结案→渲染→落盘→report_publish 全链；重启后 report_id/url/sha256 恒等；盘上 .md 的 sha256 与权威一致且含六区块；带 source_ir_fingerprint（可重建）；published_by 记结案人；node 缺失时**结案仍成功**只是报告缺席且带原因；每个案件产出各自报告（id 与 IR id 都不串）；报告 ACL = 案件可读性，且结案人自己读得回；带单数 `role` 的主体一律不认；report_publish 必须已结案、不许覆盖成另一个 report_id、同 id 幂等；report_id/sha256/url/path 形状校验 7 条",
-      "subjects": [
-        "base/report_render_bridge.py",
-        "base/report_store.py",
-        "base/review_command_service.py",
-        "base/review_reducer.py",
-        "api/review_api.py",
-        "api/production_app.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_stage_gate_d5.py",
-      "asserts": "D5 阶段门：**真实生产装配**（create_production_app + ProductionRuntime.start）而非手工 create_app。提交→判定→领取→结案全链走 HTTP；结案发布报告到 REPORT_ROOT 并进权威；重启（新 runtime 同数据根）后 report_id/sha256/url/字节全等；rbac 名单源由 start() 真实注入；六条下线写路径在生产已开启；release 两条仍 501；心跳 maintain_once 可跑；非能力内写路径答 501 而非 403/500。★ 它抓的是「零件都对、生产接线错」这一类 —— 本轮五个缺陷里三个是这个形状。",
-      "subjects": [
-        "api/production_app.py",
-        "api/review_api.py",
-        "api/write_api.py",
-        "base/review_command_service.py",
-        "base/report_render_bridge.py",
-        "base/rbac.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_release_binding.py",
-      "asserts": "T-310a 签发绑定字段：真实生产链（真 judge + 真 KB）prepare→ingest 后 state 带齐 kb_snapshot_hash/conflict_table_version/media_fingerprints/release；binding_from_state 输出过 _binding；ctv 与 ir.control_points_version 恒等（两处漂移 ingest 即红）；媒体占位 hash 确定性、非字符串常量；缺字段一律 bad_binding_fields 不补默认值",
-      "subjects": [
-        "base/release_binding.py",
-        "base/submission_service.py",
-        "base/review_reducer.py",
-        "base/release_gate.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_notification_persistence.py",
-      "asserts": "T-313a/b 通知聚合：aggregate_type_for 单一判定与聚合 ID 形状校验；emit/read/ack 纯函数状态机（ack_without_read、duplicate_notification、inbox 上限归档、未读永不淘汰）；真权威跨重启恒等与幂等重放；投影 list_notifications 按列拼回、不污染 review_cases、删库重建恒等；真 v2 库升 v3 的 notifications 表迁移；未知 aggregate_type 必拒",
-      "subjects": [
-        "base/review_reducer.py",
-        "base/projection_store.py",
-        "base/business_event_store.py",
-        "base/notifications.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_release_persistence.py",
-      "asserts": "T-310b 签发三命令进 reducer：真实生产链到已结案后 release_sign/reject/revoke 的状态机（signed/已放行、rejected/已拒绝、revoked/已撤回）；红线「未结案不许签发」；签名结构/哈希/案件/版本/派生链五类守卫各自必红；撤回只改状态不追加签名且 reason/step_up_ref 必填；真权威跨重启恒等；投影含 release 且删库重建恒等",
-      "subjects": [
-        "base/review_reducer.py",
-        "base/release_binding.py",
-        "base/release_gate.py",
-        "base/business_event_store.py",
-        "base/projection_store.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_takedown_persistence.py",
-      "asserts": "T-312d 下线任务：真权威落任务与跨重启恒等、跨重启不撞号（len 计数回归形状）、投影重建恒等、GET {tasks,metrics} 形状（空库 [] + open_count==0）、年龄单口径（HTTP == TD.metrics_view 复算、无超时类字段、前端静态扫描无 Date.now/formatTaskAge）、非法迁移拒且 seq 不变、无 deadline 字段",
-      "subjects": [
-        "base/takedown.py",
-        "base/review_reducer.py",
-        "base/review_command_service.py",
-        "api/review_api.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_reaudit_persistence.py",
-      "asserts": "T-317 全量重审：失效检测建 queued job（job_id 确定性、同 change_set 合并、无变化返 None）；run_reaudit 锁外真重判后新 ir_id 与旧不同（#98 ①）、job done 回待放行、ir_prev 指针、旧 IR 事件链逐字节未变（#98 ②）、新报告追加旧报告文件 sha 不变（#98 ③）、重审后再签发 derived_from 接链",
-      "subjects": [
-        "base/review_reducer.py",
-        "base/review_command_service.py",
-        "base/release_gate.py",
-        "base/report_store.py",
-        "api/production_app.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_openapi_spec.py",
-      "asserts": "T-408 / TS-10 OpenAPI 3.1 装配层：两个 spec 入口（/openapi.json 与 /api/openapi.json）逐字节恒等；实现表（定义在 api/write_api.py）/生产表/声明表三个方向都 ⊆ spec；★ 占位端点只许声明 501、只读守卫的写方法只许声明 403 —— spec 不得对它们说 200（改前实测五个占位端点 + 三个只读入口全部声明 200，而它们永远返 501/403）；spec 无自指条目；生产 spec 无无人认领的写端点；API 层不得调用判定引擎。--controls 5 项：占位声明 200 / 只读声明 200 / 实现端点从 spec 消失 / 版本 3.0 四个坏样本各自红，好样本绿 · ★ T-454 加 S8b/S8c：只读 POST 豁免表自己的两个方向 —— 名单里的路径必须真在 prod spec 里（否则是过期豁免）、豁免不许与四张写表重叠（否则被用来夹带真写端点）；--controls 4 项",
-      "subjects": [
-        "api/review_api.py",
-        "api/production_app.py",
-        "api/write_api.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_browser_harness.py",
-      "asserts": "前后端接线联调驱动（web/scripts/lib/browser_harness.mjs）的三条硬约束：H1 ★ 无 Chrome 抛 HarnessUntested（调用方据此退 2 不是退 1）；H2 ★ 每个 CDP 调用有超时，且判据双向（elapsed 落在 [100,3000) —— 下界证明超时真触发、上界证明它没把页面里 5000ms 的 Promise 等完）；H3 ★ close 幂等且关闭后调用明确失败；H4 ★ CLI 三态退出码 0/1/2（未测 ≠ 红 ≠ 通过，在进程退出码上的执行点）；H5 goto 等 readyState=complete、页内 JS 抛错变 HarnessFailed；H6 ★ close 后临时 profile 真被删（从 _profileDir 读真实路径，不猜目录）。--controls 2 项：HarnessUntested 改名 → H1 必红；未测退 2 改成退 1 → H4 必红",
-      "subjects": [
-        "web/scripts/lib/browser_harness.mjs",
-        "web/scripts/pairing_check.mjs",
-        "web/scripts/dev-up.sh"
-      ]
-    },
-    {
-      "verifier": "tools/verify_report_resign.py",
-      "asserts": "T-403 / ADR-0017 报告链接的过期签名：R-1 resign 返回带 exp+sig 的 url；R-2 ★ 重签不碰正文（sha256 前后一致）；R-3 重签不写索引（签名是链接属性不是报告属性）；R-4 有效签名 URL 能打开；R-5 ★ 过期 URL 打不开（参与人也不行 —— 过期不是装饰）；R-6 ★ 篡改 sig 一位即失效；R-7 ★ 签名不跨报告（换 report_id 复用即判 bad_signature）；R-8 无签名 URL 仍能读（存量报告没坏）；R-9 ★ 无密钥不返回 url（needs_secret，调用方回 503，不许降级成假成功）；R-9b 非参与人不能重签（签名不替代 ACL）；R-10 TTL 越界与弱密钥均拒；R-11 轮换窗口（旧密钥签的靠 _PREV 仍可验）；R-12 查询串键集合恒等（多一个键即形状非法）。--controls：摘掉 read() 的验签 → 过期/篡改/跨报告三条必红",
-      "subjects": [
-        "base/report_store.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_tenant_isolation.py",
-      "asserts": "T-409 租户边界 + 领取原子性（★ 不含 TS-11，那一半已由 verify_auth_session 47 项覆盖，本文件刻意不重复）：A1 GET /cases 只返回本租户；A2 ★ 跨租户 GET /cases/{id} → 403 且响应体不含任何案件字段（只判状态码的实现会绿）；A3 /queue 同样隔离；A4 正样本「本租户读得到」（防全 403 假绿）；A5 反向 A 读 B；B1 ★ **真线程并发**领取恰一成功（顺序两次 claim 在任何实现下都成立，证不到 TS-31）；B2 失败方是明确 409 不是静默 200；B3 领取后 assignee 唯一（读台账不读投影 —— dev 装配的 claim 只写台账）；C1 ★ lease 到期自动释放；C2 ★ 释放前先存草稿。--controls 3 项：摘掉 _scope_ok → C1 红；摘掉 already_claimed → C2 红；不存草稿 → C3 红（三条独立变红）",
-      "subjects": [
-        "base/reviews_ledger.py",
-        "base/rbac.py",
-        "api/review_api.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_rule_change_gate.py",
-      "asserts": "T-411 / GA-08 规则变更门有没有真的接上（★ 不重复验回归集本身，那由 verify_regression_set 8 项 + verify_rule_change_regression 7 项各自覆盖）：G1 存在**独立 job**（判据是它自己的 paths 点了规则文件，不是全文出现过 rules-v1 —— 注释里出现也算的那种是假执行点）；G2 ★ paths **逐个点名**全部规则文件（集合恒等，写宽写窄都红）；G3 门里真跑回归集与规则变更对比两个验证器；G4 ★ 不许 continue-on-error / || true / if: false（只扫代码行不扫注释 —— 被自己解释文字绊倒过两次）；G5 门所在 workflow 挂在 pull_request 上。--controls 5 项：漏一个 path / 删掉跑回归那步 / 加 continue-on-error / 加 || true 四条各自独立红，加一条好样本必须不红（防「一律红」式假判据）",
-      "subjects": [
-        ".github/workflows/acceptance.yml",
-        "tools/verify_regression_set.py",
-        "tools/verify_rule_change_regression.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_image_shape.py",
-      "asserts": "★ 镜像形状 vs 仓内形状（T-410 收尾；既有两套自证都跑在仓内文件系统上，所以盖不住这一类）：I1 扫 base/ 与 api/ 里每一处 `from tools.X`，逐个要求 Dockerfile 有 COPY 且未被 .dockerignore 排除；I3 ★ 在临时目录里**按 Dockerfile 的 COPY 结果**建出最小子树、隔离 PYTHONPATH **真 import 一次**（I1 只证明文本上对得上，而 send_gateway 那条是 import 期失败）；D1 生产 bundle 里不许出现 /review-api（那是 Vite dev 的代理前缀，生产没有那层代理，请求会落到 SPA 兜底返回 200 text/html）。--controls：注释掉 redact 的 COPY → I1 必红",
-      "subjects": [
-        "Dockerfile",
-        ".dockerignore",
-        "base/send_gateway.py",
-        "web/src/api/client.ts"
       ]
     },
     {
@@ -1118,71 +1200,12 @@
       ]
     },
     {
-      "verifier": "tools/verify_nmem.py",
-      "asserts": "记忆与知识图谱：space/strict · 身份 · 两条 Space Rules · 四层条数与 SOP 层级映射 · 每条记忆的依据可解析 · Library 全部 indexed · 本体 9+8 且只在本 space 范围 · 来源文件在库且未填充（N0–N9）；nmem 不可达退 2",
+      "verifier": "web/scripts/verify_manual_a11y.mjs",
+      "asserts": "人工无障碍证据门（TS-9 的另一半）：未签收项退 2（未测），不是绿也不是红",
       "subjects": [
-        "tools/mem/corpus/L1.json",
-        "tools/mem/corpus/L2.json",
-        "tools/mem/corpus/L3.json",
-        "tools/mem/corpus/L4.json",
-        "tools/mem/rules/core_persona.md",
-        "tools/mem/rules/repo_boundary.md",
-        "artifacts/audit_content_ontology_patch.json",
-        "tools/mem/distill_to_nmem.py",
-        "tools/mem/ingest_library.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_workflow_timing.py",
-      "asserts": "T-451 工作流耗时读数：总耗时=步骤 duration_ms 求和（**不用 ended_at-started_at** —— `_iso()` 精度只到秒而整链只跑毫秒级，秒差恒为 0）· 最慢三步降序且并列次序可复现 · 空步骤/缺值/负值/bool/非对象一律 untested 并点名 · 未测文案不含「0 ms/很快」· 端到端：真判定 → 快照 → 真渲染器，报告那一行的数必须等于快照里的 total_ms",
-      "subjects": [
-        "base/workflow_timing.py",
-        "base/orchestrator.py",
-        "tools/audit/report_render.mjs",
-        "api/review_api.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_skill_registry.py",
-      "asserts": "T-453 skill 加载器：注册表可读且字段齐 / id 唯一 / 触发词不许重叠 · ★ 双向完整：登记了但文件不在→红 **且** 盘上有规程但没登记→红（两个方向各自能红）· 指纹 = 真实文件字节 sha256（改一个字必须变，证明不是 mtime/size）· ★★★ 回执里的 skill_hash 不再是硬编码的 \"local\"，且生产链路**真的把 skill_id 传给了判定函数**（D7 用 spy 观察入参 —— 只看结果值的 D6 抓不住「删掉那行」的变异，因为默认值恰好相同）",
-      "subjects": [
-        "base/skill_registry.py",
-        "agent-skills/registry.json",
-        "base/judge_entry.py",
-        "base/submission_service.py",
-        "agent-skills/内容合规审查/SKILL.md",
-        "agent-skills/守衡语域/SKILL.md"
-      ]
-    },
-    {
-      "verifier": "tools/verify_version_diff.py",
-      "asserts": "T-454 两版比对端点 POST /api/v1/version-diff · A 三值：同版／换版声明未变／声明已变三个结论互不相同（不许混成一档）· B 判据层反向对照：两次完全相同的文本必须判同版（不许因调用时间不同判已变）、空词表必须报错（否则每条都判「声明未变」，一个恒假的判据）· C 端点口径：端点结论与 change_detect 逐字相同（共用 _same_as_local 比较器，不各写一套）、未登录 401、缺字段 422 · ★★★ D 不写：先往 repo 放种子数据再装方法计数器，**先用读接口证明计数器会动**（否则 0 次调用是恒真），再断言三次 version-diff 一次都没碰 repo · D6 差异只出现在 2 万字符之后的正文仍判对（改成 GET 截断会静默判成「声明未变」）+ D6b 反向对照同一段长文本自比必须判同版 · E 比较器既不许恒真也不许恒假（好样本绿／改写措辞红／丢差集红／换判据名红／空返回红）",
-      "subjects": [
-        "api/review_api.py",
-        "base/change_detect.py",
-        "tools/verify_openapi_spec.py"
-      ]
-    },
-    {
-      "verifier": "tools/verify_intent_infer.py",
-      "asserts": "T-455 content_stage 建议值推断 · A 三态（inferred/absent/untested 互不相同）· ★★★ B 不覆盖：调用方给值一律采信、只在缺失时补、**不许原地改入参**（上游要用原对象算幂等哈希）· ★★★ C 不默认：两边都没命中 → untested，**不许**默认成 brief 或 final_content（默认 final_content 会让 brief 文案按终稿判，默认 brief 会让终稿被放过）· ★★★ D 幂等：补值必须发生在算哈希之前 —— D4 用真实 BusinessEventStore + WriterLease 真跑两次 execute_submission，同 key 重放不许报 idempotency_conflict（删掉 service 里那行补值，D4 立刻红）· E 证据：每条推断都指得出 pattern/hit/why，hit 必须逐字出现在正文里 · F compare 三态（一致/分歧/无法比较）· ★★★ G 如实报出：36 条规则里 content_stage/brief/final_content 各出现 0 次，**没有任何规则消费 content_stage**，推断值今天不改变任何判定；带正向对照（severity=39/layer=38）与正反两组读数的判定翻转",
-      "subjects": [
-        "base/intent_infer.py",
-        "base/submission_service.py",
-        "base/review_command_service.py",
-        "research/governance/skeleton/rules-v1.json"
-      ]
-    },
-    {
-      "verifier": "tools/verify_media_analyze.py",
-      "asserts": "ADR-0021 主线 · 多模态分析的生产接线 · A 就绪读数：两网关**分开报**（image 与 video 覆盖面不同，合并成一个布尔会让「视频不能审」被「图片能审」盖掉）、缺哪个环境变量逐个点名、读数里不含密钥值 · ★★★ B 未配凭据：build_analyze 返回 None（不注入），judge_entry 落「未接入多模态分析」而**不是**空列表；B3/B4 断言那条 note 真的活到 state（reducer 与 payload 两处都要有）· C 注入契约：analyze(media_ref, tasks)，图片 2 任务、视频 3 任务（含 av_alignment）· ★★ D 路径：不从 uri 反推、解析不出 → error 而不是猜（猜错的后果是「审了另一张图」）· ★ E 降级：只配 tokenhub 时 av_alignment 被跳过**且说清原因** · F 观测归因：每条观察带 task；「返回 ok 但零观察」降成 untested · G 反向对照",
-      "subjects": [
-        "base/media_analyze.py",
-        "base/submission_service.py",
-        "base/review_reducer.py",
-        "base/judge_entry.py",
-        "tools/multimodal_client.py"
-      ]
+        "web/a11y-manual-v1.json"
+      ],
+      "dynamic": "台账路径可由 --file 覆盖；默认 web/a11y-manual-v1.json"
     }
   ],
   "exempt": [

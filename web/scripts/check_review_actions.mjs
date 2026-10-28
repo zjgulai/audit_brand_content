@@ -194,36 +194,80 @@ try {
     throw new Error("开发身份没有签发新的 HttpOnly session cookie");
   }
 
+  // ★ 2026-10-28：初始版本不再是**硬编码的 0**。
+  //
+  //   改前这里断言 `version === 0`，因为测的是种子夹具（它们是从没人写过
+  //   的冻结案件）。现在测的是**经 POST /submissions 真建出来的**案件，
+  //   而 ingest 本身就是一次权威写 —— 建完就是 v1。
+  //
+  //   把 1 硬编码进去同样会错（规格一变就又红），所以**先记下基准，
+  //   再断言每次写都让它前进一格**。那才是这条测试真正关心的事：
+  //   「界面上的版本跟上后端了没有」。
   const before = await apiCase();
-  if (before.review.status !== "unassigned" || before.review.version !== 0) {
-    throw new Error(`初始台账不是 unassigned/v0：${JSON.stringify(before.review)}`);
+  if (before.review.status !== "unassigned") {
+    throw new Error(`初始台账不是 unassigned：${JSON.stringify(before.review)}`);
+  }
+  const v0 = before.review.version;
+  if (typeof v0 !== "number" || v0 < 0) {
+    throw new Error(`初始版本不是非负整数：${JSON.stringify(before.review.version)}`);
   }
 
   await click("认领");
   await waitText("认领 已完成并回读台账");
   const claimed = await apiCase();
-  if (claimed.review.status !== "claimed" || claimed.review.version !== 1 || claimed.review.assignee !== "u_dp3") {
-    throw new Error(`认领回读不一致：${JSON.stringify(claimed.review)}`);
+  if (claimed.review.status !== "claimed"
+      || claimed.review.version !== v0 + 1
+      || claimed.review.assignee !== "u_dp3") {
+    throw new Error(
+      `认领回读不一致（期望 v${v0 + 1}）：${JSON.stringify(claimed.review)}`);
   }
 
-  // ★ D-3 修复与验证：证据链内 candidate finding 就地点击「确认违规」，后端不返回 404，前端显示「已确认 f-...」
-  await waitEval(
-    `[...document.querySelectorAll('[data-finding-adjudicate] button')].some(x=>x.textContent?.trim()==='确认违规' && !x.disabled)`,
-    "确认违规按钮可用",
-  );
-  const confirmedFindingId = await ev(`(() => {
-    const box = document.querySelector('[data-finding-adjudicate]');
-    if (!box) return null;
-    const fid = box.getAttribute('data-finding-adjudicate');
-    const btn = [...box.querySelectorAll('button')].find(x => x.textContent?.trim() === '确认违规' && !x.disabled);
-    if (!btn) return null;
-    btn.click();
-    return fid;
+  // ── 证据链状态（2026-10-28 降级：如实验，不假装验过）─────────────────
+  //
+  // ★ 改前这里点「确认违规」并等「已确认 f-…」。那条路**今天不可能通**，
+  //   两个原因叠在一起（都实测过）：
+  //
+  //   ① 判定层 `base/judge_entry.py:286` 把 `semantic_judge` 写死成
+  //      `{"status": "untested", "findings": []}` —— 所以经 HTTP 新建的案件
+  //      **只会有规则命中的 finding，而规则命中的 status 是 `confirmed`**。
+  //      `candidate` 只由 `base/semantic_judge.py` 产出，而它没接上。
+  //   ② 界面对 `confirmed` **本来就不渲染裁决按钮**
+  //      （`CaseDetailPage` 的 `effectiveStatus === "candidate" &&` 门）。
+  //      所以「按钮可用」这条断言在真实案件上必然失败 —— 而它此前能过，
+  //      是因为那时测的是**种子冻结投影**里的案件（那里的 finding 是 candidate）。
+  //
+  // ★ 所以这里改成验**当前真实**的行为，而不是把断言删掉：
+  //   · 规则命中的 finding 状态是 confirmed；
+  //   · 因此**不该出现**可点的裁决按钮（出现才是 bug：让人去点一个必然 409 的按钮）。
+  //
+  // ★ 证据链「就地裁决」这个动作本身仍有单元级覆盖
+  //   （`tools/verify_finding_adjudication.py`），本文件只是不再假装
+  //   在真实链路上验过它。见 PMO 表格同步里那条「已登记的口径缺口」。
+  const findingStates = await ev(`(() => {
+    return [...document.querySelectorAll('[data-finding-status]')]
+      .map(el => el.getAttribute('data-finding-status'));
   })()`);
-  if (!confirmedFindingId) {
-    throw new Error("未找到可点击的确认违规按钮");
+  if (!Array.isArray(findingStates) || findingStates.length === 0) {
+    throw new Error("案件详情里一条 finding 都没有（写动作测试需要一个有命中的案件）");
   }
-  await waitText(`已确认 ${confirmedFindingId}`);
+  const badStates = findingStates.filter(
+    (st) => st !== "confirmed" && st !== "rejected" && st !== "candidate");
+  if (badStates.length > 0) {
+    throw new Error(`出现未知 finding 状态：${JSON.stringify(badStates)}`);
+  }
+  const confirmedCount = findingStates.filter((st) => st === "confirmed").length;
+  const candidateButtons = await ev(`(() => {
+    return [...document.querySelectorAll('[data-finding-adjudicate] button')]
+      .filter(x => ['确认违规','驳回','确认','驳回违规'].includes(x.textContent?.trim()))
+      .length;
+  })()`);
+  // ★ 核心判据：有 confirmed 的 finding 时，裁决按钮必须是 0。
+  //   非 0 就说明界面在让人点一个必然报 `invalid_finding_transition` 的按钮。
+  if (confirmedCount > 0 && candidateButtons !== 0) {
+    throw new Error(
+      `有 ${confirmedCount} 条 confirmed finding，却渲染了 ${candidateButtons} 个裁决按钮 ` +
+      `—— 点下去必然 409（只有 candidate 可裁决）`);
+  }
 
   const typed = await ev(`(() => {
     const el=document.querySelector('#review-note'); if(!el) return false;
@@ -238,15 +282,18 @@ try {
     throw new Error(`${error instanceof Error ? error.message : error}; 页面=${JSON.stringify((await body()).slice(-1200))}`);
   }
   const drafted = await apiCase();
-  if (drafted.review.version !== 2 || !drafted.review.primary_draft_id) {
-    throw new Error(`草稿回读不一致：${JSON.stringify(drafted.review)}`);
+  // ★ 同一口径：相对前一版 +1，不硬编码（见上面认领那段的说明）
+  if (drafted.review.version !== v0 + 2 || !drafted.review.primary_draft_id) {
+    throw new Error(
+      `草稿回读不一致（期望 v${v0 + 2}）：${JSON.stringify(drafted.review)}`);
   }
 
   await click("提交复核意见");
   await waitText("提交复核意见 已完成并回读台账");
   const submitted = await apiCase();
-  if (submitted.review.status !== "closed" || submitted.review.version !== 3) {
-    throw new Error(`提交回读不一致：${JSON.stringify(submitted.review)}`);
+  if (submitted.review.status !== "closed" || submitted.review.version !== v0 + 3) {
+    throw new Error(
+      `提交回读不一致（期望 v${v0 + 3}）：${JSON.stringify(submitted.review)}`);
   }
   await waitText("formal-");
   const text = await body();
@@ -375,8 +422,17 @@ try {
   await waitText("审核工作台");
   await fillInput("#submit-text", "Momcozy 穿戴式吸奶器日常护理说明");
   await click("提交审查单");
+  // ★ 2026-10-28 文案改动：改前等「提交未通过 / 提交已受理」两种措辞。
+  //   现在结论分成**两层**显示（真判定在上、本地预检在下，后者明确标
+  //   「不是判定」）—— 旧措辞里「合规审计结果」这个标题会让本地预检
+  //   看起来像正式结论，正是这次要修的东西。
+  //
+  //   新判据：**只要出现任一层的标题即可**。它验的是「提交有响应、界面渲染了」，
+  //   不是「结论是什么」—— 后者由后端验收器管，浏览器测试不该替它下结论。
   await waitEval(
-    `document.body.innerText.includes('提交未通过') || document.body.innerText.includes('提交已受理')`,
+    `document.body.innerText.includes('判定结果 · 已立案') ||
+     document.body.innerText.includes('提交未受理') ||
+     document.body.innerText.includes('本地预检（不是判定）')`,
     "P-01 提交响应已渲染",
   );
 
@@ -399,6 +455,19 @@ try {
   // ★ 2026-10-27 审计：解释句删除（50 字说明不回答审核员的问题），
   //   等待信号改为页面 h1 —— 同一个「页面就绪」语义。
   await waitText("全部送审内容");
+  // ★ 2026-10-28：先等**数据到位**再找按钮。
+  //
+  //   改前只等 h1（「全部送审内容」），而 h1 是静态标题 —— 它在数据回来之前
+  //   就已经在 DOM 里了。而筛选按钮**按计数渲染**（`if (cnt === 0) return null`），
+  //   于是「h1 已出现但 rows 还是 null」这一小段时间里，一个 `.queue__filter`
+  //   都不存在，`ev()` 拿到 false，报「找不到按钮」——
+  //   读起来像按钮被删了，实际是抢在数据前面了。
+  //
+  //   ★ 判据用**按钮本身出现**，而不是再等一段时间（sleep 会让测试变慢且仍是赌）。
+  await waitEval(
+    `[...document.querySelectorAll('.queue__filter')].some(x => x.textContent?.includes(${JSON.stringify("待人工复核")}))`,
+    "P-03 五标签筛选按钮已渲染（数据到位）",
+  );
   const filterClicked = await ev(`(() => {
     const btn = [...document.querySelectorAll('.queue__filter')].find(x => x.textContent?.includes(${JSON.stringify("待人工复核")}));
     if (!btn) return false;
@@ -427,7 +496,24 @@ try {
     ok: true,
     known_issues: knownTakedownReadBack ? [knownTakedownReadBack] : [],
     case_id: caseId,
-    adjudicated_finding_id: confirmedFindingId,
+    // ★ 2026-10-28：改前这里是 `adjudicated_finding_id`（点了「确认违规」的
+    //   finding）。现在**没有做裁决** —— 真实链路上新建案件的 finding 全是
+    //   规则命中的 `confirmed`，而界面对 confirmed 不渲染裁决按钮（这是对的：
+    //   点了必然 `invalid_finding_transition`）。
+    //
+    //   所以字段名改成「实际观测到的状态分布」，不叫「已裁决」——
+    //   一个叫 adjudicated 的字段里装着「没裁决」，正是本项目最忌讳的那种谎。
+    finding_status_counts: (() => {
+      const counts = {};
+      for (const st of findingStates) counts[st] = (counts[st] || 0) + 1;
+      return counts;
+    })(),
+    adjudication_buttons_when_confirmed: candidateButtons,
+    adjudication_verified: false,
+    adjudication_note:
+      "真实链路上新建案件的 finding 全为 confirmed（semantic_judge 未接，只出 candidate）"
+      + "；界面对 confirmed 不渲染裁决按钮。裁决动作本身由 "
+      + "tools/verify_finding_adjudication.py 在单元级覆盖。",
     appeal_id: createdAppealId,
     takedown_task: { id: completedTd.task_id, state: completedTd.state },
     new_pages_interacted: ["P-01", "P-02", "P-03", "P-06", "P-07", "P-08", "P-11", "P-12"],

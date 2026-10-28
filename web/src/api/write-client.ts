@@ -1,5 +1,6 @@
 import {
   request,
+  uploadBytes,
   type DraftMutation,
   type LedgerMutation,
   type ReferenceMutation,
@@ -32,7 +33,35 @@ export interface SubmitResult {
   [k: string]: unknown;
 }
 
+/** `POST /uploads` 的响应（`base/media_upload.save_upload` 的返回形状）。 */
+export interface UploadResult {
+  /** ★ 服务端绝对路径。填进 `submission.source.uri`，**不要**在前端改写它。 */
+  path: string;
+  /** 服务端按**魔数**确认的媒体种类（不是按扩展名猜的）。 */
+  kind: "image" | "video";
+  byte_size: number;
+  sha256: string;
+  /** 客户端原始文件名（已清洗，供人读）。 */
+  display_name: string;
+  /** 服务端生成的落盘名。 */
+  stored_name: string;
+}
+
 export const reviewWriteApi = {
+  /**
+   * 媒体上传（ADR-0021 主线）：浏览器文件 → 服务端落盘 → 返回可进件的路径。
+   *
+   * ★ 返回的 `path` 是**服务端路径**，填进 `submission.source.uri` 即可走
+   *   既有进件链。前端**不许**自己拼路径，也不许把 `file.name` 当 uri ——
+   *   落盘位置只由服务端决定（`media_upload.py` 的第①条边界）。
+   *
+   * ★ 这里返回 `kind`，页面用它决定 `content_type` 与 `source.kind`
+   *   （`image` / `video`）。**不按扩展名在前端猜** —— 服务端已经按魔数
+   *   确认过内容，前端再猜一次只会多一个可能与服务端不一致的口径。
+   */
+  uploadMedia: (file: File, filename: string) =>
+    uploadBytes<UploadResult>("/uploads", file, filename),
+
   claim: (caseId: string, idempotencyKey: string) =>
     request<LedgerMutation>(`/cases/${encodeURIComponent(caseId)}/claim`, {
       method: "POST",

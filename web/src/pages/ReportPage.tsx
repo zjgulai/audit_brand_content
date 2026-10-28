@@ -19,6 +19,14 @@ import Icon from "../ui/icon";
  *    ① 结论摘要 · ② 命中的问题 · ③ 覆盖证明 · ④ 依据清单 · ⑤ 未审说明 · ⑥ 执行回执与双指纹；
  * 3. 提供「申请重签过期链接（POST /api/v1/reports/{id}/resign）」入口（不修改报告正文）。
  */
+/** 毫秒读数显示口径。★ `null` 渲染成「未测」，不是 0ms（与工作台同一条纪律）。 */
+function fmtMs(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "未测";
+  if (value < 1) return "<1 ms";
+  if (value < 1000) return `${value.toFixed(1)} ms`;
+  return `${(value / 1000).toFixed(2)} s`;
+}
+
 export default function ReportPage() {
   const { reportId } = useParams<{ reportId: string }>();
   const [report, setReport] = useState<ReportSummary | null>(null);
@@ -298,6 +306,38 @@ export default function ReportPage() {
             <dt>正文校验码</dt>
             <dd className="font-data">
               {unit?.fingerprint?.text_sha256 ?? "未记录"}
+            </dd>
+            {/* ★ 2026-10-28：执行回执里报告要用的两段。
+                「用了哪个 skill / 跑了多久」是复核「这份报告是谁产出的」的
+                最小信息 —— 改前报告里只有 receipt_ref 一个编号，
+                而那个编号查不到 skill 与耗时（实测详情接口原来连
+                receipt 都没透出）。 */}
+            <dt>执行 skill</dt>
+            <dd className="font-data">
+              {typeof caseDetail?.receipt?.skill === "string" &&
+              caseDetail.receipt.skill.trim()
+                ? caseDetail.receipt.skill
+                : "未留回执"}
+            </dd>
+            <dt>判定耗时</dt>
+            <dd>
+              {caseDetail?.workflow_timing?.status === "ok" ? (
+                <span className="font-data">
+                  {fmtMs(caseDetail.workflow_timing.total_ms)}
+                  <span className="hint">
+                    （{caseDetail.workflow_timing.step_count ?? 0} 步求和）
+                  </span>
+                </span>
+              ) : caseDetail?.workflow_timing ? (
+                <>
+                  <span className="badge badge--untested">未测</span>{" "}
+                  <span className="hint">
+                    {caseDetail.workflow_timing.reason || "没有可用的耗时读数"}
+                  </span>
+                </>
+              ) : (
+                <span className="hint">这份报告没有耗时读数</span>
+              )}
             </dd>
           </dl>
         </div>

@@ -120,8 +120,14 @@ export default class ErrorBoundary extends Component<
             <Button variant="secondary" onClick={this.retry}>
               重试本页
             </Button>
+            {/* ★ 2026-10-28（DT-6 报红）：原先这里是 `variant="primary"`。
+                设计规则是「primary 只用于高风险动作，且必须带 `data-risk-action`」
+                —— 而「回到复核队列」是一次导航，不是高风险动作。
+                写 primary 的后果不是好看难看：它让**唯一**那只红色按钮
+                出现在一个安全动作上，于是「红色 = 要小心」这条视觉约定失效。
+                改成 secondary，与「重试本页」同级。 */}
             <Button
-              variant="primary"
+              variant="secondary"
               onClick={() => {
                 // 用 location.assign 而不是 history.push：这里是边界，
                 // 处于 React 树之外的危险位置，换一条最简单的路径。

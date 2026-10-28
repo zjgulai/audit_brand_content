@@ -438,14 +438,49 @@ def main():
     report(not readback_ok(stored.get("ir"), tampered),
            "N5 读回断言对篡改 findings 必须红")
 
-    no_ir = bad_env["service"].execute(
-        aggregate_id="case-no-ir", command="claim",
-        actor={"principal_id": "u1", "tenant_id": TENANT},
-        expected_version=0, payload={}, idempotency_key="no-ir-claim")
-    no_ir_case = no_ir["result"]["case_id"]
+    # ★★ 2026-10-28 改这一条：N6 的**意图**没变（没有 IR 的案件不得返回
+    #    200 + 空 findings），但「造一个空壳」的手段被禁掉了。
+    #
+    #    改前它靠 `command="claim"` 造出 `ir=None` 的空壳，再断言详情 404。
+    #    那个手段本身是个缺陷：对冻结投影里的历史案件 claim，会写进 authority
+    #    一个本库不该存在的聚合，之后每个裁决动作都报 `finding_not_found`
+    #    （实测踩过，见 `base/review_reducer.py` 的 claim 分支注释）。
+    #    现在 reducer 在 claim 处就拒（`case_not_in_authority`）。
+    #
+    #    所以这里分两段验，比原来更严：
+    #      N6a ★ 拒绝时**不许留下**那个聚合（断言"没造出来"，而不只是"报错"）；
+    #      N6b ★ 详情对不存在的案件仍返回 404（原来那条意图）。
+    try:
+        bad_env["service"].execute(
+            aggregate_id="case-no-ir", command="claim",
+            actor={"principal_id": "u1", "tenant_id": TENANT},
+            expected_version=0, payload={}, idempotency_key="no-ir-claim")
+        refused = None
+    except Exception as exc:  # noqa: BLE001
+        refused = getattr(exc, "code", type(exc).__name__)
+    report(refused == "case_not_in_authority",
+           "N6a ★★★ 对没有 IR 的案件 claim → 拒绝（code=case_not_in_authority）",
+           repr(refused))
+    # ★ 关键的一半：拒绝之后 authority 里**不许**留下那个空壳。
+    #   只断言"抛了异常"会让一个"先写入再抛"的实现也通过 —— 那正是原来
+    #   那个缺陷的形状（写进去了，然后每个动作各报一次 404）。
+    # ★ 措辞修正（2026-10-28）：原先这条写的是「先写入再抛是原来那个缺陷的形状」，
+    #   而我实测发现 `execute` 是**先跑 reducer 再落盘** —— reducer 里改 `state`
+    #   只是局部副本，抛异常时 `_states` 根本没被写。所以"先写入再抛"这个形状
+    #   在本实现里**构造不出来**，那句话是凭想当然写的。
+    #
+    #   这条断言真正抓的是什么（用真变异验证过：把门删掉 → 本项读到 'claimed'）：
+    #   **门不存在时才会留下的那个空壳**。它防的是"以后有人把门删了/挪走"，
+    #   不是防一个不存在的时序。
+    leftover = bad_env["service"].authority.state("case-no-ir")
+    report((leftover or {}).get("status") in (None, "unassigned")
+           and (leftover or {}).get("ir") is None,
+           "N6b ★★★ 被拒之后 authority 里没有留下空壳聚合"
+           "（删掉那道门时本项读到 claimed —— 已验证过）",
+           repr((leftover or {}).get("status")))
     st, response = (lambda r: (r.status_code, r.json()))(
-        bad_env["client"].get("/api/v1/cases/%s" % no_ir_case))
-    report(st == 404, "N6 没有 IR 的案件不得返回 200 + 空 findings",
+        bad_env["client"].get("/api/v1/cases/case-no-ir"))
+    report(st == 404, "N6c 没有 IR 的案件不得返回 200 + 空 findings",
            "%s %r" % (st, response))
 
     # ── C T-103：frozen 目录与 cases.json 写入 ─────────────────────

@@ -12,6 +12,7 @@ import ContentUnitViewer from "../components/ContentUnitViewer";
 import { useIdentity } from "../components/IdentitySwitcher";
 import InlineMetricSummary from "../components/InlineMetricSummary";
 import ReviewActions from "../components/ReviewActions";
+import WorkflowSection from "../components/WorkflowSection";
 import StatusBadge, {
   resolveAuthorityState,
   resolveCoverageBadge,
@@ -553,6 +554,12 @@ export default function CaseDetailPage({ embeddedCaseId }: CaseDetailViewProps =
               <span className="font-data">{meta.spec_fingerprint ?? "未测"}</span>
             </dd>
           </dl>
+
+          <WorkflowSection
+            timing={detail.workflow_timing}
+            inference={detail.intent_inference}
+            receipt={detail.receipt}
+          />
 
           <h2>未评估的部分</h2>
           <NotEvaluatedList items={notEvaluated} />

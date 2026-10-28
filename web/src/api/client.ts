@@ -193,6 +193,55 @@ export interface CaseDetail {
   //   空数组 + note 才是「没看，原因是 note」。
   multimodal_observations?: MultimodalObservation[];
   multimodal_note?: string | null;
+  /** T-451：工作流耗时读数（判定时冻结，接口不另算）。
+   *  ★ `null` 表示**没测成**，不许渲染成 0ms —— 「没测」与「跑得极快」
+   *    在界面上必须长得不一样（AGENTS.md §2.4.1）。 */
+  workflow_timing?: WorkflowTiming | null;
+  /** T-455：内容阶段的推断观察。三态原样，**不压成布尔**。 */
+  intent_inference?: IntentInference | null;
+  /** 判定回执里**报告要用的那几段**（后端逐字段点名透出，不是整份回执）。
+   *  ★ 没有它就是「这份案件没留回执」，与「回执里字段为空」不同。 */
+  receipt?: JudgmentReceipt | null;
+}
+
+/** T-451：工作流耗时。键的形状与报告「执行回执」那一行同源。 */
+export interface WorkflowTiming {
+  status: "ok" | "untested" | string;
+  /** `untested` 时点名原因；`ok` 时为空串。 */
+  reason?: string;
+  /** 各步 `duration_ms` 求和。**没有读数时是 null，不是 0。** */
+  total_ms?: number | null;
+  step_count?: number;
+  /** 降序，最多三步。 */
+  slowest?: Array<{ name: string; duration_ms: number }>;
+  source?: string;
+}
+
+/** T-455：内容阶段推断。三态 —— `inferred` / `untested` / `absent`。
+ *
+ *  ★ 为什么不是 `boolean`：`untested`（没有可推断的信号）与
+ *    `absent`（调用方已明确给出，无需推断）对审核员含义完全不同 ——
+ *    前者要说「判断不出来」，后者什么都不用说。压成 false 就把两者混了。
+ */
+export interface IntentInference {
+  status: "inferred" | "untested" | "absent" | string;
+  value?: string | null;
+  declared?: string | null;
+  confidence?: "high" | "low" | null;
+  agrees_with_declared?: boolean | null;
+  evidence?: Array<{ pattern?: string; hit?: string; why?: string }>;
+  reason?: string;
+  /** 判据版本，便于回溯「当时按什么规则推的」。 */
+  判据?: string;
+}
+
+/** 判定回执里透出的几段。★ 后端逐个点名字段，这里跟着点。 */
+export interface JudgmentReceipt {
+  skill?: string;
+  steps?: unknown[];
+  workflow_timing?: WorkflowTiming;
+  skipped?: unknown;
+  source?: unknown;
 }
 
 /** T-439：一条 L1 观察。★ 它不是 finding —— 没有 control_code / authority_ref，
@@ -301,6 +350,52 @@ export async function request<T>(
     body: init?.body === undefined ? undefined : JSON.stringify(init.body),
   });
 
+  return readResponse<T>(res, path);
+}
+
+/**
+ * 上传原始字节（`POST /api/v1/uploads`）。
+ *
+ * ## 为什么不复用 `request()`
+ *
+ * `request()` 强制 `JSON.stringify(body)` 且强制 `Content-Type: application/json`。
+ * 上传要的是**文件原始字节**，文件名走 `X-Filename` 头 —— 后端就是这么设计的
+ * （`api/write_api.py` 的上传端点：不引入 python-multipart，所以不是 multipart，
+ * 而是裸字节 + 头）。用 `request()` 表达不了。
+ *
+ * ## ★ 这不是「新增一处裸 fetch」的借口
+ *
+ * 它写在 `api/client.ts` 里，是**封装的一部分**，不是页面里的裸调用 ——
+ * `check_api_centralization.mjs` 的 A 段只扫 `pages/`，而 D 段要求
+ * `/uploads` 这个路径在 `pages/` 里出现 0 次。两段都仍然成立。
+ *
+ * ★ 响应解析与 `request()` 共用 `readResponse()` —— 否则错误体翻译
+ *   会长出第二份，而两份的差别通常只在某一边忘了读 `code`。
+ */
+export async function uploadBytes<T>(
+  path: string,
+  file: Blob,
+  filename: string,
+): Promise<T> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/octet-stream",
+    "X-Filename": filename,
+  };
+  Object.assign(headers, csrfHeaders("POST", typeof document === "undefined" ? null : document.cookie));
+
+  const res = await fetch(`${apiBase}${path}`, {
+    method: "POST",
+    headers,
+    credentials: "same-origin",
+    body: file,
+  });
+
+  return readResponse<T>(res, path);
+}
+
+/** 响应 → JSON 或抛 `ApiError`。`request` 与 `uploadBytes` 的唯一解析点。 */
+async function readResponse<T>(res: Response, path: string): Promise<T> {
   if (!res.ok) {
     let body: Record<string, unknown> | null = null;
     try {

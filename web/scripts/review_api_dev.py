@@ -41,10 +41,21 @@ if str(REPO) not in sys.path:
 from fastapi import Request  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 
-from api.review_api import FileProjectionRepository, create_app  # noqa: E402
+from types import SimpleNamespace  # noqa: E402
+
+from api.review_api import (  # noqa: E402
+    AuthorityCaseSource,
+    FileProjectionRepository,
+    create_app,
+)
 from base import rbac  # noqa: E402
 from base.auth_session import SessionStore  # noqa: E402
+from base.authority_review_reader import AuthorityReviewReader  # noqa: E402
+from base.business_event_store import BusinessEventStore, WriterLease  # noqa: E402
 from base.finding_store import FindingRejected, FindingStore  # noqa: E402
+from base.projection_store import ProjectionStore  # noqa: E402
+from base.review_command_service import ReviewCommandService  # noqa: E402
+from base.submission_service import SubmissionIngestor  # noqa: E402
 
 DATA_ROOT = os.environ.get("REVIEW_API_DATA_ROOT")
 if not DATA_ROOT:
@@ -117,13 +128,59 @@ for _case in _repo.list_cases():
         except FindingRejected:
             pass
 
+# ── 开发装配接通写路径 + 媒体上传（ADR-0021 主线）─────────────────────
+#
+# ★ 改前这个装配**没有** review_command_service，于是 `POST /submissions`
+#   恒 501 —— 于是提交页永远只能显示那段「前端 3 条正则算出来的即时审计」。
+#   实测（2026-10-28）：只传 service 仍然 501，`write_api.py` 是**两道门**
+#   （`review_command_service is None or submission_ingestor is None`），
+#   四个部件缺一不可。
+#
+# ★ 所有落盘位置都在 `${RUN_DIR}`（仓外 tmp）下：
+#   `ProjectionStore.__init__` 硬性拒绝仓内路径（`projection_store.py:37-38`），
+#   素材根同理 —— 下载物 / 上传物进公开仓是 §2.6 红线。
+_DEV_STATE = Path(DATA_ROOT).parent / "runtime"
+_DEV_STATE.mkdir(parents=True, exist_ok=True)
+_DEV_MEDIA_ROOT = _DEV_STATE / "media"
+_DEV_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+_dev_lease = WriterLease(_DEV_STATE / "authority" / "writer.lock")
+_dev_lease.acquire()
+_dev_authority = BusinessEventStore(_DEV_STATE / "authority", lease=_dev_lease)
+_dev_projection = ProjectionStore(_DEV_STATE / "projection.sqlite")
+_dev_service = ReviewCommandService(_dev_authority, _dev_projection)
+_dev_ingestor = SubmissionIngestor(media_roots=[str(_DEV_MEDIA_ROOT)])
+# ★ 打开媒体进件：开发环境要能真的试图片/视频。
+#   `REVIEW_MEDIA_INGEST` 读的是**环境变量**，所以这里设进 os.environ ——
+#   与生产走同一条读法（不设模块常量，那会让「自证测的开关」与
+#   「生产读的开关」变成两个东西，§2.4.8）。
+os.environ.setdefault("REVIEW_MEDIA_INGEST", "1")
+
 app = create_app(
     session_store=_store,
     repository=_repo,
     finding_store=_finding_store,
     principals=PRINCIPALS,
     app_env="dev",
+    review_command_service=_dev_service,
+    submission_ingestor=_dev_ingestor,
+    case_source=AuthorityCaseSource(_dev_authority),
+    # ★★ 台账摘要也必须读 authority —— 否则「认领」在界面上永远不会生效。
+    #
+    #   改前这里是 `None`，于是 `review` 摘要从**内存 ReviewsLedger** 读，
+    #   而写路径（claim / unclaim / actions）写的是 **authority**。
+    #   两份数据分叉，实测：
+    #
+    #       POST /cases/case-c4964393/claim → 200  version=1
+    #       GET  /cases/case-c4964393       → review.status="unassigned" version=0
+    #
+    #   表现是界面显示「请求已接受，但台账回读未完成」，而请求**确实成功了**。
+    #   这条不是时序问题：它在同一次请求之后立刻、且永远发生。
+    review_read_store=AuthorityReviewReader(_dev_authority),
 )
+# 上传端点从 `app.state.production_settings` 读素材根。
+# 开发装配没有 ProductionSettings，这里给一个最小替身 —— 只带 `media_roots`。
+app.state.production_settings = SimpleNamespace(media_roots=(str(_DEV_MEDIA_ROOT),))
 
 # ── 开发装配套上人级名单（否则 P-08 下线台全链路 403）───────────────
 #

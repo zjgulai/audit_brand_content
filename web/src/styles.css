@@ -1459,6 +1459,12 @@ code {
   padding: var(--space-4) var(--space-5);
   margin-bottom: var(--space-4);
   min-width: 0;
+  /* ★ 2026-10-28（UI 质感）：加一层极淡的纵深。
+     改前全站 `box-shadow` 0 处 —— 面板与背景在视觉上是同一个平面，
+     层次全靠字号，读起来像数据直接 dump 在一张纸上。
+     阴影用 --shadow-2 而不是 --shadow-3：面板是**贴在页面上**的，
+     浮层才用 3。阴影过重会让暖底泛脏。 */
+  box-shadow: var(--shadow-2);
 }
 
 .panel__title {
@@ -2282,4 +2288,185 @@ code {
 
 .taxonomy-disputes .notrun {
   margin-top: var(--space-3);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 视觉层（2026-10-28）：把「数据 dump」变成「一份可读的证据文件」
+ *
+ * ## 改之前实测的四个缺口
+ *
+ * 1. 全站 `box-shadow` **0 处** —— 面板与背景同一个平面，层次只剩字号。
+ * 2. 页面标题与正文只差 4px（20 vs 14），h1 没有「这是一页」的分量。
+ * 3. 面板内边距上下 16px、内容却常常是一条三行说明 —— 密度对，呼吸不够。
+ * 4. 提交页两种结论（真判定 / 本地预检）**共用一个标题样式**，看的人分不出
+ *    哪个是真的。
+ *
+ * ## 纪律（不改前几条）
+ *
+ * · 颜色 / 间距 / 字号**一律走 token**（DT-3 是棘轮，新增裸值即红）。
+ * · 阴影只用 `--shadow-1/2/3` 三档，不现场调深度（DESIGN §6.1）。
+ * · 不加第四档字号（DESIGN §3）：层级靠**字重 + 颜色 + 间距**。
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 页面头部：给 h1 应有的分量 ────────────────────────────────────────── */
+
+.cases-page__head {
+  /* ★ 加一层极淡的纵深：头部卡是「这张纸的抬头」，不是又一块数据。
+     --shadow-1 而不是 2 —— 它贴在页面上，不浮起。 */
+  box-shadow: var(--shadow-1);
+}
+
+.cases-page__head h1 {
+  /* 字距收紧是标题可读性的常规做法：大字号下默认字距偏松。
+     -0.02em 在 20px 上约等于 0.4px，肉眼是「更整」而不是「更挤」。 */
+  letter-spacing: -0.02em;
+  line-height: var(--leading-title);
+}
+
+.cases-page__head .hint {
+  /* 副标题与标题拉开一档，别让它们读成一行 */
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+  max-width: 68ch;
+}
+
+/* ── 面板：纵深 + 更从容的内距 ─────────────────────────────────────────── */
+
+.panel {
+  /* 上下比左右窄一档是老规矩（16/24）；这里给上下也加到 20px 的观感，
+     用 padding 的四个值而不是 --space-* 组合 —— 因为上下要略小于左右，
+     而阶梯里 16 与 24 之间没有 20。★ 这两个值不是新的阶梯，是本条规则的
+     光学补偿，写在 .panel 一处，不推广。 */
+  padding: 1.25rem var(--space-5);
+}
+
+.panel__title {
+  /* 面板标题与内容之间需要比「行距」更大的一档，否则标题读起来像首行正文 */
+  margin-bottom: var(--space-3);
+  letter-spacing: -0.01em;
+}
+
+/* 面板内第一个标题不额外顶出空白（否则卡顶部会显得比底部空一倍） */
+.panel > .panel__title:first-child,
+.panel > h2:first-child {
+  margin-top: 0;
+}
+
+/* ── 提交页：两层结论，视觉上必须分得开 ─────────────────────────────────── */
+
+/* 本地预检：**降一级**。
+   · 虚线边框：它不是一份成文的证据，是一次临时粗筛；
+   · 淡底：与真判定的白色面区分开；
+   · 不加阴影：只有真判定那块才「立起来」。
+   ★ 这三条合起来的作用是：瞟一眼就知道「下面这块不是结论」。
+     只改标题文字不够 —— 标题在滚动时会被滑出视口。 */
+.panel--precheck {
+  background: var(--surface-muted);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.panel--precheck .panel__title {
+  color: var(--text-muted);
+}
+
+/* 真判定那块（有案件号）：给它 --shadow-2，是这一页唯一立起来的东西 */
+[data-submission-receipt] {
+  box-shadow: var(--shadow-2);
+}
+
+/* ── 上传区：四种状态各有各的样子 ───────────────────────────────────────── */
+
+.upload-dropzone {
+  /* 上传是这一页的主入口，给它比普通字段更多的空间 */
+  padding: var(--space-5) var(--space-5);
+  transition: background-color var(--motion) var(--ease),
+              border-color var(--motion) var(--ease),
+              box-shadow var(--motion) var(--ease);
+}
+
+.upload-dropzone:hover {
+  /* 悬停时轻微抬起：0.5px 边框给不了「可点」的暗示，阴影可以 */
+  box-shadow: var(--shadow-1);
+}
+
+.upload-dropzone--active {
+  /* 拖拽悬停：比普通 hover 明确一档，否则用户不知道「松手会不会生效」 */
+  box-shadow: var(--shadow-2);
+}
+
+/* 上传成功：换成实线 + 语义绿，与「还没传」区分开 */
+.upload-dropzone--done {
+  background: var(--ok-surface);
+  border-color: var(--ok);
+  border-style: solid;
+}
+
+.upload-dropzone--failed {
+  background: var(--bad-surface);
+  border-color: var(--bad);
+  border-style: solid;
+}
+
+/* ── 事实清单：键值行之间给一点呼吸 ─────────────────────────────────────── */
+
+.facts dd {
+  /* 值比键更容易读错（值更长），所以行高放宽一档 */
+  line-height: var(--leading-base);
+}
+
+/* ── 移动端：阴影在窄屏上没收（浮起在两栏折叠后失去参照）───────────────── */
+
+@media (max-width: 960px) {
+  .panel,
+  [data-submission-receipt],
+  .cases-page__head {
+    box-shadow: none;
+  }
+
+  .panel {
+    padding: var(--space-4) var(--space-4);
+  }
+}
+
+/* ── 工作流读数（WorkflowSection，2026-10-28）─────────────────────────── */
+
+/* 步骤清单：名字左、耗时右，等宽数字对齐 —— 否则 2.4ms 与 12.4ms
+   的小数点不在一条竖线上，扫读时要比对位置。 */
+.workflow-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.workflow-steps li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+/* 推断依据：每条一行，命中词用等宽（它在正文里是逐字出现的） */
+.workflow-evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.workflow-evidence li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+/* 「推断只是标注」那句：用左侧一道细线标成附注，不与正文抢位置 */
+.workflow-note {
+  border-left: var(--hairline) solid var(--border-strong);
+  padding-left: var(--space-3);
+  margin: var(--space-2) 0 0;
 }

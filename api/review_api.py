@@ -1085,6 +1085,27 @@ def create_app(*, session_store=None, repository=None, principals=None,
                     continue
                 for t in st.get("takedown_tasks") or []:
                     rows.append(t)
+            # ★★ 2026-10-28（ADR-0021 主线）：authority 为空时**回落**到冻结投影。
+            #
+            #   改前这里是纯二选一：只要接了 `review_command_service`，就
+            #   **只**读 authority，冻结投影里的任务一条都看不见。
+            #   实测后果（开发装配）：`seed_projection` 造的 `td-smoke-1`
+            #   在 `takedown-tasks.json` 里、在冻结投影里都对，而
+            #   `GET /api/v1/takedown-tasks` 返回 `{"tasks": []}` ——
+            #   页面空白，读起来像「夹具没造」，实际是「数据源被换掉了」。
+            #
+            #   ★ 这里的口径与下面 `_grants_from_authority` 完全一致
+            #     （「authority 有数据就返回 authority，没有才回落 frozen」）——
+            #     那个先例就在本文件下方几十行，当时为同样的病修的。
+            #
+            #   ★ 为什么是「authority 空才回落」而不是「两边合并」：
+            #     合并会让同一条任务在两边各有一份时出现两次，而界面上
+            #     两个一模一样的行读起来像「有两条待办」。
+            #     一旦 authority 里有了下线任务，它就是唯一真相 ——
+            #     这与「写路径只在 authority」是同一条纪律。
+            if not rows:
+                rows = [row for row in repo.takedown_tasks
+                        if row.get("tenant") == tenant]
         else:
             rows = [row for row in repo.takedown_tasks
                     if row.get("tenant") == tenant]

@@ -204,11 +204,29 @@ node "${WEB}/scripts/check_pages.mjs" \
   > "${RUN_DIR}/page.json" 2> "${RUN_DIR}/page.err"
 cat "${RUN_DIR}/page.json"
 
+# ── 建一条**真实**案件给写动作测试（2026-10-28）────────────────────────
+#
+# ★ 为什么必须新建：`seed_fixture` 造的夹具案件**全部只存在于冻结投影**，
+#   authority 里一条都没有（实测：队列 10 条，authority 里有 ir 的 0 条）。
+#   对它们做写动作时，reducer 会为本库没有的案件造一个 `ir=None` 的空壳，
+#   之后每个裁决动作都报 `finding_not_found` —— 而详情里明明有 finding。
+#   （现在这条在 claim 处就被拒：`case_not_in_authority`。）
+#
+# ★ 这条变更同时钉住一件事：**冻结投影里的历史案件只能读，不能复核**。
+#   以前它只是文档里的一句话，现在有执行点。
+WRITE_CASE="$("${PY}" "${WEB}/scripts/dev_create_case.py" \
+  --api-port "${API_PORT}" --cookie "${QUEUE_COOKIE}")"
+if [ -z "${WRITE_CASE}" ]; then
+  echo "无法新建写动作测试案件 —— 写动作段无法进行（这是失败，不是跳过）"
+  exit 1
+fi
+echo "写动作测试案件（真实新建）：${WRITE_CASE}"
+
 echo "[8/11] 复核写动作：显式身份 → claim → draft → submit → GET 回读"
 node "${WEB}/scripts/check_review_actions.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --api "http://127.0.0.1:${API_PORT}" \
-  --case "${FIRST_CASE}" \
+  --case "${WRITE_CASE}" \
   > "${RUN_DIR}/actions.json" 2> "${RUN_DIR}/actions.err"
 cat "${RUN_DIR}/actions.json"
 

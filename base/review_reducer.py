@@ -1204,6 +1204,26 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         submission_id, ir_id = _ingest_submission(state, actor, payload, now)
         detail.update({"submission_id": submission_id, "ir_id": ir_id})
     elif command == "claim":
+        # ★★ 2026-10-28（ADR-0021 主线）：拒绝为「本库没有的案件」创建空壳。
+        #
+        #   实测的起因：对种子里的**冻结投影**案件（`case-c4964393`）做 claim，
+        #   reducer 会 `initial_state()` 造一个 `ir=None / content=None` 的聚合。
+        #   结果是：认领成功，之后每一个裁决动作都必然报
+        #   `finding_not_found: 案件没有可裁决的 IR findings` ——
+        #   而案件详情里明明有 1 条 finding（它只在冻结投影里，不在 authority）。
+        #
+        #   读起来像「前端点错了」，实际是**写了一个不该存在的聚合**。
+        #   拒绝在这里，比让后面每个动作各报一次 404 要诚实得多：
+        #   一次说清「这个案件不在可复核的库里」。
+        #
+        #   ★ 判据是 `ir is None` 而不是「ir 没有 findings」：
+        #     一个真实案件**可以**没有任何 finding（合规通过），
+        #     那种案件照样可以复核。只有「连 ir 都没有」才是空壳。
+        if state.get("ir") is None:
+            raise LedgerNotFound(
+                "case_not_in_authority",
+                "案件 %r 不在可复核的案件库里（authority 里没有它的判定）—— "
+                "冻结投影里的历史案件只能读，不能复核" % (state.get("case_id"),))
         if state["status"] == "claimed":
             raise LedgerConflict("already_claimed", "案件已被领取")
         if state["status"] == "closed":
