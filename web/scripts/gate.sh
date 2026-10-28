@@ -79,6 +79,12 @@ if [ "${STAGE}" = "static" ]; then
   #   ★ ReleasePage 的 reauth 是登记过的例外（302 + CSRF + redirect:manual，
   #     request() 表达不了），逐个点名，不是模糊放行。
   run_rc_check api_centralization node "${HERE}/check_api_centralization.mjs"
+  # ★ 2026-10-27（ADR-0021 · W-3）：列表页轮询 + 路由级错误边界。
+  #   轮询：隐藏时停表 / 回来立刻拉 / 刷新不清空 / 写动作暂停 / paused 不重建 run。
+  #   边界：真跑 nextBoundaryState 与环形缓冲（`return {}` 那种坏实现必须红），
+  #         并断言它真的包住 <Outlet /> 且 key 跟 pathname。
+  run_rc_check polling node --experimental-strip-types "${HERE}/check_polling.mjs"
+  run_rc_check error_boundary node --experimental-strip-types "${HERE}/check_error_boundary.mjs"
 else
   # build 阶段：dist 必须已经由 `npm run build` 产好（verify:build 的顺序就是这样）
   run_json_check bundle_budget node "${HERE}/check_bundle_budget.mjs" --dir "${WEB}/dist" --json

@@ -9,6 +9,8 @@ import {
   type CaseSummary,
 } from "../api/client";
 import { csrfHeaders } from "../api/auth-headers";
+import { usePolling } from "../hooks/usePolling";
+import { shouldSurfaceFailures } from "../hooks/polling.logic";
 import {
   releaseClient,
   type ReleasePendingItem,
@@ -102,6 +104,30 @@ export default function ReleasePage() {
       void loadList();
     }
   }, [caseId, current, devEnabled, loadDetail, loadList, sessionEpoch]);
+
+  // ★ ADR-0021 · W-3：签发台**列表态**轮询。
+  //
+  //   ★★ 只在 `!caseId`（列表）时启用 —— 详情态有签发表单（理由、step_up_token），
+  //      自动刷新会把用户填了一半的内容换掉。这与 CaseDetailPage 不挂轮询
+  //      是同一条理由（F4 那条断言也守它）。
+  //
+  //   ★ 不与 `loadList` 合并：那个函数自己 `setLoading(true/false)` 且吞异常，
+  //     搬进轮询会每 20 秒把列表打回骨架屏，而且失败计数永远是 0。
+  const poll = usePolling(
+    useCallback(async () => {
+      if (devEnabled && current === null) return;
+      const [pending, allCases] = await Promise.all([
+        releaseClient.listPending(),
+        reviewApi.listCases(),
+      ]);
+      setPendingRows(Array.isArray(pending) ? pending : []);
+      setFallbackCases(
+        (allCases ?? []).filter((c) => c.release_status === "待放行"),
+      );
+      setError(null);
+    }, [current, devEnabled]),
+    { enabled: !caseId && !(devEnabled && current === null) },
+  );
 
   const handleStartReauth = async () => {
     if (!caseId) return;
@@ -287,6 +313,16 @@ export default function ReleasePage() {
             <p className="hint">
               复核完成后在此正式签发放行。提交人与复核人本人不可自签。
             </p>
+            {/* ★ ADR-0021 · W-3：列表态轮询状态。
+                只在刷新中 / 连续失败时出现（不占位）。详情态不轮询 ——
+                见 `usePolling` 那段的注释：签发表单填到一半被换掉是最坏的情况。 */}
+            {(poll.phase === "refreshing" || shouldSurfaceFailures(poll.failures)) && (
+              <p className="hint" data-poll-status="" role="status" aria-live="polite">
+                {poll.phase === "refreshing"
+                  ? "正在更新待放行列表…"
+                  : `后台刷新失败（连续 ${poll.failures} 次），当前显示的可能不是最新数据`}
+              </p>
+            )}
           </div>
           <span className="font-data hint">
             待放行候选：{mergedList.length} 条

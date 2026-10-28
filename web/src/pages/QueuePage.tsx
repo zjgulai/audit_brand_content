@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useIdentity } from "../components/IdentitySwitcher";
 import InlineMetricSummary from "../components/InlineMetricSummary";
@@ -6,6 +6,8 @@ import StatusBadge, { resolveDecisionBadge } from "../components/StatusBadge";
 import Button from "../ui/Button";
 import Icon from "../ui/icon";
 import { QUEUE_LABELS, reviewApi, splitQueue, type CaseSummary } from "../api/client";
+import { usePolling } from "../hooks/usePolling";
+import { shouldSurfaceFailures } from "../hooks/polling.logic";
 import CaseDetailPage from "./CaseDetailPage";
 
 /**
@@ -62,28 +64,57 @@ export default function QueuePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const previewCaseId = searchParams.get("caseId");
 
+  // ★ ADR-0021 · W-3：队列页轮询。
+  //
+  //   改前是一次性 `useEffect` + `setRows(null)` 再取 —— 于是**永远不会自动刷新**，
+  //   审核员必须手动 F5 才能看到新案件（多人协作时会漏案件 / 重复领取）。
+  //
+  //   三条口径都落在 `usePolling` 里：
+  //   ① 标签页隐藏时停表（不是跳过）
+  //   ② 回到可见时**立刻**拉一次（不等满 20 秒，否则旧数据看起来像新的）
+  //   ③ 刷新**不清空**已有数据 —— 所以这里改成「只在首次把 rows 置 null」。
+  //      改前每次取数都 `setRows(null)`，那是首屏写法；搬进轮询就会每 20 秒白一下。
+  const poll = usePolling(
+    useCallback(async () => {
+      // ★ 开发身份未就绪时不请求（保持既有行为），但**不报错**：
+      //   `current === null` 是「还没切好身份」，不是「取数失败」。
+      if (devEnabled && current === null) return;
+      try {
+        const data = await reviewApi.getQueue();
+        setRows(data);
+        setError(null);
+      } catch (e: unknown) {
+        const err = e as { status?: number; message?: string };
+        setError({ status: err.status ?? 0, message: err.message ?? String(e) });
+        // ★ 要 rethrow：`usePolling` 靠它的 catch 统计 `failures`。
+        //   不抛的话 `failures` 恒 0，「后台刷新失败」那条提示永远不出现 ——
+        //   而轮询失败是**最不该静默**的一类失败（界面上还是旧数据，看起来正常）。
+        throw e;
+      }
+    }, [current, devEnabled]),
+    {
+      // 开发身份未就绪时不启用轮询（与上面的 guard 同一个条件，两处都要）
+      enabled: !(devEnabled && current === null),
+    },
+  );
+
+  // ★ 首次加载才清空；后续刷新保留旧数据（轮询不清空是 W-3 的核心口径）。
+  //
+  // ★★ **不能**把 `poll.phase` 放进依赖：phase 每轮都会变
+  //   （initial → idle → refreshing → idle…），于是「phase === initial 时清空」
+  //   会在每轮首次那一帧成立 —— 列表照样闪。第一版就是这么写的。
+  //   正确写法：清空只跟「身份/会话变了」走（那是真的换了数据源），
+  //   轮询本身从不清空。
   useEffect(() => {
     if (devEnabled && current === null) {
       setRows(null);
       setError(null);
       return;
     }
-    let alive = true;
+    // 身份就绪（或切换）时先清空：旧身份的案件不该留在屏幕上。
     setRows(null);
     setError(null);
-    reviewApi
-      .getQueue()
-      .then((data) => {
-        if (alive) setRows(data);
-      })
-      .catch((e: unknown) => {
-        if (!alive) return;
-        const err = e as { status?: number; message?: string };
-        setError({ status: err.status ?? 0, message: err.message ?? String(e) });
-      });
-    return () => {
-      alive = false;
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, devEnabled, sessionEpoch]);
 
   const { queued: rawQueued, offQueue } = useMemo(
@@ -203,6 +234,29 @@ export default function QueuePage() {
   return (
     <div className="queue">
       <div className="queue__list">
+        {/* ★ ADR-0021 · W-3：轮询状态条。
+            只在两种情况出现，**不占位**（不推挤列表）：
+            · `refreshing` —— 后台正在更新（列表内容**保持不动**）
+            · `failures` 连续 ≥2 —— 后台刷新失败（界面上还是旧数据，看起来正常，
+              所以这里必须说一句，否则用户会以为「没有新案件」） */}
+        {(poll.phase === "refreshing" || shouldSurfaceFailures(poll.failures)) && (
+          <div
+            className="hint"
+            data-poll-status=""
+            role="status"
+            aria-live="polite"
+            style={{ padding: "0 0 var(--space-2)" }}
+          >
+            {poll.phase === "refreshing"
+              ? "正在更新队列…"
+              : `后台刷新失败（连续 ${poll.failures} 次），当前显示的可能不是最新数据`}
+            {poll.lastLoadedAt && (
+              <span className="font-data">
+                {" "}· 上次成功 {new Date(poll.lastLoadedAt).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+        )}
         {sampleCount > 0 && (
           <div className="sample-banner" data-sample-banner="">
             <span>

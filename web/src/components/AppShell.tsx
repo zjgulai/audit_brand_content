@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useIdentity } from "./IdentitySwitcher";
+import ErrorBoundary from "./ErrorBoundary";
 import Button from "../ui/Button";
 import Icon, { type IconName } from "../ui/icon";
 import { reviewApi } from "../api/client";
@@ -364,7 +365,20 @@ export default function AppShell() {
               <p>旧身份的案件内容已隐藏；新 session 建立后重新加载。</p>
             </section>
           ) : (
-            <Outlet />
+            /* ★ ADR-0021 · W-3：路由级错误边界。
+               改前全仓 ErrorBoundary = 0 命中 —— 任意页面一个渲染异常就整站白屏。
+
+               ★ 为什么挂在 Outlet 上而不是逐条路由包：
+                 19 条路由逐条包，漏一条就是一个白屏缺口，而「漏了哪条」
+                 没有任何东西会告诉你。挂在这里一次覆盖全部。
+
+               ★ 为什么 key={location.pathname}：换页时把边界重置。
+                 不重置的话，从崩掉的 A 页跳到正常的 B 页，B 页看到的还是
+                 A 页的错误页 —— 用户会以为 B 也坏了。
+                 location 是这个组件里已有的，不额外引入依赖。 */
+            <ErrorBoundary name={`route:${location.pathname}`} key={location.pathname}>
+              <Outlet />
+            </ErrorBoundary>
           )}
         </main>
       </div>
