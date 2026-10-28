@@ -391,7 +391,14 @@ def main() -> int:
         n_img = sum(len(_images_of(r)) for r in gold["records"])
         print("\n可以跑：%d 条记录 / %d 张图。" % (len(gold["records"]), n_img))
         print("★ 这是 --check 读数，**没有一条指标** —— 指标要真跑才有。")
-        return 2
+        # ★ 退出码语义：--check 只回答「能不能跑」。
+        #   能跑 = 0；跑不了（缺凭据/缺 gold）= 2。
+        #
+        #   ★ 第一版这里也退 2，与「跑不了」撞了同一个码 —— 于是调用方
+        #     分不清「配好了可以跑」和「凭据没配」。那正是本项目反复记的
+        #     那个病：**两种完全不同的状态长得一样**。
+        #     （`--check` 本身不产出指标，所以退 0 不会被读成「测过了」。）
+        return 0
 
     if gold["status"] != "ok":
         print("\n⚠ 未测：gold 读不出。")

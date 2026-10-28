@@ -126,7 +126,36 @@ def group_b():
     report(bool(r["reason"]),
            "B3 ★★ 未测必须带原因（否则读的人只知道「没结果」）", r["reason"])
 
-    # B4 ★★★ gold 读不出 → untested，不是「0 条记录所以全对」
+    # B9 ★★★ `--check` 的退出码必须把「能跑」与「跑不了」分开
+    #
+    #   实测踩过：第一版两种情况下都退 2，于是调用方分不清
+    #   「配好了可以跑」和「凭据没配」。这是本项目反复记的那个病：
+    #   **两种完全不同的状态长得一样**。
+    #
+    #   ★ 判据打在源码上而不是真跑子进程：子进程会读真实环境，
+    #     而自证**不许依赖外部状态**（环境里有没有凭据会改变结论）。
+    src = (ROOT / "tools" / "eval_media_vs_llm.py").read_text(encoding="utf-8")
+    # ★ 按**行号范围**取 `--check` 那一段，不按字符串切分 ——
+    #   块内部也有 `if gold["status"] != "ok":`，用 split 会切在块的中间
+    #   （第一版就这么写的，取到的片段里既没有 return 0 也没有 return 2，
+    #   于是 B9/B10 都判红，而读起来像「代码真的没有那两个分支」）。
+    lines = src.splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.strip() == "if args.check:")
+    # ★ 块的结束 = 下一个**缩进回到函数体层级**的行（`if gold[...]`）。
+    #   块内部的那一行缩进更深（8 空格），所以必须同时判缩进 ——
+    #   只按文本相等找会取到紧跟的下一行，切片为空，
+    #   于是 B9/B10 都判红、读起来像「代码真的没有那两个分支」。
+    base_indent = len(lines[start]) - len(lines[start].lstrip())
+    end = next(i for i in range(start + 1, len(lines))
+               if lines[i].strip()
+               and (len(lines[i]) - len(lines[i].lstrip())) <= base_indent)
+    body = "\n".join(lines[start:end])
+    report("return 0" in body,
+           "B9 ★★★ `--check` 能跑时退 0（退 2 会与「跑不了」撞码）",
+           "命中" if "return 0" in body else "零命中")
+    report(body.count("return 2") >= 1,
+           "B10 ★★ 跑不了时仍退 2（B9 的另一半：别把两条一起改成 0）",
+           "%d 处 return 2" % body.count("return 2"))
     #
     #   ★ 这一条真跑一次读盘（指向一个临时空目录），不是读源码猜。
     #     第一版这里写的是 `report(g is None or True, "B4（跳过…）")` ——
