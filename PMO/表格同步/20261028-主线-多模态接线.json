@@ -1,0 +1,22 @@
+[
+ {
+  "事项名称": "主线（一）：多模态分析接进生产 —— 图片/视频用模型审，不再靠 host_vision / ASR",
+  "关联执行票": "ADR-0021 主线",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "规则/模型",
+  "功能三级分类": "语义/OCR/ASR",
+  "工作类型": [
+   "后端",
+   "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "待核实",
+  "页面路由": "全站",
+  "事项明细": "委托方要求「图片和视频必须都能审，最起码用多模态视频语义模型」。查清后确认技术完全可行，且不用接 OCR/ASR。★ 审计发现第四次同形：judge_entry 早就有 multimodal_analyze 注入点、tools/multimodal_client.py 也早建成（3 任务/2 网关/回落链），但**生产链路一个参数都没传**（grep = 0 命中），于是每张图每段视频都落「未接入多模态分析」。前面三次是 due_at / 工作流耗时 / semantic_judge / skill_hash。★ 为什么不需要 ASR/OCR：本机模型清单实测 8951 个模型里 **1689 个支持 video 输入**（Gemini 3 Pro / GLM-4.6V / Qwen3.8 / Kimi K3），所以视频路径是「整段视频字节→多模态模型」，与 DEFAULT_OCR_ENGINE=host_vision、DEFAULT_ASR_ENGINE=None 两条本地引擎完全解耦。改法：新增 base/media_analyze.py（契约适配 + readiness 图片视频分开报 + 凭据未配返回 None 不注入）；submission_service 把已解析的本地绝对路径写进 unit 并对媒体载体注入 multimodal_analyze；payload 顶层带上 multimodal_note；review_reducer 的 state.update 收下它。",
+  "验收标准": "verify_media_analyze 30/30：A 就绪读数（两网关分开报、缺哪个变量逐个点名、读数不含密钥值）· ★★★ B 未配凭据必须 untested 且点名，不许空列表；B3/B4 断言那条 note 真的活到 state · C 注入契约（图片 2 任务、视频 3 任务含 av_alignment）· ★★ D 路径不从 uri 反推、解析不出→error 不猜 · ★ E 降级（只配 tokenhub 时 av_alignment 跳过且说清原因）· F 观测归因（每条带 task；返回 ok 但零观察降 untested）· G 反向对照。回归：media_ingest 42/42 · submission_pipeline 43/43 · stage_gate_d5 23/23 · multimodal_provider 53/53 · judge_entry 12/12 · intent_infer 42/42。",
+  "状态依据": "★★★ 执行中抓到一个真缺陷：judge_entry 一直返回 multimodal_note='未接入多模态分析'，但 ① submission_service 的 payload 顶层没带这个键 ② review_reducer 的 state.update 里没有这个键。两处缺一，报告里「画面语义」那一节就只剩**空列表**——读起来像「画面没问题」而实际是「没看成」。与 T-455 的 intent_inference 同一个形状（payload 有、state 没有）。B3/B4 断言钉住它，删掉 reducer 那行→B3 立刻红。★ 四个真变异：video_ready=image_ready（最阴的错，视频被图片盖掉）→A4/E1/E2/E3 四条红；凭据未配时返回「ok 空结果」（把没测说成没问题）→B1 红；reducer 删掉 multimodal_note→B3 红。★ 端到端实测（未配凭据、图片进件已开）：multimodal_observations=[]、multimodal_note='未接入多模态分析'——不是「没问题」。提交 c4a2ab7。★ verify_coverage A 段现报 tools/verify_feishu_materials.py 未登记，那是另一会话的文件，未代其登记。",
+  "下一步行动": "★ 待委托方提供 4 个环境变量（MULTIMODAL_TOKENHUB_BASE_URL/API_KEY、MULTIMODAL_VOD_BASE_URL/API_TOKEN）—— 未配时图片/视频一律落 untested，不会撒谎。配好后跑 python3 tools/multimodal_client.py --probe <图> 一条命令验证真通，再打开图片/视频进件开关。"
+ }
+]
