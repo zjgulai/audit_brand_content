@@ -1,0 +1,21 @@
+[
+ {
+  "事项名称": "W-3 轮询 + 错误边界：队列不再需要手动 F5，一个页面崩了不带倒整站",
+  "关联执行票": "ADR-0021 · W-3",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+   "前端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "审计实测：全仓 setInterval 0 命中、WebSocket/EventSource 0、visibilitychange 0、ErrorBoundary/componentDidCatch 0。两条后果日常可见：① 队列页不自动刷新，审核员必须手动 F5 才看到新案件，多人协作会漏案/重复领取；② 任意页面一个渲染异常就**整站白屏**且用户不知道是哪个页面坏了。★ 轮询三条口径（缺一条就变负资产）：隐藏时**停表**而不是跳过（否则十个后台标签页=每 20 秒十次无用请求）· 回来时**立刻拉**不等周期（否则 20 秒内旧数据看起来像新的）· 刷新**不清空**已有数据（三个列表页原本都是 setRows(null); fetch(...)，那是首屏写法，直接搬进轮询会每 20 秒闪一次）。所以 usePolling 分三态 initial/refreshing/idle。★ 错误边界三条口径：说清是哪一块坏了 · 必须能回到别的页面（白屏最坏的地方是把人困住）· **不许把错误吞掉**（进 window.__REVIEW_ERRORS__ 环形缓冲 20 条）。挂在 AppShell 的 <Outlet /> 上而不是逐条路由包——19 条路由逐条包，漏一条就是一个白屏缺口而没有东西会告诉你；key={location.pathname} 让换页时重置边界。",
+  "验收标准": "check_polling.mjs 33/33：A 该不该跑 5 条 + A6 四种不跑理由互不相同 + A7 隐藏优先于暂停 · B 三态加载 5 条（refreshing 不许被算成 initial）· C 可见性 4 条 · D 失败阈值 3 条 · E hook 源码口径 7 条（E1/E2 ★★★ run 依赖里不含 paused/loader）· F ★★★ 三个列表页真的挂上了 + F4 CaseDetailPage 不许挂 · G 三条反向对照。check_error_boundary.mjs 26/26：A 语法结构 8 条 · B ★★★ 真跑纯逻辑 9 条（含环形缓冲丢最旧、不改入参）· C 接线 4 条（真的包住 Outlet、key 跟 pathname）· D 四条反向对照。门禁：gate[static] 全绿（5 个自证）· build 14/14 · tsc -b 严格模式 · a11y 13/13 · pages 双向可达 · budget 通过。",
+  "状态依据": "★★ 三条判据自己不够格被实测抓出来：① A5 假红——原本在 .tsx 里找 return { error }，后来把逻辑抽到 errorBoundary.logic.ts 那条正则就假红了，红的是判据的射程不是代码；改成正则指向真正实现（A5b）。② B 组整组 UNTESTED——原本 import .tsx 让 Node 加载 JSX 失败即跳过，而**未测不是通过**；抽成 .ts 后能 import 真身，B 组 9 项才真的在跑。③ D2/D3 假红——直接用 /<ErrorBoundary/.test(\"...\") 测正则本身，没走剥注释+词边界，于是 <ErrorBoundaryLike 和注释里的都被判命中；抽成 scanBoundary() 三组共用同一条链。★ 两个自己写出来又自己删掉的缺陷：paused 进 run 依赖 → 点「认领」时列表闪空一次（修：paused/loader 走 ref，自证 E1/E2 钉住）；清空 effect 依赖 poll.phase → phase 每轮都变，每轮首次那帧都会清空（修：清空只跟身份/会话变了走）。★ 四个真变异：nextBoundaryState 返回 {} → A5b+B1+B2+B5 四条同时红（静态与行为两路都抓住，这是最阴的坏实现：通过了「有没有这个钩子」的检查，但 React 拿不到 error，边界变透明 div，崩溃照样白屏）；摘掉 <ErrorBoundary> → C1–C4 全红；去掉 key → C3 红。读数：polling 33/33 · error_boundary 26/26 · api_centralization 33/33 · field_state 28/28 · gate[static] 全绿 · build 14/14。提交 8a0e9fc。",
+  "下一步行动": "A 级 SubmitPage 两层结论（真判定在上、本地预检降级让位）"
+ }
+]
