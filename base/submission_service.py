@@ -99,10 +99,11 @@ class MediaIngestConfigError(ValueError):
 
 #: 打开后允许的媒体载体种类。今天只有 image（视频要 T-435 的抽帧，
 #: 没有抽帧就收视频等于收一个「审过了」的空壳）。
-MEDIA_SOURCE_KINDS = frozenset({"image"})
+MEDIA_SOURCE_KINDS = frozenset({"image", "video"})
 
 #: 图片载体必须配的 content_type（与 contract.CONTENT_TYPES 同一取值域）。
-_SOURCE_KIND_CONTENT_TYPE = {"free_text": "文本", "ad_text": "文本", "image": "图片"}
+_SOURCE_KIND_CONTENT_TYPE = {"free_text": "文本", "ad_text": "文本",
+                             "image": "图片", "video": "视频"}
 
 DECISION_LABELS = ("PASS", "待自决", "REVIEW", "BLOCK", "未审查")
 
@@ -118,38 +119,109 @@ def ingest_media_enabled(env=None):
 
 
 def media_ingest_readiness(env=None):
-    """开关与引擎是否**配套**。返回 (ok, reason)。
+    """媒体进件此刻能**审到什么程度**。返回 `(ok, reason)`。
 
-    ★ T-452 的核心判据，也是这一票**没有直接打开开关**的原因：
-      `DEFAULT_OCR_ENGINE` 仍是 `host_vision`（macOS 专用），容器引擎
-      `rapidocr_ppocr_v6` 只是**注册**、没接线。此时把进件开关打开，
-      每张图都会落 `parse_status=failed` —— 不崩，但等于开了个什么都审不了的入口。
+    ## ★ 2026-10-28 改判据：多模态接上之后，旧判据已经不对了
 
-      所以这里把「开关开了但引擎没接」做成一个**可指认**的状态：
-      运维看到 reason，就知道该去接引擎（T-118-follow），而不是以为图片能审了。
+    T-452 当时的判据是「开关开了但 OCR 引擎是 `host_vision` → 报 False」。
+    那个判据当时是对的：没有 OCR 就没有正文，媒体进件等于开了个审不了的入口。
+
+    **但多模态接进生产之后，这个前提变了。** 实测（2026-10-28）：
+
+        parse_status = failed（OCR 没成）
+        multimodal_observations = 1 条真实画面观察
+        decision = 未审查
+
+    也就是说：没有 OCR **照样能审画面语义**，只是「正文那一半」做不了。
+    再拿 OCR 一条卡死整个入口，就是把「能做一半」说成「一点都不能做」。
+
+    ## 所以判据改成「审到什么程度」
+
+    | 条件 | ok | reason |
+    |---|---|---|
+    | 开关没开 | True | ""（默认安全，不算错配） |
+    | 开关开 + 多模态就绪 | True | ""（画面能审；正文能否提取另说） |
+    | 开关开 + 无多模态 + 无 OCR | False | 说清两条都缺 |
+
+    ★ 仍然返回 False 的最后一种情况是**真的什么都审不了**，不是「不够完美」。
     """
     from base import media as MEDIA
 
     if not ingest_media_enabled(env):
         return True, ""
+
     engine = getattr(MEDIA, "DEFAULT_OCR_ENGINE", None)
-    if engine == "host_vision":
-        return False, (
-            "进了图片进件开关（%s），但 OCR 引擎仍是 host_vision（macOS 专用）。"
-            "在生产容器里每张图都会落 parse_status=failed。"
-            "接引擎是 T-118-follow，本票不打开它。" % MEDIA_INGEST_ENV)
-    return True, ""
+    ocr_ready = engine != "host_vision"
+
+    try:
+        from base import media_analyze as MA
+        mm = MA.readiness(env)
+        vision_ready = bool(mm["image"]["ready"])
+    except Exception:  # noqa: BLE001
+        # 接线层自己坏了 → 当作没有多模态（保守），但仍不静默：
+        # 下面的 reason 会说清「多模态不可用」。
+        vision_ready = False
+
+    if ocr_ready or vision_ready:
+        return True, ""
+
+    return False, (
+        "进了媒体进件开关（%s），但两条审图能力都没有："
+        "① OCR 引擎仍是 host_vision（macOS 专用，容器里必然落 parse_status=failed）；"
+        "② 多模态网关凭据未配（缺 MULTIMODAL_TOKENHUB_* / MULTIMODAL_VOD_*）。"
+        "两条都没有时，媒体进件等于开了个什么都审不了的入口。"
+        % MEDIA_INGEST_ENV)
 
 
-def supported_source_kinds_now():
-    """**此刻**真实接受的载体集合：开关打开才含 image。
+def media_ingest_capability(env=None):
+    """媒体进件**具体能审哪几件事**。给界面用的可读读数。
+
+    ★ 为什么不能只返回一个布尔：一张图能审「画面语义」但审不了「图内文字」，
+      这两件事对审核员的含义完全不同（前者答「画面有没有暗示疗效」，
+      后者答「文案里那句话有没有违规」）。合并成一个「能审/不能审」，
+      会让人以为看过了全部。
+    """
+    from base import media as MEDIA
+
+    enabled = ingest_media_enabled(env)
+    engine = getattr(MEDIA, "DEFAULT_OCR_ENGINE", None)
+    ocr_ready = engine != "host_vision"
+    try:
+        from base import media_analyze as MA
+        mm = MA.readiness(env)
+    except Exception:  # noqa: BLE001
+        mm = {"image": {"ready": False}, "video": {"ready": False},
+              "missing_env": [], "reason": "多模态接线层不可用"}
+
+    return {
+        "enabled": enabled,
+        # 图内文字（OCR）：决定「文案层面」能不能判
+        "text_extraction": {"ready": ocr_ready, "engine": engine},
+        # 画面语义 / 标志识别（多模态）：决定「画面层面」能不能判
+        "vision": {
+            "image": bool(mm.get("image", {}).get("ready")),
+            "video": bool(mm.get("video", {}).get("ready")),
+            "missing_env": list(mm.get("missing_env") or []),
+        },
+        # 视频的音画对齐只有 vod 能做
+        "av_alignment": bool(mm.get("video", {}).get("ready")),
+    }
+
+
+def supported_source_kinds_now(env=None):
+    """**此刻**真实接受的载体集合。
 
     ★ 为什么要有这个函数而不是直接读 `SUPPORTED_SOURCE_KINDS`：
-      那个常量是「不做媒体的那份声明」，它在 T-118-follow 之前不该变；
-      而「现在能收什么」是随开关走的。两个问题两个答案，混用就会出现
-      「常量说没有、实际收得了」或者反过来 —— 后者正是 §2.4.1 说的假数据。
+      那个常量是「不做媒体的那份声明」；而「现在能收什么」是随开关走的。
+      两个问题两个答案，混用就会出现「常量说没有、实际收得了」或者反过来
+      —— 后者正是 §2.4.1 说的假数据。
+
+    ★ 2026-10-28：视频也进来了。它的正文来自多模态（整段视频字节送模型），
+      不再等 `DEFAULT_ASR_ENGINE` —— 那个仍是 None，但已经不再是阻塞项
+      （实测 1689 个模型支持 video 输入，见 `base/media_analyze.py` 文件头）。
+      音画对齐（`av_alignment`）另说：它只有 vod 能做，缺 vod 时跳过并说清。
     """
-    if ingest_media_enabled():
+    if ingest_media_enabled(env):
         return SUPPORTED_SOURCE_KINDS | MEDIA_SOURCE_KINDS
     return SUPPORTED_SOURCE_KINDS
 
@@ -349,8 +421,11 @@ class SubmissionIngestor:
                 "unsupported_content_type", 422,
                 "source.kind=%s 必须配 content_type=%s"
                 % (kind, expected_content_type))
-        if kind == "image":
-            unit = self._build_image_unit(submission, uri=uri)
+        if kind in MEDIA_SOURCE_KINDS:
+            # ★ 2026-10-28：视频与图片走同一条「媒体进件」路径（路径校验、
+            #   本地路径回填、覆盖边界声明都一样）。差别只在正文从哪来，
+            #   那在 `_build_media_unit` 里按 kind 分支。
+            unit = self._build_media_unit(submission, kind=kind, uri=uri)
         elif kind == "free_text":
             text = submission.get("text")
             if not isinstance(text, str) or not text.strip():
@@ -378,18 +453,81 @@ class SubmissionIngestor:
                 "bad_content_unit", 422, "; ".join(problems))
         return unit
 
-    def _build_image_unit(self, submission, *, uri):
-        """图片载体 → ContentUnit。
+    @staticmethod
+    def _video_unit(target, *, uri):
+        """视频 → ContentUnit。**没有口播转写时，明说没做。**
 
-        ★ 能力边界照实说：**只做图内文字的 OCR**。`row_to_unit()` 产出的
-          `does_not_cover` 里含「画面语义」，本函数**不许**往里加任何东西 ——
-          往 `covers` 里加一句「画面语义已审」就等于把没审的部分伪装成审过，
-          而那正是 T-430 刚在投影层修掉的那个病。
+        ## 为什么正文是空串
 
-        ★ 路径约束：只接受**调用方显式给出**且落在允许根内的位图。
-          没有根约束时，这个端点会变成「对机器上任意文件做 OCR 并回显正文」的
-          内容读取器 —— 与 §2.6 第 3 条（凭据文件一律不许读）是同一个形状：
-          一旦能读任意路径，挡路的就只剩调用方的自觉。
+        `DEFAULT_ASR_ENGINE = None` —— 本仓没有语音转写。
+        `from_media()` 要求正文由调用方给出，而这里**确实没有**正文可给。
+
+        所以传空串，并把「口播文案未审」写进 `does_not_cover`。
+        这不只是措辞：`covers` / `does_not_cover` 会原样进报告，
+        审核员看到「视频已审」时默认会以为连口播一起查过了。
+
+        ## 那视频还审什么
+
+        审**画面** —— 由多模态在判定阶段做（`base/media_analyze.py`：
+        `scene_semantics` + `mark_symbol`，配了 vod 还加 `av_alignment` 音画对齐）。
+        实测：1689 个模型支持 video 输入，整段视频字节直接送模型，
+        不需要抽帧、也不需要 ASR。
+
+        ★ 画面观察是**独立的 L1 观察**，不是这个 unit 的 `covers` ——
+          两处的区别在报告里看得出来：「覆盖声明」说的是这份载体被处理到哪一步，
+          「观察」说的是模型看到了什么。
+        """
+        from base import contract as C
+
+        raw = target.read_bytes()
+        if not raw:
+            raise ValueError("视频文件为空（0 字节）")
+        unit = C.from_media(
+            "video", raw, "",
+            uri=uri,
+            extractor="multimodal-direct-v1",
+            # ★ 只声明**确实做了**的：把整段视频交给多模态看画面。
+            covers=["视频画面（整段，多模态模型直接读取）"],
+            # ★★ 这一条是本函数存在的理由：没有 ASR 就**必须**说出来。
+            does_not_cover=[
+                "口播文案（本仓无语音转写，DEFAULT_ASR_ENGINE = None）",
+                "画面逐帧 OCR（未开图内文字提取）",
+            ],
+        )
+        # ★★ `parse_status` 必须是 **partial**，不是 ok、也不是 failed。
+        #
+        #   `from_media()` 自己不设这个字段（那是 `row_to_unit` 的职责，
+        #   而视频不走那条路）。如果不显式补，`_build_media_unit` 的校验会拒
+        #   （实测：`parse_status=None 非法（只允许 ok/partial/failed）`）。
+        #
+        #   为什么是 partial：
+        #     · 不是 ok    —— 口播文案一个字都没读，说 ok 就是撒谎；
+        #     · 不是 failed —— 画面确实交给了多模态，模型会给出真实观察。
+        #   三态里「partial」在这里不是模糊，它精确地是「做了一半」。
+        unit["parse_status"] = "partial"
+        return unit
+
+    def _build_media_unit(self, submission, *, kind, uri):
+        """媒体载体（图片 / 视频）→ ContentUnit。
+
+        ## ★ 能力边界照实说
+
+        **图片**：`row_to_unit()` 产出的 `does_not_cover` 里含「画面语义」。
+        本函数**不许**往里加任何东西 —— 往 `covers` 里加一句「画面语义已审」
+        就等于把没审的部分伪装成审过（T-430 修掉的正是这个病）。
+        画面语义由**多模态**在判定阶段补，产出的是一条独立的 L1 观察，
+        不是这件事的 `covers`。
+
+        **视频**：`DEFAULT_ASR_ENGINE = None`，没有口播转写。所以
+        `covers` 只敢写「画面帧」与「音轨（未对齐时不含）」，
+        `does_not_cover` **必须**明写「口播文案」—— 这条不是客气话：
+        审核员看到「视频已审」时，默认会以为连口播一起查过了。
+
+        ## ★ 路径约束
+
+        只接受**调用方显式给出**且落在允许根内的文件。没有根约束时，
+        这个端点会变成「对机器上任意文件做提取并回显正文」的内容读取器 ——
+        与 §2.6 第 3 条（凭据文件一律不许读）是同一个形状。
         """
         from pathlib import Path as _Path
 
@@ -399,7 +537,8 @@ class SubmissionIngestor:
         raw_uri = source.get("uri")
         if not isinstance(raw_uri, str) or not raw_uri.strip():
             raise SubmissionRejected(
-                "bad_image_uri", 422, "source.kind=image 必须带 source.uri（位图路径）")
+                "bad_media_uri", 422,
+                "source.kind=%s 必须带 source.uri（文件路径）" % kind)
         candidates = []
         for root in self.media_roots:
             try:
@@ -431,8 +570,11 @@ class SubmissionIngestor:
                 "image_not_found", 404, "位图不存在或不是普通文件")
 
         try:
-            row = MEDIA.image_file_row(target, uri=uri)
-            unit = MEDIA.row_to_unit(row, uri)
+            if kind == "video":
+                unit = self._video_unit(target, uri=uri)
+            else:
+                row = MEDIA.image_file_row(target, uri=uri)
+                unit = MEDIA.row_to_unit(row, uri)
         except Exception as exc:  # noqa: BLE001
             # ★ 不许把异常吞成「审过了」。判据要求 OCR 失败必须落
             #   parse_status=failed 且 failure_kind 属于四类之一 ——

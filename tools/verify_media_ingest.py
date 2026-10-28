@@ -156,8 +156,15 @@ def check_gate_defaults():
     report("image" not in S.SUPPORTED_SOURCE_KINDS,
            "A3 ★ SUPPORTED_SOURCE_KINDS 不含 image（ADR-0018 §6.2 的静态那一半）",
            repr(sorted(S.SUPPORTED_SOURCE_KINDS)))
-    report(S.MEDIA_SOURCE_KINDS == frozenset({"image"}),
-           "A4 媒体载体集合今天只有 image（视频要 T-435 抽帧，不提前收）",
+    # ★ 2026-10-28 改判据：视频**已经进来了**。
+    #   旧判据写的是「今天只有 image（视频要 T-435 抽帧，不提前收）」——
+    #   当时的理由是「没有 ASR 就没有正文，收视频等于收一个空壳」。
+    #   但多模态接进生产之后这个前提变了：整段视频字节直接送模型
+    #   （实测 1689 个模型支持 video 输入），不靠 ASR 也不靠抽帧。
+    #   所以这里改成断言**两种都在**，并单独钉住「视频的正文确实是空的」——
+    #   那才是「不提前收」原本要防的东西。
+    report(S.MEDIA_SOURCE_KINDS == frozenset({"image", "video"}),
+           "A4 ★ 媒体载体集合含 image 与 video（视频走多模态，不再等 ASR）",
            repr(sorted(S.MEDIA_SOURCE_KINDS)))
     # ★ 反例：只有明确的真值才算打开。
     #   T-452 之前开关是模块常量，A5/A6 验的是「字符串真值不算打开」。
@@ -244,6 +251,52 @@ def check_env_entry():
                "H7 ★★ 只配根目录、不设开关 → 仍是不收图（根目录不会自己打开开关）")
 
 
+def check_video_coverage():
+    """I 组（2026-10-28）：视频的覆盖边界必须**如实**声明。
+
+    ★ 这一组存在的理由：视频没有 ASR（`DEFAULT_ASR_ENGINE = None`），
+      所以「口播文案未审」必须写在 `does_not_cover` 里。
+      审核员看到「视频已审」时默认会以为连口播一起查过了 ——
+      不写这一条，就是把没审的部分伪装成审过。
+
+    ★ 同时钉住 `parse_status = partial` 而不是 ok / failed：
+      · ok    → 口播一个字没读，说 ok 就是撒谎
+      · failed→ 画面确实交给了多模态，模型会给出真实观察
+      「做了一半」才是这里精确的状态。
+    """
+    import tempfile
+    from pathlib import Path as _P
+
+    d = _P(tempfile.mkdtemp(prefix="video-cov-"))
+    try:
+        mp4 = d / "t.mp4"
+        mp4.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 200)
+        ing = S.SubmissionIngestor(media_roots=[str(d)])
+        with _with_flag('1'):
+            try:
+                unit = ing._build_media_unit(
+                    _submission(mp4, source={"kind": "video", "uri": str(mp4)}),
+                    kind="video", uri="u")
+            except Exception as exc:  # noqa: BLE001
+                report(False, "I1 视频 → unit", "%s: %s" % (type(exc).__name__, exc))
+                return
+        report(unit.get("parse_status") == "partial",
+               "I1 ★★★ 视频 parse_status = partial（不是 ok：口播没读；"
+               "不是 failed：画面确实审了）", repr(unit.get("parse_status")))
+        dnc = (unit.get("textification") or {}).get("does_not_cover") or []
+        report(any("口播" in x for x in dnc),
+               "I2 ★★★ does_not_cover 明写「口播文案」未审"
+               "（不写就是把没审的伪装成审过）", repr(dnc[:2]))
+        cov = (unit.get("textification") or {}).get("covers") or []
+        report(cov and all("画面" in x for x in cov),
+               "I3 ★ covers 只声明画面（不许把口播算进覆盖）", repr(cov))
+        report((unit.get("text") or "") == "",
+               "I4 ★ 没有 ASR 时正文为空（不编一段假正文）", repr(unit.get("text")))
+    finally:
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def check_two_readings():
     """B 组：两个读数不许混用。"""
     with _with_flag('0'):
@@ -276,8 +329,13 @@ def check_gate_blocks(image_path):
             ing.prepare,
             _submission(image_path, source={"kind": "video", "uri": "x"}),
             principal=PRINCIPAL)
-    report(code2 != "media_ingest_disabled",
-           "C2 ★ video 被挡不许用媒体的码（它连能力都还没有）", repr(code2))
+    # ★ 2026-10-28 改判据：视频现在是媒体载体，被挡时**应当**用媒体的码。
+    #   旧判据写「不许用媒体的码，它连能力都还没有」—— 那在当时是对的，
+    #   现在能力已经有了（多模态）。改判据不是放宽，是把断言挪到新事实上：
+    #   「被哪道门挡」必须说清，而视频与图片现在走同一道门。
+    report(code2 == "media_ingest_disabled",
+           "C2 ★ video 是媒体载体，被挡时用媒体的码（与 image 同一道门）",
+           repr(code2))
     # 媒体门开着时，文本链路不许受影响
     with _with_flag('1'):
         code3 = _expect_reject(
@@ -354,8 +412,11 @@ def check_path_constraints(image_path):
             ing._build_unit,
             _submission(image_path, source={"kind": "image", "uri": ""}),
             product_line="p", uri="u")
-        report(code4 == "bad_image_uri",
-               "E4 source.uri 为空 → 422", repr(code4))
+        # ★ 2026-10-28：错误码从 `bad_image_uri` 改成 `bad_media_uri` ——
+        #   图片与视频共用同一个 builder，码里带 image 会让视频的错误读起来
+        #   像「图片那边的问题」。
+        report(code4 == "bad_media_uri",
+               "E4 source.uri 为空 → 422（码用 media，图片视频共用）", repr(code4))
 
         unit = ing._build_unit(
             _submission(image_path,
@@ -613,6 +674,7 @@ def main(argv):
     check_gate_defaults()
     check_env_entry()
     check_two_readings()
+    check_video_coverage()
     if image_path is None:
         untested("盘上没有 ok 状态的真实位图 —— C/D/E 组无对象")
     else:
