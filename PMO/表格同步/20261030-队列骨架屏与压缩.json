@@ -1,0 +1,20 @@
+{
+  "事项名称": "队列页永远停在骨架屏（effect 依赖竞态）+ 前端包未压缩 427KB→142KB",
+  "关联执行票": "T-405 / ADR-0021 W-3",
+  "功能一级分类": "P-05 复核队列",
+  "功能二级分类": "列表",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "前端",
+    "后端",
+    "测试验收"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "/queue",
+  "事项明细": "一、队列页永远停在骨架屏。症状：登录后进 /queue，停在 4 条骨架屏 + 「全部待办（0）」，接口明明返回 1 条，**等 20 秒轮询 tick 到了才恢复** —— 这个「等一会儿就好」正是竞态最典型的样子。在页面里埋 MutationObserver + 网络时序取证：+2218ms /api/v1/queue 发出、+5993ms 返回 200、+5983ms DOM 变成「全部待办（1）」、+6001ms 被抹回「（0）」—— 18ms 后被自己清掉。根因：QueuePage 的清空 effect 依赖 [current, devEnabled, sessionEpoch]，而 current 在 /api/v1/me 返回时从 null 变成对象，那是**首屏加载过程中必然发生的一次变化**，不是「换了身份」。两条 effect 谁先跑取决于两个请求的返回顺序。而 usePolling 的 inFlight 会拦掉重入，所以首屏拿不到第二次机会。修法：清空只跟 sessionEpoch（会话真的换了）走；开发身份那条依赖改成布尔量 devIdentityReady。InboxPage 是同一处竞态，一并修；ReleasePage 不改（它清空后会自己 loadList，竞态被覆盖）。二、前端包未压缩。实测 /assets/index-*.js 427KB，响应头**没有** content-encoding；而 index.html 有 gzip（上游 nginx 做的）。原因是 js/css 由本服务 FileResponse 直出（共享反代看不到宿主机新目录），而 FileResponse 不做压缩。加 GZipMiddleware(minimum_size=1024) 后实测 426821B → 141877B，省 67%，加载时间 42s → 3.7s。这同时解释了 /submit 在冷缓存下白屏 6 秒 —— 不是页面坏了，是 lazy chunk 在主包之后排队下载。",
+  "验收标准": "竞态：check_polling.mjs 新增 F5「挂轮询的页面 useLayoutEffect 依赖里不许有 current」。变异已验证：把 current 加回依赖 → F5 立刻红并打印违规依赖。生产实测：改前 t=3s 起永远停在「全部待办（0）」+骨架屏 4；改后 t=2s 即为「全部待办（1）」+骨架屏 0，稳定保持 9 秒不回落，左侧列表显示真实案件 case-b34fd5eb231046540f74。压缩：verify_password_login 新增 R8，变异已验证（注释掉调用 → 红）。生产实测 content-encoding: gzip，压缩后 141877 字节。★ check_polling 35/35；verify_password_login 10/10 + 反向对照 8/8；verify_production_app 85 PASS 0 FAIL；verify_coverage 737/737；verify_acceptance_run passed=127 failed=0 untested=9。",
+  "状态依据": "提交 33799e6（竞态修复）+ 603f366（gzip）。镜像 momcozy-audit:603f366 已上线。★ 写这两条判据时我自己踩了同一个坑四次：① check_browser_scope C7 用 /return null/ 正则扫源码，把判断改成 if(false) return null 后照样绿；② verify_acceptance_trigger 用 GATE in text，注释里留着旧命令名就恒真；③ check_polling F5 第一版没剥注释，读到了修复说明里「原来依赖是 [current,...]」那句；④ R8 第一版判 \"GZipMiddleware\" in src，注释掉整行调用后 import 那行还留着这个词，照样绿。统一读法：**剥注释后再判调用形状**。另 F5 第二版还有个误报：它扫所有 `}, [...] )`，把 useCallback 的依赖也判红（那是 loader 的依赖，允许有 current）—— 误报比漏报更糟，它让人开始不信报告。"
+}
