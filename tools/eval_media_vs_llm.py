@@ -106,6 +106,21 @@ sys.path.insert(0, str(ROOT))
 
 GOLD_DIR = Path(os.path.expanduser("~/audit-data/gold/pilot"))
 
+
+def say(*args: Any) -> None:
+    """打印并**立刻刷出**。
+
+    ★ 为什么不用裸 `print`：本工具单张要 2.5–3.4 分钟（本系统 `scene_semantics`
+      83s + `mark_symbol` 11s + baseline 74s），15 张要 40–50 分钟。
+      而 Python 在 stdout 被重定向到文件时是**块缓冲**的 —— 裸 `print`
+      会让整轮跑完才一次性落盘。
+
+      实测代价（2026-10-29）：`nohup ... > log` 跑了 11 分钟，
+      `wc -l log` 是 **0 行** —— 看起来像「卡住了」，实际在正常干活。
+      一个长任务让人以为它死了，和它真的死了，处理方式完全不同。
+    """
+    print(*args, flush=True)
+
 #: 基线模型。★ 取 `tools/multimodal_client.py` 的 `LIVE_PROBE` 里**实测 ok** 的那几个，
 #: 不写一个「听起来最强」但没探过的 id —— 那样的基线挂了会被读成「大模型不行」。
 BASELINE_MODELS = ("glm-5.3-flash",)
@@ -136,6 +151,36 @@ def _untested(reason: str) -> Dict[str, Any]:
     return {"status": "untested", "reason": reason, "metrics": None}
 
 
+def images_for_market(records: List[Dict[str, Any]], market: str) -> List[Dict[str, Any]]:
+    """按市场筛图。返回 `[{record_id, image, lang, gold_category, ocr_text}]`。
+
+    ★ 必须**先 OCR 再筛**：光看文件名（`recvw7XIUgdDyv__s0_0.png`）看不出语言。
+      这就是为什么第一轮我用「前 3 条记录」当样本时，恰好全是德文和中文，
+      于是得出了「规则库不认中文、所以整条链路不通」的错误结论 ——
+      真实原因是**我筛错了样本**。
+    """
+    from base import media as M
+
+    out: List[Dict[str, Any]] = []
+    for rec in records:
+        for img in _images_of(rec):
+            try:
+                text = (M.ocr_file(img).get("text") or "").strip()
+            except Exception:  # noqa: BLE001
+                text = ""
+            lang = classify_language(text)
+            if market == MARKET and lang != "en":
+                continue
+            out.append({
+                "record_id": rec.get("record_id"),
+                "image": img,
+                "lang": lang,
+                "gold_category": rec.get("原因分类"),
+                "ocr_text": text,
+            })
+    return out
+
+
 def _load_gold() -> Dict[str, Any]:
     """读 gold。★ 读不出就是 untested —— 「没有 gold」与「gold 为空」不同。"""
     p = GOLD_DIR / "gold.json"
@@ -148,6 +193,52 @@ def _load_gold() -> Dict[str, Any]:
     if not isinstance(data, list) or not data:
         return {"status": "untested", "reason": "gold 不是非空数组", "records": []}
     return {"status": "ok", "reason": "", "records": data}
+
+
+#: 市场口径。★ 委托方 2026-10-29：「不用再测中文，我们只关注北美市场」。
+#:
+#: 这句话直接决定评测集怎么筛：gold 的 25 张里混着德语（3）、中文（3）、
+#: 法语（1）、英文（16）—— 那是 Momcozy 各国站点的素材。
+#: 拿德语图去评「北美市场的合规判定」，测出来的是规则库的语言覆盖缺口，
+#: 而不是北美业务的真实表现。两者混在一起报，读数会被双向误读。
+MARKET = "north-america"
+
+#: 判定「这张图是英文素材」的口径。
+#:
+#: ★ 不用 OCR 语言识别库（没有、也不该为这个装一个）。
+#:   用**功能词**判：德语/法语各有极高频的功能词（der/die/und、le/la/des），
+#:   而英文的功能词集合与它们几乎不重叠。三条以上才算，避免把
+#:   「德语品牌名 + 英文文案」误判。
+_DE_WORDS = re.compile(
+    r"\b(der|die|das|und|nicht|dein|deine|für|mit|ist|ein|eine|braucht|"
+    r"gefühl|sicherheit|mehr|kann|wenn|dein)\b", re.I)
+_FR_WORDS = re.compile(
+    r"\b(le|la|les|des|une|un|est|pour|avec|votre|nous|dans|plus|"
+    r"vous|sur|par)\b", re.I)
+
+
+def classify_language(text: str) -> str:
+    """判断一段 OCR 文字主要是什么语言。返回 `en` / `de` / `fr` / `zh` / `unk`。
+
+    ★ 这是**粗判**，只用来筛评测集，不用于任何判定。
+      判错的后果是「某张图进/出评测集」，不是「结论错了」——
+      所以不用更精细的模型，用功能词就够。
+    """
+    if not isinstance(text, str) or not text.strip():
+        return "unk"
+    cjk = len(re.findall(r"[\u4e00-\u9fff]", text))
+    latin = len(re.findall(r"[A-Za-z]", text))
+    if cjk > latin * 0.3 and cjk >= 5:
+        return "zh"
+    de = len(_DE_WORDS.findall(text))
+    fr = len(_FR_WORDS.findall(text))
+    if de >= 3 and de >= fr:
+        return "de"
+    if fr >= 3 and fr > de:
+        return "fr"
+    if latin >= 20:
+        return "en"
+    return "unk"
 
 
 def _images_of(record: Dict[str, Any]) -> List[Path]:
@@ -337,6 +428,19 @@ def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
         ],
         "decision": out.get("label"),
         "observations": len(out.get("multimodal_observations") or []),
+        # ★★ 观察**原文**必须一起落盘，不只是条数。
+        #
+        #   实测代价（2026-10-29）：第一版只存了 `observations` 的条数，
+        #   于是跑完 5 张之后想做「观察质量对照」时，手上只有「13 条」这个数字，
+        #   一条原文都没有 —— 只能重跑 40 分钟。
+        #   ★ 这又是那个形状：**存了一个读数，但读不出它说的是什么。**
+        #
+        #   条数保留（摘要用），原文另存（复核用）。两者都要。
+        "observation_texts": [
+            {"task": o.get("task"), "statement": o.get("statement"),
+             "status": o.get("status"), "reason": o.get("reason")}
+            for o in (out.get("multimodal_observations") or [])
+        ][:40],
         "multimodal_note": out.get("multimodal_note"),
         # ★★ 下面三个是「0 条 finding」的**解释字段**，不是装饰。
         #    OCR 读到多少字、其中多少是中文、规则跑了几条 ——
@@ -573,8 +677,16 @@ def main() -> int:
             print("   配好 MULTIMODAL_TOKENHUB_BASE_URL / MULTIMODAL_TOKENHUB_API_KEY 后重跑。")
             return 2
         # ★ 只检查「能不能跑」，不假装跑过。
-        n_img = sum(len(_images_of(r)) for r in gold["records"])
-        print("\n可以跑：%d 条记录 / %d 张图。" % (len(gold["records"]), n_img))
+        #   ★ 这里必须报**筛完之后**的张数，不是 gold 的总数 ——
+        #     报 25 而实际跑 15，读的人会以为漏了 10 张。
+        picked = images_for_market(gold["records"], MARKET)
+        from collections import Counter as _C
+        dist = dict(_C(p["lang"] for p in picked))
+        print("\n市场口径 %s：%d 条记录 / **%d 张**可评（语言 %s）"
+              % (MARKET, len({p["record_id"] for p in picked}), len(picked), dist))
+        print("   （gold 总计 %d 条 / %d 张，其中非英文素材不在此市场口径内）"
+              % (len(gold["records"]),
+                 sum(len(_images_of(r)) for r in gold["records"])))
         print("★ 这是 --check 读数，**没有一条指标** —— 指标要真跑才有。")
         # ★ 退出码语义：--check 只回答「能不能跑」。
         #   能跑 = 0；跑不了（缺凭据/缺 gold）= 2。
@@ -594,27 +706,45 @@ def main() -> int:
               "而「0ms / 0 条发现」会被读成「跑得很好」。")
         return 2
 
-    records = gold["records"] if not args.limit else gold["records"][: args.limit]
+    # ★★ 先按市场筛图，再跑。
+    #
+    #   第一轮我没有这一步，直接用 `records[:3]` —— 那 3 条恰好是德语和中文，
+    #   于是得出「规则库不认中文所以整条链路不通」的结论，而真实原因
+    #   是**我筛错了样本**。25 张里 16 张是英文，正好是北美要评的那批。
+    picked = images_for_market(gold["records"], MARKET)
+    if args.limit:
+        picked = picked[: args.limit]
+    if not picked:
+        print("\n⚠ 未测：按市场 %r 筛完一张图都不剩。" % MARKET)
+        print("   ★ 这不是「没有违规」——是筛完没有可评对象。")
+        return 2
+
+    from collections import Counter
+    lang_dist = Counter(p["lang"] for p in picked)
+    print("市场口径：%s · 筛出 %d 张 · 语言分布 %s"
+          % (MARKET, len(picked), dict(lang_dist)))
+
     rows: List[Dict[str, Any]] = []
-    for rec in records:
-        rid = rec.get("record_id")
-        for img in _images_of(rec):
-            print("\n── %s / %s ──" % (rid, img.name))
+    for item in picked:
+        rid, img = item["record_id"], item["image"]
+        if True:
+            say("\n── %s / %s ──" % (rid, img.name))
             sys_out = run_system(img)
             base_out = run_baseline(img, model=args.model)
             rows.append({"record_id": rid, "image": img.name,
-                         "gold_category": rec.get("原因分类"),
+                         "gold_category": item["gold_category"],
+                         "lang": item["lang"],
                          "system": sys_out, "baseline": base_out})
-            print("   system  : %-8s %s ms · findings=%d"
+            say("   system  : %-8s %s ms · findings=%d"
                   % (sys_out["status"],
                      sys_out["ms"] if sys_out["ms"] is not None else "—",
                      len(sys_out.get("findings") or [])))
-            print("   baseline: %-8s %s ms · findings=%d"
+            say("   baseline: %-8s %s ms · findings=%d"
                   % (base_out["status"],
                      base_out["ms"] if base_out["ms"] is not None else "—",
                      len(base_out.get("findings") or [])))
             if base_out.get("status") != "ok" and base_out.get("reason"):
-                print("     · %s" % base_out["reason"][:110])
+                say("     · %s" % base_out["reason"][:110])
 
     summary = _summarize(rows)
     print("\n" + "─" * 74)
@@ -662,7 +792,9 @@ def main() -> int:
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "baseline_model": args.model,
         "credentials": env_rows,
-        "gold_records": len(records),
+        "market": MARKET,
+        "images_evaluated": len(picked),
+        "language_distribution": dict(lang_dist),
         "summary": summary,
         "rows": rows,
     }

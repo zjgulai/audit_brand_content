@@ -1222,6 +1222,14 @@
       "subjects": [
         "tools/eval_media_vs_llm.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_observation_candidates.py",
+      "asserts": "观察升级 candidate 的**边界**：A 四条规则的正例（逐字取自实测多模态输出，不编句子）· B ★★★ 反例不命中（「只说看不清」/「未发现拼写错误」/「无水印」/医疗宣称/品牌调性）—— B 组比 A 组更重要：A 证明能命中，B 证明不瞎命中，而误报的代价是让人不再看队列 · C ★★★ 三态底线（只产 candidate / confirmed_by_rule_class=False / authority_state=untested）· D 按 control_code 去重（同图两条说法不同的水印只出一条）+ finding_id 稳定 · E ★★★ untested/error 观察不产 finding（没看成 ≠ 有问题）· F 规则自检 + ★★★ 反向对照（清空 patterns 必须不再命中，恢复后必须重新命中）。★ 两个变异已验证会红：去掉否定排除 → B 组两条红（真误报）；清空 patterns → A 组红。",
+      "subjects": [
+        "base/observation_candidates.py",
+        "base/judge_entry.py"
+      ]
     }
   ],
   "exempt": [

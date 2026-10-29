@@ -60,6 +60,9 @@ def _draft_findings(unit, hits, registry):
     return out
 
 
+from base.observation_candidates import candidates_from_observations  # noqa: E402
+
+
 def _local_authority_query(_ref):
     """默认没有外部依据查询器：未测必须压成 missing，绝不凭登记字段 fail-open。"""
     return {"state": "untested", "reason": "authority_query_not_wired"}
@@ -377,13 +380,37 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
         control_points_version=registry.table_version,
         clock=clock,
     ).run(request, unit=unit)
+    # ★★★ 2026-10-29：把**确定性事实类**观察升级成 candidate finding。
+    #
+    #   起因（实测）：本系统对 5 张英文素材各产出 10–15 条高质量观察
+    #   （「Trail 疑为 Trial 拼写错误」「A$ 与 £ 混用」「画面遍布设计稿水印」），
+    #   而 `findings` 是 **0 条**。裸大模型对同样 5 张产 21 条 finding ——
+    #   人工比对发现**双方看到的是同一批问题**，差别只在「说不说成结论」。
+    #
+    #   ★ 产出的东西仍守三条底线（见 `base/observation_candidates.py`）：
+    #     · status 只到 `candidate`，绝不产 confirmed；
+    #     · `authority_state="untested"`（本层不查依据，不知道就不许写 missing）；
+    #     · 只升级**客观可复核**的事实类（拼写/货币/水印/清晰度），
+    #       法规类判断（医疗宣称、功效暗示）仍留给人工。
+    #
+    #   ★ 不塞进 `semantic_judge={"status": ...}`：那是另一个来源，
+    #     塞进去会让回执把「事实核查」记成「语义判定已跑过」——
+    #     而这台机器的 semantic_judge 至今是 `untested`。两个来源，
+    #     两个字段，不许互相冒充。
+    fact_candidates = candidates_from_observations(
+        observations, unit_id=str(unit.get("unit_id") or ""))
+    merged_findings = list(result["ir"]["findings"]) + fact_candidates
+
     return {
         "contract_version": CONTRACT_VERSION,
         "label": result["decision"]["state"],
         "layer": result["decision"]["layer"],
         "release_status": result["decision"]["release_status"],
-        "findings": result["ir"]["findings"],
-        "ir": result["ir"],
+        "findings": merged_findings,
+        "ir": dict(result["ir"], findings=merged_findings),
+        # ★ 单独报一份，让调用方能区分「规则命中」与「事实类 candidate」。
+        #   合并进 findings 是为了让界面上看得见；分开报是为了不被混读。
+        "fact_candidates": fact_candidates,
         "receipt": result["receipt"],
         "steps": result["steps"],
         "run_state": result["run_state"],
