@@ -163,6 +163,61 @@ for (const name of LIST_PAGES) {
   check(/usePolling\(/.test(src), `F ★★★ ${name} 挂上了 usePolling`);
 }
 
+// F5 ★★★ 挂轮询的页面，**清空数据的 effect 依赖里不许有 `current`**
+//
+//   2026-10-30 实测事故：`QueuePage` 的清空 effect 依赖 `[current, devEnabled,
+//   sessionEpoch]`。而 `current` 在 `/api/v1/me` 返回时会从 null 变成对象 ——
+//   那是**首屏加载过程中必然发生的一次变化**，不是「换了身份」。
+//   于是清空 effect 会在取数请求还在飞的时候跑 `setRows(null)`，
+//   谁先跑取决于两个请求的返回顺序 —— **竞态**。
+//
+//   实测表现：首屏永远停在 `全部待办（0）` + 4 条骨架屏，
+//   而 20 秒后轮询的 tick 能把数据显示出来（那时 current 已稳定）。
+//   「等一会儿就好了」是竞态最典型的症状。
+//
+//   ★ 判据只针对 **useEffect** 的依赖数组：
+//     `useCallback(..., [current, devEnabled])` 是 loader 的依赖，**允许**有
+//     current —— loader 重建只会更新 `loaderRef.current`，不会让 effect 重跑。
+//     第一版写成「所有 `}, [...] )` 都查」，于是把 useCallback 一起判红，
+//     两条都误报（那两条本来是对的）。**误报比漏报更糟**：
+//     它会让读报告的人开始不信这份报告。
+{
+  const PAGES_WITH_CLEAR = ["QueuePage.tsx", "InboxPage.tsx"];
+  for (const name of PAGES_WITH_CLEAR) {
+    const p = path.join(SRC, "pages", name);
+    let src;
+    try { src = fs.readFileSync(p, "utf8"); } catch { skip(`F5 ${name}`, "读不出"); continue; }
+
+    // ★ 注释不算代码。今天这个坑踩了三次（check_browser_scope J1a、
+    //   verify_acceptance_trigger、这里）。
+    const code = src
+      .split("\n")
+      .map((line) => line.replace(/\/\/.*$/, ""))
+      .join("\n");
+
+    // 只取 `useEffect(` 到它闭合的 `}, [...])` —— 用配对扫描而不是全局正则，
+    // 否则会跨过 useCallback 的边界。
+    const offenders = [];
+    const effRe = /useEffect\s*\(/g;
+    let e;
+    while ((e = effRe.exec(code)) !== null) {
+      // 从 useEffect( 起找它自己的依赖数组：向前扫到匹配的 `}, [ ... ] )`
+      const tail = code.slice(e.index, e.index + 4000);
+      const m = tail.match(/\n\s*\}, \s*\[([^\]]*)\]\s*\)/);
+      if (!m) continue;
+      const deps = m[1];
+      if (/\bcurrent\b/.test(deps)) {
+        offenders.push(deps.replace(/\s+/g, " ").trim());
+      }
+    }
+    check(
+      offenders.length === 0,
+      `F5 ★★★ ${name} 的 useEffect 依赖里**不许有 current**（首屏 /me 返回会让它变，与取数形成竞态）`,
+      offenders.length ? `违规依赖：[ ${offenders.join(" ] [ ")} ]` : "",
+    );
+  }
+}
+
 // F4 ★★★ 详情页**不许**挂轮询（有未保存草稿，自动刷新会冲掉）
 {
   const p = path.join(SRC, "pages", "CaseDetailPage.tsx");

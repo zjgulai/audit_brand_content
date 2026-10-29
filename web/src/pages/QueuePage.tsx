@@ -105,17 +105,50 @@ export default function QueuePage() {
   //   会在每轮首次那一帧成立 —— 列表照样闪。第一版就是这么写的。
   //   正确写法：清空只跟「身份/会话变了」走（那是真的换了数据源），
   //   轮询本身从不清空。
+  // ★★★ 2026-10-30 修一个**竞态**：首屏数据到手后被自己清掉，列表永远停在骨架屏。
+  //
+  //   原来的依赖是 `[current, devEnabled, sessionEpoch]`。`current` 在
+  //   `/api/v1/me` 返回时从 null 变成对象 —— 而那是**首屏加载过程中必然发生
+  //   的一次变化**，不是什么「换了身份」。于是：
+  //
+  //     +2218ms  /api/v1/queue 发出           ← usePolling 的 initial
+  //     +2250ms  /api/v1/me 返回 → current 变  ← 这个 effect 重跑
+  //     +2260ms  setRows(null)                 ← 把还在飞的请求结果的位置清空
+  //     +2300ms  queue 返回 → setRows(data)   ← 如果顺序反过来，数据就留下了
+  //
+  //   两条 effect 谁先跑取决于网络返回顺序 —— **这就是竞态**。实测表现：
+  //   首屏永远停在 `全部待办（0）` + 4 条骨架屏，而 20 秒后轮询的 tick
+  //   （此时 `current` 已稳定、不再触发清空）能把数据显示出来。
+  //   「等 20 秒就好了」是竞态最典型的症状。
+  //
+  //   修法：清空只跟**会话真的换了**走 —— `sessionEpoch` 就是为这件事存在的
+  //   （开发身份切换时 +1）。`current` 从 null → 对象是**加载完成**，
+  //   不是换人，不该清空。
+  //
+  //   ★ 为什么还要 `devEnabled && current === null` 那条：开发环境下身份
+  //     还没建好时不该拿着上一个人的数据。那时 `sessionEpoch` 也没变过，
+  //     所以那条单独留着，但它只在开发身份模式下成立（生产 `devEnabled`
+  //     恒 false）。
+  // （1）开发身份还没建好：不该拿着上一个人的数据。
+  //     生产 `devEnabled` 恒 false，这条永不触发。
+  //   ★ 依赖用 `devIdentityReady` 这个布尔量，而不是 `current` ——
+  //     `current` 从 null 变成对象会让依赖变 true→false，从而**再跑一次**；
+  //     用布尔量则只在「真的从有到无」时跑。这正是竞态的来源，不能留着。
+  const devIdentityReady = devEnabled ? current !== null : true;
   useEffect(() => {
-    if (devEnabled && current === null) {
+    if (!devIdentityReady) {
       setRows(null);
       setError(null);
-      return;
     }
-    // 身份就绪（或切换）时先清空：旧身份的案件不该留在屏幕上。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devIdentityReady]);
+
+  // （2）会话真的换了（开发身份切换 / 重新登录）才清空 —— 此时旧数据确实该走。
+  useEffect(() => {
     setRows(null);
     setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, devEnabled, sessionEpoch]);
+  }, [sessionEpoch]);
 
   const { queued: rawQueued, offQueue } = useMemo(
     () => splitQueue(rows ?? []),

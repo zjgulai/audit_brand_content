@@ -1253,6 +1253,14 @@
       "subjects": [
         "api/production_app.py"
       ]
+    },
+    {
+      "verifier": "web/scripts/verify_prod_pages_authed.mjs",
+      "asserts": "**登录后**逐页验收（只读，不点任何改变状态的按钮）：12 个业务页各自的特征文本命中、无错误态、无 JS 异常、无横向溢出、骨架屏已消失、且**确实跳到了目标路由**。★ 与 verify_prod_pages.mjs 分工：那个无凭据只验「未登录被送回登录页」，这个连人已登录的 Chrome 验真正的业务页面。★ 一页一判据（每页写自己的特征串），不用统一的「文字 > 0」——统一判会让「加载失败的兜底文案」也算通过。",
+      "subjects": [
+        "web/src/App.tsx"
+      ],
+      "dynamic": "目标是人已手动登录的**外部生产站点**（连 --port 指定的调试端口），不在仓内；路由清单与 web/src/App.tsx 的 Route 对应。★ 刻意不进 verifier_map / 离线自证链路：它要联网、要一个已登录的浏览器会话。"
     }
   ],
   "exempt": [

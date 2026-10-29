@@ -77,17 +77,30 @@ export default function InboxPage() {
   //   「phase === initial 时清空」会在每轮首次那一帧成立 —— 列表又闪了。
   //   正确写法：清空只跟「身份/会话变了」走（那是真的换了数据源）；
   //   轮询本身从不清空。
+  // ★★★ 2026-10-30：与 `QueuePage` 同一处竞态，同一个修法。
+  //
+  //   依赖里原来有 `current`。而 `current` 在 `/api/v1/me` 返回时会从 null
+  //   变成对象 —— 那是**首屏加载过程中必然发生的一次变化**，不是「换了身份」。
+  //   于是清空 effect 会在取数请求还在飞的时候跑一遍 `setXxx(null)`，
+  //   谁先跑取决于两个请求的返回顺序 —— 竞态。
+  //   在 QueuePage 上的实测表现是「永远停在骨架屏，等 20 秒轮询才恢复」。
+  //
+  //   修法：开发身份未就绪（`devEnabled && current === null`）时才清；
+  //   会话真的换了（`sessionEpoch`）时也清。`current` 从 null → 对象不清。
+  const devIdentityReady = devEnabled ? current !== null : true;
   useEffect(() => {
-    if (devEnabled && current === null) {
+    if (!devIdentityReady) {
       setNotifications(null);
       setCases(null);
-      return;
     }
-    // 身份就绪（或切换）时先清空：旧身份的通知不该留在屏幕上。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devIdentityReady]);
+
+  useEffect(() => {
     setNotifications(null);
     setCases(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, devEnabled, sessionEpoch]);
+  }, [sessionEpoch]);
 
   const handleNotifAction = async (id: string, kind: "read" | "ack") => {
     setActionFlash(null);
