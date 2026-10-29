@@ -421,11 +421,23 @@ def run_system(image: Path, *, clock=time.perf_counter) -> Dict[str, Any]:
         "status": "ok",
         "reason": "",
         "ms": round(ms, 3),
+        # ★★ `status` 与 `produced_by` 必须一起落盘。
+        #
+        #   实测代价（2026-10-29）：第一版只存 control_code/severity/quote，
+        #   于是「规则命中（confirmed）」与「事实类 candidate」在输出里
+        #   **长得完全一样** —— 读数上看到 2 条 finding，读不出它们是
+        #   哪一种，也就答不了「自动升级到底产出了几条」。
+        #   那正是本文件反复记的那个形状：存了读数，读不出它说的是什么。
         "findings": [
             {"control_code": f.get("control_code"), "severity": f.get("severity"),
+             "status": f.get("status"), "produced_by": f.get("produced_by"),
+             "fact_label": f.get("fact_label"),
              "quote": f.get("quote")}
             for f in (out.get("findings") or [])
         ],
+        # 单独报一份事实类候选的条数 —— 与规则命中分开数，
+        # 否则「自动升级有没有生效」这件事会混进总数里看不出来。
+        "fact_candidates": len(out.get("fact_candidates") or []),
         "decision": out.get("label"),
         "observations": len(out.get("multimodal_observations") or []),
         # ★★ 观察**原文**必须一起落盘，不只是条数。
@@ -608,6 +620,22 @@ def _summarize(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
             "findings_total": sum(n_findings) if n_findings else None,
             "findings_per_image": (
                 round(statistics.fmean(n_findings), 2) if n_findings else None),
+            # ★ 拆开数：规则命中 vs 事实类 candidate。
+            #
+            #   合并成一个总数会让「自动升级有没有生效」看不见 ——
+            #   而这一轮的全部改动就是为了让 candidate 出现。
+            "by_status": {
+                st: sum(1 for r in ok_rows
+                        for f in (r[key].get("findings") or [])
+                        if f.get("status") == st)
+                for st in ("confirmed", "candidate", "untested")
+            } if key == "system" else None,
+            "by_produced_by": {
+                pb: sum(1 for r in ok_rows
+                        for f in (r[key].get("findings") or [])
+                        if f.get("produced_by") == pb)
+                for pb in ("rule", "verifiable-fact", "semantic")
+            } if key == "system" else None,
             # ★ 只有 system 侧有：**画面**有没有被看过（OCR 是另一件事）。
             #   缺这一个字段，读数的读者会以为 0 条 finding = 判得准。
             #
@@ -757,6 +785,10 @@ def main() -> int:
                  lat["median"], lat["mean"], lat["n"]))
     print("产出：本系统 %s 条 finding · 裸模型 %s 条"
           % (summary["system"]["findings_total"], summary["baseline"]["findings_total"]))
+    # ★ 拆开报。合并成一个数读不出「自动升级有没有生效」。
+    bs = summary["system"].get("by_status") or {}
+    bp = summary["system"].get("by_produced_by") or {}
+    say("   本系统拆分：按状态 %s · 按来源 %s" % (bs, bp))
 
     # ★★ 必须单独说：本系统的 0 条 finding **不是「判得准」**。
     #   两件不同的事都要报：画面没看 / 读到了字但规则不认。

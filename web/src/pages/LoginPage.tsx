@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { appOrigin, reviewApi } from "../api/client";
+import BrowserSupportNotice from "../components/BrowserSupportNotice";
 import LoginQr from "../components/LoginQr";
 
 /**
@@ -100,9 +101,17 @@ export default function LoginPage() {
         )}
       </div>
 
-      <p className="login__foot">
-        仅支持桌面版 Chrome 155 及以上
-      </p>
+      {/* ★ 2026-10-29（#113）：原来这里是一行手写文案
+          「仅支持桌面版 Chrome 155 及以上」—— 版本号**写死在组件里**，
+          而基准在 `web/src/data/browser-baseline.json`（随时会更新）。
+          手写那一行的后果：基准改了、这行不改，界面就在撒谎。
+
+          换成组件后两件事一起解决：
+            · 版本范围从 baseline 读（B3 要求的「不许写死」）；
+            · 非支持浏览器会看到 role="alert" 的显式横幅（原来只有一行灰字）。 */}
+      <div className="login__foot">
+        <BrowserSupportNotice />
+      </div>
     </main>
   );
 }

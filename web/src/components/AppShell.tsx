@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useIdentity } from "./IdentitySwitcher";
+import BrowserSupportNotice from "./BrowserSupportNotice";
 import ErrorBoundary from "./ErrorBoundary";
 import Button from "../ui/Button";
 import Icon, { type IconName } from "../ui/icon";
@@ -359,6 +360,9 @@ export default function AppShell() {
         </header>
 
         <main id="main" className="shell__main" tabIndex={-1}>
+          {/* ★ #113 / TS-12：非支持浏览器的显式告知横幅。
+              ★ 只告知、不阻断 —— 详情见 BrowserSupportNotice 文件头第 3 条。 */}
+          <BrowserSupportNotice />
           {__REVIEW_DEV_IDENTITY__ && switching ? (
             <section className="case" aria-live="polite">
               <h1>正在切换开发身份</h1>

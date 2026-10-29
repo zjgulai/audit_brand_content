@@ -329,6 +329,132 @@ def group_c2():
            "H6 ★ 纯中文 → 1.0", repr(E._cjk_ratio("家纺线下试衣镜选品")))
 
 
+# ─────────────────────────── P 长任务必须能看见进度
+
+def group_p():
+    """P 组（2026-10-29）：输出必须**立刻刷出**，不许憋在缓冲里。
+
+    ## 它守的是什么
+
+    本工具单张 2.5–3.4 分钟，15 张 40–50 分钟。实测代价：
+
+        nohup ... > log &   # 跑了 11 分钟
+        wc -l log           # → 0 行
+
+    **看起来像卡死，实际在正常干活。** 一个长任务让人以为它死了，
+    和它真的死了，处理方式完全不同 —— 前者会被 kill 掉重跑（白烧 50 分钟）。
+
+    ★ Python 在 stdout 重定向到文件时是块缓冲的，裸 `print` 不会立刻落盘。
+      所以本文件断言的是「主循环用的是 `say()`（带 flush）而不是 `print`」。
+
+    ★ 这个判据是**源码级**的，不是行为级 —— 行为级要起子进程跑 3 分钟，
+      自证不该那么慢。承认这个取舍：它拦不住「`say` 自己忘了 flush」，
+      那由 `say` 的实现本身保证（它也在这条断言的范围里）。
+    """
+    import re as _re
+
+    src = (ROOT / "tools" / "eval_media_vs_llm.py").read_text(encoding="utf-8")
+    code = "\n".join(line.split("#", 1)[0] for line in src.splitlines())
+
+    # P1 ★★★ say() 的定义必须带 flush=True
+    report(_re.search(r"def say\([^)]*\)[\s\S]{0,600}?flush=True", code)
+           is not None,
+           "P1 ★★★ `say()` 用 flush=True（否则长任务看不到进度）")
+
+    # P2 ★★★ 主循环里不许有裸 print（进度全靠它）
+    #
+    #   判据定位到 `for item in picked:` 之后的循环体。那里如果还是 print，
+    #   重定向就又是 0 行。
+    body = ""
+    m = _re.search(r"for item in picked:([\s\S]*?)\n    summary = ", code)
+    if m:
+        body = m.group(1)
+    report(bool(body), "P2 ★ 取到主循环体（取不到说明结构变了）",
+           "%d 字符" % len(body))
+    bare = [ln.strip() for ln in body.splitlines()
+            if _re.match(r"\s*print\(", ln)]
+    report(not bare,
+           "P3 ★★★ 主循环里没有裸 `print`（重定向时它会憋到跑完）",
+           repr(bare[:2]))
+
+    # P4 ★★ 反向对照：真 print 会被抓、say 不会
+    report(bool(_re.match(r"\s*print\(", "    print('x')")),
+           "P4 ★★ 反向对照：裸 print 样本会被 P3 抓到（证明判据有效）")
+    report(not _re.match(r"\s*print\(", "    say('x')"),
+           "P5 ★★ `say(...)` 不会被 P3 误报（否则这条判据会把正确实现判红）")
+
+
+# ─────────────────────────── L 市场口径与语言判定
+
+def group_l():
+    """L 组（2026-10-29）：按市场筛图的口径。
+
+    ## 它守的是什么
+
+    委托方 2026-10-29 明确：「不用再测中文，我们只关注北美市场」。
+    gold 的 25 张里混着德语 / 中文 / 法语 —— 那是各国站点素材。
+    拿德语图评「北美合规判定」，测出来的是**语言覆盖缺口**，
+    而不是北美业务的真实表现。
+
+    ★ 而且我第一轮就栽在这上面：用 `records[:3]` 当样本，那 3 条恰好
+      全是德语和中文，于是写下「规则库不认中文所以链路不通」的结论，
+      而真实原因是**我筛错了样本**。25 张里有 15–16 张是英文。
+
+    ## 判据
+
+    语言判定必须**分得开**（中/德/法/英各自的样本都要判对），
+    而且 `images_for_market` 必须真的把非英文滤掉、把英文留下。
+    只验「滤掉了」会让一个恒返回空的实现也绿。
+    """
+    from tools import eval_media_vs_llm as E
+
+    # L1-L4 ★★★ 四种语言各自判对
+    report(E.classify_language(
+               "本品是母婴行业唯一产品，经三甲医院临床观察。") == "zh",
+           "L1 ★★★ 中文样本判成 zh")
+    report(E.classify_language(
+               "Dein korper braucht ein gefuhl von sicherheit, "
+               "damit oxytocin seine wirkung entfalten kann.") == "de",
+           "L2 ★★★ 德文样本判成 de（gold 里真有 3 张德文图）",
+           repr(E.classify_language(
+               "Dein korper braucht ein gefuhl von sicherheit, "
+               "damit oxytocin seine wirkung entfalten kann.")))
+    report(E.classify_language(
+               "Le corps a besoin d'un sentiment de securite pour que "
+               "l'ocytocine agisse avec vous dans la vie.") == "fr",
+           "L3 ★★ 法文样本判成 fr")
+    report(E.classify_language(
+               "FDA approved and certified, trusted by 6 million moms. "
+               "Shop the sale and find your essentials on sale.") == "en",
+           "L4 ★★★ 英文样本判成 en（北美市场要评的就是它）")
+
+    # L5 ★★★ 空 / 无字 → unk，不是 en
+    #
+    #   ★ 这一条防「没有文字就算英文」——那会让没字的图混进评测集，
+    #     而它在两边都判不出东西，白花两分钟。
+    report(E.classify_language("") == "unk",
+           "L5 ★★★ 空文字 → unk（不许默认成 en）")
+    report(E.classify_language("123 456") == "unk",
+           "L6 ★★ 只有数字 → unk（不是 en）")
+
+    # L7 ★★★ 真 gold 上筛出来的必须**全是 en**，且数量非零
+    gold = E._load_gold()
+    if gold["status"] != "ok":
+        untested("L7 市场筛选", gold["reason"])
+        return
+    picked = E.images_for_market(gold["records"], E.MARKET)
+    report(len(picked) > 0,
+           "L7 ★★★ 北美口径筛出至少一张（0 张说明筛子恒空）",
+           "%d 张" % len(picked))
+    report(all(p["lang"] == "en" for p in picked),
+           "L8 ★★★ 筛出来的全是英文（混进别的语言＝口径没生效）",
+           repr(sorted({p["lang"] for p in picked})))
+    report(len(picked) < sum(len(E._images_of(r)) for r in gold["records"]),
+           "L9 ★★ 确实滤掉了东西（全留下说明筛子没起作用）",
+           "%d / %d" % (len(picked),
+                        sum(len(E._images_of(r)) for r in gold["records"])))
+
+
 # ─────────────────────────────────────────────── D 速度快照
 
 def group_d():
@@ -419,6 +545,8 @@ def main():
     group_b()
     group_c()
     group_c2()
+    group_l()
+    group_p()
     group_d()
     group_e()
     print("-" * 74)

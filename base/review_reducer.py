@@ -1204,26 +1204,33 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         submission_id, ir_id = _ingest_submission(state, actor, payload, now)
         detail.update({"submission_id": submission_id, "ir_id": ir_id})
     elif command == "claim":
-        # ★★ 2026-10-28（ADR-0021 主线）：拒绝为「本库没有的案件」创建空壳。
+        # ★★★ 2026-10-29 撤回一道我自己加的检查，两个版本都留着。
         #
-        #   实测的起因：对种子里的**冻结投影**案件（`case-c4964393`）做 claim，
-        #   reducer 会 `initial_state()` 造一个 `ir=None / content=None` 的聚合。
-        #   结果是：认领成功，之后每一个裁决动作都必然报
-        #   `finding_not_found: 案件没有可裁决的 IR findings` ——
-        #   而案件详情里明明有 1 条 finding（它只在冻结投影里，不在 authority）。
+        #   加的是什么（bc9842e）：`if state.get("ir") is None: raise
+        #   LedgerNotFound("case_not_in_authority", ...)`，理由是
+        #   「冻结投影里的历史案件只能读，不能复核」。
         #
-        #   读起来像「前端点错了」，实际是**写了一个不该存在的聚合**。
-        #   拒绝在这里，比让后面每个动作各报一次 404 要诚实得多：
-        #   一次说清「这个案件不在可复核的库里」。
+        #   为什么撤回：
         #
-        #   ★ 判据是 `ir is None` 而不是「ir 没有 findings」：
-        #     一个真实案件**可以**没有任何 finding（合规通过），
-        #     那种案件照样可以复核。只有「连 ir 都没有」才是空壳。
-        if state.get("ir") is None:
-            raise LedgerNotFound(
-                "case_not_in_authority",
-                "案件 %r 不在可复核的案件库里（authority 里没有它的判定）—— "
-                "冻结投影里的历史案件只能读，不能复核" % (state.get("case_id"),))
+        #   ① **那句理由是我编的，没有依据。** 查下来 `FileProjectionRepository`
+        #      的注释「API 只读」说的是**仓库对象**只读（`api/review_api.py:220`），
+        #      不是「冻结案件不许复核」。两件事被我混成一件。
+        #
+        #   ② **它与生产装配的既有设计直接冲突。** `tools/verify_production_app.py`
+        #      的 C7–C9 要求对 `case-prod`（一个只在冻结投影里的案件）走完
+        #      claim → draft → submit 全链路。加上那道门之后，这 8 条全红
+        #      （实测：加门 8 FAIL，撤回 0 FAIL）。
+        #
+        #   ③ **真正的病因不在 claim，在「读的案件没进 authority」。**
+        #      详情接口经 `CaseOverlayRepository` 能读到冻结投影里的案件，
+        #      而写路径只写 authority —— 于是 reducer 拿到 `initial_state`，
+        #      `ir` 是 None。加门只是把这个断层变成一句报错，没有修它。
+        #
+        #   ★ 那条断层的**正确修法**是「claim 时把该案件的 ir 并进 authority」，
+        #     那是改写入语义，比一行 raise 大得多。本轮不做，已登记为已知缺陷
+        #     （见 PMO/表格同步/20261029-写路径断层.json）。
+        #     在那之前，行为回到加门之前：认领能成功，后续裁决动作会报
+        #     `finding_not_found` —— 这个症状本来就在，不是我引入的。
         if state["status"] == "claimed":
             raise LedgerConflict("already_claimed", "案件已被领取")
         if state["status"] == "closed":

@@ -224,10 +224,23 @@ function runControls(appSrc, pageNames, pkgJson, inlineSrc, queueSrc, caseSrc, r
       { cwd: REPO, encoding: "utf8", timeout: 8000 },
     );
     const parsed = JSON.parse(out.trim());
-    const four = Object.values(parsed.metrics || {});
+    const all = Object.values(parsed.metrics || {});
+    // ★★★ 2026-10-29：这里原来硬编码 `all.length === 4`，于是 T-451
+    //   （提交 80d42a6）加上第 5 个指标 `workflow_latency_ms` 之后，
+    //   本项从那一刻起**一直是红的**，而没人发现。
+    //
+    //   ★ 病在判据写成了「恰好 4 个」而不是「**每个**都合规」：
+    //     前者把「指标集合长什么样」抄进了检查器，后者只关心「每个指标的
+    //     三态是否合规」。指标增加是正常演进，而「恰好 4」会让正常演进变红 ——
+    //     更糟的是，红久了大家都当它是噪音，真正的红也看不见了。
+    //
+    //   改：判据改成「至少一个指标」+「**每个**都合规」。
+    //   为什么不再钉个数：个数由 `base/metrics_read_model.py` 一处决定，
+    //   抄一份到检查器就是两个口径（改了必漂——这次漂了 4 天没人发现）。
+    //   真正的守卫是「每个都合规」，那是**性质**而不是**数量**。
     pyBackendOk =
-      four.length === 4 &&
-      four.every((item) => {
+      all.length > 0 &&
+      all.every((item) => {
         const res = validateMetric(item);
         return res.valid && res.displayStatus === "未测" && res.displayValue === "未测";
       });
@@ -235,7 +248,7 @@ function runControls(appSrc, pageNames, pkgJson, inlineSrc, queueSrc, caseSrc, r
     pyBackendOk = false;
   }
   cases.push([
-    "C1 正样本：无独立看板路由/页面 + 三页三元摘要齐全 + 后端 MetricsReadModel 四指标断源输出精确为『未测』",
+    "C1 正样本：无独立看板路由/页面 + 三页三元摘要齐全 + 后端 MetricsReadModel 全部指标断源输出精确为『未测』",
     pyBackendOk,
     "MetricsReadModel 对拍失败",
   ]);

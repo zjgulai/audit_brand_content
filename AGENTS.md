@@ -52,7 +52,7 @@
 | **L1 里那件 418KB 产物能不能重建** | `python3 tools/verify_browser_ext_artifact.py` | 跑一遍构建配方（`.vendor/dsh-browser-main/extensions/dsh-browser` 的 `scripts/build.mjs`）再**逐文件 sha256** 对回 `dsh-browser-ext/`：16 个文件多一个少一个、内容差一个字节都红；**`.vendor/` 不在盘上 → 退 2（未测），不是绿**（见 §2.4）。★ 它是 `Q39` 选项 A 的落地：**配方与校验合在一个文件里** |
 | **守衡自己还活着吗** | `python3 tools/verify_shouheng_ops.py` | 重启闸门默认必须拒绝、**拒绝时不许记账**、全仓不许有人绕过闸门动守护进程、`KeepAlive` 必须仍能自愈、**没有任何检查器会自动执行 AGENTS.md 里的命令**、它现在在跑且日志还在写（**没在跑 / 或有读数未测 → 退 2**，是未测不是通过；**H1–H7 断言这句话本身不许撒谎**）（见 §2.7） |
 | **工作区指令预算（本文件自己）** | `python3 tools/verify_agents_budget.py` | 本文件超 **65536** 就红 —— 注入版会被**截掉尾部**（尾部 = §2.6 红线 + §2.7 重启闸门；2026-09-22 实测过一次）；**余量不足一条教训（实测 3288 字节）同样红**（再写一节 §2.4.x 就会越线，而越线是静默的）。★ 另断言搬走的那段**逐字还在** `PMO/填充态-环境特性-实测史.md`、**且本文件里 0 残留** —— 两条成对，缺一条另一个方向就恒真。反向对照 7 项：`--controls` |
-| **记忆与知识图谱（nmem）** | `python3 tools/verify_nmem.py`（加 `--controls` 跑反向对照） | N0–N9：space 必须 `strict` · 身份默认 space 正确 · 两条 Space Rules active 且优先级对 · 四层条数下限（6/4/10/3）· **unit_type 与 importance 必须符合 SOP 层级映射**（1.0↔decision / 0.9↔fact / 0.85↔learning / 0.7↔context）· 每条记忆的「依据：」尾注必须解析得到仓内已跟踪文件 · Library 全部 `indexed` 且 `chunk_count>0` · 本体 9 对象 + 8 关系且**只写 space 范围**（global 不许被污染）。**nmem 不可达 → 退 2（未测）**。反向对照 5 项（层级映射错 / 重要性低于 0.7 / 缺依据 / 依据指向不存在文件 / **好样本必须闭嘴**）。写入口径见 `tools/mem/`（`distill_to_nmem.py` 默认 dry-run、`ingest_library.py` 入库前逐份两口径读，被填充的文件不许进） |
+| **记忆与知识图谱（nmem）** | `python3 tools/verify_nmem.py`（加 `--controls` 跑反向对照） | N0–N9：space 必须 `strict` · 身份默认 space 正确 · 两条 Space Rules active 且优先级对 · 四层条数下限（6/4/10/3）· **unit_type 与 importance 必须符合 SOP 层级映射**（1.0↔decision / 0.9↔fact / 0.85↔learning / 0.7↔context）· 每条记忆的「依据：」尾注必须解析得到仓内已跟踪文件 · Library 全部 `indexed` 且 `chunk_count>0` · 本体：**两条互斥的合法状态，且必须被声明** —— ①已播种：每个声明类型 ≥1 个实体；②声明未播种（`SEED_PENDING` 在）：本 space 实体**必须为 0**，且声明类型数与盘上一致。**「词汇表存在」不等于「图谱写得进去」** —— 这条原先只查 `len(objectTypes)>=9`，于是在实体全为 0 时也报绿（2026-10-27 实测的假绿）；结论行同步改成「已声明但未播种」而不是「本体已生效」。另须**只写 space 范围**（global 不许被污染）。**nmem 不可达 → 退 2（未测）**。反向对照 5 项（层级映射错 / 重要性低于 0.7 / 缺依据 / 依据指向不存在文件 / **好样本必须闭嘴**）。写入口径见 `tools/mem/`（`distill_to_nmem.py` 默认 dry-run、`ingest_library.py` 入库前逐份两口径读，被填充的文件不许进） |
 
 > **本节原先还有一大段：填充态 +4096 的实测矩阵、两次更正、以及「落盘配方」——
 > 已搬到 `PMO/填充态-环境特性-实测史.md`**（2026-09-22 搬，搬前逐字节比对过，**一个字符没删**）。
@@ -229,6 +229,16 @@ print(f'源码 {\"有\" if has_src else \"无\"} / pyc {\"有\" if has_pyc else 
    规矩：**靠外部命令取的读数，取不到时必须说「未测」—— 不许空着，也不许当成 0。**
    执行点：`verify_shouheng_ops.py` 的 **E1**（未测）+ **H1–H7**（结论行自己不许撒谎，
    含「有红时也必须报出有未测」）。
+
+8. **`git reset HEAD~1` 会清空整个 index —— 包括别人暂存的文件。**（2026-10-27 一晚被清三次）
+
+   `git reset` 默认 mixed：index 回到目标提交。所以 `git reset HEAD~1 && git commit …`
+   重做提交时，**别的会话刚 `git add` 的东西一起消失**，而 `git status` 只显示
+   「还没 add」——读起来完全像自己忘了。当晚 reflog 两次同款（间隔 16s / 25s）。
+
+   **重做提交用 `git commit --amend`**（保留 index）。要用 reset 就用 `--soft`。
+   ⚠️ 无自动执行点（发生在别人的 shell 里，只有 reflog 能回溯）。症状侧有兜底：
+   `verify_coverage.py` 的 E 段与 `verify_nmem.py` 的 N0 会在文件变未跟踪时红。
 
 ### 2.3 skills 放哪
 
@@ -627,7 +637,24 @@ after .lastState = ok                          ← 原来是 drift 也会被抹�
 bash tools/restart_shouheng.sh                        # 只报告影响面，拒绝（退 3）
 bash tools/restart_shouheng.sh --check                # 同上，退 0（纯查看）
 bash tools/restart_shouheng.sh --yes --why="<理由>"    # 真重启，必须留痕
+bash tools/restart_shouheng.sh --stop --yes --why="<理由>"   # 停：bootout + 落停令
+bash tools/restart_shouheng.sh --resume --why="<理由>"       # 撤停令（**不**顺带启动）
 ```
+
+#### 停令：关闭是命令，不是「一次可以覆盖的临时状态」
+
+2026-10-26 实测：委托方要求关闭 → `--stop` 停掉 → 几小时后**另一个会话**为了
+「让改动生效」rescue 把它拉了回来（PID 39251 → 39401）。两个会话各自都对 ——
+rescue 本来就写着「没在跑时不必问」。病在**没有一处记录「这是被命令停掉的」**。
+
+停令文件 `PMO/shouheng-state/stop-lock` 就是那一处：`--stop` **在执行之前**落盘，
+之后每一个「起」的入口（含 rescue）先过它，锁在就退 3 并留痕到
+`PMO/logs/restart-blocked.jsonl`；解除只能 `--resume --why=…`，它只撤令、不启动。
+`--stop` 自己不被挡（重复停是幂等的）。
+
+> ⚠️ 同日一个 §2.4.8 形状的坑：停令的 `--check` 最初写成 `exit 0`，锁一落盘就
+> **整块读数不再打印**，B1/B2/B4/B5 一起变红，读起来像「读数坏了」。`--check` 必须
+> 永远给全图；自证把 A/B 段的停令指到临时路径，锁的行为只由 T 段证。
 
 流程是：**先跑不带 `--yes` 的那条，把它报的东西念给人听，得到明确同意之后再带 `--yes`。**
 它报三件事，第三件是判断时机的唯一硬依据：
@@ -679,7 +706,8 @@ bash tools/restart_shouheng.sh --yes --why="<理由>"    # 真重启，必须留
 | **D1–D7** | 仓库 plist 副本 ≡ 在跑的配置；`KeepAlive.SuccessfulExit` 必须仍是 `false` |
 | **E1–E3** | 它现在在跑吗、日志还在写吗（心跳每 5 分钟一次）。**`ps` 用不了时 E1 落「未测」**（2026-09-22 之前是直接抛 traceback、把整个自证打死），不许当成「没在跑」 |
 | **F1–F4** | §2.2 第 4 条那个 bash 3.2 陷阱 |
-| **H1–H7** | **结论行自己不许撒谎**：未测 ≠ 通过 ≠ 红；**有红时也必须报出有未测**（否则只看最后一行的人会以为「其余都验过了」） |
+| **H1–H7** | **结论行自己不许撒谎**：未测 ≠ 通过 ≠ 红；**有红时也必须报出有未测**（否则只看最后一行的人会以为「其余都验过了」）；停令在时「没在跑」另说「按停令关闭中」——否则下一个人会跑去救活它 |
+| **T1–T9** | 停令：锁在时 `--yes` 退 3 且**一次起进程的动作都不许发**；`--stop` 不被挡且**真落盘**（否则 T1 恒真）；`--resume` 缺理由拒、`--no-kick` 不撤令、撤令后放行；**无锁时 `--resume` 也拒**；锁在时 `--check` 仍是纯查看 |
 
 ⚠️ **守衡没在跑时，或有任何读数采不到时，这个自证退 2**（与 §2.4.2 的 L3 同口径）——
 断言全过也不许说「通过」：前者是**它此刻在对外失联**，后者是**我根本没测到**，

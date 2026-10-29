@@ -151,7 +151,7 @@ function checkPolyfillsAndBranches(srcMap, pkgJson) {
       const webkitHits =
         clean
           .match(/-(?:webkit|moz|ms)-[a-z-]+/g)
-          ?.filter((x) => x !== "-webkit-font-smoothing") ?? [];
+          ?.filter((x) => !CHROME_STANDARD_PREFIXED.has(x)) ?? [];
       if (webkitHits.length > 0) {
         problems.push(
           `B4 ${rel} 含非 Chrome 标准私有 CSS 前缀：${[...new Set(webkitHits)].join(", ")}`,
@@ -169,6 +169,41 @@ function checkPolyfillsAndBranches(srcMap, pkgJson) {
   }
   return problems;
 }
+
+/**
+ * Chrome **官方支持**的带前缀属性。这些不是「Safari 专属兼容分支」，
+ * 而是 CSS 标准本身就把名字定成了带前缀（前缀是名字的一部分）。
+ *
+ * ## ★ 2026-10-29 加这份白名单的原因
+ *
+ * B4 原判据是「除 `-webkit-font-smoothing` 外，所有 `-webkit-` 都算私有前缀」。
+ * 实测它误报了三条**完全正确的多行文本截断写法**（`web/src/styles.css:1439`）：
+ *
+ *     display: -webkit-box;
+ *     -webkit-line-clamp: 2;
+ *     -webkit-box-orient: vertical;
+ *
+ * 这三行是 CSS `line-clamp` 的标准写法 —— 标准名**就叫** `-webkit-line-clamp`
+ * （W3C 的 `overflow-clamp` 尚未定稿），Chrome / Edge / Safari 全部支持。
+ * 把它判成「Safari 专属兼容分支」，等于要求把好代码改坏
+ * （改用 `max-height` 就做不到「第二行末尾加省略号」）。
+ *
+ * ★ 一个会误报的检查器比没有检查器更糟 —— 它会让人开始不看报告
+ *   （AGENTS.md §2.1.1）。所以这里**逐个点名**而不是放宽成「`-webkit-box` 开头都放行」：
+ *   模糊放行会让真正的 Safari 专属写法也混进来。
+ */
+const CHROME_STANDARD_PREFIXED = new Set([
+  "-webkit-font-smoothing",   // 原白名单：字体渲染，macOS 上必须带前缀
+  "-webkit-line-clamp",       // 多行截断，标准名就带前缀
+  "-webkit-box-orient",       // 与 line-clamp 配套（必须一起用）
+  "-webkit-box",              // display: -webkit-box 是 line-clamp 的载体
+  // ★ `box-decoration-break` 在 Chrome 里**只有带前缀的实现**（未带前缀的那行
+  //   是标准名，Firefox/Safari 认）。两行成对出现在 `styles.css:997-998`，
+  //   是「跨浏览器同一件事」的常规写法，不是 Safari 专属分支。
+  //   ★ 判据：两行**必须成对**——只有 -webkit- 而没有标准名，那才是兼容分支
+  //     （本文件的 B4 会对那种情况另报，见下方 checkPairedPrefixes）。
+  "-webkit-box-decoration-break",
+]);
 
 function checkUiWiring(noticeSrc, loginSrc, shellSrc, baseline) {
   const problems = [];
