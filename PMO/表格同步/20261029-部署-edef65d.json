@@ -1,0 +1,19 @@
+{
+  "事项名称": "部署 edef65d 到生产（ca.luteos.com）：多模态接线 + 上传端点 + 样例矩阵上线",
+  "关联执行票": "ADR-0021 主线 / T-455",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "工程发布",
+  "功能三级分类": "镜像/挂载",
+  "工作类型": [
+    "部署运维",
+    "测试验收"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "把本轮 24 个提交（多模态分析接进生产、图片/视频进件 + 上传端点、样例矩阵、T-455 三跳、媒体评测工具、观察升级 candidate）从本地 f7f828e 部署到生产。构建方式与既有流程一致：按 commit 打镜像 tag（momcozy-audit:edef65d），compose 用 AUDIT_IMAGE 选镜像，独立项目名 momcozy-audit + 独立网络 momcozy-audit-net，只绑 172.20.0.1:18000 由既有反代对外 —— 服务器上另有 8 个容器（vicky-pr-web/api、si-agent-workbench、data_achieve_scrapy 三件、flowise-training-proxy 等）全程未触碰。★ 部署前记录了回滚基线：旧镜像 id sha256:de90bbe，healthz=200。★ 未做的事要说清：.env.production 里没有 MULTIMODAL_* 任何键（只有 REVIEW_* 系列），所以线上多模态运行时仍是 untested —— 本次烟测只验证了「未测这条路径如实报出」，没验证真实图片/视频判定。",
+  "验收标准": "生产烟测四项：① /healthz 200 {\"status\":\"ok\"} ② /readyz 200 且七项检查全 true（config / authority_chain / projection_fresh / session_db / writer_lease / data_permissions / principal_directory）③ /api/openapi.json 路由数 46 → 47，/api/v1/uploads 与 /api/v1/version-diff 均在其中 ④ 前端 root 200、bundle 425006 字节、含「判定结果」与新增的「仅做告知、不阻断页面访问」。★ 鉴权探针用 POST：两个新端点未认证均返 403。★ 反向对照：GET 一个不存在的 /api/v1/nonexistent-xyz 也返 200 —— 这是 SPA 兜底，说明用 GET 探 API 存在性会假阳性，必须看状态码是不是 403/401 而不是 200。",
+  "状态依据": "提交 edef65d，镜像 momcozy-audit:edef65d。容器 Up 且 health 通过。★ 本轮同时修掉三个既有验收项与推送闸门（WBPM-0141），所以这次是钩子**第一次**真正放行 —— 此前 .git/SKIP-ACCEPTANCE.log 有 28 次跳过、0 次放行。★ 一处更正：此前记录说「前端 bundle 不含『本地预检』」，核对后那是我误判 —— 该字串在本轮源码里只出现在注释（styles.css:2301 / write-client.ts:22 / SubmitPage.tsx:16），从来不是 UI 文案，grep 为 0 是正常的。同理 web/src/api/client.ts:357 的 uploadBytes 是封装不是页面调用（check_api_centralization 的 D 段要求 /uploads 在 pages/ 出现 0 次，仍然成立）。"
+}
