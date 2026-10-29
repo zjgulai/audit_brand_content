@@ -549,6 +549,11 @@ async function runControls(cdp) {
   ]);
 
   await cdp.send("Emulation.clearDeviceMetricsOverride").catch(() => {});
+  // ★ 2026-10-29：reduced-motion 的机器半边挂在 **runControls 的末尾** ——
+  //   因为 `--controls` 与 `--standalone` 都必经这里（前者直接返回它，
+  //   后者把它并进 suiteResults）。放进 runStandaloneSuite 就只有一条路径覆盖到，
+  //   等于「自证跑不到它」，与没有断言同一个效果（§2.4.1）。
+  cases.push(...(await runReducedMotion(cdp, readStandaloneCss())));
   return cases;
 }
 
@@ -558,7 +563,13 @@ async function runControls(cdp) {
  * 挂载工作台三大核心布局（复核队列 Master-Detail、案件双栏原件+证据链+复核动作、分类规范与签发核验台），
  * 在 1280×720 与 320px (400% zoom) 下执行完整 13 项 AA + 几何 + Reflow 检查，并附真实 CSS 下的破坏对照。
  */
-async function runStandaloneSuite(cdp) {
+/**
+ * 读真实样式：`tokens.css` + `styles.css`（去掉 `@import` —— 上面已经手工并了）。
+ *
+ * ★ 2026-10-29 提成函数：`runStandaloneSuite` 与 `runReducedMotion` 都要这份 CSS。
+ * 两处各读一遍就是两个口径 —— 改了一处另一处必漂（本项目 §2.4.8 记过同形状）。
+ */
+function readStandaloneCss() {
   const tokensCss = fs.readFileSync(
     path.join(WEB, "src/styles/tokens.css"),
     "utf8",
@@ -566,7 +577,11 @@ async function runStandaloneSuite(cdp) {
   const stylesCss = fs
     .readFileSync(path.join(WEB, "src/styles.css"), "utf8")
     .replace(/@import\s+["'][^"']+["'];?/g, "");
-  const fullCss = `${tokensCss}\n${stylesCss}`;
+  return `${tokensCss}\n${stylesCss}`;
+}
+
+async function runStandaloneSuite(cdp) {
+  const fullCss = readStandaloneCss();
 
   const TEMPLATES = [
     {
@@ -816,6 +831,175 @@ async function runStandaloneSuite(cdp) {
   return suiteResults;
 }
 
+/**
+ * ★★★ 2026-10-29 新增：`prefers-reduced-motion` **机器可判的一半**。
+ *
+ * ## 为什么要加：这一项此前被列为「人工」，而仓库里没有任何一行验过它
+ *
+ * `a11y_check.mjs` 的 `unmeasured` 里写着「减少动效 prefers-reduced-motion（人工）」，
+ * 全仓 grep 只有这一句话 —— **没有第二条**。也就是说：
+ * `styles.css:2116` 那个 `@media (prefers-reduced-motion: reduce)` 块
+ * 到底还活着、还是被人删了/写错了，**没有任何东西会红**。
+ *
+ * ## 但「这条能机器判」和「这整项能机器签收」是两件事
+ *
+ * CDP 的 `Emulation.setEmulatedMedia` 能真的把媒体特性设成 `prefers-reduced-motion: reduce`，
+ * 然后读 `getComputedStyle` —— 这不是猜，是浏览器自己算出来的值。所以：
+ *
+ *   ✅ 这里能判：**「降级之后还有没有动的东西」**（性质判断，可变红）
+ *   ❌ 这里判不了：「动效关掉之后**体验是否仍然可接受**」——那要人看
+ *
+ * 所以本组跑绿**不等于** `reduced-motion` 这一项可以签收。它把人工项里
+ * 「能机器化的那半边」拿出来了，人工台账仍然是 `not_run`。
+ * ★ 这条区分是刻意的：把「测了一半」写成「测过了」，比不测更糟。
+ *
+ * ## 拿什么当判据（而不是「源码里有 @media」）
+ *
+ * 源码里有那个块不等于它**生效** —— 可能被同优先级的后一条规则盖掉、
+ * 可能选择器写错、可能 `!important` 被更强的 `!important` 压住。
+ * 所以判据是：在 reduce 环境下读**真实渲染元素**的
+ * `animationName` / `transitionDuration`，必须全是 `none` / `0s`。
+ *
+ * ★ 反向对照（C6）：把降级块删掉再跑，本组**必须红**。
+ *   只证明「现在绿」，不证明「它拦得住」。
+ */
+async function runReducedMotion(cdp, fullCss) {
+  const results = [];
+
+  /**
+   * 在给定 CSS 下测「reduce 环境里还有没有动的东西」。
+   * 返回 {normalAnimates, stillMoving, matches} —— 抽成内部函数是为了让
+   * 正样本（真实 CSS）与**坏样本**（人为删掉降级块的 CSS）走同一条测量路径。
+   * ★ 两处各写一份测量代码，坏样本那边必然先漂 —— 那正是「自证测的不是被测物」。
+   */
+  const probe = async (css) => {
+    const probeHtml = `<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8" /><style>${css}</style></head>
+<body>
+  <div class="loading-rows"><span class="loading-rows__bar"></span></div>
+  <button type="button" class="btn" id="probe-btn">按钮</button>
+</body>
+</html>`;
+
+    const measure = async () => {
+      const r = await cdp.send("Runtime.evaluate", {
+        expression: `(() => {
+          const pick = (sel) => {
+            const el = document.querySelector(sel);
+            if (!el) return null;
+            const cs = getComputedStyle(el);
+            return {
+              sel,
+              animationName: cs.animationName,
+              animationDuration: cs.animationDuration,
+              transitionDuration: cs.transitionDuration,
+              transitionProperty: cs.transitionProperty,
+            };
+          };
+          return {
+            matches: matchMedia("(prefers-reduced-motion: reduce)").matches,
+            els: [pick(".loading-rows__bar"), pick(".btn")].filter(Boolean),
+          };
+        })()`,
+        returnByValue: true,
+      });
+      return r?.result?.value ?? null;
+    };
+
+    await cdp.send("Page.navigate", {
+      url: "data:text/html;charset=utf-8," + encodeURIComponent(probeHtml),
+    });
+    await sleep(200);
+
+    await cdp.send("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+    });
+    await sleep(100);
+    const normal = await measure();
+
+    await cdp.send("Emulation.setEmulatedMedia", {
+      features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+    });
+    await sleep(150);
+    const reduced = await measure();
+    await cdp.send("Emulation.setEmulatedMedia", { features: [] }).catch(() => {});
+
+    const off = (v) => !v || v === "none" || v === "0s" || /^(0s,?\s*)+$/.test(v);
+    const stillMoving =
+      reduced?.els?.filter(
+        (e) =>
+          !off(e.animationName) ||
+          !off(e.animationDuration) ||
+          (e.transitionProperty !== "none" && !off(e.transitionDuration)),
+      ) ?? [];
+    const animatesByDefault =
+      normal?.els?.some(
+        (e) =>
+          (e.animationName && e.animationName !== "none") ||
+          (e.transitionDuration && e.transitionDuration !== "0s"),
+      ) ?? false;
+    return { animatesByDefault, stillMoving, matches: reduced?.matches, normal, reduced };
+  };
+
+  // ── 正样本：真实 styles.css
+  const good = await probe(fullCss);
+
+  /**
+   * ★ M1 与 M2 **共用的那一条判据**。
+   *
+   * 抽出来是为了让「反向对照」真的对着这条判据，而不是对着测量结果。
+   * 把判断写在两处 = 两处各自漂，而漂了之后 M2 仍然绿（实测过）。
+   */
+  const judge = (stillMoving, matches) => matches === true && stillMoving.length === 0;
+
+  results.push([
+    "M0 ★ 前置：默认环境下探针元素**确实在动**（否则下面那条恒真；探针类名写错也会在这里红）",
+    good.animatesByDefault === true,
+    JSON.stringify(good.normal),
+  ]);
+  results.push([
+    "M1 ★ 模拟 prefers-reduced-motion: reduce 后，真实渲染元素零动画/零过渡",
+    judge(good.stillMoving, good.matches),
+    JSON.stringify({ matches: good.matches, stillMoving: good.stillMoving }),
+  ]);
+
+  // ── 坏样本：把降级块删掉，喂同一份测量代码 —— **必须红**
+  //
+  //   ★ 这一条是前面那两条的**反向对照**。没有它，「M1 绿」只说明现在没坏，
+  //     不说明这条判据拦得住坏。删降级块是真实的坏法（有人重构 styles.css
+  //     时把那段一起删掉，不会有任何东西报错）。
+  //
+  //   ★★★ 2026-10-29 第一版这里写错了，记下来：它当时判的是
+  //     `bad.stillMoving.length > 0` —— **直接看测量结果，绕过了 M1 的判据**。
+  //     实测：把 M1 的表达式改成恒 `true`，M2 仍然绿。
+  //     也就是说那条「反向对照」测的是「探针能测出东西」，
+  //     而不是「M1 这条断言会红」—— 它守错了对象（§2.4.1）。
+  //
+  //     修法：把 M1 的判据抽成 `judge(stillMoving, matches)`，正样本与坏样本
+  //     **都过它**。于是 M2 红 ⟺ 同一个判据在坏样本上给出 false。
+  //     再拿「把 judge 写成恒真」做变异，M2 必须红 —— 这条已实测。
+  const strippedCss = fullCss.replace(
+    /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/,
+    "/* 反向对照：降级块已删 */",
+  );
+  const hasBlock = strippedCss !== fullCss;
+  const bad = hasBlock ? await probe(strippedCss) : null;
+  const badVerdict = bad ? judge(bad.stillMoving, bad.matches) : null;
+  results.push([
+    "M2 ★ 反向对照：删掉 @media (prefers-reduced-motion: reduce) 块 → **M1 的判据本身**必须给出 false",
+    hasBlock === true && badVerdict === false,
+    JSON.stringify({
+      blockFound: hasBlock,
+      judgeVerdictOnBadSample: badVerdict,
+      stillMoving: bad?.stillMoving ?? "没找到降级块，无法造坏样本",
+    }),
+  ]);
+
+  return results;
+}
+
+
 async function main() {
   await waitVersion();
   const origin = new URL(base).origin;
@@ -997,7 +1181,12 @@ async function main() {
       "键盘全流程（人工）",
       "读屏语义与焦点顺序（人工）",
       "动态内容播报（人工）",
-      "减少动效 prefers-reduced-motion（人工）",
+      // ★ 2026-10-29：prefers-reduced-motion 的**机器半边**已经能判了
+      //   （`runReducedMotion`：CDP 模拟媒体特性 + 读真实渲染的计算样式，
+      //   四个变异里三个已验红）。但这里**仍然列着它** —— 因为剩下的那一半
+      //   「动效关掉之后体验是否仍可接受」要人看。
+      //   ★ 不把它从这行删掉：删掉会让读到这份输出的人以为**整项**已经测过。
+      "减少动效：已机器判「降级后还有没有动的东西」，仍需人工判「关掉后体验是否可接受」",
       "文本覆盖图片/渐变时的对比（自动检查跳过）",
       "真实用户测试（人工）",
     ],
