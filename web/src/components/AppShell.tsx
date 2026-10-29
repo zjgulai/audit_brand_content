@@ -361,7 +361,12 @@ export default function AppShell() {
 
         <main id="main" className="shell__main" tabIndex={-1}>
           {/* ★ #113 / TS-12：非支持浏览器的显式告知横幅。
-              ★ 只告知、不阻断 —— 详情见 BrowserSupportNotice 文件头第 3 条。 */}
+              ★ 只告知、不阻断 —— 详情见 BrowserSupportNotice 文件头第 3 条。
+              ★★ 2026-10-29 更正：这个组件现在**受支持时渲染 null**，
+                 所以合规浏览器上它零占位。改前它无条件渲染一行版本范围，
+                 于是每个业务页面正文顶部都常驻那行灰字（实测截图可见），
+                 把「待人工复核」这类当前任务往下压一整行。
+                 范围明示没有消失 —— 它留在登录页页脚。 */}
           <BrowserSupportNotice />
           {__REVIEW_DEV_IDENTITY__ && switching ? (
             <section className="case" aria-live="polite">

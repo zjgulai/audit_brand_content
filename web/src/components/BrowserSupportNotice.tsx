@@ -1,4 +1,5 @@
 import browserBaselineJson from "../data/browser-baseline.json";
+import { noticeModeFor } from "./browserNotice.logic";
 
 /**
  * 浏览器支持范围明示与非支持环境检测横幅（#113 / TS-12）。
@@ -139,12 +140,23 @@ export interface BrowserSupportNoticeProps {
   userAgent?: string;
   baseline?: BrowserBaseline;
   compact?: boolean;
+  /**
+   * 即使在受支持的浏览器上，也渲染一行**极轻**的范围说明。
+   *
+   * ★ 只给登录页用（`LoginPage.tsx` 的页脚）。那是用户第一次接触系统、
+   *   最该知道「什么浏览器能用」的地方，写在那里是**信息**；
+   *   而把它挂到每个业务页面的正文顶部就是**噪音** ——
+   *   2026-10-29 实测：它占掉工作区最显著的一行，把当前任务往下压。
+   *   业务页面一律用默认值 `false`。
+   */
+  alwaysShowRange?: boolean;
 }
 
 export default function BrowserSupportNotice({
   userAgent,
   baseline = browserBaseline,
   compact = false,
+  alwaysShowRange = false,
 }: BrowserSupportNoticeProps) {
   const ua =
     userAgent ??
@@ -152,29 +164,63 @@ export default function BrowserSupportNotice({
   const check = evaluateUserAgent(ua, baseline);
   const rangeText = formatSupportedBrowserRange(baseline);
 
+  // ★★★ 2026-10-29 修正一处**我自己造成的 UI 退化**，两个版本都留着。
+  //
+  //   改前：无条件渲染 `rangeText`（「正式支持范围：仅桌面 Google Chrome
+  //   最近两个主要版本（Chrome 155 / 156，基准实测于 2026-10-23）」），
+  //   于是**每一个业务页面的正文顶部都常驻那一行灰字**。
+  //   实测截图：它横在标题栏与内容之间，把「待人工复核」这类当前任务
+  //   往下压一整行，而 `.browser-support` / `.hint` / `.state--warn`
+  //   三个类**根本没有样式定义**，所以是一行裸 div。
+  //
+  //   为什么错：受支持的浏览器**不需要被告知它被支持**。那条信息
+  //   属于「不合规环境」的告知，不是常驻横幅。#113 的要求是
+  //   「范围明示 + 非支持环境检测」，两者都不要求对合规用户常驻显示。
+  //
+  //   现在：
+  //   · 受支持 → **渲染 null**（DOM 里没有它，零占位）；
+  //   · 不受支持 → 渲染 role="alert" 横幅，把范围与原因一起说清
+  //     （那才是真正需要看到它的时刻）。
+  //
+  //   ★ 范围明示没有消失：它落在登录页页脚 —— 那是用户第一次接触系统、
+  //     最该知道「什么浏览器能用」的地方。业务页面里再重复一遍是噪音。
+  // ★ 判据抽到 `browserNotice.logic.ts` 的真身里 —— 门禁 `check_browser_scope.mjs`
+  //   直接 import 它喂真实入参，而不是正则扫这段源码。
+  //   「源码里有 return null」这种判据在有注释的地方恒真（§2.4）。
+  const mode = noticeModeFor({ supported: check.supported, alwaysShowRange });
+
+  if (mode === "none") return null;
+
+  if (mode === "range-only") {
+    // 登录页专用：一行灰字，不带告警框、不带 role="alert"（没有告警）。
+    return (
+      <p className="hint" data-browser-support-range-only="">
+        {rangeText}
+      </p>
+    );
+  }
+
   return (
     <div className="browser-support" data-browser-support="">
-      <span className="hint" data-browser-range="">
-        {rangeText}
-      </span>
-      {!check.supported && (
-        <div
-          className="state state--warn"
-          role="alert"
-          data-browser-unsupported-banner=""
-        >
-          <strong>
-            当前浏览器不在正式支持范围（{check.reason}）
-          </strong>
-          {!compact && (
-            <p className="hint">
-              请更换为桌面版 Google Chrome {baseline.min_supported_chrome_major} 或{" "}
-              {baseline.measured_chrome_major}。
-              注意：本提示仅做告知、不阻断页面访问，在非支持浏览器下继续操作仍可能发生未预期的功能降级或异常。
-            </p>
-          )}
-        </div>
-      )}
+      <div
+        className="state state--warn"
+        role="alert"
+        data-browser-unsupported-banner=""
+      >
+        <strong>
+          当前浏览器不在正式支持范围（{check.reason}）
+        </strong>
+        <p className="hint" data-browser-range="">
+          {rangeText}
+        </p>
+        {!compact && (
+          <p className="hint">
+            请更换为桌面版 Google Chrome {baseline.min_supported_chrome_major} 或{" "}
+            {baseline.measured_chrome_major}。
+            注意：本提示仅做告知、不阻断页面访问，在非支持浏览器下继续操作仍可能发生未预期的功能降级或异常。
+          </p>
+        )}
+      </div>
     </div>
   );
 }

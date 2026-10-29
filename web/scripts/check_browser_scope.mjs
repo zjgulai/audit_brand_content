@@ -233,8 +233,9 @@ function checkUiWiring(noticeSrc, loginSrc, shellSrc, baseline) {
   return problems;
 }
 
-function runControls(realBaseline, realSrcMap, realPkg) {
+async function runControls(realBaseline, realSrcMap, realPkg) {
   const cases = [];
+  let c7ImportErr = "";
 
   // C1 正样本：当前真实基准 + 源码 + 受支持 Chrome 156 UA
   const p1 = [
@@ -259,6 +260,39 @@ function runControls(realBaseline, realSrcMap, realPkg) {
     "C1 正样本：桌面 Chrome 155/156 判定 supported=true（不渲染不支持横幅），且源码/基准 0 违规",
     p1.length === 0 && uaChrome156.supported === true && uaChrome155.supported === true,
     p1.join("; "),
+  ]);
+
+  // ★★★ 2026-10-29 新增 C7：受支持浏览器的**业务页面**不许出现那条常驻横幅。
+  //
+  //   起因是一次真实的 UI 退化（我自己造成并已修）：`BrowserSupportNotice`
+  //   原先无条件渲染一行「正式支持范围…」，于是每个业务页面正文顶部都
+  //   常驻那行灰字，把「待人工复核」这类当前任务往下压一整行。
+  //   实测证据：1280×720 截图里它横在标题栏与内容之间。
+  //
+  //   ★ 这条断言**必须调真身**，不能正则扫源码：
+  //     第一版就是 `/return\s+null/` —— 而我把判断改成 `if (false) return null`
+  //     之后它照样绿（实测）。那正是 §2.4「名字出现过 ≠ 拦得住」。
+  //     现在判据抽在 `browserNotice.logic.ts`，直接 import 进来喂真实入参。
+  let modeFor = null;
+  try {
+    ({ noticeModeFor: modeFor } = await import(
+      "../src/components/browserNotice.logic.ts"
+    ));
+  } catch (e) {
+    modeFor = null;
+    c7ImportErr = e.message;
+  }
+  const c7ok =
+    typeof modeFor === "function" &&
+    modeFor({ supported: true }) === "none" &&
+    modeFor({ supported: true, alwaysShowRange: true }) === "range-only" &&
+    modeFor({ supported: false }) === "alert";
+  cases.push([
+    "C7 ★ 受支持浏览器上不渲染任何横幅（none）；登录页显式 opt-in 才给 range-only；不支持才给 alert",
+    c7ok,
+    modeFor
+      ? `supported→${modeFor({ supported: true })} / optIn→${modeFor({ supported: true, alwaysShowRange: true })} / unsupported→${modeFor({ supported: false })}`
+      : `无法 import browserNotice.logic.ts：${c7ImportErr || "未知"}`,
   ]);
 
   // C2 成对验证（Safari / Edge / 移动 / 旧版 Chrome 154 必须判定为 unsupported 并触发横幅）
@@ -355,7 +389,7 @@ function runControls(realBaseline, realSrcMap, realPkg) {
   return cases;
 }
 
-function main() {
+async function main() {
   for (const p of [BASELINE_PATH, NOTICE_PATH, LOGIN_PATH, SHELL_PATH, PKG_PATH, DEPLOY_DOC_PATH]) {
     if (!fs.existsSync(p)) {
       console.error(`⚠ 未测：缺少必需文件 ${path.relative(REPO, p)}`);
@@ -382,7 +416,7 @@ function main() {
     ),
   ];
 
-  const controls = runControls(baseline, srcMap, pkgJson);
+  const controls = await runControls(baseline, srcMap, pkgJson);
   const failedControls = controls.filter(([, ok]) => !ok);
 
   console.log("==============================================================================");
@@ -411,4 +445,8 @@ function main() {
   return 0;
 }
 
-process.exit(main());
+// ★ 2026-10-29：main 变成 async（C7 要 await import 纯逻辑真身）。
+//   `process.exit(main())` 会把 Promise 当退出码传下去 —— 那等于永远退 0。
+//   必须 await 之后再 exit。
+const _rc = await main();
+process.exit(_rc);

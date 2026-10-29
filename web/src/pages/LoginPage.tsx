@@ -110,7 +110,9 @@ export default function LoginPage() {
             · 版本范围从 baseline 读（B3 要求的「不许写死」）；
             · 非支持浏览器会看到 role="alert" 的显式横幅（原来只有一行灰字）。 */}
       <div className="login__foot">
-        <BrowserSupportNotice />
+        {/* ★ 登录页是「第一次知道什么浏览器能用」的地方，所以这里常显范围；
+            业务页面（AppShell）不传这个参数 —— 那里显示它就是噪音。 */}
+        <BrowserSupportNotice alwaysShowRange />
       </div>
     </main>
   );

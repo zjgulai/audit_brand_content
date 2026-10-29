@@ -2490,3 +2490,50 @@ code {
   line-height: var(--leading-base);
   color: var(--text);
 }
+
+/* ── 浏览器支持提示（#113 / TS-12）───────────────────────────────────────
+ *
+ * ★ 2026-10-29：这两个类此前**完全没有样式**。实测后果：
+ *   `BrowserSupportNotice` 渲染出来的是一行裸 div —— 在 Safari 下
+ *   三条告警信息是裸文本，和登录页那个有红底的 `.login__error` 完全
+ *   不是一个观感。根因是那个组件只在「不受支持」时才渲染，
+ *   而开发时用的是 Chrome，所以从来没有人看见过它长什么样。
+ *
+ * ★ 只在**不受支持**时才会渲染（受支持时组件返回 null），
+ *   所以这里的样式只服务告警态 —— 不需要「静默变体」。
+ *   登录页那行范围说明用 `[data-browser-support-range-only]`，
+ *   不走这两个类（它不该有告警外观）。
+ */
+.browser-support {
+  margin-bottom: var(--space-3);
+}
+
+.browser-support .state--warn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--warn-surface);
+  border: 1px solid var(--warn-graphic);
+  border-radius: var(--radius-control);
+  color: var(--warn-text);
+}
+
+.browser-support .state--warn strong {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.browser-support .state--warn .hint {
+  margin: 0;
+  color: var(--warn-text);
+  opacity: 0.85;
+}
+
+/* 登录页页脚那行「正式支持范围」：轻、居中、不与内容争注意力 */
+[data-browser-support-range-only] {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
