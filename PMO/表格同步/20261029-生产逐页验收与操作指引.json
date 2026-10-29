@@ -1,0 +1,20 @@
+{
+  "事项名称": "生产逐页验收（ca.luteos.com）+ 操作指引 HTML：15 条路由验了什么、没验什么",
+  "关联执行票": "ADR-0021 主线 / T-112",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "工程发布",
+  "功能三级分类": "生产 API 前缀",
+  "工作类型": [
+    "前端",
+    "测试验收",
+    "部署运维"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "此前只做过窄口径部署烟测（healthz / readyz / openapi / bundle 字串），**没有**对 ca.luteos.com 逐页做 UI/UX 烟雾与验收，也没有操作指引。本轮补齐：① 新增 verify_prod_pages.mjs，用真实 Chrome 打开 15 条路由，读 #root 渲染出多少东西、可见文本、h1 数、可聚焦元素、横向溢出、JS 异常、静态资源失败；② 新增 make_ops_guide.mjs 生成 PMO/部署验收/生产验收与操作指引.html（103KB，自包含 —— 登录页两视口截图内嵌成 data URI，挪到任何地方都能打开）；③ 新增 verify_guide_renders.mjs 证明生成的 HTML 渲染后真的能读（读 .wrap 计算样式、不查源码有没有 <style>）。★ 结论口径必须说清：15/15 绿的意思是「未登录时每条路径都被正确送回登录页，且外壳无 JS 错、无溢出、单 h1、无资源失败」，**不是**「15 个业务页面都能用」—— 15 条路径渲染的都是同一个登录页（可见文本完全相同）。这一句同时写进脚本结论行与 HTML 顶部警示框。",
+  "验收标准": "三个假阳性/误报各已修正并留注释：① 对 13 条路由逐个 curl 全部 200，但 12 条响应体是同一个 SPA 外壳（<div id=\"root\"></div>）—— 200 只证明静态文件服务器活着；改用真实 Chrome 读渲染结果。② 第一版把业务接口 401 判成失败，8/15 页误报 —— 那些 401（/api/v1/queue、/api/v1/cases）正是「送回登录页」的触发条件；判据改成「被正确送回登录页」。③ 第一条路由 /login 稳定报 #root=0 —— Chrome 冷启动 bundle 未执行完，1400ms 不够；加预热，连跑两次 rc=0（不是调大超时掩盖）。变异已验证：换错误域名 → 15/15 全红并指出 mounted/hasText/routedToLogin；删 </style> → 样式判据红；body 清空 → 内容判据红。verify_coverage --controls 741/741、verify_depad 7840 文件 0 填充、verify_download_governance 全过、verify_acceptance_run passed=127 failed=0 untested=9。",
+  "状态依据": "提交 40315b2。新增两个判红的验算器已按规则登记进 tools/verifier-coverage.json（verify_prod_pages.mjs、verify_guide_renders.mjs），登记时被 C 段当场抓到「声明验 make_ops_guide.mjs 但文件名在源码里没出现」，已在文件头成对写出两个文件名。★ 未覆盖的四类如实写进指引第 5 节：登录后 12 个业务页（无飞书会话，自动探针进不去）、图片/视频多模态（.env.production 无 MULTIMODAL_* 任何键）、真实用户/读屏用户测试、无障碍 9 项真人签收（机器半边 0 违规 13 项 AA 全过）。★ 截图落在仓外 ~/audit-data/prod-shots —— 公开仓不收媒体二进制，DG-3 会拦。★ 指引里所有数字由读数 JSON 灌入，不手写（手写下次部署就过期）。"
+}
