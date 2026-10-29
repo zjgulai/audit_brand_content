@@ -231,7 +231,10 @@ export default function CasesPage() {
                   <td>
                     <StatusBadge axis="decision" value={c.state} />
                   </td>
-                  <td className="font-data">{c.layer ?? "未测"}</td>
+                  {/* ★ 2026-10-29：去掉 font-data。DP2/DP3 是**状态词**，
+                      和旁边的「违规拦截 / 部分规则覆盖」同类，不是要逐字
+                      对齐的标识符。等宽让它在整行里跳出来，读起来像代码。 */}
+                  <td>{c.layer ?? "未测"}</td>
                   <td>
                     <StatusBadge axis="coverage" value={c.coverage_state} />
                   </td>
@@ -244,7 +247,9 @@ export default function CasesPage() {
                       <span className="hint">{c.entry_channel}</span>
                     )}
                   </td>
-                  <td className="font-data">{c.assignee_id ?? "未指派"}</td>
+                  {/* ★ 同上：负责人是可读文本（`u-zhoujian` / 姓名），
+                      不是哈希。等宽只在**需要竖直对齐**时才划算。 */}
+                  <td>{c.assignee_id ?? "未指派"}</td>
                   <td>{c.release_status ?? "待放行"}</td>
                   <td>
                     <Link

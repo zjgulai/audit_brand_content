@@ -13,6 +13,10 @@
  * ========================================================================== */
 
 @import "./styles/tokens.css";
+/* ★ 2026-10-29：Inter 自托管字体（只带 latin 两个子集）。
+   放在 tokens 之后 —— @font-face 与 token 定义没有依赖关系，
+   但 token 里已经引用了 "Inter" 这个族名，先把名字的来源摆上更清楚。 */
+@import "./styles/inter-fonts.css";
 
 html {
   color: var(--text);
@@ -2553,4 +2557,80 @@ code {
   text-align: center;
   color: var(--text-muted);
   font-size: var(--text-sm);
+}
+
+/* ── 登录页：账号密码表单（★ 2026-10-29，委托方要求为测试便利开启）────────
+ *
+ * 排布：账号 / 口令 / 提交 三行，等宽对齐；下面是「或」+ 飞书扫码备选。
+ * ★ 不用两栏并排：登录页只有一个任务，并排会让人犹豫「该点哪个」。
+ * ★ 全部字号/间距/颜色取自 token，本段不写裸值（DT-3）。
+ */
+.login__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.login__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.login__field input {
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.login__field input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.login__submit {
+  min-height: 2.5rem;
+  margin-top: var(--space-1);
+}
+
+/* 口令错误：红底一行，**不用 role=alert 的强提示框** ——
+   它在表单内部，紧邻输入框，位置本身已经说明「这里出错了」。 */
+.login__form-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bad-surface);
+  color: var(--bad-text);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+
+.login__alt {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  padding-top: var(--space-3);
+  border-top: var(--hairline) solid var(--border);
+}
+
+.login__alt-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+  .login__alt {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
 }

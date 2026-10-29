@@ -282,8 +282,23 @@
   --topbar-h: 3rem;
 
   /* ── 字体族 ───────────────────────────────────────────────────────── */
-  --ui-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  /* ★★ 2026-10-29 换成 Inter + 系统中文。
+   *
+   * 改前的栈以 `-apple-system` 打头：在 macOS 上落成 SF Pro，Windows 上落成
+   * 系统默认（Segoe UI / 雅黑），**两个平台观感不同**，且 SF Pro 的小字号
+   * 中宫偏紧，中文一混排就显挤。
+   *
+   * 现在：Inter 打头（自托管，见 `inter-fonts.css`），中文继续走系统栈 ——
+   * 苹方 / 雅黑都是各自平台上最好读的中文黑体，换成 web font 反而要让
+   * 国内用户多下一次几百 KB。所以**只统一拉丁，不统一中文**，这是刻意的。
+   *
+   * ★ Inter 后面跟了 `-apple-system` 作退路：woff2 没加载成功时
+   *   （老浏览器、被拦截）不能掉到 serif 去。
+   * ★ `system-ui` 放在最后而不是最前：放在前面会在部分 Linux 上
+   *   抢在 Inter 之前命中，等于白引字体。 */
+  --ui-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue",
+    Arial, sans-serif;
   --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }

@@ -1246,6 +1246,13 @@
         "web/scripts/make_ops_guide.mjs"
       ],
       "dynamic": "被测对象是**运行时生成的 HTML 产物**（默认不落地，需 --file 指定），没有可声明的仓内静态主体；★ 本文件守的是 make_ops_guide.mjs 的产出契约，所以 subjects 指生成器本身。"
+    },
+    {
+      "verifier": "tools/verify_password_login.py",
+      "asserts": "账号密码登录通道（委托方 2026-10-29 要求，为测试便利）：P1 未启用返 404 而非 403（403 会泄露功能存在）；P2 只配开关不配账号/口令仍按未启用；P3 正确口令 → 200 且发与 OAuth **同构**的 session（同 create_session、同 csrf 机制，登录后 /api/v1/me 200）；P4 错账号与错口令均 401 且**响应体逐字相同**（不可枚举账号）；P5 principal 不在 principals.json → 403，不凭空造。★ 用真身 app_from_env 起 app 打真实请求（临时目录、0700、不联网）。R1–R6 是实现属性级反向对照（等时比对 / 404 vs 403 / 统一 401 / 三项 AND /中间件白名单 / 源码无硬编码口令），每条都注明「为什么它没有行为差异可观察」。",
+      "subjects": [
+        "api/production_app.py"
+      ]
     }
   ],
   "exempt": [

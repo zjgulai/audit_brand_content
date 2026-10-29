@@ -475,6 +475,40 @@ export const reviewApi = {
   /** 登出：POST（带 CSRF），后端撤销 session 并清 cookie。 */
   logout: () => request<{ logged_out: boolean }>("/logout", { method: "POST" }),
 
+  /**
+   * 账号密码登录（★ 仅测试便利，委托方 2026-10-29 要求开启）。
+   *
+   * ## 为什么不走 `request()`
+   *
+   * `request()` 会先算 CSRF 头（`csrfHeaders`）。而登录**还没有 session**，
+   * 也就没有 csrf cookie —— 那一步会拿空值算出一个头，后端虽放行
+   * （`/auth/password` 在中间件白名单里），但读起来像是「登录要求 CSRF」，
+   * 下一个改这块的人会照着它去加页面级 csrf 初始化，**多绕一圈**。
+   *
+   * 这里直接 fetch，语义就是「登录前的裸请求」。
+   *
+   * ★ 后端未启用该通道时返 **404**（不是 403）。调用方据此区分
+   *   「这个部署不支持密码登录」与「密码错了」—— 两者提示完全不同。
+   */
+  async passwordLogin(username: string, password: string): Promise<{ ok: boolean; principal: string }> {
+    const res = await fetch(`${apiBase}/auth/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      let body: Record<string, unknown> | null = null;
+      try {
+        body = (await res.json()) as Record<string, unknown>;
+      } catch {
+        /* 非 JSON 错误体：交给 ApiError 用状态码兜底 */
+      }
+      throw new ApiError(res.status, body, "/auth/password");
+    }
+    return res.json();
+  },
+
   // ── 以下为 ADR-0021 · W-1 收纳的裸调用 ────────────────────────────────
   //
   // ★ 这些方法原本散在 12 个页面的 `request(...)` 里。搬进来**只搬不改语义**，

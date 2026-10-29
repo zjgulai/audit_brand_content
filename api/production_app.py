@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 import re
@@ -137,6 +138,18 @@ class ReauthStartBody(BaseModel):
     nonce: str
 
 
+class PasswordLoginBody(BaseModel):
+    """账号密码登录的请求体（`POST /auth/password`）。
+
+    ★ 字段名用 `username` / `password` 而不是 `user` / `secret`：
+    这是给人和工具读的公开契约，用通用名字；环境变量那边用
+    `REVIEW_PASSWORD_USER` / `REVIEW_PASSWORD_SECRET` 是为了与
+    `REVIEW_OAUTH_*` 的命名习惯一致，两者不必同名。
+    """
+    username: str
+    password: str
+
+
 class RuntimeProxy:
     def __init__(self, runtime, attribute):
         self.runtime = runtime
@@ -246,6 +259,42 @@ class ProductionSettings:
     #: ★ 必须声明成正式字段：这是 `slots` 类，动态 setattr 新名字会 TypeError。
     media_ingest_ready: bool = True
     media_ingest_readiness_note: str = ""
+
+    #: ★★ 2026-10-29：账号密码登录（**为测试便利**，委托方明确要求）。
+    #:
+    #: ## 它是什么
+    #:
+    #: 一个与飞书 OAuth **并列**的登录通道：`POST /auth/password` 交账号密码，
+    #: 通过后发一个**同构的** session（同 `create_session`、同 `provider` 字段、
+    #: 同 CSRF 机制），此后所有接口的行为完全一样 —— 不是第二套认证体系。
+    #:
+    #: ## 它的安全边界（三件事都必须成立才启用）
+    #:
+    #: 1. `password_login_enabled` 为真 —— 由 `REVIEW_PASSWORD_LOGIN=1` 控制，
+    #:    **默认关**。没配就完全不存在这条路径（端点返 404，不是 403 ——
+    #:    「没有这个功能」与「有这个功能但不给你用」是两件事）。
+    #: 2. 账号与口令**只从环境变量读**（`REVIEW_PASSWORD_USER` /
+    #:    `REVIEW_PASSWORD_SECRET`），**绝不写进代码或仓内任何文件**。
+    #:    本仓库是公开的：硬编码口令 = 永久留在 git 历史里。
+    #: 3. 口令比对用 `hmac.compare_digest`（等时），不是 `==` ——
+    #:    后者可以按响应时间逐字符猜出长度与前缀。
+    #:
+    #: ## 已知且**被接受**的风险（委托方 2026-10-29 明确同意）
+    #:
+    #: 这条通道一旦开启，任何知道口令的人都能进入一个有真实审计数据的系统，
+    #: 且**绕过了**飞书的租户校验（`tenant_allowlist` 不再参与）。
+    #: 委托方在知悉这一点后选择了开启；本字段的注释把这件事记下来，
+    #: 是为了让**下一个读代码的人**知道这不是疏忽。
+    password_login_enabled: bool = False
+    password_login_user: str = ""
+    password_login_secret: str = ""
+    #: 口令登录建出的 session 用哪个 principal。默认取 `password_login_user`。
+    #: 必须能在 `principals.json` 里查到且 `status=active`，否则登录失败 ——
+    #: **不**为它凭空造一个 principal（那会让 RBAC 认不出它是谁）。
+    password_login_principal: str = ""
+    #: 口令登录用哪个租户。空 = 取 `tenant_allowlist` 里唯一那个；
+    #: 多租户部署时必须显式配，否则登录会 403（而不是瞎猜一个）。
+    password_login_tenant: str = ""
 
     def __post_init__(self):
         # ★ `report_root` 必须在这里，不能只加一个字段。
@@ -404,6 +453,21 @@ class ProductionSettings:
             report_link_secrets=_link_secrets_from_env(env),
             report_link_ttl=_link_ttl_from_env(env),
             media_roots=media_roots,
+            # ★ 账号密码登录：**默认关**。三件事必须同时给齐（开关/账号/口令），
+            #   少一件就当作没配 —— 而不是「半开」。半开的后果是端点存在但
+            #   永远登录失败，读起来像 bug 而不是像「没配」。
+            password_login_enabled=(
+                env.get("REVIEW_PASSWORD_LOGIN", "") == "1"
+                and bool(env.get("REVIEW_PASSWORD_USER"))
+                and bool(env.get("REVIEW_PASSWORD_SECRET"))
+            ),
+            password_login_user=env.get("REVIEW_PASSWORD_USER", ""),
+            password_login_secret=env.get("REVIEW_PASSWORD_SECRET", ""),
+            password_login_principal=(
+                env.get("REVIEW_PASSWORD_PRINCIPAL")
+                or env.get("REVIEW_PASSWORD_USER", "")
+            ),
+            password_login_tenant=env.get("REVIEW_PASSWORD_TENANT", ""),
         )
 
 
@@ -831,8 +895,13 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
 
     @app.middleware("http")
     async def production_gate(request: Request, call_next):
+        # ★ `/auth/password` 要在这里放行：它是 POST，而下面的 CSRF 校验
+        #   要求「已有 session」—— 登录本身当然还没有。
+        #   ★ 放行的代价是它**不受 CSRF 保护**：攻击者可以从别的站点
+        #   用你的口令登录（但攻击者本来就知道口令才会走到这一步）。
+        #   真正的 CSRF 风险在「已登录状态下被诱导执行动作」，那条仍然守着。
         if request.url.path in ("/healthz", "/readyz", "/auth/login", "/auth/callback",
-                                "/auth/reauth/callback"):
+                                "/auth/reauth/callback", "/auth/password"):
             return await call_next(request)
         if not runtime.ready and request.url.path not in ("/api/v1/me", "/api/v1/logout"):
             return JSONResponse(status_code=503,
@@ -872,6 +941,78 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
     def readyz():
         body = runtime.readiness()
         return JSONResponse(content=body, status_code=200 if body["ready"] else 503)
+
+    @app.post("/auth/password", include_in_schema=False)
+    def password_login(body: PasswordLoginBody, request: Request):
+        """账号密码登录（★ 为测试便利，委托方 2026-10-29 明确要求开启）。
+
+        ## 它与飞书 OAuth 是**并列**通道，不是第二套认证
+
+        通过后发一个**同构的** session：同一个 `create_session`、同一个
+        `provider` 字段、同一个 CSRF 机制。此后所有接口行为完全一样。
+        差别只在「凭什么证明你是你」这一步。
+
+        ## 三个必须同时成立的启用条件
+
+        `settings.password_login_enabled` 由 `REVIEW_PASSWORD_LOGIN=1` +
+        账号 + 口令三项**同时给齐**才算真（`from_env` 里就是这么写的）。
+        没启用时本端点返 **404** —— 「没有这个功能」与「有这个功能但
+        不给你用」必须长得不一样，否则探测者能从 403 得知功能存在。
+
+        ## 口令比对用 `hmac.compare_digest`
+
+        `==` 会在第一个不同的字符处提前返回，于是响应时间泄露
+        「前几位猜对了」。这类攻击在实践中确实可行（局域网内毫秒级抖动够用）。
+        """
+        if not settings.password_login_enabled:
+            # ★ 不返 403：那等于告诉探测者「这里有东西，只是不给你」。
+            raise HTTPException(404, "not_found")
+        if not runtime.ready:
+            raise HTTPException(503, "服务未就绪")
+
+        user_ok = hmac.compare_digest(
+            body.username.encode("utf-8"),
+            settings.password_login_user.encode("utf-8"))
+        secret_ok = hmac.compare_digest(
+            body.password.encode("utf-8"),
+            settings.password_login_secret.encode("utf-8"))
+        if not (user_ok and secret_ok):
+            # 账号错与口令错**不给不同提示** —— 那会让人先枚举出账号。
+            raise HTTPException(401, "invalid_credentials")
+
+        # 必须能在 principals.json 里查到，且 active。
+        # ★ 不为它凭空造 principal：那会让 RBAC 认不出它是谁，
+        #   于是「登录成功」之后的每个动作都会在权限检查里落空 ——
+        #   读起来像「登录了但什么都点不了」，比登录失败更难查。
+        # ★ 租户取 `tenant_allowlist` 里**唯一**那个。
+        #   多于一个时必须显式配 `REVIEW_PASSWORD_TENANT` —— 瞎猜一个
+        #   会让登录成功但数据全看不到（看起来像「没有案件」）。
+        tenants = sorted(settings.tenant_allowlist)
+        tenant = settings.password_login_tenant or (
+            tenants[0] if len(tenants) == 1 else "")
+        if not tenant:
+            raise HTTPException(
+                403, "password_tenant_ambiguous:allowlist=%s" % (tenants,))
+        principal = runtime.directory.by_id(
+            settings.password_login_principal, tenant)
+        if principal is None:
+            raise HTTPException(
+                403, "principal_not_authorized:principal=%r tenant=%r"
+                     "（检查 REVIEW_PASSWORD_PRINCIPAL 与 principals.json）"
+                     % (settings.password_login_principal, tenant))
+
+        csrf = os.urandom(24).hex()
+        sid = runtime.session_store.create_session(
+            principal["id"], tenant=tenant,
+            provider="password", issuer="local-password",
+            csrf_token=csrf, auth_time=None,
+            authz_version=principal.get("authz_version"))
+        response = JSONResponse(content={"ok": True, "principal": principal["id"]})
+        response.set_cookie(COOKIE_NAME, sid, secure=True, httponly=True,
+                            samesite="lax", path="/")
+        response.set_cookie("csrf", csrf, secure=True, httponly=False,
+                            samesite="lax", path="/")
+        return response
 
     @app.get("/auth/login", include_in_schema=False)
     def login():

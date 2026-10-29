@@ -1,0 +1,46 @@
+/* ── Inter（可变字重）· 只带 latin 两个子集 ───────────────────────────────
+ *
+ * ## 为什么自己写 @font-face，而不是 `import "@fontsource-variable/inter"`
+ *
+ * 那个入口的 CSS 引了 **7 个语种子集**（西里尔 ext / 西里尔 / 希腊 ext /
+ * 希腊 / 越南 / latin-ext / latin，合计 224 KB）。`unicode-range` 会让浏览器
+ * **只下载实际用到的那一个**，所以网络开销本来就不高 —— 但那 6 个用不到的
+ * 文件仍然会被带进构建产物，`dist/` 里白躺 176 KB。
+ *
+ * 本项目只有中文与英文，所以只留两个：
+ *   · latin      47 KB —— 基本拉丁 + 常用标点（U+0000-00FF 等）
+ *   · latin-ext  83 KB —— 拉丁扩展（欧洲语言变音、排版符号）
+ *
+ * ★ 中文**不引字体**：交给系统栈里的 `PingFang SC` / `Microsoft YaHei`。
+ *   理由：中文字体全量 8–10 MB，子集化后仍要几百 KB，而这些字形的
+ *   「对不对」依赖平台（macOS 用户看惯了苹方）。引一个中文 web font
+ *   会让国内用户多等一次大文件下载，收益却只是「字形统一」。
+ *
+ * ★ 文件放在 `public/fonts/`：Vite 会原样拷进 `dist/fonts/`，
+ *   路径固定（`/fonts/xxx.woff2`），不参与 hash 改名 —— @font-face
+ *   里写死的路径不会因为构建而失效。
+ */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  /* 可变字重：一个文件覆盖 100–900，不需要为每个字重各下一份 */
+  font-weight: 100 900;
+  /* ★ swap：字体没到之前先用系统字显示，到了再换。
+     用 block 会让首屏最长 3 秒空白 —— 对一个内部工作台不值得。 */
+  font-display: swap;
+  src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
