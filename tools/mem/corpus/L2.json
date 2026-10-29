@@ -11,40 +11,282 @@
     {
       "id": "l2-01-judge-eats-26-rules",
       "title": "判定只吃 26 条规则，而分类基准有 638 条 —— 其余四套库一条判决都影响不了",
-      "labels": ["caliber", "kb", "engine"],
+      "labels": [
+        "caliber",
+        "kb",
+        "engine"
+      ],
       "content": "这是本项目最反直觉的一条事实，动知识库那一侧之前必须先知道。\n\n- 判定路径实际消费：26 条规则。\n- 分类基准总量：638 条。\n- 其余四套知识库：一条判决都影响不了。\n\n含义：往那四套库里加料，不会改变任何一条判定结果。要改判定，只改那 26 条所在的链路。\n\n★ 数字口径：这两个数是 2026-10-21 深度分析那一轮的读数，不是常量。复现方式写在该文档里；引用前重跑一遍（AGENTS.md §2.2 第 1 条：文档里的数字要算出来，不能写进去）。",
       "source_pointers": [
-        {"file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md", "anchor": "26 条规则", "note": "六个存疑点之一"},
-        {"file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md", "anchor": "638", "note": "分类基准总量"}
+        {
+          "file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md",
+          "anchor": "26 条规则",
+          "note": "六个存疑点之一"
+        },
+        {
+          "file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md",
+          "anchor": "638",
+          "note": "分类基准总量"
+        }
       ]
     },
     {
       "id": "l2-02-brand-words-are-prompt-constraint",
       "title": "品牌禁用词是「AIGC 提示词约束」，直接接进引擎实测 6–10% 误报（KB-GAP-21）",
-      "labels": ["caliber", "kb", "brand"],
+      "labels": [
+        "caliber",
+        "kb",
+        "brand"
+      ],
       "content": "品牌禁用词的**来源用途**是约束 AIGC 生成提示词，不是判定真人写的文案。\n\n直接把它接进判定引擎，实测误报率 6–10%。\n\n含义：这一套词表要接进判定，必须先做误报治理（排除语境、分级），不能原样接。它是已知缺口，编号 KB-GAP-21。\n\n★ 这是「一个部件在它被设计的地方是对的，搬到另一个地方必然撞车」的实例（AGENTS.md §2.4.5 那个形状）。",
       "source_pointers": [
-        {"file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md", "anchor": "KB-GAP-21", "note": "品牌一致性存疑点"}
+        {
+          "file": "PMO/内容审查Agent-知识库与工作流-深度分析-20261021.md",
+          "anchor": "KB-GAP-21",
+          "note": "品牌一致性存疑点"
+        }
       ]
     },
     {
       "id": "l2-03-media-layered-reality",
       "title": "媒体分层的真实状态：图片实现完整但进件门关着，视频只有一个状态函数",
-      "labels": ["caliber", "media", "status"],
+      "labels": [
+        "caliber",
+        "media",
+        "status"
+      ],
       "content": "不许把「代码写完了」读成「功能可用了」。真实分层：\n\n- 图片：实现完整（OCR + 三指标），但**进件门在代码里确实是关的** —— 素材进不来。\n- 视频：只有一个状态函数，没有实现。\n- 容器内 OCR/ASR：选型已定（ADR-0018，OCR=rapidocr 3.10.0 / ASR=faster-whisper 1.2.1），但注册 ≠ 接线，默认引擎仍是 host_vision。\n- 行 118 的状态是 vacuous_true（空真），不是 passed。改成 passed 需要四件事齐备。\n\n★ 为什么这条要单独记：交付执行计划 v1 全文 0 处提图片/视频 —— 一份失职。媒体审核落地执行方案是补这一份的。",
       "source_pointers": [
-        {"file": "PMO/implement/媒体审核落地执行方案-v1-20261026.md", "anchor": "进件", "note": "真实分层状态"},
-        {"file": "ADR/ADR-0018-容器内OCR与ASR选型.md", "anchor": "vacuous_true", "note": "行 118 只能落 vacuous_true 的四件事"}
+        {
+          "file": "PMO/implement/媒体审核落地执行方案-v1-20261026.md",
+          "anchor": "进件",
+          "note": "真实分层状态"
+        },
+        {
+          "file": "ADR/ADR-0018-容器内OCR与ASR选型.md",
+          "anchor": "vacuous_true",
+          "note": "行 118 只能落 vacuous_true 的四件事"
+        }
       ]
     },
     {
       "id": "l2-04-launch-scope-precise-to-route",
       "title": "上线能上/不能上精确到路由；两个待决策挂在明处",
-      "labels": ["caliber", "release", "status"],
+      "labels": [
+        "caliber",
+        "release",
+        "status"
+      ],
       "content": "上线前的唯一该读的一份是 PMO/implement/上线交付说明-20261024.md。它的结构本身就是口径：\n\n- §三 能上 / 不能上 —— 精确到路由，不是「基本可用」。\n- §四 决定一：报告要不要装 Node。\n- §五 决定二：结案无报告能不能接受。\n- §一 上线前必须跑的六条命令（含环境清理、验收棘轮 passed/failed、覆盖登记、文档可达性）。\n- §六 合入顺序：先 base 层 → 重跑全部命令 → 确认棘轮 failed=0 → 才允许部署。\n\n★ 引用上线状态时必须带日期。「能上」是一个有时效的读数，不是属性。",
       "source_pointers": [
-        {"file": "PMO/implement/上线交付说明-20261024.md", "anchor": "能上", "note": "§三 精确到路由"},
-        {"file": "PMO/implement/上线交付说明-20261024.md", "anchor": "决定一", "note": "§四 §五 两个待决策"}
+        {
+          "file": "PMO/implement/上线交付说明-20261024.md",
+          "anchor": "能上",
+          "note": "§三 精确到路由"
+        },
+        {
+          "file": "PMO/implement/上线交付说明-20261024.md",
+          "anchor": "决定一",
+          "note": "§四 §五 两个待决策"
+        }
+      ]
+    },
+    {
+      "id": "l2-05-kb-four-classes",
+      "title": "四类知识库的字段与负责人（委托方 2026-09-15 立项口径）",
+      "labels": [
+        "caliber",
+        "kb",
+        "feishu"
+      ],
+      "content": "来自《内容治理-知识库》的「知识库分类说明」表（5 条）。四类库各自的字段与负责人是**立项时定的口径**，不是后来推的：\n\n1. **外部标准库** —— 要包含：美国法规、平台政策、行业标准、医学共识、本地常识。字段：官方链接/PDF、条款、内部合规摘要、适用产品线、生效日期。负责人：法务 Sharon、专家 Emma、北美待定。\n2. **内部负面样本库** —— 要包含：投诉、下架、警告、返工、达人争议、审核争议。字段：样本 ID、产品线、渠道、内容类型、原文/截图/视频、问题/亮点、风险等级、依据、处理结果、修改前后、是否可规则化。负责人：品牌张丽敏、吸奶器银舒涵、喂养 William、法务。\n3. **措辞表达库** —— Do not say / Say this instead；禁用、慎用、推荐表达；中英对照；适用场景。字段：表达、类型、场景、依据、风险等级、替代表达、语言。负责人：品牌、法务、北美、专家。\n4. **产品描述库** —— 功能边界、型号差异、允许/禁止描述、适用人群、使用场景、认证参数、常见误解。字段：产品线、型号、卖点、边界、禁止表述、认证、FAQ。负责人：吸奶器 Misty/银舒涵、喂养 William、品牌 Daisy/张丽敏、专家 Emma。\n\n★ 每条都带「需向对接人收集的问题」—— 说明这四类库**当时是空的，要靠回收材料才能填**。这正是 KB-GAP 的源头。",
+      "source_pointers": [
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "kb-content-governance",
+          "note": "内容治理-知识库 · 知识库分类说明表 5 条"
+        },
+        {
+          "file": "PRD/feishu/README.md",
+          "anchor": "_history",
+          "note": "同一批材料的本地归档口径"
+        }
+      ]
+    },
+    {
+      "id": "l2-06-vocab-three-tables",
+      "title": "词表三表分工：判险 24 条 / 白名单 30 词 / 语境守卫 85 词，94 条「豁免词」应废弃",
+      "labels": [
+        "caliber",
+        "vocab",
+        "engine"
+      ],
+      "content": "来自《品线内容边界-机器词表》的「词表分工说明」表（4 条）。这三张表的不变量是**互斥关系**，不是并列关系：\n\n| 词表 | 语义 | 通道 | 规模 | 不变量 |\n|---|---|---|---|---|\n| 判定规则词表 | 词出现 → 判险（产生命中）| 产生命中 | 24 条规则产生命中 | **唯一产生命中的来源** |\n| 白名单表 | 词出现 → **证成**主张（客观事实、第三方可复核）| auto_pass（隔离词走降级）| 30 词 | W1 与判险词表互斥｜W2 必须有放行目标｜W3 隔离词不得放行 |\n| 语境守卫表 | 词出现 → **取消/弱化**主张（否定/免责/溯源/弱化）| manual_review only（**绝不放行**）| 85 词 | G1 与判险词表互斥｜G2 必须有降级目标｜G3 落放行带即违反｜G4 与白名单不重名 |\n\n★ **第 4 条是历史遗留且应废弃**：主 Base「品线内容边界规则库」第 18 行附近的 `豁免词` 字段，94 条 = 84 守卫 + 10 白名单词，**两种机制共用一个字段，靠词义区分**。这与 ADR-0014 §45 记的「旧 `豁免词` 的语义是**放行**，不是不生效」是同一个形状 —— 一个字段装两种语义，判据就只能靠字符串猜。\n\n★ 存放位置有两个副本：主 Base 的规则库（人写）+ 本地 `whitelist-v1.json` / `context-guards-v1.json`。**两份必须恒等**，否则判据漂移。",
+      "source_pointers": [
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "kb-product-line-vocab",
+          "note": "品线内容边界-机器词表 · 词表分工说明表 4 条"
+        },
+        {
+          "file": "ADR/ADR-0014-未接线守卫词的归属.md",
+          "anchor": "94 个旧豁免词",
+          "note": "同一个病的历史记录"
+        }
+      ]
+    },
+    {
+      "id": "l2-07-product-lines-nine",
+      "title": "产品线实体规模：小百科 9 品线 96 条，吸奶器品牌型号库 62 条",
+      "labels": [
+        "caliber",
+        "product",
+        "feishu"
+      ],
+      "content": "两份实体表的真实规模（2026-10-27 读数，**会随上游增长**）：\n\n**《全球产品小百科》96 条 / 9 张表**：吸奶器 38、哺乳内衣 18、消毒机 7、暖奶器 7、婴儿背带 7、冻奶壶 6、托腹带 5、尿布桶 4、辅食机 4。\n\n**《全球吸奶器品牌型号库》62 条 / 1 张表**：字段是英文规格（App Function / Battery Capacity / Charing Time / Core Scenarios / Default Flange Size / In-Package Insert Size / Key Features / MSRP / Milk Cup Capacity / Mobile-App Control）。\n\n★ **这两份天然是图不是文**：品线 → 型号 → 规格/卖点，正是 `SUBSYSTEM`/实体关系那类结构。它们进 Library 只能被全文检索，**多跳查询（「哪些型号支持 App 控制且 MSRP < 300」）用不上**。\n\n★ 立项口径是第一阶段的打样对象为**三类产品**：美国市场吸奶器、baby monitor、bulbous washer（见规划会纪要）。而小百科里没有 baby monitor 与 bulbous washer 的表 —— **打样对象与实体库不重合**，这是个待补的缺口。",
+      "source_pointers": [
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "kb-product-wiki",
+          "note": "全球产品小百科 9 表 96 条"
+        },
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "meeting-20260915",
+          "note": "三类打样产品的立项口径"
+        }
+      ]
+    },
+    {
+      "id": "l2-08-project-kickoff-scope",
+      "title": "立项口径（2026-09-15 规划会）：三品线打样 + 四类知识库 + 三个月交付四项",
+      "labels": [
+        "caliber",
+        "project",
+        "feishu"
+      ],
+      "content": "《智能纪要：内容合规审查项目规划会 2026年9月15日》的**关键决策**：\n\n> 第一阶段内容合规审查按既定方案落地，以美国市场**吸奶器、baby monitor、bulbous washer** 三类产品为打样对象，执行「**agent 初审 → 人工多维度审核 → 负责人上线确认**」的全流程，配套搭建**四类知识库**，**3 个月内**完成阶段交付。\n\n**交付物清单（四项）**：① 完成 agent 工具开发；② 明确配套知识库版本；③ 跑通全审查流程；④ 落地审核留存及反馈机制。\n\n**对接分工**：专业内容 → Emma；视频/图片等所有社交相关 → M；IT → Dora。具体时间表由 Dora 结合各方提交内容归类建库后给出。\n\n★ 这条口径的价值：它把「第一阶段做什么」钉死成三品线 + 四库 + 四项交付。后续任何「要不要多做一条品线 / 多接一种内容形态」的问题，判据都在这里。",
+      "source_pointers": [
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "meeting-20260915",
+          "note": "规划会纪要 · 关键决策与交付物清单"
+        }
+      ]
+    },
+    {
+      "id": "l2-09-req-framework-three-directions",
+      "title": "需求框架的三段治理：上线前怎么审 / 上线后怎么查 / 整改后怎么全量改",
+      "labels": [
+        "caliber",
+        "requirement",
+        "feishu"
+      ],
+      "content": "《202608 营销内容生命周期内容合规审核规范建设-需求框架整理》把问题拆成**三段生命周期**，每段一个缺口：\n\n| 阶段 | 核心点 | 当前情况 | 需补充的机制 |\n|---|---|---|---|\n| **上线前** | 新内容怎么审 | 不同业务/内容类型送审方式不统一；提交材料完整程度不同；不同场景审核重点、修改确认、留痕方式存在差异 | 统一、分类、可追踪的**审核准入机制** |\n| **上线后** | 已发布内容怎么查 | 法务只看得到业务主动送审的内容，**无法持续掌握公司实际已对外发布的全部销售页/展示页/营销素材**；上线后内容修改时，除非出问题，**不一定重新进入审核** | 已发布内容的**盘点、持续监测及变更发现机制** |\n| **整改后** | 问题怎么全量改 | A 页面整改后，B/C 页面、其他版本、其他渠道（亚马逊/独立站/EDM/广告）或图片素材中**可能仍存在相同或类似风险** | 跨页面、跨版本的**整改闭环机制** |\n\n整体架构口径：**三个规范方向 + 两个基础支撑**，目标是「营销内容全生命周期合规治理体系」。\n\n★ 第二段是**本项目最有价值也最被低估的一条**：它明说「法务看不到已发布的全量内容」。这正是 `research/landing/`（落地页内容获取）与 §2.4.2 基线漂移检测在做的事 —— 它们在需求文档里是**有出处的**，不是我们自己加的。",
+      "source_pointers": [
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "req-framework-202608",
+          "note": "需求框架整理 · 三个核心方向"
+        }
+      ]
+    },
+    {
+      "id": "l2-10-verifier-inventory",
+      "title": "验证器清单：每个 verify_* 是一个独立断言主体，各自带三态退出码",
+      "labels": [
+        "caliber",
+        "verifier",
+        "governance"
+      ],
+      "content": "本项目把「谁验什么」做成了一等公民。**每个 `verify_*.py` 是一个验证器实体**，不是脚本。\n\n| 验证器 | 它断言什么 | 退出码语义 |\n|---|---|---|\n| `verify_coverage.py` | 「谁验什么」的登记表与实现对得上（A–F 六段双向反证） | 0/1/2 |\n| `verify_nmem.py` | 记忆与知识图谱（N0–N9 + 反向对照 11 项） | 0/1/**2** |\n| `verify_download_governance.py` | 下载治理 DG-1…DG-6 | 0/1/**2** |\n| `verify_shouheng_ops.py` | 守衡闸门 / 自愈 / 在跑（A–H 段） | 0/1/**2** |\n| `verify_agents_budget.py` | 本文件 65536 字节预算（B1 取 max(real, stat)） | 0/1 |\n| `verify_depad.py` | 全仓有没有被 +4096 填充的文件 | 0/1 |\n| `verify_secret_patterns.py` | 仓内文本里的凭据形态 | 0/1 |\n| `verify_doc_reachability.py` | 每份文档走不走得到 | 0/1/2 |\n| `verify_feishu_materials.py` | B 档飞书材料登记表（M1–M5） | 0/1/**2** |\n| `verify_waivers.py` | 砍掉项的书面豁免，**到期即红**（W1–W12） | 0/1/2 |\n\n**每个验证器的退出码是它最重要的接口**：`0` 通过 / `1` 红 / `2` **未测**。\n三者互不可代 —— 一个验证器「没测到」和「测了没问题」是两件不同的事。\n\n★ 注册纪律：新增任何 `verify_*` **必须同时**登记进 `tools/verifier-coverage.json`，\n否则 `verify_coverage.py` 的 A 段会红（它扫 `git ls-files`，所以「提交前全绿、提交后变红」是真事）。",
+      "source_pointers": [
+        {
+          "file": "tools/verifier-coverage.json",
+          "anchor": "verifiers",
+          "note": "全部验证器的登记表"
+        },
+        {
+          "file": "AGENTS.md",
+          "anchor": "先跑验收，再改",
+          "note": "§2.1 自证表"
+        }
+      ]
+    },
+    {
+      "id": "l2-11-release-gate-six-commands",
+      "title": "上线闸门：六条必跑命令 + 棘轮 failed=0，未满足不许部署",
+      "labels": [
+        "caliber",
+        "release",
+        "gate"
+      ],
+      "content": "**上线闸门是一个实体**，不是一句流程。它有可执行判据，跑不过就不许部署。\n\n### 上线前必须跑的六条命令\n\n1. **环境清理** —— 三个文件曾被写坏成 4091–4158 个 null 字节，Python 无法 parse\n2. **本轮所有改动的直接验证器**\n3. **被本轮底层改动波及的既有验证器**\n4. **验收棘轮** —— 必须 `failed=0`\n5. **覆盖登记** —— 新验证器必须先 `git add`，否则 A 段红\n6. **文档可达性**\n\n### 合入顺序（不许跳）\n\n```\n0. 先确认工作区干净\n1. 先合 base 层\n2. 再跑一遍上面六条全部命令\n3. 确认棘轮 passed 达标 / failed=0 后，才允许部署\n```\n\n### 两个挂在明处的待决策\n\n- **决定一**：报告要不要装 Node（唯一报告渲染器是 Node 实现，而运行时镜像里没有 Node）\n- **决定二**：结案无报告能不能接受\n\n★ 「能上 / 不能上」必须**精确到路由**，不是「基本可用」。引用上线状态必须带日期 —— 那是一个有时效的读数，不是属性。",
+      "source_pointers": [
+        {
+          "file": "PMO/implement/上线交付说明-20261024.md",
+          "anchor": "上线前必须跑的六条命令",
+          "note": "§一"
+        },
+        {
+          "file": "PMO/implement/上线交付说明-20261024.md",
+          "anchor": "合入顺序",
+          "note": "§六"
+        }
+      ]
+    },
+    {
+      "id": "l2-12-three-redlines-detail",
+      "title": "三条红线各自的边界与执行点",
+      "labels": [
+        "caliber",
+        "redline",
+        "boundary"
+      ],
+      "content": "**每条红线都是一个独立实体**，各自有边界与执行点，不许合并成一句「注意安全」。\n\n### 红线一 · 凭据文件一律不许读\n\n名单**逐个点名**：`~/.dsh/credentials`、`~/.dsh/.credentials.yaml`、`~/.ssh`、`~/.aws`、`~/.config/gh`，\n外加按文件名拦 `.env` · `id_rsa` · `.netrc` · `.git-credentials`。\n**不做模糊匹配 `secret|token|key`** —— 仓里有 `…/pycparser/ply/ctokens.py`，模糊匹配会把它一起拦掉。\n执行点：`tools/agent/tools.mjs` 的 `secretGuard()` + `secret_path.test.mjs`（27 项）。\n★ 四条读通道各采一遍，只有 `run_readonly_command` 需要这道闸门 —— 一条通道活着不给另一条作证。\n\n### 红线二 · 下载来的东西不许进公开仓\n\n本仓是**公开仓**，附件里可能有客户素材、个人信息。\n判据是 `git ls-files` 里没有任何媒体/文档二进制，执行点 `verify_download_governance.py`（DG-1…DG-6）。\n⚠️ **`.gitignore` 不是执行点** —— `git add -f` 照样能进。\n\n### 红线三 · 重启守衡必须先问、且必须留痕\n\n守衡在飞书群里替我们答话，**重启窗口里群里发的消息不会被回答，也不会有任何东西记下来**。\n只许走 `tools/restart_shouheng.sh` 闸门，默认拒绝。\n⚠️ **不要用 `kill -TERM`** —— 它的 `shutdown()` 是 `process.exit(0)`，launchd 按 `KeepAlive{SuccessfulExit:false}` 认定「正常停机」，于是**永不拉起**，而日志看起来一切正常。\n唯一正确的方式是 `launchctl kickstart -k`，由闸门执行。\n\n★ 红线一（飞书内容禁止下载）**已被 2026-10-17 委托方改定推翻** —— 现在「你都可以下载」。两个日期都要留着。",
+      "source_pointers": [
+        {
+          "file": "AGENTS.md",
+          "anchor": "凭据文件一律不许读",
+          "note": "§2.6 第 3 条"
+        },
+        {
+          "file": "AGENTS.md",
+          "anchor": "2026-10-17 委托方改定",
+          "note": "§2.6 第 1 条的推翻记录"
+        },
+        {
+          "file": "AGENTS.md",
+          "anchor": "唯一正确的重启方式",
+          "note": "§2.7"
+        }
+      ]
+    },
+    {
+      "id": "l2-13-shouheng-outage-incident",
+      "title": "事故 · 守衡停机 21 天（2026-09-30 → 10-22）：闸门只会 kickstart，服务装不回去",
+      "labels": [
+        "caliber",
+        "incident",
+        "shouheng"
+      ],
+      "content": "**这是一次具体事故的完整记录**，不是一条教训的抽象。\n\n### 事实\n\n- 2026-09-30T18:51:10，守衡收到 `SIGTERM` 后停机。\n- 之后 **21.3 天**没有任何东西发现它停了。`pgrep` rc=1，`launchctl print` 报 `Could not find service`。\n- plist 一直在 `~/Library/LaunchAgents/`（与仓库副本 sha256 逐字节相同），但**从未被 bootstrap 加载**。\n\n### 根因（两条，缺一不可）\n\n1. **`kill -TERM` 让它以 0 退出** → launchd 按 `KeepAlive{SuccessfulExit:false}` 认定「正常停机」→ 不拉起。\n2. **闸门的 rescue 分支只会发 `kickstart`**，对未加载的服务退 113 —— **救活路径上没有任何一条命令能把它装回去**。\n\n### 代价\n\nPRD 基线每日兜底与待收提醒**停了 22 天**，相关读数全是死的 —— 而它们看起来只是「没有新事件」。\n\n### 修法（两条都做了才算修好）\n\n- 闸门 rescue 分支先判 `launchctl print` 能否找到服务；找不到就走 `bootstrap` 路径，**同样留痕**。\n- `verify_shouheng_ops.py` 的 C1 扫描面补上 `bootstrap|enable`（原先只扫 `kickstart|bootout|unload|pkill`）；\n  新增三态断言 `judge_service_state()`：**在跑 / 没在跑但已加载（kickstart 可救）/ 未加载（必须先 bootstrap）**。\n\n★ 这次事故的形状是 §2.4.7「判据没盖住的那一跳，就是事故所在的那一跳」。",
+      "source_pointers": [
+        {
+          "file": "tools/verify_shouheng_ops.py",
+          "anchor": "judge_service_state",
+          "note": "三态断言"
+        },
+        {
+          "file": "tools/restart_shouheng.sh",
+          "anchor": "SERVICE_LOADED",
+          "note": "闸门的 bootstrap 分支"
+        },
+        {
+          "file": "AGENTS.md",
+          "anchor": "KeepAlive",
+          "note": "§2.7 kill -TERM 的实测"
+        }
       ]
     }
   ]

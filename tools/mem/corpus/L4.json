@@ -11,28 +11,88 @@
     {
       "id": "l4-01-stage-retrospective",
       "title": "阶段复盘（2026-09-16）：第一阶段是怎么走过来的",
-      "labels": ["history", "retrospective"],
+      "labels": [
+        "history",
+        "retrospective"
+      ],
       "content": "PMO/内容合规-阶段性复盘-20260916.md 记的是第一阶段的整体复盘：做了什么、哪些判断后来被推翻、代价在哪。\n\n★ 读它的正确方式：这是「判断的记录」，不是「成果的说明」。读它是为了知道当时凭什么这么定，以及哪些结论后来变了。\n\n范围：三品线并行（ADR-0004）下的调研与规则库搭建阶段。它早于基座层（base/）与 Web 工作台，所以里面出现的目录结构和现在不一样 —— 别拿它当当前结构的依据。",
-      "source_pointers": [{"file": "PMO/内容合规-阶段性复盘-20260916.md", "anchor": "", "note": "全文（阶段复盘）"}]
+      "source_pointers": [
+        {
+          "file": "PMO/内容合规-阶段性复盘-20260916.md",
+          "anchor": "",
+          "note": "全文（阶段复盘）"
+        }
+      ]
     },
     {
       "id": "l4-02-parallel-session-discipline",
       "title": "并行会话共用同一工作区：提交前必须逐项归属",
-      "labels": ["history", "workflow", "parallel"],
+      "labels": [
+        "history",
+        "workflow",
+        "parallel"
+      ],
       "content": "本工作区长期有多个 agent 会话同时干活，共用同一个 git 工作树。由此产生三条硬纪律：\n\n1. 提交前逐项归属：只 git add 你确认是自己产出的具体路径，绝不 git add -A。\n2. 不许把别人在办的文件扫进自己的提交 —— 提交前先看 git status，别人改的文件原样留着。\n3. depad --fix 是全量的：它会扫描并修复整个仓库，所以跑它之前要知道「它可能动到别人刚写的文件」（实际只动被填充的那些）。\n\n★ 已知的历史代价：2026-10-19 曾因公开仓里进了 58 张客户素材图而重写历史（远端 fa97050 / 本地 04ca808，备份在 ~/audit_backups）。这是「并行 + 公开仓 + 无执行点」三者叠加的后果。\n\n★ 另一条：新 verify_* 必须与登记表、被测文件在同一次提交里，否则 verify_coverage.py 的 A 段扫 git ls-files —— 提交前全绿、提交后变红。",
       "source_pointers": [
-        {"file": "AGENTS.md", "anchor": "verify_coverage.py", "note": "§2.1 登记表纪律"},
-        {"file": "PMO/audit/红线冲突登记-CR-001", "anchor": "", "note": "公开仓事实的来源（标题指认）"}
+        {
+          "file": "AGENTS.md",
+          "anchor": "verify_coverage.py",
+          "note": "§2.1 登记表纪律"
+        },
+        {
+          "file": "PMO/audit/红线冲突登记-CR-001",
+          "anchor": "",
+          "note": "公开仓事实的来源（标题指认）"
+        }
       ]
     },
     {
       "id": "l4-03-launch-ticket-index",
       "title": "上线 Ticket 清单是唯一权威清单（2026-10-22）—— 只存索引与读法",
-      "labels": ["history", "release", "index"],
+      "labels": [
+        "history",
+        "release",
+        "index"
+      ],
       "content": "PMO/上线Ticket清单-20261022.md 是上线就绪度的**唯一权威清单**（体量 74KB，正文不入记忆）。\n\n同一单元的三份产出，读的时候别只读一份：\n- 上线Ticket清单-20261022.md —— 唯一权威清单。其 §一 记着**红队推翻了合并清单的四处**。\n- 上线前深度盘点-20261022.md —— 推理过程与作者自己的错误记录。其 §一 记着**作者否掉了自己发起的一轮投票**（守衡不是产品，是协作助手）。\n- 并行会话分工-20261022.md —— 按链路环节重编的分工。\n\n后续票号体系：T-300..T-392（交付执行计划 v1）、T-420..T-425（媒体审核）。\n\n★ 读法：这些是「判断的记录」，不是「成果的说明」。要点是当时凭什么这么定、哪些结论后来被推翻了，不是当前状态 —— 当前状态要跑验证器。",
       "source_pointers": [
-        {"file": "PMO/上线Ticket清单-20261022.md", "anchor": "", "note": "唯一权威清单（索引级引用）"},
-        {"file": "PMO/上线前深度盘点-20261022.md", "anchor": "", "note": "推理过程与错误记录"}
+        {
+          "file": "PMO/上线Ticket清单-20261022.md",
+          "anchor": "",
+          "note": "唯一权威清单（索引级引用）"
+        },
+        {
+          "file": "PMO/上线前深度盘点-20261022.md",
+          "anchor": "",
+          "note": "推理过程与错误记录"
+        }
+      ]
+    },
+    {
+      "id": "l4-04-b-material-numbers",
+      "title": "B 档飞书材料盘点读数（2026-10-27）：454 条可读资源，真正项目相关 12 份",
+      "labels": [
+        "history",
+        "feishu",
+        "inventory"
+      ],
+      "content": "**读数，不是常量**（复现：`python3 tools/verify_feishu_materials.py`）。\n\n守衡能访问的飞书资源：`research/feishu/资源索引-v1.json` 记 **454 条 / 全部 `readable=True`**。按 tier 分层：`core` 25、`reference` 28、`noise` **401**。\n\n`core` 25 条里按 `hit_kw` 逐条复核，**真正与项目相关、且仓内无副本的只有 12 份**（已全取）。其余 13 条是泛词碰撞（`规范`/`审批`/`需求`/`测试` 把行政类与别的项目看板一起扫进来）。\n\n这 12 份的规模：合计 **1.83 MB**，切片 1+4+9+16+17+19+48+122+127+213+732+**1694**。\n\n★ **这份读数要这样读**：\n- 「454 条可访问」≠「454 条可用」。**可访问是能力，相关是判断**，两者差 442 条。\n- `tier` 字段是**按关键词自动分层的，不是人工确认的**。25 条 `core` 里有 13 条需人工排除 —— 任何人引用 `tier=core` 当「项目相关」都会多算一倍。\n- 12 份里最大的是《AAA外部需求池》（875 KB / 1694 切片），最小的是《🛠️ 自动化测试需求收集与管理》（**50 B，空表**）。",
+      "source_pointers": [
+        {
+          "file": "research/feishu/资源索引-v1.json",
+          "anchor": "resources",
+          "note": "454 条资源的来源"
+        },
+        {
+          "file": "tools/feishu_content_materials.json",
+          "anchor": "items",
+          "note": "12 份的登记与指纹"
+        },
+        {
+          "file": "tools/verify_feishu_materials.py",
+          "anchor": "M3",
+          "note": "逐份重算指纹的验证器"
+        }
       ]
     }
   ]
