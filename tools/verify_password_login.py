@@ -393,6 +393,33 @@ def run_controls() -> int:
         "client.ts 里仍用 ${apiBase}/auth/password",
     )
 
+    # ⑧ ★★ 静态资源必须被压缩
+    #
+    #   2026-10-30 实测：`/assets/index-*.js` 427 KB，响应头**没有**
+    #   content-encoding —— 整个前端包未压缩传输。而 `index.html` 有 gzip
+    #   （那是上游 nginx 做的）。差别的原因是 js/css 由**本服务**的
+    #   FileResponse 直出，`FileResponse` 不做压缩。
+    #
+    #   427 KB 压完约 120 KB，这一项省 70%。实测本机到服务器拉主 bundle
+    #   要 42 秒，用户每次硬刷新都吃这个。
+    # ★★★ 这条的第一版**测不出东西**：判据是 `"GZipMiddleware" in src`。
+    #   把 `app.add_middleware(GZipMiddleware, ...)` 整行注释掉之后它**照样绿** ——
+    #   因为 import 那一行还留着 `GZipMiddleware` 这个词。
+    #   实测：注释掉 → R8 仍然 ✅。这是同一个病今天第四次出现。
+    #
+    #   修法两条：① 剥掉 `#` 注释再判；② 判的是**调用形状**
+    #   `add_middleware(GZipMiddleware`（带左括号），不是类名出现。
+    without_comments = "\n".join(
+        line.split("#")[0] for line in src.splitlines()
+    )
+    check(
+        "R8 ★★ 生产 app **真的调用了** add_middleware(GZipMiddleware)（不是只 import）",
+        "add_middleware(GZipMiddleware" in without_comments,
+        "js/css 由本服务的 FileResponse 直出，而 FileResponse 不压缩；"
+        "上游 nginx 只压了 index.html。427 KB → 约 120 KB。"
+        "★ 判据要求带左括号的调用形状 —— 只查类名在有 import 的地方恒真",
+    )
+
     # ⑦ 绝不硬编码口令 —— 仓库是公开的
     check(
         "R6 ★ 源码里没有任何硬编码的口令字面量",

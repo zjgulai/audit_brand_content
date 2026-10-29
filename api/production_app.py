@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi import Response
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel
 
 from api.oauth import FeishuWebOAuthProvider, OAuthError
@@ -1343,6 +1344,26 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             raise HTTPException(404, "报告不存在")
         return Response(content=out["content"], media_type="text/markdown; charset=utf-8",
                         headers={"Cache-Control": "private, max-age=0, must-revalidate"})
+
+    # ── ★★ 2026-10-30：静态资源压缩 ─────────────────────────────────────
+    #
+    # 实测：`https://ca.luteos.com/assets/index-*.js` 427 KB，响应头**没有**
+    # `content-encoding` —— 也就是整个包是未压缩传输的。而同一个站点的
+    # `index.html` 有 gzip（那是上游 nginx 做的）。
+    #
+    # 为什么 js/css 没被 nginx 压：它们由**本服务**的 `FileResponse` 直出
+    # （上面那段注释说了原因：共享反代看不到宿主机新目录）。`FileResponse`
+    # 不做任何压缩。于是用户每次都下原始体积 —— 427 KB 的 JS 压完约 120 KB，
+    # 这一项就省 70%。
+    #
+    # ★ 用 `GZipMiddleware` 而不是让 nginx 压：改反代要动 40+ 站点的共享配置，
+    #   风险不成比例（与上面那段注释同一条理由）。
+    # ★ `minimum_size=1024`：小响应（几百字节的 JSON）压了反而更大 ——
+    #   gzip 头 + 分块开销会超过收益。
+    # ★ 只对**静态产物**有意义，但中间件是全局的。这可以接受：
+    #   API 的 JSON 响应多数很小，达不到 minimum_size；大的（案件列表）
+    #   压了也确实更快。CPU 代价在单租户内部系统上可以忽略。
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     # ── SPA 静态产物 ────────────────────────────────────────────────────
     # ★ 2026-10-22：原计划由宿主机共享反代 `ai_video_nginx` 直接 serve，
