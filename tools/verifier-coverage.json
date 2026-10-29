@@ -1230,6 +1230,22 @@
         "base/observation_candidates.py",
         "base/judge_entry.py"
       ]
+    },
+    {
+      "verifier": "web/scripts/verify_prod_pages.mjs",
+      "asserts": "生产逐页渲染探针（未登录态，只读）：15 条路由每条都要 ① #root 有子节点（防白屏而 HTTP 仍 200） ② 有可见文字 ③ 恰好一个 h1 ④ 1280×720 下无横向溢出 ⑤ 无未捕获 JS 异常 ⑥ 静态资源无 4xx/5xx ⑦ html lang 非空 ⑧ 被正确送回登录页。★ 判据刻意不把业务接口的 401 当失败 —— 它正是「送回登录页」的触发条件；第一版判成红，8/15 页误报。★ 结论行必须说清「15/15 绿」只是「每条路径都被送回登录页」，不是「15 个业务页面都能用」。变异已验证：换错误域名 → 15/15 全红，指出 mounted/hasText/routedToLogin",
+      "subjects": [
+        "web/src/App.tsx"
+      ],
+      "dynamic": "目标是**外部生产站点**（默认 https://ca.luteos.com，可由 PROD_BASE 覆盖），不在仓内；路由清单与 web/src/App.tsx 的 Route 一一对应，改路由要改脚本里的 ROUTES 表。★ 刻意不进 verifier_map / 离线自证链路：它要联网、要 Chrome，且在无飞书会话时只能验登录页那一层。"
+    },
+    {
+      "verifier": "web/scripts/verify_guide_renders.mjs",
+      "asserts": "生成的操作指引 HTML 是否**真的能打开**：渲染后 ① 样式表已生效（读 .wrap 的 max-width 与 body 背景色，不是查源码里有没有 <style>）② 正文有内容（>2000 字、表格有行、≥4 个 h2）③ 无横向溢出 ④ 无 JS 错误 ⑤ 无坏图。★ 存在的理由：本项目栽过两次「生成物看起来做完了、其实用不了」（填充态、--selftest 改真状态），HTML 字节数正常不等于排版正常。变异已验证：删掉 </style> → 样式判据红；body 清空 → 内容判据红；两者各自独立命中",
+      "subjects": [
+        "web/scripts/make_ops_guide.mjs"
+      ],
+      "dynamic": "被测对象是**运行时生成的 HTML 产物**（默认不落地，需 --file 指定），没有可声明的仓内静态主体；★ 本文件守的是 make_ops_guide.mjs 的产出契约，所以 subjects 指生成器本身。"
     }
   ],
   "exempt": [
