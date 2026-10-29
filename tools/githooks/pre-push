@@ -57,26 +57,51 @@ else
   _py="python3"
 fi
 
-echo "pre-push：跑验收执行器…（跳过请用 SKIP_ACCEPTANCE=1 git push）" >&2
-"$_py" "$_gate"
+echo "pre-push：跑验收棘轮（failed=0 · 总数对 · passed 不倒退 —— 与 CI 同一判据）…" >&2
+echo "  （跳过请用 SKIP_ACCEPTANCE=1 git push）" >&2
+
+# ★★★ 2026-10-29：这里原来直接跑 `verify_acceptance_run.py` 并要求它 rc=0。
+#
+#   那个判据**永远不可能成立**，因为这个执行器把「未测」也算进退出码：
+#   `if counts["untested"]: return 2`。而验收表里有 9 条是**文档逐条裁定**的
+#   永久未测 —— 5 条「不该在此层：文档治理，不作为执行验收项 / 第一阶段按人工验收」
+#   （#29 #43 #44 #55 #86，见 `tests/acceptance/untested-triage.md`），
+#   4 条等 TanStack 迁移或等真人签收（#109 #110 #112 #128）。
+#
+#   实测证据：`.git/SKIP-ACCEPTANCE.log` 里 **28 次跳过、0 次真正放行** ——
+#   这个钩子从装上（8e6f2a7，10-23）起就没有通过过一次。
+#   而 `ratchet`（1a237bd，10-26）建立时没接进这里，于是两套判据并存：
+#   CI 用棘轮（允许未测），钩子要求未测为 0。
+#
+#   ★ 「一个永远红的检查器」比没有检查器更糟 —— 它会让人习惯性跳过它，
+#     于是真正的红也被一起跳过（AGENTS.md §2.1.1）。所以判据改成与 CI 一致：
+#       · failed > 0            → 红，拦住
+#       · 计数之和 ≠ 136        → 红（防「删几行所以看着没倒退」）
+#       · passed < 地板         → 红（棘轮倒退）
+#       · 未测                  → **允许**，但照样逐条打印出来
+#     这三条在 `verify_acceptance_ratchet.py` 的 `--controls` 里各有反向对照。
+#
+#   ★ 没有降低标准：failed 这一条反而**更严**了 —— 旧写法在「有红」时也退 1，
+#     但那时如果同时有未测，报出来的原因会是「未测」，红被混在里面；
+#     现在红单独判，明细里直接说哪几条红。
+_ratchet="$_root/tools/verify_acceptance_ratchet.py"
+if [ ! -f "$_ratchet" ]; then
+  echo "⚠ pre-push：找不到 $_ratchet —— **拦住**。" >&2
+  echo "  找不到棘轮就退回裸跑执行器，会重新落入「永远过不去」的老毛病。" >&2
+  exit 1
+fi
+
+"$_py" "$_ratchet" --run
 _rc=$?
 
-# 三态退出码（全项目约定）：
-#   0 = 全过 → 放行
-#   1 = 有红 → **拦住**
-#   2 = 未测 → **拦住**。未测 ≠ 通过 ≠ 红，两者都不是放行的理由。
 case "$_rc" in
   0)
-    echo "✅ 验收执行器：全过，放行" >&2
+    echo "✅ 验收棘轮成立（failed=0、总数对、passed 未倒退），放行。" >&2
+    echo "   未测项按未测对待，不冒充通过 —— 明细见上面的执行器输出。" >&2
     exit 0
     ;;
-  2)
-    echo "⚠ 验收执行器退 2（未测）—— **拦住**。未测不是通过。" >&2
-    echo "  要么补上未测项，要么 SKIP_ACCEPTANCE=1 并留痕。" >&2
-    exit 1
-    ;;
   *)
-    echo "❌ 验收执行器退 $_rc —— 拦住。" >&2
+    echo "❌ 验收棘轮退 $_rc —— 拦住。" >&2
     echo "  明细见上面输出；确需推送请 SKIP_ACCEPTANCE=1 git push（会留痕）。" >&2
     exit 1
     ;;

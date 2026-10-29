@@ -61,6 +61,33 @@ ROOT = Path(__file__).resolve().parent.parent
 #: 被「触发」的那个东西 —— 全项目只有这一个验收执行入口。
 GATE = "verify_acceptance_run"
 
+#: ★ 2026-10-29：**间接**触发入口。`verify_acceptance_ratchet.py` 的 `--run`
+#: 会 subprocess 调 `verify_acceptance_run.py`，所以它也是「会跑执行器」。
+#: 钩子改成走棘轮之后（与 CI 同一判据），只测 `GATE` 会把它判成假触发。
+RATCHET = "verify_acceptance_ratchet"
+
+#: 「调用」与「提到」的区别。
+#:
+#: ★★★ 这条正则补的是一个**已经开始骗人的判据**。2026-10-29 实测：
+#: 本文件此前写的是 `runs_gate = GATE in text` —— 一个**源码文本存在性测试**。
+#: 我把 `tools/githooks/pre-push` 从「直接跑执行器」改成「跑棘轮」之后，
+#: 钩子里**一次也没有调用**执行器了，而通道二仍打印
+#: 「hook 已配且会跑验收执行器」—— 因为我留在钩子里的**注释**写着
+#: 「这里原来直接跑 `verify_acceptance_run.py`」。一行解释话就让判据恒真。
+#:
+#: 这正是 AGENTS.md §2.4 点名的那个病：「名字出现过」不是「它跑得起来」。
+#: 现在判据要求「真正的调用形状」：`python …/verify_acceptance_run.py`、
+#: `bash tools/xxx.sh`、或把它写进 `run:` / `exec` 的参数里。
+CALL_RE = re.compile(
+    r"(?:python3?|py|exec|run:|-\s*run|=)\s*[^\n]*\b"
+    r"(?:verify_acceptance_run|verify_acceptance_ratchet)\b"
+)
+
+#: 注释不算代码。整行 `#` 开头与 YAML 的 `# ` 都剥掉再判。
+#: ⚠️ 已知盲区（与 `verify_shouheng_ops.py` C5 同一条）：**行尾注释**仍会被扫到。
+#:    明着留着，不用更复杂的语法分析 —— 一个会误报的检查器比没有更糟。
+_COMMENT_LINE_RE = re.compile(r"^\s*#.*$", re.M)
+
 #: 六大 CI 家族的代表路径。做成常量是为了让 controls 能复用同一张表
 #: （两处各写一份，迟早有一份先改）。
 CI_PATHS = (
@@ -84,11 +111,30 @@ NOT_INSTALLED = "repo_scripts_not_installed"
 NONE = "none"
 
 STATE_ZH = {
-    RUNS_GATE: "已配且会跑验收执行器",
+    RUNS_GATE: "已配且会跑验收执行器（直接或经棘轮）",
     NO_GATE: "已配但**不跑**验收执行器",
     NOT_INSTALLED: "仓库里有 hook 脚本但**未安装**",
     NONE: "没有",
 }
+
+
+# ─────────────────────────── 判据：调用 vs 提到 ───────────────────────────
+
+
+def runs_gate_in(text: str) -> bool:
+    """这条通道的源码里，**真的会跑**验收执行器吗？
+
+    ★ 2026-10-29 从 `GATE in text` 改过来。原来那个写法是「这个名字在源码里
+      出现过吗」，而任何一行解释性注释都能满足它 —— 本文件自己就撞过：
+      钩子改成跑棘轮后一次也没调执行器，却因为注释里还留着旧命令名而仍报
+      「已配且会跑」。
+
+    现在要求：剥掉整行注释后，仍有**调用形状** ——
+    `python …/verify_acceptance_run.py`（直接）或
+    `python …/verify_acceptance_ratchet.py --run`（间接）。
+    """
+    stripped = _COMMENT_LINE_RE.sub("", text)
+    return bool(CALL_RE.search(stripped))
 
 
 # ─────────────────────────── 通道一：CI ───────────────────────────
@@ -106,7 +152,7 @@ def scan_ci(root: Path) -> dict:
             found.append(p)
 
     text = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in found)
-    runs_gate = GATE in text
+    runs_gate = runs_gate_in(text)
     claims = bool(CLAIM_RE.search(text))
     if not found:
         state = NONE
@@ -167,7 +213,7 @@ def scan_hook(root: Path, hooks_path: str | None = None,
         files = sorted(x for x in d.iterdir()
                        if x.is_file() and not x.name.endswith(".sample"))
     text = "\n".join(x.read_text(encoding="utf-8", errors="ignore") for x in files)
-    runs_gate = GATE in text
+    runs_gate = runs_gate_in(text)
     claims = bool(CLAIM_RE.search(text))
 
     repo_scripts = (root / HOOK_SCRIPTS_DIR)
@@ -335,6 +381,32 @@ def run_controls() -> int:
         hp2 = _fake_hook(root, "#!/bin/sh\necho hi\n")
         hook = scan_hook(root, hooks_path=hp2)
         ok("hook 存在但不引用 → present_no_gate", hook["state"] == NO_GATE, repr(hook["state"]))
+
+        # 6b ★★★ 只在注释里提到执行器 → 必须判 present_no_gate。
+        #    这组的起因是真实事故（2026-10-29）：钩子改成跑棘轮后**一次也没调**
+        #    执行器，而它仍报「已配且会跑」，因为钩子里的注释写着旧命令名。
+        #    判据改成「调用形状」之后，这组必须转红 —— 否则等于没改。
+        hp6b = _fake_hook(
+            root,
+            "#!/bin/sh\n"
+            "# 这里原来跑 python3 tools/verify_acceptance_run.py，现在改了\n"
+            "echo hi\n",
+            name="pre-push",
+        )
+        hook = scan_hook(root, hooks_path=hp6b)
+        ok("★ 只在注释里提到执行器 → 必须 present_no_gate（名字出现过 ≠ 会跑）",
+           hook["state"] == NO_GATE, repr(hook["state"]))
+
+        # 6c ★ 经棘轮**间接**调用 → 必须判 runs_gate。
+        #    反向的那一半：只认直接调用会把钩子判成假触发（改完之后就是这种形状）。
+        hp6c = _fake_hook(
+            root,
+            "#!/bin/sh\npython3 tools/verify_acceptance_ratchet.py --run\n",
+            name="pre-push",
+        )
+        hook = scan_hook(root, hooks_path=hp6c)
+        ok("★ 经 verify_acceptance_ratchet.py --run 间接调用 → 必须 runs_gate",
+           hook["state"] == RUNS_GATE, repr(hook["state"]))
 
         # 7 ★ 仓库有 hook 脚本但未安装 → 单列，不与「没有」混为一谈
         _fake_hook(root, "#!/bin/sh\necho hi\n")

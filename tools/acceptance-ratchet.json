@@ -2,24 +2,24 @@
   "schema_version": 1,
   "policy": "T-145 · 验收棘轮地板",
   "why": "verify_acceptance_run.py 今天退 2（untested=20，其中 7 条 manual 永远不会转 passed）。所以 CI 不能断言 untested==0 —— 那会永远红，红了三个月之后所有人都会无视这条 CI。棘轮的作用是：今天的地板是今天的读数，只许往上。",
-  "passed_floor": 126,
-  "recorded_at": "2026-10-25",
+  "passed_floor": 127,
+  "recorded_at": "2026-10-29",
   "recorded_reading": {
-    "passed": 126,
+    "passed": 127,
     "failed": 0,
-    "untested": 10,
+    "untested": 9,
     "untested_split": {
-      "machine": 5,
+      "machine": 4,
       "manual": 5,
       "unverifiable": 0,
       "unknown": 0
     },
     "untested_origin": {
-      "unmapped": 9,
-      "executed_rc2": 1
+      "unmapped": 5,
+      "executed_rc2": 4
     }
   },
-  "recorded_note": "2026-10-26 更正：此前 recorded_reading.passed=124 而 passed_floor=126，两者自相矛盾（地板高于当次读数）。核对 git 历史：floor 是 2026-10-25 一次上调后写入，但 recorded_reading 没跟着更新。★ 修法是补 recorded_reading，不动 floor —— floor 下调是倒退，而这里的事实是「读数当时就已经是 126，只是没记」。",
+  "recorded_note": "2026-10-29 按 how_to_raise 上调 126 → 127（有提示才上调，不是顺手改数）。本轮来源：#129 与 #113 从 failed 转 passed（两条都是**判据本身写错**，不是被测代码坏）：#129 硬编码「恰好 4 个指标」，T-451（80d42a6）加第 5 个后一直红着；#113 把 -webkit-line-clamp 等标准写法误判成 Safari 私有前缀，且 LoginPage 手写了版本号。#112 的机器半边也已转绿（0 违规 / 13 项 AA / 页面集合 14↔15 零缺口），但其综合状态仍是 untested —— 9 项真人签收没做，不许记成 passed。★ #112 那 12 条「集合差」的真因不是代码：web/scripts/dev-up.sh 处在填充态（stat 17130B / 真实 13034B / 差正好 4096），Node 读成二进制乱码，正则匹配不到 --pages；verify_depad.py --fix 之后立刻全对。",
   "how_to_raise": "当 verify_acceptance_ratchet.py 提示「passed 已高于地板」时，把 passed_floor 改成当前 passed。**只许上调。** 下调是一次有记录的决定，必须在 reason 里写清为什么某条从 passed 掉了出去，而不是顺手改个数字。",
   "how_to_lower": "只有一种合法情形：某条验收项被**正式裁定**撤销或降级（例如行 132 的 manifest 半句若真被判无对象）。那时同时改 passed_floor 与 reason，并在 PMO/ 的票清单里留一条记录。**倒退不许静默发生。**",
   "lower_history": [
