@@ -310,7 +310,12 @@ code {
   min-height: var(--topbar-h);
   padding: var(--space-2) var(--space-5);
   background: var(--surface);
-  border-bottom: var(--hairline) solid var(--border);
+  /* ★ 2026-10-29：这条线原来用 --border（对暖底 1.10:1 —— 基本看不见），
+     用户报告「页面标题没有线条」。它是**顶栏与正文的区域分界**，
+     不是容器外沿，所以改用 --divider（对暖底 2.28:1）。
+     ★ 它是 sticky 的：滚动时正文从它下面穿过，线太淡会让人分不清
+       「这一行是固定的还是内容的一部分」。 */
+  border-bottom: 1px solid var(--divider);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -1349,7 +1354,19 @@ code {
   flex-wrap: wrap;
   gap: var(--space-3);
   background: var(--surface);
+  /* ★ 2026-10-29：上下边框分开定色 —— 这是本次「标题没有线条」的第二处。
+   *
+   *   原来四边都用 --border（对暖底 1.10:1）。上半边（贴着顶栏）看不见
+   *   问题不大，因为顶栏自己有一条分界；但**下半边**是「标题区 / 内容区」
+   *   的分界，看不见就等于标题和下面的工具栏、表格糊在一起。
+   *
+   *   现在：下边用 --divider（对白 2.57:1），其余三边保持 --border。
+   *   ★ 不同边不同色听起来琐碎，但这里恰好是「容器外沿」与「区域分界」
+   *     两种语义：上/左/右是卡的外沿，下是区域分界。用同一个颜色是
+   *     把两件事当成一件 —— 那正是它此前看不见的成因。
+   */
   border: var(--hairline) solid var(--border);
+  border-bottom: 1px solid var(--divider);
   border-radius: var(--radius-panel);
   /* 卡内左右内距全站统一 --space-5：头部卡、表格卡、面板卡的标题与内容共享同一条左线 */
   padding: var(--space-4) var(--space-5);
