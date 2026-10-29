@@ -15,6 +15,11 @@
     python3 tools/mem/distill_to_nmem.py --apply         # 真写
     python3 tools/mem/distill_to_nmem.py --layer L1      # 只处理某一层
     python3 tools/mem/distill_to_nmem.py --check-only    # 只校验指针，不连 nmem
+
+触发时机（2026-10-29 显式化，不设自动 watcher）：
+    L1/L2 真源实质变更后、每票收尾时手跑一次；蒸馏要判断力（判「值不值得记」
+    与「锚点指哪」），挂 watcher 只会灌低质条目稀释检索相关度 —— 对齐 SOP §五·1
+    「规避全量灌入」。
 """
 
 from __future__ import annotations
