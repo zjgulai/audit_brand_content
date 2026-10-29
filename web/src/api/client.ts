@@ -491,7 +491,18 @@ export const reviewApi = {
    *   「这个部署不支持密码登录」与「密码错了」—— 两者提示完全不同。
    */
   async passwordLogin(username: string, password: string): Promise<{ ok: boolean; principal: string }> {
-    const res = await fetch(`${apiBase}/auth/password`, {
+    // ★★ 2026-10-29 实测踩坑：这里原来写的是 `${apiBase}/auth/password`，
+    //   而生产环境 `apiBase === "/api/v1"` —— 于是请求打到
+    //   `/api/v1/auth/password`，那不是登录端点，路径也不在 CSRF 中间件的
+    //   白名单里，于是被拦成 **403「CSRF 校验失败」**。
+    //
+    //   这个错读起来完全不像路径问题：界面上显示的是「CSRF 校验失败」，
+    //   会让人去查 csrf cookie、查中间件、查 origin —— 而不去查 URL。
+    //   真身 `/auth/password` 挂在 **app 根**（和 `/auth/login` 同级），
+    //   不在 `/api/v1` 前缀下。
+    //
+    //   所以用 `appOrigin`（它是 `apiBase` 去掉 `/api/v1` 之后的东西）。
+    const res = await fetch(`${appOrigin}/auth/password`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       credentials: "same-origin",

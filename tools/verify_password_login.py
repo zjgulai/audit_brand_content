@@ -360,7 +360,40 @@ def run_controls() -> int:
         "P3a 的 200 会直接变红",
     )
 
-    # ⑥ 绝不硬编码口令 —— 仓库是公开的
+    # ⑥ ★★★ 前端拼的 URL 必须是 `/auth/password`，不是 `/api/v1/auth/password`
+    #
+    #   2026-10-29 实测事故：`client.ts` 里写成 `${apiBase}/auth/password`，
+    #   而生产 `apiBase === "/api/v1"` —— 请求打到 `/api/v1/auth/password`，
+    #   那个路径不在 CSRF 白名单里，被拦成 **403「CSRF 校验失败」**。
+    #
+    #   这个错的方向极具误导性：界面报的是 CSRF 失败，人就会去查 csrf cookie、
+    #   查中间件、查 origin —— 而真相是 URL 多了一段前缀。
+    #
+    #   ★ 我原来的自证抓不到它：P1–P5 都是**直接打后端** `/auth/password`，
+    #     从来没经过前端那次拼接。所以补这一条 —— 它读的是前端源码里的拼接形状。
+    client_raw = (ROOT / "web" / "src" / "api" / "client.ts").read_text(encoding="utf-8")
+    # ★★★ **注释不算代码** —— 这条判据的第一版没剥注释，于是它读到了我自己
+    #   写在那段修复注释里的「原来写的是 `${apiBase}/auth/password`」，
+    #   把 D 本来正确的代码判成红。
+    #
+    #   这是同一个坑今天第三次出现（前两次在 verify_acceptance_trigger.py 与
+    #   check_browser_scope 的 C7）。统一读法：**先剥整行注释再判**。
+    #   ⚠️ 已知盲区（与 check_browser_scope J1a、verify_shouheng_ops C5 同一条）：
+    #      行尾注释仍会被扫到，明着留着。
+    client_src = "\n".join(
+        line.split("//")[0] for line in client_raw.splitlines()
+    )
+    check(
+        "R7 ★★ 前端登录 URL 用 appOrigin 拼（不是 apiBase —— 后者带 /api/v1 前缀）",
+        "${appOrigin}/auth/password" in client_src
+        and "${apiBase}/auth/password" not in client_src,
+        "生产 apiBase === '/api/v1'，用它拼会打到 /api/v1/auth/password；"
+        "那不在 CSRF 白名单里，会被拦成 403「CSRF 校验失败」——"
+        "错误信息指向 csrf/origin，真因在 URL",
+        "client.ts 里仍用 ${apiBase}/auth/password",
+    )
+
+    # ⑦ 绝不硬编码口令 —— 仓库是公开的
     check(
         "R6 ★ 源码里没有任何硬编码的口令字面量",
         not __import__("re").search(
