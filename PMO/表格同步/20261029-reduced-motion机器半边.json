@@ -1,0 +1,19 @@
+{
+  "事项名称": "reduced-motion 从「人工」拿回一半：降级后还有没有动的东西，机器能判",
+  "关联执行票": "T-112 / T-116（TS-9 / TS-14）",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "工程发布",
+  "功能三级分类": "无障碍人工验收",
+  "工作类型": [
+    "前端",
+    "测试验收"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "a11y_check.mjs 的 unmeasured 里长期写着「减少动效 prefers-reduced-motion（人工）」，而全仓 grep 只有这一句话 —— web/src/styles.css:2116 那个 @media (prefers-reduced-motion: reduce) 块到底还活着、还是重构时被删了，**没有任何东西会红**。本轮把能机器化的那半边拿回来：用 CDP 的 Emulation.setEmulatedMedia 真的把媒体特性设成 reduce，再读真实渲染元素的 getComputedStyle —— animationName 必须 none、transitionDuration 必须 0s。判据是浏览器自己算出来的值，不是源码里有没有那一行（源码有 @media 不等于它生效：可能被同优先级后一条规则盖掉、可能选择器写错、可能 !important 被更强的压住）。★ 但这一项**没有整项签收**：剩下那一半「动效关掉之后体验是否仍可接受」要人看，所以人工台账 a11y-manual-v1.json 仍是 not_run，unmeasured 里那一行也**没有删掉**，只改成如实描述「机器判了哪半、人工还差哪半」——删掉会让读这份输出的人以为整项已经测过，那比不测更糟。",
+  "验收标准": "四个变异已验红，每个都真跑过：① 删掉整个降级块 → M1 红，指出 .loading-rows__bar 的 loading-rows-pulse 1.2s ② 只删 `animation: none !important` 一行（保留 transition）→ M1 红，同一元素 ③ 降级块只覆盖 .loading-rows__bar、漏掉 .btn → M1 红，指出 .btn 的 0.25s 过渡 ④ 把 judge 写成恒真 → M2 红。★ 两个自证是在修 bug 的过程中长出来的：M0「默认环境下探针确实在动」= 探针是否存在的判据；M2「删掉降级块后 judge 必须给出 false」= 判据本身的反向对照。check_a11y_dual_gate --controls 5/5；a11y_check --standalone 退 0；verify_coverage --controls 737/737。",
+  "状态依据": "提交 0dcfb99。验收读数不变：passed=127 failed=0 untested=9 —— 这一项本来就不是红，所以它不会让数字变好，只是把「测不了」变成「测了一半」。双闸仍退 2（人工 9 项未签收），这是对的：未测不许冒充通过。★ 本轮踩了两个真失误并写在代码注释里：① 第一版探针选择器写的是 .queue__loading-row，真实类名是 .loading-rows__bar —— querySelector 返回 null，filter(Boolean) 把它丢掉，于是「没有还在动的元素」判绿，**探针不存在时会静默通过**；抓到它的是「只删 animation 那一行」这个变异。② 第二版 M2 判的是 bad.stillMoving.length > 0，直接看测量结果、绕过了 M1 的判据；实测把 M1 表达式改成恒 true，M2 仍然绿 —— 那条「反向对照」守错了对象。修法是抽成 judge()，正样本与坏样本都过它。"
+}
