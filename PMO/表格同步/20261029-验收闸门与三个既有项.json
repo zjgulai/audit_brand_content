@@ -1,0 +1,19 @@
+{
+  "事项名称": "推送闸门改成棘轮判 + 三个既有验收项的真因",
+  "关联执行票": "T-145 / T-142 / T-112",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "工程发布",
+  "功能三级分类": "规则变更门",
+  "工作类型": [
+    "后端",
+    "测试验收"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "未核验",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "推送被仓库自己的 pre-push 钩子拦住，查下来三件事都不是被测代码坏，而是**判据自己写错了**。① #129 判据硬编码「恰好 4 个指标」，T-451（80d42a6）加上第 5 个 workflow_latency_ms 之后从那天起一直红着，四天没人发现 —— 个数由 base/metrics_read_model.py 一处决定，抄一份到检查器就是两个口径，改了必漂；改成「至少 1 个且每个都合规」。② #113 把 -webkit-line-clamp / -webkit-box-orient / display:-webkit-box / -webkit-box-decoration-break 判成 Safari 私有前缀，而这几条的前缀是**名字的一部分**（W3C 的 overflow-clamp 未定稿），Chrome 全支持；改成逐个点名白名单而不是模糊放行整个 -webkit-box 家族。同项另有两条真缺陷：LoginPage.tsx:104 手写「Chrome 155」（基准在 browser-baseline.json，改了基准这行不改界面就在撒谎）、AppShell 未渲染横幅。③ #112 那 12 条「集合差」不是代码问题：web/scripts/dev-up.sh 处在**填充态**（stat 17130B / 真实 13034B / 差正好 4096B），Node 读成二进制乱码，正则匹配不到 --pages；verify_depad.py --fix 之后 15 条路由立刻全对。★ 第四件事是闸门本身：钩子直接跑 verify_acceptance_run.py 并要求 rc=0，而执行器把「未测」也编进退出码，验收表里 5 条是文档逐条裁定的「不该在此层 / 第一阶段按人工验收」、4 条等迁移或等真人签收，于是这个判据**永远不可能成立**。实测 .git/SKIP-ACCEPTANCE.log 有 28 次跳过、0 次真正放行 —— 它从装上（8e6f2a7，10-23）起就没通过过。ratchet（1a237bd，10-26）建立时没接进钩子，CI 用棘轮（允许未测）、钩子要求未测为 0，两套判据并存。改成钩子调用 verify_acceptance_ratchet.py --run，与 CI 同一判据；有红这一条反而更严了（旧写法在有红且同时有未测时，报出来的原因是「未测」，红被混在未测里）。",
+  "验收标准": "失败清零 + 推送实测放行。三个变异各自验证会红：#129 喂「有图表但七要素不全」→ C2 红、逐个删七要素 7/7 轮全红；#113 植入 isSafari 分支 / -webkit-backdrop-filter / core-js → 三处均被抓（C5）、组件里写死版本号 → C6 红；#112 的 --controls 跑 C1–C5 正反样本。钩子判据改完后：verify_acceptance_trigger.py --controls 13/13（新增两组反向对照：只在注释里提到执行器 → 必须判「不跑」；经棘轮间接调用 → 必须判「会跑」）；verify_acceptance_ratchet.py --controls 9/9；verify_coverage.py --controls 737/737；verify_depad.py 扫 7832 个文本文件 0 个被填充。★ 未测仍是 9 条，不冒充通过：5 条永久人工项 + 4 条等迁移/等真人签收。",
+  "状态依据": "提交 f8ea9f6 + 3755b4d。推送实测输出：passed=127 failed=0 untested=9，钩子退 0 放行，26c15fe..3755b4d main -> main。棘轮地板按 how_to_raise 从 126 上调到 127（#113 #129 从 failed 转 passed），下调仍是一次有记录的决定。★ #112 综合状态仍是 untested 不是 passed —— 机器半边 0 违规 / 13 项 AA / 页面集合 14↔15 零缺口，但 9 项真人签收（keyboard-flow / screen-reader-semantics / focus-order / dynamic-announcements / zoom-200 / reflow-400 / reduced-motion / text-over-image-contrast / real-user-test）一项都没做。★ 同时撤回一道我自己加的检查（bc9842e 的 case_not_in_authority）：理由是「冻结投影里的历史案件只能读」，而 api/review_api.py:220 的「API 只读」说的是**仓库对象**只读；它还与 verify_production_app 的 C7–C9 既有设计直接冲突（加门 8 FAIL，撤回 0 FAIL）。真正的病因是「读得到、写不进 authority」的断层，正确修法是 claim 时把 ir 并进 authority，本轮未做。"
+}
