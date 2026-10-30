@@ -79,6 +79,21 @@ COPY tools/bj_time.py ./tools/bj_time.py
 #     将来再加必须同时改这里，否则同一个坑会以同样的方式再踩一次。
 COPY tools/redact.py ./tools/redact.py
 
+# ★★ 2026-10-30：`base/media.py` 在 import 期就 `from lp_extract import ...`
+#   与 `import lp_fetch`（它把 `tools/` 加进 sys.path）。
+#
+#   改前这两个文件不在镜像里，于是容器一 import `base.media` 就
+#   `ModuleNotFoundError: No module named 'lp_extract'` —— 而这条路径
+#   在**媒体进件打开之后**成了每个进件的必经之路（`_build_image_unit`
+#   与 `_video_unit` 都要 `from base import media as MEDIA`）。
+#
+#   上游注释里那句「补完之后 tools/ 下没有别的运行时依赖了」在当时是对的，
+#   它统计的是 `from tools.*` 这种**带前缀**的写法；而 `base/media.py` 是
+#   **把 tools/ 加进 sys.path 后裸 import** 的，grep 那句口径扫不到。
+#   两个文件都只有标准库依赖（实测：argparse/gzip/html/json/re/pathlib/sys/…）。
+COPY tools/lp_extract.py ./tools/lp_extract.py
+COPY tools/lp_fetch.py ./tools/lp_fetch.py
+
 # 运行时数据（规则库 / 控制点 / 路由 / 外部标准库）。
 # 这些是**只读输入**，与 authority 那种可写数据分开：
 #   - research/ 打进镜像（发版即固化，规则变了必须重建镜像 —— 这是有意的）
