@@ -24,6 +24,17 @@ export default function AdminSessionsPage() {
       setSessions(Array.isArray(data) ? data : []);
       setError(null);
     } catch (e: unknown) {
+      // ★★ 2026-10-30 生产实测修：失败时必须把 `sessions` 从 null 里放出来。
+      //
+      //   改前只 `setError(...)`，而渲染分支是
+      //   `sessions === null ? <LoadingRows/> : ...`，于是 403/404 之后
+      //   **骨架屏永远转下去**，同一页上「审计访问说明」已经把原因写清楚了，
+      //   下面却还挂着一个 1071×180 的 `div.loading-rows[aria-busy=true]`。
+      //
+      //   实测（https://ca.luteos.com/admin/sessions，principal=u-zhoujian，
+      //   roles=[dp3]）：`GET /api/v1/admin/sessions` → 403，骨架屏不停。
+      //   这与 AdminGrantsPage 是同一个形状，两处一起修。
+      setSessions([]);
       if (e instanceof ApiError) {
         if (e.status === 403) {
           setError(

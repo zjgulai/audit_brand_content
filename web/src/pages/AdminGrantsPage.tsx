@@ -82,6 +82,21 @@ export default function AdminGrantsPage() {
       setTakedownGrants(Array.isArray(tg) ? tg : []);
       setError(null);
     } catch (e: unknown) {
+      // ★★ 2026-10-30 生产实测修：失败时**必须**把列表从 null 里放出来。
+      //
+      //   改前这里只 `setError(...)`，而列表状态 `signerGrants` / `takedownGrants`
+      //   仍停在 `null`。渲染分支是 `activeRows === null ? <LoadingRows/> : ...`，
+      //   于是**403 之后骨架屏永远转下去**：
+      //
+      //     实测 https://ca.luteos.com/admin/grants（principal=u-zhoujian, roles=[dp3]）
+      //     页面已经打印出「权限受限 仅内部治理角色可读取授权台账。」，
+      //     同时仍有 1 个 `div.loading-rows[aria-busy=true]` 占着 1071×236 的版面。
+      //
+      //   这不是「少刷一次」，是**错误态和加载态同时显示** —— 读起来像还没加载完，
+      //   于是人会一直等一个永远不会来的请求结果。
+      //   错误已经有 `error` 那一处显示，列表的职责只是「别再转」。
+      setSignerGrants([]);
+      setTakedownGrants([]);
       if (e instanceof ApiError && e.status === 403) {
         setError(
           "仅内部治理角色可读取授权台账。",
