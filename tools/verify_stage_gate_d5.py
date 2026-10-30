@@ -63,6 +63,9 @@ try:
     from api.production_app import (
         PRODUCTION_WRITE_PATHS, ProductionRuntime, ProductionSettings,
         create_production_app)
+    # ★ 2026-10-31：D5-6b 要对账两张表，缺一条 import 会让断言现场 NameError
+    #   —— 那会表现成「跑不起来」而不是「对不上」，两种红指向完全不同的修法。
+    from api.write_api import IMPLEMENTED_WRITE_PATHS
 except Exception as exc:  # noqa: BLE001
     print("UNTESTED: cannot import production assembly: %s" % exc)
     sys.exit(2)
@@ -242,6 +245,31 @@ def main():
         report("/api/v1/cases/{id}/release-decision" in PRODUCTION_WRITE_PATHS
                and "/api/v1/cases/{id}/release-revoke" in PRODUCTION_WRITE_PATHS,
                "D5-7 ★ release 两条已进生产能力表（T-310c 交付，有真实现）")
+
+        # ★★ 2026-10-31：D5-6b —— 实现表里的每一条，生产都必须放行。
+        #
+        #   这是同一个病第四次（T-312b 下线六条 / T-402 名单四条 /
+        #   T-401a 申诉三条 / 这次 uploads）。每次的形状完全一样：
+        #   `IMPLEMENTED_WRITE_PATHS` 加了，`PRODUCTION_WRITE_PATHS` 没加，
+        #   于是「开发测得通、生产 501」，而**没有任何东西会红** ——
+        #   因为既有自证要么跑开发装配（回落成实现表），要么直接调底层。
+        #
+        #   ★ 判据是**单向包含**，不是相等。我第一版写的是相等，当场红了：
+        #     只在生产表里的有 5 条（admin 四条 + reports/resign），它们由
+        #     `api/admin_api.py` 与重签 handler 实现、**不经过** `write_api`
+        #     的 `require_enabled` 闸门，所以本来就不该出现在实现表里。
+        #     把那 5 条也塞进实现表，等于让实现表宣称一件它不负责的事。
+        #
+        #   ★ 所以真正会伤到用户的那个方向只有一个：
+        #     「实现了、生产没放行」→ 用户点了 501。反过来（生产表多一条）
+        #     由那段代码自己是否真的注册了路由来保证，`OPENAPI` 那条已经覆盖。
+        _impl = set(IMPLEMENTED_WRITE_PATHS)
+        _prod = set(PRODUCTION_WRITE_PATHS)
+        report(_impl <= _prod,
+               "D5-6b ★★ 实现表 ⊆ 生产能力表（上一版漏了 /api/v1/uploads，"
+               "生产选图片一律 501）",
+               "实现了但生产没放行=%r（这些在生产上必 501）"
+               % (sorted(_impl - _prod),))
 
         session, csrf = cookie_for(runtime)
         client = TestClient(app)

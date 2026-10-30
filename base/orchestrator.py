@@ -73,6 +73,129 @@ VALID_REASON = ("no_capability", "no_rule", "not_wired", "no_control_points")
 UNKNOWN_BUCKET_KEYS = ("family", "scene_domain", "authority_source", "consequence")
 FAILURE_KIND_KEYS = ("fetch_error", "parse_error", "empty", "unsupported")
 
+#: 「未审说明」区块的责任人。按 `why` 归类 —— Playbook §4.3.3 要求每条未审
+#: 都写得出「责任人」，而责任人取决于**为什么没做**，不是取决于没做的是哪一块:
+#: 没能力要找采购/技术、没规则要找产品+法务、没接线要找技术。
+REASON_OWNER = {
+    "no_capability": "技术（能力采购）",
+    "no_rule": "产品 + 法务",
+    "not_wired": "技术（接线）",
+    "no_control_points": "产品 + 法务",
+}
+
+
+def _evidence_lines(findings, coverage, ir):
+    """从 findings 的 `authority_ref` 反推「依据清单」。
+
+    ## 为什么必须真算，而不是写 `[]`
+
+    2026-10-31 生产实测：报告里「## 依据清单 / 无」，而同一份快照里的 finding
+    **带着完整的 `authority_ref`**（`entry_id=EXT-025`、`source=外部标准库`、
+    条文号、url、指纹）。也就是说数据一直在，只是这一格被硬编码成 `[]`。
+
+    这正是 Playbook §4.3.3 那条 F1 想防的反面：**「无」既表示「本来就没有」，
+    又表示「我没算」**，两者长得一模一样。改前 `report_snapshot` 里
+    `"evidence": []` 与 `"unassessed": []` 两个常量，把「算过、结论是没有」
+    与「根本没算」压成了同一个读数（AGENTS.md §2.4.1 第 4 行：
+    **这句话比它的输入大**）。
+
+    ## 口径
+
+    一个 finding 可能带**多个** authority_ref（一条规则命中多个法源），逐个展开、
+    按 `entry_id` 去重 —— 同一法条被两条规则引用只列一次，否则依据清单会
+    随命中数膨胀，读起来像「依据很多」而实际是重复。
+
+    `source_type` 区分外部/内部：外部标准库是 `外部`，其余（内部规则库/知识库）
+    记 `内部`。Playbook §4.3.3 要求这个字段就是为了一眼看出依据的效力来源。
+    """
+    rows = []
+    seen = set()
+    kb_snapshot = (ir or {}).get("kb_snapshot")
+    for finding in findings or []:
+        if not isinstance(finding, dict):
+            continue
+        refs = finding.get("authority_ref")
+        if isinstance(refs, dict):
+            refs = [refs]
+        if not isinstance(refs, list):
+            continue
+        for ref in refs:
+            if not isinstance(ref, dict):
+                continue
+            entry_id = ref.get("entry_id") or ref.get("article") or ""
+            key = str(entry_id)
+            if key and key in seen:
+                continue
+            seen.add(key)
+            source = str(ref.get("source") or "")
+            rows.append({
+                "evidence_id": entry_id or None,
+                "source_type": "外部" if "外部" in source else "内部",
+                "source": source or str(ref.get("url") or "") or None,
+                "article": ref.get("article"),
+                "url": ref.get("url"),
+                "fingerprint": ref.get("fingerprint"),
+                # 生效期：外部标准库条目今天不带有效期字段（实测 24 条全无
+                # `valid_from`）。按「没给」处理，**不编一个**。
+                "valid_from": ref.get("valid_from"),
+                "valid_to": ref.get("valid_to"),
+                "control_code": finding.get("control_code"),
+                "kb_snapshot": finding.get("kb_snapshot") or kb_snapshot,
+            })
+    return rows
+
+
+def _unassessed_entries(coverage, unit):
+    """从 `coverage.not_evaluated_reason` 反推「未审说明」。
+
+    ## 为什么必须真算
+
+    同一个形状：改前是常量 `[]`，于是**一条 `coverage_state=partial` 的案件，
+    报告里也写着「未审部分：无」**。生产实测（case-12ef9e…）：
+    `coverage_state=partial`、义务 `partial_coverage`、三族空控制点，
+    而报告第 5 区块写「未审部分：无 / 原因：无 / 责任人：无」。
+
+    这是报告**说了不实的话**，而且方向最坏：它让人以为审全了。
+
+    ## 口径
+
+    只搬 `coverage.not_evaluated_reason` 里已有的条目（那是覆盖证明那一节
+    同源的数据，`_coverage_ir` 已归一到 4 个 VALID_REASON）。**不在这里
+    新造条目** —— 两处各生成一份措辞，迟早各自漂移。
+
+    另外把「载体本身没覆盖的部分」（`coverage.does_not_cover`）也列进来：
+    它回答的是「这个载体有什么我们根本看不到」（如视频无音轨、图内文字以外
+    的画面语义），与「哪些控制点没跑」是两件事，但都属于「未审」。
+    """
+    out = []
+    for r in (coverage or {}).get("not_evaluated_reason") or []:
+        if not isinstance(r, dict):
+            continue
+        why = r.get("why")
+        out.append({
+            "part": r.get("what") or "未说明",
+            "reason": why if why in VALID_REASON else "not_wired",
+            "label": r.get("label"),
+            "owner": REASON_OWNER.get(why, "技术（接线）"),
+        })
+    unit = unit or {}
+    textification = unit.get("textification") if isinstance(unit, dict) else None
+    declared = []
+    if isinstance(textification, dict):
+        declared = list(textification.get("does_not_cover") or [])
+    if not declared:
+        declared = list((coverage or {}).get("does_not_cover") or [])
+    for item in declared:
+        if not isinstance(item, str) or not item.strip():
+            continue
+        out.append({
+            "part": item.strip(),
+            "reason": "no_capability",
+            "label": "未做·无能力",
+            "owner": REASON_OWNER["no_capability"],
+        })
+    return out
+
 
 def _iso(ts):
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(ts)))
@@ -558,8 +681,13 @@ class Orchestrator(object):
             "ir": ir,
             "failure_kind_counts": failure_counts,
             "unknown_bucket_counts": unknown_counts,
-            "evidence": [],
-            "unassessed": [],
+            # ★★ 2026-10-31：这两格原先写死 `[]`，于是报告里
+            #   「## 依据清单 / 无」「## 未审说明 / 未审部分：无」——
+            #   而同一份快照的 finding 上带着完整 authority_ref，
+            #   coverage 上带着 partial 与三族空控制点。
+            #   数据一直在，只是没人算。现在真算（见两个 helper 的注释）。
+            "evidence": _evidence_lines(findings, coverage, ir),
+            "unassessed": _unassessed_entries(coverage, u),
             "receipt": {
                 "skill": receipt["skill_id"],
                 "version": receipt["skill_version"],

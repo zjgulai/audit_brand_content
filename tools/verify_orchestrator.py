@@ -430,6 +430,92 @@ def main():
            {k: 0 for k in O.UNKNOWN_BUCKET_KEYS},
            "C9c 无未知桶时四键仍为 0（不省略）", repr(r["receipt"].get("unknown_buckets")))
 
+    # ★★ 2026-10-31：C9e/C9f —— `report_snapshot.evidence` 与 `.unassessed`
+    #   原先写死 `[]`，于是报告里「依据清单 / 无」「未审部分：无」，
+    #   而同一份快照的 finding 带 authority_ref、coverage 带 partial。
+    #   两条断言分别守「必须从输入算出来」与「空的时候必须真的是空」。
+    #
+    #   ★ 反向对照（判据不能恒真）：把 finding 的 authority_ref 拿掉、
+    #     把 coverage 的 not_evaluated_reason 清空，两条读数必须各自变空。
+    #     没有这一半，「非空」在数据本来就空时也测不出来。
+    ru = r.get("report_snapshot") or {}
+
+    def _c9e():
+        """有 authority_ref → evidence 非空，且逐项带 Playbook 要求的四字段。"""
+        f = dict(finding, authority_ref=[
+            {"entry_id": "EXT-021", "source": "外部标准库",
+             "article": "S7-03", "url": "https://e.test/a",
+             "fingerprint": "sha256:aa"},
+            {"entry_id": "EXT-022", "source": "内部规则库",
+             "article": "S7-04", "url": "https://e.test/b",
+             "fingerprint": "sha256:bb"},
+            # 重复 entry_id：必须去重（否则依据清单随命中数膨胀）
+            {"entry_id": "EXT-021", "source": "外部标准库", "article": "S7-03"},
+        ])
+        cnt = Counter()
+        rr = build(cnt, rule=[f]).run(request(unit=None))
+        ev = (rr.get("report_snapshot") or {}).get("evidence") or []
+        ids = [e.get("evidence_id") for e in ev]
+        fields_ok = all(
+            {"evidence_id", "source_type", "source", "valid_from"} <= set(e)
+            for e in ev)
+        return (len(ev) == 2 and ids == ["EXT-021", "EXT-022"] and fields_ok,
+                repr(ev))
+
+    def _c9e_reverse():
+        """★ 反向对照：finding 没有 authority_ref 时 evidence 必须为空。
+
+        这一半是判据的立身之本 —— 只断言「非空」，在数据本来就没有依据时
+        它会永远红，或者在写了假数据时永远绿。
+        """
+        f = {k: v for k, v in finding.items() if k != "authority_ref"}
+        cnt = Counter()
+        rr = build(cnt, rule=[f]).run(request(unit=None))
+        ev = (rr.get("report_snapshot") or {}).get("evidence") or []
+        return (ev == [], repr(ev))
+
+    def _c9f():
+        """有 not_evaluated_reason → unassessed 逐条搬过来，带 reason/owner。"""
+        untested = [{"part": u.get("part"), "reason": u.get("reason")}
+                    for u in (ru.get("unassessed") or [])]
+        return (any(u["part"] == "视频音轨" and u["reason"] == "no_capability"
+                    for u in untested),
+                repr(untested))
+
+    def _c9f_reverse():
+        """★ 反向对照：coverage 说「没有未跑的东西」时 unassessed 必须为空。
+
+        ★ 注意这里刻意**不**用 `coverage_state == "full"` 当判据：
+          `does_not_cover` 非空时状态不许是 full（C16g），两条会打架。
+          判据只认 not_evaluated_reason 与载体声明这两处输入。
+        """
+        cov = dict(coverage, not_evaluated_reason=[])
+        cnt = Counter()
+
+        def comp_cov(ctx):
+            return cov
+
+        o2 = build(cnt)
+        o2.coverage = comp_cov
+        rr = o2.run(request(unit=dict(unit(), textification={
+            "covers": ["正文"], "does_not_cover": []})))
+        un = (rr.get("report_snapshot") or {}).get("unassessed") or []
+        return (un == [], repr(un))
+
+    for key, fn in (("C9e 报告依据清单从 finding.authority_ref 真算（去重 + 四字段）",
+                     _c9e),
+                    ("C9e' ★ 反向对照：没有 authority_ref 时依据清单必须为空",
+                     _c9e_reverse),
+                    ("C9f 未审说明从 coverage.not_evaluated_reason 真算",
+                     _c9f),
+                    ("C9f' ★ 反向对照：没有未跑项时未审说明必须为空",
+                     _c9f_reverse)):
+        try:
+            ok, detail = fn()
+        except Exception as exc:  # noqa: BLE001
+            ok, detail = False, "跑不起来：%r" % (exc,)
+        report(ok, key, detail)
+
     # C9d 报告侧：让真实 report_render.mjs 读 snapshot，四个计数必须出现。
     runner = tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False)
     try:

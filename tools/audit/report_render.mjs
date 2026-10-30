@@ -47,6 +47,13 @@ const REASON_ZH = {
   no_capability: "无能力",
   no_rule: "无规则",
   not_wired: "未接线",
+  // ★ `no_control_points` 这里**刻意没有**条目，别顺手补上。
+  //   2026-10-31 我补过一次，`verify_report_coverage_reason` 的 S5 立刻变红：
+  //   那张断言的判据是「IR 的 label 丢了之后，报告必须**看得出这是缺口**」，
+  //   而给一个顺眼的中文词（「无控制点」）恰好把缺口抹平成一句正常说明。
+  //   label 在的时候由 IR 给（「未做·无控制点」）；label 不在时退回原始 why，
+  //   让读到的人知道「这里是没接线，不是本来说没有」。
+  //   反向对照见该 verifier 的 `S5 坏样本`。
 };
 const SEVERITY_RANK = { L0: 0, L1: 1, L2: 2, L3: 3, L4: 4, L5: 5 };
 
@@ -335,8 +342,12 @@ export function renderReport(snapshot) {
     lines.push("- 责任人：无");
   } else {
     for (const u of unassessed) {
+      // ★ 2026-10-31：把 `label` 也传进去。`reasonText` 的第一优先级就是它
+      //   （「IR 自带的可读标签优先」），改前这里只传了 `reason`，于是
+      //   编排器精心带下来的 `label`（如空族的「未做·无控制点」）被丢掉，
+      //   退回通用措辞 —— 同一个原因在两处显示两种说法。
       lines.push(`- 未审部分：${textOrNone(u.part)} · `
-        + `原因：${reasonText(u.reason)} · 责任人：${textOrNone(u.owner)}`);
+        + `原因：${reasonText(u.reason, u.label)} · 责任人：${textOrNone(u.owner)}`);
     }
   }
   const fc = snapshot.failure_kind_counts;
@@ -448,7 +459,7 @@ export function renderMessage(snapshot) {
     detail = ir.decision.review_reason || "需要人看";
   } else if (state === "未审查") {
     const u = asArray(snapshot.unassessed)[0];
-    detail = u ? `${u.part}：${reasonText(u.reason)}` : "未审原因未提供";
+    detail = u ? `${u.part}：${reasonText(u.reason, u.label)}` : "未审原因未提供";
   } else if (state === "待自决") {
     detail = ir.decision.self_decide || "请提交人确认是否修改";
   } else if (state === "PASS") {

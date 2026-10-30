@@ -405,6 +405,25 @@ class ReviewCommandService:
         ★ external_binding_provider 未装配时返回 None —— 那是「未测」，
           不是「没有失效」；production 在 start() 里接真身（规则表 +
           KB 快照的当前值）。「无变化」是常态，静默返回 None。
+
+        ★★ 2026-10-31：provider 现在**接收 state**。
+          改前它不带参数，于是生产那份 `_external_binding()` 拿不到案件，
+          只能把 `raw_sha256` / `text_sha256` 写成 `None`；而
+          `ReleaseGate._changes()` 拿它与签名里的 hex64 比，**恒判两条变化** ——
+          生产实测：每个案件签发后 30 秒内（心跳周期）必被
+          `release_invalidate` 判失效，建一条 `queued` 重审 job。
+          而 `run_reaudit` 全仓零调用点，job 就永远躺在那里。
+
+          症状是「签了等于没签」，且没有任何自证会红：
+          `verify_reaudit_persistence` 的 X1c「无变化」用的是自己造的、
+          与签名完全一致的 binding 夹具 —— **验证器的形状 ≠ 生产的形状**。
+
+          改接口而不是在 `_changes` 里对 `None` 特判，理由有三：
+          ① 特判 `None` 等于说「读不到就算没变化」，而读不到是**未测**，
+             按三态纪律它既不是「没变化」也不是「有变化」；
+          ② 那会让「provider 真的算了但内容变了」与「provider 根本没算」
+             长得一样，正是本仓反复记的那个病；
+          ③ 指纹是案件的属性，provider 本来就该拿到案件。
         """
         if self.external_binding_provider is None:
             return None
@@ -412,7 +431,7 @@ class ReviewCommandService:
             state = self.authority.state(case_id)
             if (state.get("release") or {}).get("status") != "signed":
                 return None
-            current = self.external_binding_provider()
+            current = self.external_binding_provider(state)
             if not isinstance(current, dict):
                 return None
             try:

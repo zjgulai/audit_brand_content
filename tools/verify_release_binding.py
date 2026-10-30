@@ -25,7 +25,7 @@ try:
                                       binding_from_state,
                                       media_placeholders)
     from base.release_gate import (_binding, ReleaseGate, SignatureError,
-                                   validate_signature)
+                                   _hex64, validate_signature)
     from base.review_reducer import initial_state, reduce_command
     from base.reviews_ledger import LedgerValidation
     from base.submission_service import SubmissionIngestor
@@ -98,6 +98,70 @@ def main(controls_only=False):
                    ("kb_snapshot_hash", "conflict_table_version",
                     "media_fingerprints", "release")),
                "P6 initial_state 四个新键齐全")
+
+        # ★★ 2026-10-31：P7 —— **媒体件**也必须能走完签发绑定。
+        #
+        #   改前本文件只测文本件（P4 那条断言本身就是「media_fingerprints
+        #   缺省为 {}」），于是媒体路径上的一处硬阻断整整活着：
+        #   `judge_entry` 把 `asr_output_hash` 写成字符串 `"not_available"`，
+        #   而 `release_gate._binding()` 要求六个媒体字段全是 hex64 →
+        #   **图片/视频案件永远签不了发**，且没有任何自证会红。
+        #
+        #   生产实测（case-f02841432752f61c822a）：`binding_from_state` 能过，
+        #   紧接着 `_binding` 抛 `case.asr_output_hash 不是 64 位十六进制`。
+        #   PRD §5.4 写明业务主形态就是图片和视频 —— 等于主形态放不了行。
+        #
+        #   ★ 为什么走 `judge_unit` 真链路而不是手搓 dict：手搓的 dict 只能
+        #     证明「我会填这六个字段」，证明不了「生产者填得对」。这次的缺陷
+        #     恰好在生产者那一侧。
+        try:
+            _media_unit = {
+                "unit_id": "cu-media-bind", "contract_version": "content-unit-v1",
+                "source": {"kind": "image"}, "parse_status": "ok",
+                "text": "经三甲医院临床验证，效果最佳",
+                "fingerprint": {"raw_sha256": "a" * 64, "text_sha256": "b" * 64},
+                "textification": {"covers": ["图内文字"],
+                                  "does_not_cover": ["画面语义"],
+                                  "extractor": "rapidocr"},
+            }
+            from base import judge_entry as _JE
+            _media_ir = _JE.judge_unit(_media_unit)["ir"]
+            _mf = _media_ir.get("media_fingerprints") or {}
+            # ★ 判据是「生产者**给了**的每个字段都得是 hex64」，不是
+            #   「六个字段都在」。`review-ir-v1.schema.json:183` 的 required
+            #   只有四个：keyframe_set_hash / sampling_config_hash 是可选项，
+            #   由 `media_placeholders()` 在下游补确定性占位。
+            #   我第一版写成「六字段全在」，当场红了 —— 红得对，是断言错了对象。
+            _bad = [k for k, v in _mf.items()
+                    if k in MEDIA_BINDING_FIELDS and not _hex64(v)]
+            report(not _bad,
+                   "P7 ★★ 图片件 media_fingerprints 里生产者给出的字段必须都是 "
+                   "hex64（改前 asr_output_hash 是字符串 'not_available'）",
+                   repr({k: str(_mf.get(k))[:24] for k in _bad}) if _bad else "")
+            # 且**经下游占位之后**六字段必须全 hex64 —— 这才是签发的真实输入。
+            _filled, _ = media_placeholders(_mf)
+            _bad2 = [k for k in MEDIA_BINDING_FIELDS
+                     if not _hex64(_filled.get(k, ""))]
+            report(not _bad2,
+                   "P7c ★ 经 media_placeholders 之后六字段全 hex64（签发真实输入）",
+                   repr(_bad2))
+            _mstate = {
+                "case_id": "case-media-bind", "version": 3, "ir": _media_ir,
+                "content": {"fingerprint": {"raw_sha256": "a" * 64,
+                                            "text_sha256": "b" * 64}},
+                "kb_snapshot_hash": hashlib.sha256(b"kb").hexdigest(),
+                "conflict_table_version":
+                    _media_ir.get("control_points_version") or "cp-1",
+                "media_fingerprints": _mf,
+            }
+            _binding(copy.deepcopy(binding_from_state(_mstate)))
+            report(True, "P7b ★★ 图片件 binding_from_state 输出通过 _binding")
+        except SignatureError as exc:
+            report(False, "P7b ★★ 图片件 binding_from_state 输出通过 _binding",
+                   "（%s）" % exc)
+        except Exception as exc:  # noqa: BLE001
+            report(False, "P7b ★★ 图片件 binding_from_state 输出通过 _binding",
+                   "（跑不起来：%r）" % (exc,))
 
         # ---- A1：11 个绑定字段齐全，binding_from_state 能过 _binding ----
         binding = None

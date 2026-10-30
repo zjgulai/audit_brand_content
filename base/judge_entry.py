@@ -352,7 +352,30 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
         media_fingerprints = {
             "frame_manifest_hash": str(fp.get("raw_sha256") or "unknown"),
             "ocr_output_hash": str(fp.get("text_sha256") or "unknown"),
-            "asr_output_hash": "not_available",
+            # ★★ 2026-10-31：这里原先是字符串 `"not_available"`，而
+            #   `release_gate._binding()` 要求六个媒体字段**全是 64 位十六进制**
+            #   （`:149-153`），`media_placeholders()` 又对任何非空字符串
+            #   原样透传。于是图片/视频案件走到签发一律
+            #   `SignatureError: case.asr_output_hash 不是 64 位十六进制`
+            #   —— 媒体是业务主形态（PRD §5.4），等于主形态永远放不了行。
+            #
+            #   生产实测（case-f02841432752f61c822a）：`binding_from_state`
+            #   能过，紧接着 `_binding` 就抛，且**没有任何自证会红**
+            #   （`verify_release_binding` 只测文本件 media_fingerprints={}）。
+            #
+            #   ★ 为什么不用 `"absent:<field>"` 那种占位串：`media_placeholders`
+            #     自己会造 `sha256(b"absent:"+name)` 的 hex64；生产者的职责是
+            #     **只给真的有的值**，不确定就不给键，让下游统一兜。写一个
+            #     看起来像说明的字符串，等于让「没有 ASR」假装成一个值。
+            #
+            #   ★ 语义不变：本仓 `DEFAULT_ASR_ENGINE = None`，没有语音转写，
+            #     `asr_output_hash` 就是「未测」。但如果直接省略这个键，
+            #     `review-ir-v1.schema.json:183` 的 `required` 会拒（它要求
+            #     四个键都在），所以这里给**确定性 hex64 占位**，与
+            #     `media_placeholders` 的空值分支**逐字同一算法** ——
+            #     两边算出同一个值，才谈得上「签名可复算」。
+            "asr_output_hash": hashlib.sha256(
+                b"absent:asr_output_hash").hexdigest(),
             "model_config_hash": hashlib.sha256(
                 (CONTRACT_VERSION + "|" + extractor).encode("utf-8")).hexdigest(),
         }

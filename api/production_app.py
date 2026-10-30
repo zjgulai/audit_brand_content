@@ -96,6 +96,27 @@ PRODUCTION_WRITE_PATHS = {
     # T-403：报告重签（ADR-0017）。它**不写权威状态**，只签发一条带时效的链接。
     # 加进本表是因为生产闸门按「能力表」拦写请求 —— 不放行就永远 501。
     "/api/v1/reports/{id}/resign",
+    # ★★ 2026-10-31：媒体上传。**改前漏了，生产上选图片/视频一律 501。**
+    #
+    #   `api/write_api.py:276` 的 `IMPLEMENTED_WRITE_PATHS` 里一直有它，
+    #   而本表没有 —— 于是开发装配能传（`enabled_capabilities=None` 回落成
+    #   实现表），生产点了报 `capability_not_enabled`。
+    #
+    #   ★ 为什么之前的自证全绿：`verify_stage_gate_d5` 跑的是**开发装配**，
+    #     `verify_media_upload` 直接调 `base/media_upload.py` 而不经过能力表。
+    #     两处都绕过了「生产闸门」这一跳，所以没有任何东西会红。
+    #     ——AGENTS.md §2.4.1「验证器的形状 ≠ 生产的形状」，这是新的一例。
+    #
+    #   ★ 后果不是「少一个按钮」：PRD §5.4 写明业务主形态就是图片和视频
+    #     （AI 平面素材每日产出、达人内容月均 100–200 条）。这条不通，
+    #     工作台的「审核工作台」页对主形态等于不可用。
+    #
+    #   ★ 与 T-312b/T-402/T-401a 完全同一个病，第四次。判据已加在
+    #     `tools/verify_stage_gate_d5.py` 的 D5-6b：实现表 ⊆ 生产能力表。
+    #     （这条注释原先写的是 `tools/verify_production_parity.py` 的 W1 ——
+    #      那个文件**从未存在过**。一条指向不存在文件的注释，比没有注释更糟：
+    #      下一个人照着去找，只会以为是自己漏拉了。）
+    "/api/v1/uploads",
 }
 def build_allowlist_source(projection):
     """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
@@ -605,11 +626,36 @@ class ProductionRuntime:
             _ingestor = SubmissionIngestor()
             from base.control_points import ControlPointRegistry as _CPR
 
-            def _external_binding():
+            def _external_binding(state=None):
+                """采集**当前**外部绑定，与签名侧逐字段可比。
+
+                ★★ 2026-10-31：`state` 形参是这次加的（配套
+                `ReviewCommandService.invalidate_if_due` 改成传 state）。
+
+                改前这里把 `raw_sha256` / `text_sha256` 写死 `None`、
+                `media_fingerprints` 写死 `[]`，而 `ReleaseGate._changes()`
+                拿它们与签名里的 hex64 比 —— **每个案件签发后一个心跳周期内
+                必被判「三条输入已变化」**，建 queued 重审 job，而
+                `run_reaudit` 全仓零调用点，job 永远不跑。
+
+                现在：内容指纹从案件 state 的 `content.fingerprint` 取
+                （那正是签名时 `binding_from_state` 用的同一处），媒体指纹
+                优先用当前 IR（重判后 IR 会带新值），没有就退回空列表 ——
+                `media_root([])` 是确定性摘要，与签名侧一致。
+                **不复制签名自己的值**：那样「内容真的变了」就永远发现不了。
+                """
                 from base.rule_judge import RuleJudge as _RJ
                 reg = _CPR()
                 kb_id = _ingestor._kb_snapshot()
                 import hashlib as _hl
+                st = state if isinstance(state, dict) else {}
+                content = st.get("content") if isinstance(st.get("content"), dict) else {}
+                fp = content.get("fingerprint") if isinstance(
+                    content.get("fingerprint"), dict) else {}
+                ir = st.get("ir") if isinstance(st.get("ir"), dict) else {}
+                media = ir.get("media_fingerprints")
+                if not isinstance(media, dict):
+                    media = {}
                 return {
                     "rule_snapshot": {"version": "rules-v1",
                                       # 与 judge_entry 同一来源：RuleJudge 的快照指纹
@@ -618,8 +664,12 @@ class ProductionRuntime:
                                     "hash": _hl.sha256(
                                         kb_id.encode("utf-8")).hexdigest()},
                     "conflict_table_version": reg.table_version,
-                    "raw_sha256": None, "text_sha256": None,
-                    "media_fingerprints": [],
+                    # 内容指纹：与 `binding_from_state` 同源（state.content.fingerprint）。
+                    # 取不到时**保留 None** —— 让 `_changes` 判成变化，
+                    # 而不是伪装成「没变化」。
+                    "raw_sha256": fp.get("raw_sha256"),
+                    "text_sha256": fp.get("text_sha256"),
+                    "media_fingerprints": media,
                     "used_authority_refs": [],
                 }
 

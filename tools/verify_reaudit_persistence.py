@@ -170,7 +170,7 @@ def main():
                 }
             # ★ _changes 需要 current 侧的 raw/text 指纹与签名侧一致才只报
             #   kb 变化 —— 从旧签名取，避免混入内容变化。
-            def _changed_binding_exact():
+            def _changed_binding_exact(state=None):
                 cur = _changed_binding()
                 cur["raw_sha256"] = signed["result"]["signature"]["raw_sha256"]
                 cur["text_sha256"] = signed["result"]["signature"]["text_sha256"]
@@ -194,7 +194,7 @@ def main():
                    "X1b 同 change_set 重复失效 → 合并（job_id 确定性）")
             # X1c：无变化 → nothing_to_reaudit → None（常态，不是失败）
             _sig = signed["result"]["signature"]
-            svc.external_binding_provider = lambda: dict(
+            svc.external_binding_provider = lambda state=None: dict(
                 _sig,
                 rule_snapshot={"version": _sig["rule_snapshot_version"],
                                "hash": _sig["rule_snapshot_hash"]},
