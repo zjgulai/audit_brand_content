@@ -439,7 +439,28 @@ class SubmissionIngestor:
                 "unsupported_source_kind", 422,
                 "本轮只接 %s，收到 %r" % (sorted(allowed), kind))
         expected_content_type = _SOURCE_KIND_CONTENT_TYPE.get(kind)
-        if submission.get("content_type") != expected_content_type:
+        # ★★★ 2026-10-30：`content_type=文档` 走飞书文档链接时是**合法**的，
+        #   但它在这张映射表里没有条目 —— 于是下面那句比较恒不等，恒 422。
+        #
+        #   那句比较的判据是「kind ↔ content_type 一一对应」，而文档这一类
+        #   **本来就不是一一对应**：Playbook §3.1 与《技术解决方案》§946 的口径是
+        #
+        #       content_type=文档 + source.kind=free_text + source.doc_type=docx|sheet|bitable
+        #
+        #   也就是「飞书里的那份文档」用 free_text 承载（正文是读出来的文字），
+        #   而 `source.kind=文档` 专门留给「上传的 .docx/.pdf」且**显式 unsupported**。
+        #
+        #   实测这条缺口：`submission_router.classify_submission()` 判 accepted
+        #   （它只查 `content_type=文档` 是否走了飞书文档链接通道），
+        #   到了 ingestor 这一层却被 422 挡回 ——
+        #   **两层判据不一致，而报错文字（「必须配 content_type=文本」）
+        #   把责任推给了调用方**。这正是 §2.4.1 那个形状。
+        is_feishu_doc = (
+            submission.get("content_type") == "文档"
+            and submission.get("entry_channel") == "飞书文档链接"
+            and kind == "free_text"
+        )
+        if not is_feishu_doc and submission.get("content_type") != expected_content_type:
             raise SubmissionRejected(
                 "unsupported_content_type", 422,
                 "source.kind=%s 必须配 content_type=%s"
