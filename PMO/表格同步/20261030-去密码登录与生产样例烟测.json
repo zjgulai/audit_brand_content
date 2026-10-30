@@ -1,0 +1,20 @@
+{
+  "事项名称": "去掉账号密码登录（Daisy）+ 生产样例数据烟测 + 工作流耗时读数",
+  "关联执行票": "WBPM-0148",
+  "功能一级分类": "登录与身份入口",
+  "功能二级分类": "登录态",
+  "功能三级分类": "OAuth 完整登录",
+  "工作类型": [
+    "前端",
+    "部署运维",
+    "测试验收"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "/login",
+  "事项明细": "① 撤掉账号口令登录：委托方要求「将账号密码 Daisy 去掉，依旧使用飞书扫码登陆作为登陆方」。登录页删掉「账号/口令/提交」表单与四个只服务于它的 CSS 类（login__form / login__field / login__submit / login__form-error），只留飞书扫码 +「使用飞书账号登录」；`.login__alt` 加 `--solo` 变体去掉已无第二项可分隔的「或」。`api/client.ts` 的 passwordLogin 一并删除，不留「暂时没人调」的方法。后端 `POST /auth/password` 实现保留（verify_password_login 的五组判据仍指着它），生产由 REVIEW_PASSWORD_LOGIN 控制并置空 —— 真判据是环境变量与服务端 404，不是 JSX：界面上看不见不等于通道不存在。② 生产投 5 条样例（绝对化极限词 / 医疗临床宣称 / FDA 背书 / 完全合规 / 中立记录），按委托方口径留在生产。③ 读工作流逐步耗时与 10 次连跑稳定性。④ 顺带修一个生产实测发现的 bug：/admin/grants 与 /admin/sessions 在 403/404 后骨架屏永远转（错误态与加载态同时显示）。",
+  "验收标准": "S1 生产 `POST /auth/password` 必须 404（不是 403 —— 403 等于告诉探测者「有这个东西，只是不给你」）；此前实测 401，即为通道开着。S2 /auth/login 必须 302 到 accounts.feishu.cn，client_id=cli_aa2243de0438dcd7，scope=auth:user.id:read。S3 /readyz 七项检查全 true。S4 线上主包必须换成含本次改动的 hash。S5 样例五类判定：hyperbole→BLOCK、clinical→REVIEW、endorse→BLOCK、clean→REVIEW(findings=0)、neutral→REVIEW(findings=0)；界面徽标必须逐条等于后端 decision.state。S6 后端 0 条 finding 时界面不许出现「违规拦截」。S7 覆盖 partial 时界面必须有「未评估的部分」。S8 同一内容连跑 10 次，结论与 steps 数必须一致。S9 workflow_timing 必须 status=ok 且 step_count=5。",
+  "状态依据": "提交 246cd21（登录改造）、d9ea962（admin 骨架屏），镜像 momcozy-audit:246cd21 与 momcozy-audit:d9ea962，容器 Up 且 /readyz 200。★ 生产实测读数：`POST /auth/password` = 404（改前 401），`.env.production` 的 REVIEW_PASSWORD_LOGIN / USER / SECRET / PRINCIPAL 四项全空，Daisy 明文不再留在文件里（备份 .env.production.bak-20261030）。线上主包 assets/index-CDkrbZHT.js。★ 逐页验收 12 页：修前 6 红 → 修后 1 红（唯一红是 /reports「共 0 份报告」，已查明不是页面 bug，见下）。★ 样例判定与界面完全一致：hyperbole BLOCK/partial/findings=1、clinical REVIEW/partial/1、endorse BLOCK/partial/1、clean REVIEW/partial/0/未评估3、neutral REVIEW/partial/0/未评估3；界面徽标逐条等于后端。★ 稳定性 10/10 一致（BLOCK/partial/1 finding/5 steps）。★ 耗时：total_ms min=1.058 med=1.092 max=1.14（逐步求和口径，非秒差 —— orchestrator 的 _iso 精度只到秒而整链约 1ms，秒差恒为 0）；最慢步几乎总是 dispose（0.75–4.93ms），judge 0.24–0.31ms；端到端墙钟（含 HTTP）min=412ms med=576ms max=9866ms（首次请求含冷启动/首连开销）。★ 未测项要说清：报告索引为空**不是** bug —— report_snapshot 只在 submit_review（结案）时产出，而 10-22 那条已结案案件的 state 里没有 report_snapshot（T-316b 早已登记的断链），本轮 5 条样例尚未结案；reports-root 与 authority/reports 目录均为空、/api/v1/reports 返回 []。★ 一个测法更正：headless 标签页的 document.visibilityState 是 hidden，而 usePolling 的可见性是硬门禁，于是首轮 6 红里有 3 红（/queue、/inbox、/my-cases 停在骨架屏、/api/v1/queue 一次未发）**全是测量环境造成的假失败**，不是生产 bug；Target.activateTarget 激活标签页后复测转绿。这条要记：用 headless 跑轮询页面时必须先激活 target。"
+}
