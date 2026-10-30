@@ -217,6 +217,19 @@ class PrincipalDirectory:
         """按模板造一条自动登记记录。`id` 从 open_id 推，稳定且可预期。
 
         ★ 不用姓名做 id：姓名会变、会重名，而 id 是 ACL 与审计里的那个键。
+
+        ★★ `authz_version` 必须**这里就算出来**。
+        2026-10-30 生产实测踩过：本地验的时候目录是
+        `require_authz_version=False`（缺了会自动算一个哈希），于是
+        `_auto_row` 不填也能跑；而 `ProductionRuntime.start()` 用的是
+        `True`（`api/production_app.py`），那里缺这个字段直接
+        `principal_field: authz_version` —— **第一个真人扫码就 500**。
+        这正是「本地验的形状 ≠ 生产的形状」，所以现在不论 require 与否
+        都算，并且断言里补了 `require_authz_version=True` 那一支。
+
+        算法与 `_validate` 的兜底分支**同一个**：对记录本身取 sha256。
+        于是「改了角色模板」→ 版本变 → 已登录的人被判「授权已变化」需重登，
+        这是想要的行为（授权变了就该重新拿一次授权）。
         """
         key_hash = hashlib.sha256(
             ("%s\n%s" % (tenant_id, open_id)).encode("utf-8")).hexdigest()[:16]
@@ -224,15 +237,20 @@ class PrincipalDirectory:
             "id": "auto-" + key_hash,
             "tenant_id": tenant_id,
             "open_id": open_id,
-            "roles": list(self.auto_grant["roles"]),
-            "product_lines": list(self.auto_grant["product_lines"]),
-            "capabilities": list(self.auto_grant["capabilities"]),
-            "product_line": self.auto_grant["product_lines"][0],
+            "roles": sorted(set(self.auto_grant["roles"])),
+            "product_lines": sorted(set(self.auto_grant["product_lines"])),
+            "capabilities": sorted(set(self.auto_grant["capabilities"])),
+            "product_line": sorted(set(self.auto_grant["product_lines"]))[0],
             "status": "active",
             "source": "auto",
         }
         if display_name:
             row["name"] = str(display_name)
+        # ★ 与 `_validate` 的兜底分支逐字同一算法，且**不含 authz_version 自己**
+        #   （否则它会是自己的输入，永远算不出一个稳定值）。
+        row["authz_version"] = hashlib.sha256(json.dumps(
+            row, ensure_ascii=False, sort_keys=True,
+            separators=(",", ":")).encode("utf-8")).hexdigest()
         return row
 
     def _persist_auto(self, row):

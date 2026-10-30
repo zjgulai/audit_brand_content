@@ -146,6 +146,39 @@ def group_a(tmp):
               row is not None and row.get("name") == "刘华丽",
               repr(row and row.get("name")))
 
+    def a3e(d):
+        # ★★ 生产形状用的是 require_authz_version=True，本地那一支覆盖不到
+        #   （缺字段时本地会自动补算，生产直接拒）。2026-10-30 实测踩过：
+        #   第一个真人扫码就 500 principal_field: authz_version。
+        fx = Fixture(d, auto_grant=GRANT)
+        pd = fx.open(require_authz_version=True)
+        try:
+            row = pd.by_identity("t1", "ou_strict", "刘华丽")
+        except PrincipalDirectoryError as exc:
+            bad("A3e ★ 生产形状 require_authz_version=True 下也必须能自动登记",
+                "实际 code=%r —— 本地 False 那一支覆盖不到这一条" % (exc.code,))
+            return
+        except Exception as exc:  # noqa: BLE001
+            bad("A3e ★ 生产形状 require_authz_version=True 下也必须能自动登记",
+                repr(exc))
+            return
+        check("A3e ★ 生产形状 require_authz_version=True 下也能自动登记",
+              row is not None and row["authz_version"])
+        # 反向对照：同样形状下，缺 authz_version 的显式记录仍必须被拒
+        # （不许为了「让人能进」把这条校验放松掉）
+        fx2 = Fixture(d, explicit=[{"id": "u-nover", "tenant_id": "t1",
+                                    "open_id": "ou_nover", "roles": ["dp3"],
+                                    "product_lines": ["吸奶器"]}])
+        try:
+            fx2.open(require_authz_version=True)
+        except PrincipalDirectoryError as exc:
+            check("A3f ★ 反向对照：显式记录缺 authz_version 仍然被拒（校验没被放松）",
+                  exc.code == "principal_field", "实际 code=%r" % (exc.code,))
+        except Exception as exc:  # noqa: BLE001
+            bad("A3f ★ 反向对照：显式记录缺 authz_version 仍然被拒", repr(exc))
+        else:
+            bad("A3f ★ 反向对照：显式记录缺 authz_version 仍然被拒", "被接受了")
+
     def a4(d):
         fx = Fixture(d, auto_grant=GRANT)
         pd = fx.open()
@@ -251,7 +284,7 @@ def group_a(tmp):
                   os.path.join(store_dir, "principals-auto.json")),
               repr(row and row["id"]))
 
-    for fn in (a1, a2, a3, a4, a5, a6, a7):
+    for fn in (a1, a2, a3, a3e, a4, a5, a6, a7):
         t(fn)
 
 
