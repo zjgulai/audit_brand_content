@@ -353,6 +353,31 @@ class AuthorityCaseSource:
             "intent_inference": (state.get("intent_inference")
                                  if isinstance(state.get("intent_inference"), dict)
                                  else None),
+            # ★★★ 2026-10-30：同一张投影表里的**第三处**遗漏，形状与前两处完全相同。
+            #
+            #   多模态观察真的产出了（authority state 实测：图片 6 条 / 视频 12 条，
+            #   逐条带 statement/confidence/bbox/model），reducer 也确实把它写进了
+            #   `multimodal_observations` —— 但投影这一层不透传，于是：
+            #
+            #     GET /api/v1/cases/{id} → multimodal_observations = []
+            #     → 报告里「画面语义」那一节空着
+            #     → 读起来像「看了画面、没发现问题」
+            #
+            #   而实际上模型说了很多（实测有一条："画面为白底纯文字排版，
+            #   全画面未出现产品实物、人物或使用场景，无法判断演示的使用场景"）。
+            #   这正是 §2.4.1 那个病：一个读数（空列表）比它的输入（12 条观察）小。
+            #
+            #   ★ 三态原样透传，不压成布尔：
+            #       []                    —— 本载体不需要多模态（文本）
+            #       [{status:"untested"}] —— 需要但没测成（缺凭据/抽帧失败）
+            #       非空且 status=ok      —— 真的看到了
+            #     前两者与第三者必须长得不一样，否则「没看成」会被读成「没问题」。
+            "multimodal_observations": (
+                state.get("multimodal_observations")
+                if isinstance(state.get("multimodal_observations"), list) else []),
+            "multimodal_note": (state.get("multimodal_note")
+                                if isinstance(state.get("multimodal_note"), str)
+                                else None),
         }
 
     def get_case(self, case_id):
