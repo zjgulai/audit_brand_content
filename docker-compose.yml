@@ -65,6 +65,17 @@ services:
       #     （api/production_app.py 的 _ensure_private_dir 循环）。
       #     所以这不是「少配了一个目录」，是「配了但没人在查」。
       - /opt/momcozy-audit-platform/data/reports-root:/data/reports-root
+      # ★ 2026-10-30：媒体素材根。图片/视频进件的路径校验基准。
+      #   不加这一行时 REVIEW_MEDIA_ROOTS=/data/media 在容器里**不存在**，
+      #   ProductionSettings 构造期就抛 media_roots[0]_not_a_directory ——
+      #   容器起不来，整站 502。实测就是这个形状。
+      #
+      # ★★ 这一行原先**只在服务器上**、从未进过版本库。于是 2026-10-30
+      #   部署时一句 `git reset --hard origin/main` 就把它冲掉了，而
+      #   当时运行中的容器还带着老挂载，所以**看起来没坏** ——
+      #   下一次重建才会 502。这正是「部署脚本会抹掉手改」的形状：
+      #   手改的东西没有归属，而 reset 不知道它属于谁。
+      - /opt/momcozy-audit-platform/data/media:/data/media
 
     networks:
       - momcozy-audit-net
