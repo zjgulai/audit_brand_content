@@ -9,6 +9,24 @@
   "note": "第四层：归纳后的画像与状态索引，不是流水账。★ 本层只存「哪里有什么、当时凭什么这么定」，不存正文 —— 正文有 74KB，灌进来是语义稀释。",
   "items": [
     {
+      "id": "l4-05-nmem-sop-acceptance-closed",
+      "title": "nmem SOP 验收 8/8 闭合（2026-10-31 ⌘5 确认）—— 只存状态与指针",
+      "labels": ["history", "nmem", "acceptance"],
+      "content": "《智能体记忆系统与知识图谱构建规范 v2.0》§六 八条硬标准在本 space 全部通过。事件链：T-500（10-26 落地六步）→ 10-27 图谱「不适用」裁定当晚作废（gate 在 HTTP 路由上，不在 CLI）→ 10-29 增量补齐四票（环境固化 / 遗留提交 / 打卡 / 运营口径）→ 10-31 委托方桌面端 ⌘5 人工查验确认图谱可见，最后一条闭合。\n\n读数（10-29 打卡当刻）：58 条记忆 / 20 份真源全 indexed / 244 实体 / 443 条本体匹配边 / 检索 Top-1 0.99（SOP 线 ≥0.70）/ controls 15/15。\n\n仍开放两条：①抽取 gate=fallback_one_shot_model_not_tool_capable（预算瓶颈在 nmem 服务端 $0.15/日上限，非仓内执行面）；②recall 命中率按 T-500 约定观察一周。\n\n★ 流程教训（本条自身的来历）：终态原本经 CLI 手写落库，source=cli 被判 foreign 当场红 —— 检查器抓到的是真实的流程违规：绕过了 distill_to_nmem.py 这个唯一受控写入口。手写记忆必须先进 corpus、走蒸馏通道。",
+      "source_pointers": [
+        {
+          "file": "PMO/nmem-SOP验收打卡-20261029.md",
+          "anchor": "",
+          "note": "8 条打卡逐条读数（索引级引用）"
+        },
+        {
+          "file": "tools/verify_nmem.py",
+          "anchor": "OTHER_SOURCES",
+          "note": "foreign 判据（抓到手写绕道的执行点）"
+        }
+      ]
+    },
+    {
       "id": "l4-01-stage-retrospective",
       "title": "阶段复盘（2026-09-16）：第一阶段是怎么走过来的",
       "labels": [
