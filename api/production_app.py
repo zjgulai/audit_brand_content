@@ -201,6 +201,32 @@ def _link_secrets_from_env(env, *, required=False):
     return tuple(out)
 
 
+def _auto_grant_from_env(env):
+    """读自动登记模板（`REVIEW_PRINCIPAL_AUTO_GRANT`，一段 JSON）。
+
+    形状：`{"roles": ["dp3"], "product_lines": ["吸奶器"]}`。
+
+    ★ 为什么是一整段 JSON 而不是三个环境变量：角色、品线、能力三者
+      必须**成组**给。拆成三个 var 就会出现「角色给了、品线忘了」这种半开，
+      而半开的表现是「所有人都能登进来，但一个人也领不了案」——
+      读起来像 RBAC 坏了，实际是配置少了一行。
+    ★ 校验刻意不在这里做第二次：`PrincipalDirectory._normalize_auto_grant`
+      是唯一判据，坏模板在 `ProductionRuntime.start()` 里抛
+      `principal_auto_grant_*`。这里只负责「读出来」。
+    """
+    raw = (env.get("REVIEW_PRINCIPAL_AUTO_GRANT") or "").strip()
+    if not raw:
+        return None
+    try:
+        cfg = json.loads(raw)
+    except ValueError as exc:
+        raise SettingsError("principal_auto_grant_not_json: %s"
+                            % (type(exc).__name__,))
+    if not isinstance(cfg, dict):
+        raise SettingsError("principal_auto_grant_not_object")
+    return cfg
+
+
 def _link_ttl_from_env(env):
     """读 TTL。缺省 1 小时；越界（<=0 或 >30 天）构造期拒。
 
@@ -260,6 +286,18 @@ class ProductionSettings:
     #: ★ 必须声明成正式字段：这是 `slots` 类，动态 setattr 新名字会 TypeError。
     media_ingest_ready: bool = True
     media_ingest_readiness_note: str = ""
+    #: ★ 2026-10-30：自动登记（委托方要求「放行所有人员飞书登录」）。
+    #:
+    #: 两项都**默认关**（None / None = 行为与加这一层之前逐字相同）。
+    #: 打开时必须两项都给：`auto_principals` 是「给了什么角色」，
+    #: `principal_directory_auto` 是「登记写在哪」—— 只给前者的话，
+    #: 「谁被放进来过」在盘上没有落点，撤人都无从撤起。
+    #:
+    #: ★ 为什么放在默认值区：这两个是**新增**的可选字段。塞进必填区会让
+    #:   `verify_production_app.py` 与 `verify_stage_gate_d5.py` 里每一处
+    #:   按位置构造 `ProductionSettings(...)` 的夹具全部 TypeError。
+    auto_principals: dict[str, Any] | None = None
+    principal_directory_auto: Path | None = None
 
     #: ★★ 2026-10-29：账号密码登录（**为测试便利**，委托方明确要求）。
     #:
@@ -469,6 +507,14 @@ class ProductionSettings:
                 or env.get("REVIEW_PASSWORD_USER", "")
             ),
             password_login_tenant=env.get("REVIEW_PASSWORD_TENANT", ""),
+            # ★ 2026-10-30 自动登记：两件都给才开，缺一件当作没配。
+            #   读的是同一份 JSON 文本（`REVIEW_PRINCIPAL_AUTO_GRANT`），
+            #   不拆成三个环境变量 —— 拆开就会出现「角色给了、品线没给」
+            #   这种半开状态，而半开的表现是「所有人都能登，但一个人都领不了案」。
+            auto_principals=_auto_grant_from_env(env),
+            principal_directory_auto=(
+                external("REVIEW_PRINCIPAL_DIRECTORY_AUTO")
+                if env.get("REVIEW_PRINCIPAL_DIRECTORY_AUTO") else None),
         )
 
 
@@ -518,7 +564,13 @@ class ProductionRuntime:
                 generation_file=str(
                     self.settings.access_log_path.parent / "session-generation"))
             self.directory = PrincipalDirectory(
-                self.settings.principal_directory, require_authz_version=True)
+                self.settings.principal_directory, require_authz_version=True,
+                # ★ 2026-10-30：自动登记。审计落 access_log 同目录 ——
+                #   与 auth-audit / step-up-audit 放一起，运维找得到。
+                auto_grant=self.settings.auto_principals,
+                auto_store_path=self.settings.principal_directory_auto,
+                audit_path=str(self.settings.access_log_path.parent
+                               / "principal-auto-audit.jsonl"))
             if not self.directory.ready():
                 raise SettingsError("principal_directory_empty")
             self.authority = BusinessEventStore(
@@ -1061,7 +1113,12 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             raise HTTPException(
                 403, "tenant_not_allowed:收到 %r，允许列表 %s"
                      % (identity.tenant_id, sorted(settings.tenant_allowlist)))
-        principal = runtime.directory.by_identity(identity.tenant_id, identity.open_id)
+        principal = runtime.directory.by_identity(
+            identity.tenant_id, identity.open_id,
+            # ★ 2026-10-30：姓名只用于自动登记时留痕（「这条是谁」）。
+            #   开启自动登记后，这一跳可能**新建**一条 principal ——
+            #   落盘的记录里带上姓名，运维才认得出该撤谁。
+            display_name=getattr(identity, "name", None))
         if principal is None:
             # ★ 2026-10-22：同一条理由 —— 把实际收到的身份回显给配置者。
             #   与 tenant_not_allowed 那次是同一个病的第二次：
@@ -1071,8 +1128,13 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             #
             #   为什么可以回显：调用方**刚刚完成飞书授权**，这就是他自己的身份；
             #   它不是凭据（拿 open_id 换不到 access_token）。
+            #
+            # ★ 2026-10-30：开了自动登记之后这条分支**应当**不再出现。
+            #   它还在的唯一理由是「自动登记被关着」，或显式把我们撤了。
+            #   所以文案里补一句去哪儿看 —— 否则下一个人只会以为是同一个 bug。
             raise HTTPException(
                 403, "principal_not_authorized:tenant=%r open_id=%r name=%r"
+                     "（本部署未开启自动登记，或该主体已被显式撤销）"
                      % (identity.tenant_id, identity.open_id, identity.name))
         csrf = os.urandom(24).hex()
         sid = runtime.session_store.create_session(
