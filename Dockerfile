@@ -93,6 +93,18 @@ COPY tools/redact.py ./tools/redact.py
 #   两个文件都只有标准库依赖（实测：argparse/gzip/html/json/re/pathlib/sys/…）。
 COPY tools/lp_extract.py ./tools/lp_extract.py
 COPY tools/lp_fetch.py ./tools/lp_fetch.py
+# ★★ 2026-10-30：`base/media_analyze._make_client()` 惰性 `from tools.multimodal_client
+#   import GatewayClient` —— 它是**唯一发网络请求**的那一层（provider 闸门在
+#   base/multimodal_provider.py，那一层一行网络都没有）。
+#
+#   不在镜像里时，`build_analyze()` 仍返回一个可调用对象（readiness 说 ready），
+#   但每次 analyze 都落 `untested / 多模态客户端不可用：ModuleNotFoundError`。
+#   症状是**观察数恒为 0**：报告里「画面语义」那一节空着，而
+#   `multimodal_note` 是 None —— 读起来像「看了没问题」，实际一次都没发出去。
+#   这是 §2.4.1 那个形状：一个读数比它的输入大。
+#   实测：生产容器里 build_analyze(...) → untested，
+#        reason="ModuleNotFoundError: No module named 'tools.multimodal_client'"。
+COPY tools/multimodal_client.py ./tools/multimodal_client.py
 
 # 运行时数据（规则库 / 控制点 / 路由 / 外部标准库）。
 # 这些是**只读输入**，与 authority 那种可写数据分开：

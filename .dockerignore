@@ -52,6 +52,7 @@ tools
 #   这与 redact.py 是同一个形状：Dockerfile 拷了，但文件没进上下文。
 !tools/lp_extract.py
 !tools/lp_fetch.py
+!tools/multimodal_client.py
 # 报告渲染器与它那条相对 import 链（report_render.mjs → registry.mjs → cards.mjs）
 # ★ 2026-10-26 实测：这三个**原先一个例外都没有**，于是 Dockerfile 里那三条
 #   COPY 全部拿不到文件 —— `COPY failed: … stat tools/audit/report_render.mjs:
