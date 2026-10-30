@@ -312,7 +312,30 @@ class ReleaseGate(object):
                 raise SoDViolation("缺少 release.revoke")
         if principal.get("tenant") != case.get("tenant"):
             raise SoDViolation("跨租户")
-        if principal.get("product_line") != case.get("product_line"):
+        # ★★ 2026-10-31：品线判定必须看 `product_lines`（复数、数组），
+        #   不是 `product_line`（单数）。
+        #
+        #   改前这里读 `principal["product_line"]`，而目录
+        #   （`base/principal_directory.py:_validate`）产出的是
+        #   `product_lines` 数组；单数那个键只有在 JSON 里手写才有，
+        #   而生产 principals.json **一条都没有**（实测 5/5 全是 None）。
+        #
+        #   后果：`None != "吸奶器"` 恒真 → **生产上任何人都签发不了**，
+        #   报错还是一句看起来像数据问题的「跨品线」。
+        #
+        #   这是同一个病的**第五处**（前四处：workflow_timing / intent_inference /
+        #   multimodal_observations / report_snapshot 的 evidence+unassessed）。
+        #   形状完全一致：读侧用了与写侧不同的字段名，`None` 比较恒真，
+        #   没有任何东西会红。
+        #
+        #   ★ 口径与 `rbac._scope_ok` 对齐：案件的品线**在**本人品线集合里。
+        #     `release_gate` 与 `rbac` 是两套判据，但这里判的是同一件事
+        #     （这人有没有这条品线），不许两套口径各自说一套。
+        #   ★ 空集合不是通配（`[] <= anything` 恒真那条越权），所以先判
+        #     集合非空 —— 与 `rbac._scope_contains` 同一条纪律。
+        lines = principal.get("product_lines") or []
+        if not isinstance(lines, list) or not lines \
+                or case.get("product_line") not in lines:
             raise SoDViolation("跨品线")
 
     def _consume(self, principal, case, action, token, nonce, now):

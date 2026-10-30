@@ -173,7 +173,13 @@ def case(**over):
 
 
 def signer(uid="u3", **over):
-    p = {"id": uid, "tenant": "t1", "product_line": "p1",
+    # ★ 2026-10-31：夹具改成 `product_lines`（复数、数组）。
+    #   `_authorize` 原先读单数 `product_line`，而 `principal_directory`
+    #   只产出复数 —— 生产 principals.json **一条单数都没有**（5/5 全 None），
+    #   于是 `None != "吸奶器"` 恒真 → 生产上任何人都签发不了。
+    #   这个夹具一直用单数，所以本验证器**从来没红过**：
+    #   「验证器的形状 ≠ 生产的形状」，第六处。
+    p = {"id": uid, "tenant": "t1", "product_lines": ["p1"],
          "roles": ["signer"], "capabilities": ["release.sign", "release.revoke"]}
     p.update(over)
     return p
@@ -371,8 +377,16 @@ def main():
     must_deny("C3 跨租户 → 拒",
               lambda: g4.sign(c4, signer("u3", tenant="t2"), token(s4, signer("u3", tenant="t2"), c4), "n1", reason="test", now=1001),
               SoDViolation)
+    # ★ 2026-10-31：跨品线夹具必须覆盖**复数** `product_lines` ——
+    #   `_authorize` 现在读的正是它。改前这里只覆盖单数 `product_line`，
+    #   而单数那个键生产上根本不存在，于是这条断言改完后会「未拒」
+    #   （因为 product_lines 仍是 ["p1"]，品线其实对得上）。
     must_deny("C4 跨品线 → 拒",
-              lambda: g4.sign(c4, signer("u3", product_line="p2"), token(s4, signer("u3", product_line="p2"), c4), "n1", reason="test", now=1001),
+              lambda: g4.sign(c4, signer("u3", product_lines=["p2"]), token(s4, signer("u3", product_lines=["p2"]), c4), "n1", reason="test", now=1001),
+              SoDViolation)
+    # ★ C4b 反向对照：空品线集合**不是**通配（`[] <= anything` 恒真那条越权）。
+    must_deny("C4b ★ 空品线集合 → 拒（空不是通配）",
+              lambda: g4.sign(c4, signer("u3", product_lines=[]), token(s4, signer("u3", product_lines=[]), c4), "n1", reason="test", now=1001),
               SoDViolation)
     must_deny("C5 无 release.sign → 拒",
               lambda: g4.sign(c4, signer("u3", capabilities=[]), token(s4, signer("u3", capabilities=[]), c4), "n1", reason="test", now=1001),
