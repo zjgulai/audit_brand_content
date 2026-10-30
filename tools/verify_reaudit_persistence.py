@@ -139,8 +139,10 @@ def main():
                         payload={"conclusion":
                                  {"review_notes": "逐条看过后结案"}},
                         idempotency_key="close", now=5002)
+            # ★ 2026-10-31：`product_lines`（复数）。`_authorize` 原先读单数，
+            #   而 principal_directory 只产出复数；生产里 5/5 全是 None。
             principal = {"id": "u_signer", "tenant": "t-ra",
-                         "product_line": "home",
+                         "product_lines": ["home"],
                          "capabilities": ["release.sign", "release.revoke"]}
             signed = svc.release_decision(
                 aggregate_id=cid, principal=principal, action="sign",

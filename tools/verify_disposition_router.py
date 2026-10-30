@@ -252,7 +252,10 @@ def _sign_case(tmpdir, principal_id="u3", case_id="case-h", now=1000):
     """真实签发一件案子，返回 (sig, principal, gate)。"""
     sessions = SessionStore(os.path.join(tmpdir, "sess_%s.db" % case_id))
     gate = ReleaseGate(sessions=sessions)
-    principal = {"id": principal_id, "tenant": "t1", "product_line": "p1",
+    # ★ 2026-10-31：`product_lines`（复数）。`_authorize` 原先读单数，
+    #   而 principal_directory 只产出复数；生产里 5/5 全是 None，
+    #   于是任何人都签发不了。夹具一直用单数，所以从未红过。
+    principal = {"id": principal_id, "tenant": "t1", "product_lines": ["p1"],
                  "capabilities": ["release.sign"]}
     case = dict(SIGN_CASE)
     case["case_id"] = case_id
