@@ -61,7 +61,22 @@ class Finding(BaseModel):
     status: str
     severity: str
     produced_by: str
-    derived_from: Optional[str]
+    # ★★ 2026-10-30：补 `= None`。改前是 `Optional[str]` 但**没有默认值**，
+    #   而 Pydantic v2 里「Optional 且必填」= 「必须有这个键，值可以是 null」，
+    #   与「可以没有这个键」是两件事。
+    #
+    #   实测后果是**整个案件详情 500**：
+    #     视频的 mark_symbol 观察里含「红色矩形标记，疑似 RoHS 标识，分辨率不足
+    #     无法辨认」，`observation_candidates` 按 M04 升成 candidate，
+    #     而 candidate 的字段是 `derived_from_observation`（带来源），
+    #     没有 `derived_from`（那是规则命中 finding 才有的字段）。
+    #     → ResponseValidationError: ('response','ir','findings',0,'derived_from')
+    #       'Field required'
+    #
+    #   报错读起来像「数据坏了」，实际是**模型比数据严格**：
+    #   同一个 `findings` 列表里合法地存在两种来源（规则命中 / 观察升级），
+    #   后者天然没有 `derived_from`。
+    derived_from: Optional[str] = None
     authority_state: Optional[str] = None
     detected_by: Optional[str] = None
     location: Optional[Dict[str, Any]] = None
