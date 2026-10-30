@@ -2559,55 +2559,24 @@ code {
   font-size: var(--text-sm);
 }
 
-/* ── 登录页：账号密码表单（★ 2026-10-29，委托方要求为测试便利开启）────────
+/* ── 登录页：飞书扫码（★ 2026-10-30 撤掉账号口令表单）─────────────────────
  *
- * 排布：账号 / 口令 / 提交 三行，等宽对齐；下面是「或」+ 飞书扫码备选。
- * ★ 不用两栏并排：登录页只有一个任务，并排会让人犹豫「该点哪个」。
+ * 上一版（2026-10-29）这里是「账号 / 口令 / 提交」三行 + 下方「或」+ 扫码。
+ * 委托方 2026-10-30 要求去掉口令通道，于是现在只剩扫码这一条路 ——
+ * 也就没有「或」了：一个选项前面不该有分隔符。
+ *
+ * ★ `.login__form` / `.login__field` / `.login__submit` / `.login__form-error`
+ *   这四个类名已随表单一起删除。留着不删的后果不是「多几行 CSS」，
+ *   而是下一个读样式的人以为界面上还有那个表单。
+ *
  * ★ 全部字号/间距/颜色取自 token，本段不写裸值（DT-3）。
  */
-.login__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.login__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
-
-.login__field input {
-  font: inherit;
-  font-size: var(--text-base);
-  color: var(--text);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-control);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-}
-
-.login__field input:focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 1px;
-}
-
-.login__submit {
-  min-height: 2.5rem;
-  margin-top: var(--space-1);
-}
-
-/* 口令错误：红底一行，**不用 role=alert 的强提示框** ——
-   它在表单内部，紧邻输入框，位置本身已经说明「这里出错了」。 */
-.login__form-error {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--bad-surface);
-  color: var(--bad-text);
-  border-radius: var(--radius-control);
-  font-size: var(--text-sm);
+.login__alt--solo {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--space-4);
+  border-top: none;
+  padding-top: 0;
 }
 
 .login__alt {

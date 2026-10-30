@@ -475,50 +475,11 @@ export const reviewApi = {
   /** 登出：POST（带 CSRF），后端撤销 session 并清 cookie。 */
   logout: () => request<{ logged_out: boolean }>("/logout", { method: "POST" }),
 
-  /**
-   * 账号密码登录（★ 仅测试便利，委托方 2026-10-29 要求开启）。
-   *
-   * ## 为什么不走 `request()`
-   *
-   * `request()` 会先算 CSRF 头（`csrfHeaders`）。而登录**还没有 session**，
-   * 也就没有 csrf cookie —— 那一步会拿空值算出一个头，后端虽放行
-   * （`/auth/password` 在中间件白名单里），但读起来像是「登录要求 CSRF」，
-   * 下一个改这块的人会照着它去加页面级 csrf 初始化，**多绕一圈**。
-   *
-   * 这里直接 fetch，语义就是「登录前的裸请求」。
-   *
-   * ★ 后端未启用该通道时返 **404**（不是 403）。调用方据此区分
-   *   「这个部署不支持密码登录」与「密码错了」—— 两者提示完全不同。
-   */
-  async passwordLogin(username: string, password: string): Promise<{ ok: boolean; principal: string }> {
-    // ★★ 2026-10-29 实测踩坑：这里原来写的是 `${apiBase}/auth/password`，
-    //   而生产环境 `apiBase === "/api/v1"` —— 于是请求打到
-    //   `/api/v1/auth/password`，那不是登录端点，路径也不在 CSRF 中间件的
-    //   白名单里，于是被拦成 **403「CSRF 校验失败」**。
-    //
-    //   这个错读起来完全不像路径问题：界面上显示的是「CSRF 校验失败」，
-    //   会让人去查 csrf cookie、查中间件、查 origin —— 而不去查 URL。
-    //   真身 `/auth/password` 挂在 **app 根**（和 `/auth/login` 同级），
-    //   不在 `/api/v1` 前缀下。
-    //
-    //   所以用 `appOrigin`（它是 `apiBase` 去掉 `/api/v1` 之后的东西）。
-    const res = await fetch(`${appOrigin}/auth/password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      credentials: "same-origin",
-      body: JSON.stringify({ username, password }),
-    });
-    if (!res.ok) {
-      let body: Record<string, unknown> | null = null;
-      try {
-        body = (await res.json()) as Record<string, unknown>;
-      } catch {
-        /* 非 JSON 错误体：交给 ApiError 用状态码兜底 */
-      }
-      throw new ApiError(res.status, body, "/auth/password");
-    }
-    return res.json();
-  },
+  // ★ 2026-10-30 删除 `passwordLogin`：委托方要求撤掉账号口令通道，
+  //   飞书扫码是唯一入口（见 `pages/LoginPage.tsx` 的注释）。
+  //   后端 `POST /auth/password` 的实现仍在，但生产环境已不启用（返 404）。
+  //   这里**不留**一个「暂时没人调」的方法 —— 留着它，下一个读代码的人
+  //   会以为界面上还有一个入口，而那个入口已经在同一批改动里被删了。
 
   // ── 以下为 ADR-0021 · W-1 收纳的裸调用 ────────────────────────────────
   //

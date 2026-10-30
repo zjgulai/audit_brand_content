@@ -30,13 +30,6 @@ export default function LoginPage() {
     __REVIEW_DEV_IDENTITY__ ? "authed" : "checking",
   );
   const [detail, setDetail] = useState("");
-  // ★ 2026-10-29：账号密码登录（委托方要求，为测试便利）。
-  //   只有「显式发起提交」时才显示它的错误 —— 页面刚打开就红一片会让人
-  //   以为登录坏了，而那只是还没填。
-  const [pwUser, setPwUser] = useState("");
-  const [pwSecret, setPwSecret] = useState("");
-  const [pwBusy, setPwBusy] = useState(false);
-  const [pwError, setPwError] = useState("");
 
   useEffect(() => {
     if (__REVIEW_DEV_IDENTITY__) return;
@@ -87,76 +80,20 @@ export default function LoginPage() {
 
         {state === "anon" && (
           <div className="login__signin">
-            {/* ★★ 2026-10-29：主入口改成账号密码（委托方要求，测试便利）。
-                飞书扫码保留为备选 —— 它是真实授权通道，删掉就没有
-                租户校验那条路了。 */}
-            <form
-              className="login__form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (pwBusy) return;
-                setPwBusy(true);
-                setPwError("");
-                try {
-                  await reviewApi.passwordLogin(pwUser, pwSecret);
-                  // 成功后整页跳 —— 让它走一次真实的「带 session 重新加载」，
-                  // 而不是在页面里改状态。后者会绕过 identity provider 的
-                  // 初始化路径，于是侧栏身份、权限都不刷新。
-                  window.location.assign("/queue");
-                } catch (err) {
-                  const e2 = err as { status?: number; message?: string };
-                  // ★ 404 = 这个部署没开密码登录。必须与「密码错」分开说，
-                  //   否则用户会一直重试一个根本不存在的口令。
-                  setPwError(
-                    e2.status === 404
-                      ? "本部署未启用账号密码登录，请用飞书扫码。"
-                      : e2.status === 401
-                        ? "账号或口令不正确。"
-                        : `登录失败：${e2.message ?? "未知错误"}`,
-                  );
-                } finally {
-                  setPwBusy(false);
-                }
-              }}
-            >
-              <label className="login__field">
-                <span>账号</span>
-                <input
-                  type="text"
-                  name="username"
-                  autoComplete="username"
-                  value={pwUser}
-                  onChange={(e) => setPwUser(e.target.value)}
-                  required
-                />
-              </label>
-              <label className="login__field">
-                <span>口令</span>
-                <input
-                  type="password"
-                  name="password"
-                  autoComplete="current-password"
-                  value={pwSecret}
-                  onChange={(e) => setPwSecret(e.target.value)}
-                  required
-                />
-              </label>
-              <button
-                type="submit"
-                className="btn btn--primary login__submit"
-                disabled={pwBusy || !pwUser || !pwSecret}
-              >
-                {pwBusy ? "登录中…" : "登录"}
-              </button>
-              {pwError && (
-                <p className="login__form-error" role="alert">
-                  {pwError}
-                </p>
-              )}
-            </form>
+            {/* ★★ 2026-10-30：撤掉账号口令表单，飞书扫码是**唯一**入口。
+                委托方原话：「将账号密码 Daisy 去掉，依旧使用飞书扫码登陆作为登陆方」。
+                上一版（2026-10-29）曾把口令表单放在主位、扫码放备选，
+                理由是「测试便利」—— 代价是这条通道绕过飞书租户校验，
+                任何知道口令的人都能进一个装着真实审计数据的系统。
+                那条代价现在被撤回了；扫码本身就是真实的授权通道。
 
-            <div className="login__alt">
-              <span className="login__alt-label">或</span>
+                ★ 后端 `POST /auth/password` 的实现仍留在 `api/production_app.py`，
+                  但由 `REVIEW_PASSWORD_LOGIN` 控制且**默认关**、生产环境已置空 ——
+                  于是该端点在生产上返 404，界面上没有任何入口指向它。
+                  「界面上看不见」不等于「通道不存在」，所以真判据在环境变量与服务端
+                  404 上，而不是这份 JSX。 */}
+            <div className="login__alt login__alt--solo">
+              <span className="login__alt-label">飞书扫码登录</span>
               <LoginQr target={`${appOrigin}/auth/login`} />
               <a
                 className="btn login__sso"
