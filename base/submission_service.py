@@ -34,7 +34,19 @@ from base.authority_query import ExternalStandardsAuthority
 from base.judge_entry import judge_unit
 
 MAX_TEXT_CHARS = 100_000
-SUPPORTED_SOURCE_KINDS = frozenset({"free_text", "ad_text"})
+#: 本期**默认开启**的载体（不需要任何外部引擎）。
+#:
+#: ★ 2026-10-30：`structured_json` 加进来。它此前不在这个集合里，而
+#:   `contract.SOURCE_KINDS` 早就有它 —— 于是同一份商品 JSON，
+#:   走抓取批次（`from_landing_page(label="structured")`）能产出合法 unit，
+#:   走网页提交却被 `_build_unit` 一句「本轮只接 ['ad_text','free_text']」拒掉。
+#:   这不是「能力没做」，是**能力做了却没接线**：契约认它、构造器有它、
+#:   判定链吃它，只有进件层这一道门没开。
+#:
+#:   它与 `image`/`video` 的区别正是关键：那两类要容器内 OCR 引擎与外部网关，
+#:   开了就要担 ADR-0018 §6.2 的行 118；结构化记录**不需要任何引擎**
+#:   （正文来自调用方给的字段），所以它可以默认开，不必等 T-118-follow。
+SUPPORTED_SOURCE_KINDS = frozenset({"free_text", "ad_text", "structured_json"})
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ★ 2026-10-26 T-431：图片进件（**能力**已建，**生产路径**仍未打开）
@@ -103,6 +115,7 @@ MEDIA_SOURCE_KINDS = frozenset({"image", "video"})
 
 #: 图片载体必须配的 content_type（与 contract.CONTENT_TYPES 同一取值域）。
 _SOURCE_KIND_CONTENT_TYPE = {"free_text": "文本", "ad_text": "文本",
+                             "structured_json": "结构化记录",
                              "image": "图片", "video": "视频"}
 
 DECISION_LABELS = ("PASS", "待自决", "REVIEW", "BLOCK", "未审查")
@@ -150,7 +163,12 @@ def media_ingest_readiness(env=None):
     if not ingest_media_enabled(env):
         return True, ""
 
-    engine = getattr(MEDIA, "DEFAULT_OCR_ENGINE", None)
+    # ★ 判据只读 `resolve_ocr_engine()`（唯一决策点），不读常量 ——
+    #   读常量等于绕开 `REVIEW_OCR_ENGINE`，于是「配了 container 却没生效」会静默发生。
+    try:
+        engine = MEDIA.resolve_ocr_engine(env)
+    except ValueError as exc:
+        return False, "OCR 引擎配置非法：%s" % exc
     ocr_ready = engine != "host_vision"
 
     try:
@@ -184,7 +202,12 @@ def media_ingest_capability(env=None):
     from base import media as MEDIA
 
     enabled = ingest_media_enabled(env)
-    engine = getattr(MEDIA, "DEFAULT_OCR_ENGINE", None)
+    # ★ 判据只读 `resolve_ocr_engine()`（唯一决策点），不读常量 ——
+    #   读常量等于绕开 `REVIEW_OCR_ENGINE`，于是「配了 container 却没生效」会静默发生。
+    try:
+        engine = MEDIA.resolve_ocr_engine(env)
+    except ValueError as exc:
+        return False, "OCR 引擎配置非法：%s" % exc
     ocr_ready = engine != "host_vision"
     try:
         from base import media_analyze as MA
@@ -431,6 +454,19 @@ class SubmissionIngestor:
             if not isinstance(text, str) or not text.strip():
                 raise SubmissionRejected("bad_text", 422, "free_text 必须带非空 text")
             unit = C.from_text(text, uri=uri)
+        elif kind == "structured_json":
+            # ★ 2026-10-30：结构化记录走自己的构造器。
+            #
+            #   不加这个分支时它落到下面的 `ad_text` 分支 —— 而那条要求
+            #   `fields` 里有 `Primary Text`/`Headline`，于是商品记录的
+            #   `title`/`description_text` 会被判成「两个都空」422。
+            #   报错读起来像「你字段填错了」，实际是**这条载体没接**。
+            #
+            #   字段也**不从 `fields` 里挖**：`text` 与 `fields` 都可能是
+            #   调用方给的原文，而单位口径必须唯一。所以先取 `fields`，
+            #   取不到再看 `text`（前端可能把整段 JSON 塞进 text）。
+            rec = self._structured_record(submission)
+            unit = C.from_structured_record(rec, uri=uri)
         else:
             fields = submission.get("fields")
             if not isinstance(fields, dict):
@@ -452,6 +488,60 @@ class SubmissionIngestor:
             raise SubmissionRejected(
                 "bad_content_unit", 422, "; ".join(problems))
         return unit
+
+    @staticmethod
+    def _structured_record(submission):
+        """从提交里取出结构化记录的字段。**两个入口都认，但只产出一种记录。**
+
+        ## 为什么两个入口都要认
+
+        网页提交走 `fields`（表单），接口调用方可能把整段 JSON 塞进 `text`。
+        两者都是真实调用形态，只认一种会让另一条路在进件层被 422 拒掉 ——
+        而报错文字（「两个字段都空」）会把责任推给调用方。
+
+        ## 为什么合并而不是二选一
+
+        `fields` 与 `text` 同时给出时，**`fields` 优先**：它已经是结构化的，
+        不需要再解析一次；而 `text` 里的 JSON 解析失败必须是 422 而不是
+        「当成没有」。反过来若 `fields` 空、`text` 是 JSON 串，就解它。
+
+        ★ 解析失败**不静默降级成空记录** —— 那会产出一个 `has_text=False` 的
+          unit，路由去 DP0「没有可判文本」，读起来像「这条内容确实没什么可看的」，
+          实际是「我读不懂你给的东西」（AGENTS §2.4.1 那个病）。
+        """
+        fields = submission.get("fields")
+        rec = {}
+        if isinstance(fields, dict):
+            for key in ("title", "description_text"):
+                if key in fields:
+                    rec[key] = fields.get(key)
+
+        if not any(str(v or "").strip() for v in rec.values()):
+            raw = submission.get("text")
+            if isinstance(raw, str) and raw.strip():
+                try:
+                    parsed = json.loads(raw)
+                except ValueError as exc:
+                    raise SubmissionRejected(
+                        "bad_structured_json", 422,
+                        "结构化记录的 text 不是合法 JSON：%s" % exc) from exc
+                if not isinstance(parsed, dict):
+                    raise SubmissionRejected(
+                        "bad_structured_json", 422,
+                        "结构化记录必须是 JSON 对象，收到 %s"
+                        % type(parsed).__name__)
+                rec = parsed
+
+        if not isinstance(rec, dict):
+            raise SubmissionRejected(
+                "bad_fields", 422, "结构化记录必须是对象")
+        if not any(str(v or "").strip() for v in
+                   (rec.get("title"), rec.get("description_text"))):
+            raise SubmissionRejected(
+                "bad_fields", 422,
+                "结构化记录必须带 title 或 description_text（至少一个非空）；"
+                "两者都没有时没有可判正文")
+        return rec
 
     @staticmethod
     def _video_unit(target, *, uri):

@@ -65,6 +65,7 @@ import hashlib
 import random
 import re
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -179,7 +180,14 @@ class MediaProvider:
                 % (self.provider_id,))
 
 
-#: 默认 OCR 引擎。★ 今天必须是 `host_vision` —— 改成容器引擎就是打开媒体进件。
+#: 默认 OCR 引擎的**声明值**。★ 它只回答「本机默认走哪条路」，不是判据。
+#:
+#: ★★ 2026-10-30：判据搬到了 `resolve_ocr_engine()`（读 `REVIEW_OCR_ENGINE`，
+#:   未设时按平台选）。这个常量保留是因为有两件事仍要它：
+#:   ① `--selftest` 要在 **macOS 上**断言「宿主 Vision 仍是默认」；
+#:   ② 文档与 ADR 引用它来说明「注册 ≠ 接线」的历史口径。
+#:   ★ **决策点一律读 `resolve_ocr_engine()`**，不许读这个常量 ——
+#:     读常量等于绕开环境变量，于是「配了 container 却没生效」会静默发生。
 DEFAULT_OCR_ENGINE = "host_vision"
 
 #: 默认 ASR 引擎。今天 `None`：仓里没有 ASR，也没有音频素材。
@@ -244,9 +252,27 @@ class ContainerOcrProvider:
 
     # ---------------------------------------------------------------- 就绪判定
     def probe(self) -> dict:
-        """引擎在不在。**不抛** —— 返回一个可读的就绪读数。"""
+        """引擎在不在。**不抛** —— 返回一个可读的就绪读数。
+
+        ★★ 2026-10-30 修：改前这里只 `find_spec("rapidocr")`，于是
+        **包在、后端不在**时会报 `ready=True`，而第一次 `analyze()` 就抛
+        `ImportError: onnxruntime is not installed`。
+
+        实测后果（本机真跑出来的）：
+
+            probe()   → {"ready": True, "reason": "installed"}
+            analyze() → ImportError: onnxruntime is not installed
+            图片进件  → parse_status=failed，正文空串
+
+        而 `failed` 的图片与「图里真的没有字」在读数上完全一样 ——
+        正是 §2.4.1 那个病：一个就绪判定比它的输入大。
+
+        所以这里**逐个探**：先适配层包，再推理后端。缺后端时报的是
+        「缺 onnxruntime」而不是「缺 rapidocr」—— 这两句话要修的东西不同。
+        """
+        import importlib.util
+
         try:
-            import importlib.util
             spec = importlib.util.find_spec(self.spec.package.replace("-", "_"))
         except Exception as e:                            # noqa: BLE001
             return {"ready": False, "reason": "probe_failed", "detail": str(e)[:160]}
@@ -254,6 +280,15 @@ class ContainerOcrProvider:
             return {"ready": False, "reason": "not_installed",
                     "detail": "缺 %s==%s（本模块不替你装）"
                               % (self.spec.package, self.spec.version)}
+        # ★ 后端与适配层是**两个包**。`rapidocr` 本身不含 onnxruntime。
+        try:
+            backend = importlib.util.find_spec("onnxruntime")
+        except Exception as e:                            # noqa: BLE001
+            return {"ready": False, "reason": "probe_failed", "detail": str(e)[:160]}
+        if backend is None:
+            return {"ready": False, "reason": "backend_missing",
+                    "detail": "缺推理后端 onnxruntime（rapidocr 只是适配层，不含它）—— "
+                              "**这是未测，不是「图里没有字」**"}
         return {"ready": True, "reason": "installed"}
 
     def _load(self):
@@ -398,8 +433,49 @@ register_media_provider(MediaProvider(
 
 # ------------------------------------------------------------------ OCR 二进制
 
+#: 走哪条 OCR 路。★ 两个**互斥**的实现，不是「一个主一个备」：
+#:
+#:   `host_vision` —— macOS 原生 Vision（`base/ocr_vision.m`，须在 macOS 上编译）。
+#:   `container`   —— 容器内 pip 引擎（`ContainerOcrProvider`，跨平台）。
+#:
+#: ★★ 2026-10-30：这个开关**不再是模块常量**，改成读 `REVIEW_OCR_ENGINE`。
+#:
+#:   改前的形状是：`DEFAULT_OCR_ENGINE = "host_vision"` 写死在源码里，
+#:   于是「生产用哪个引擎」这件事**只能在构建时决定**（改源码 → 重建镜像）。
+#:   而真正要它决定的是**部署环境**：macOS 开发机用 Vision（快、免模型），
+#:   Linux 容器用 pip 引擎（Vision 在那里根本编译不出来）。
+#:   写死在源码里就让同一个镜像无法服务两种环境 —— 而这不是设计意图，
+#:   是「常量当初只为了标记未接线」留下的形状。
+#:
+#:   三态取值与「没配」的处理：
+#:     · 未设 / 空串 → 按平台自动选（macOS 用 host_vision，其余用 container）
+#:     · `host_vision` / `container` → 显式指定（配错时报错，不静默回落）
+#:     · 其它值 → 抛 ValueError（拼错了要说出来，不许当成默认）
+#:
+#:   `verify_media_selection` 的 S6 仍断言「没打开媒体进件时不要偷偷换引擎」——
+#:   它读的是**解析后**的值（`resolve_ocr_engine()`），所以这条断言的意义不变。
+OCR_ENGINE_ENV = "REVIEW_OCR_ENGINE"
+
+
+def resolve_ocr_engine(env=None) -> str:
+    """此刻该走哪条 OCR 路。**唯一判据**，别的地方不许自己读环境变量。"""
+    e = os.environ if env is None else env
+    raw = (e.get(OCR_ENGINE_ENV) or "").strip().lower()
+    if not raw:
+        return "host_vision" if sys.platform == "darwin" else "container"
+    if raw in ("host_vision", "container"):
+        return raw
+    raise ValueError(
+        "%s=%r 不是合法取值（只允许 host_vision / container，或留空按平台自动选）"
+        % (OCR_ENGINE_ENV, raw))
+
+
 def ensure_ocr(rebuild: bool = False) -> Path:
-    """没有就编译。**不把二进制提交进仓** —— 源码与重建脚本才是 L1 的东西。"""
+    """编译并返回**宿主** OCR 二进制。
+
+    ★ 只在 `resolve_ocr_engine() == "host_vision"` 时有意义。
+      容器路径不走这里 —— 直接 `ContainerOcrProvider().analyze()`。
+    """
     if OCR_BIN.exists() and not rebuild:
         return OCR_BIN
     if not OCR_SRC.exists() or not OCR_BUILD.exists():
@@ -410,18 +486,44 @@ def ensure_ocr(rebuild: bool = False) -> Path:
     return OCR_BIN
 
 
-def ocr_file(path: Path, langs: list[str] | None = None, server: "OcrServer | None" = None) -> dict:
+def ocr_file(path: Path, langs: list[str] | None = None, server: "OcrServer | None" = None,
+             *, env=None) -> dict:
     """调 OCR，回结构化结果。**失败不抛** —— 返回 ok=False 与成因。
 
     ★ `server` 给了就走**常驻进程**（B2），否则走一次一进程（B1 的行为）。
       两条路**必须给出同一份文本** —— 这是 `[8]` 那条自证在守的东西。
       常驻模式省掉的只是「每次起一个子进程 + 框架预热」，识别配置一行没改。
+
+    ★★ 2026-10-30：加了**容器引擎分支**。改前这里只有 `ensure_ocr()` 一条路，
+      它在非 macOS 上必然抛（找不到 Xcode SDK），于是 `image_file_row()` 会把
+      每一张图都记成 `ocr_failed`。生产容器正处在这个状态 ——
+      这不是「图里没字」，是「引擎不在」，而两者在旧读数里长得一样。
     """
+    try:
+        engine = resolve_ocr_engine(env)
+    except ValueError as e:
+        return {"ok": False, "error": "ocr_engine_invalid", "detail": str(e)[:200]}
+
+    t0 = time.time()
+
+    if engine == "container":
+        try:
+            out = ContainerOcrProvider().analyze(Path(path))
+        except ProviderNotInstalled as e:
+            # ★ 这是**未测**（环境没备好），不是「图里没有字」。
+            return {"ok": False, "error": "provider_not_installed",
+                    "detail": str(e)[:200]}
+        except Exception as e:                           # noqa: BLE001
+            return {"ok": False, "error": "perform_failed",
+                    "detail": "%s: %s" % (type(e).__name__, str(e)[:160])}
+        enriched = _enrich(out)
+        enriched["wall_ms"] = int((time.time() - t0) * 1000)
+        return enriched
+
     try:
         bin_ = ensure_ocr()
     except Exception as e:                               # noqa: BLE001
         return {"ok": False, "error": "ocr_build_failed", "detail": str(e)[:200]}
-    t0 = time.time()
     if server is not None:
         out = _enrich(server.ocr(Path(path)))
         out["wall_ms"] = int((time.time() - t0) * 1000)

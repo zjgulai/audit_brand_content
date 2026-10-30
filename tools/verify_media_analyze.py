@@ -103,6 +103,40 @@ def _fake_file(suffix: str) -> Path:
     return p
 
 
+def _fake_video(suffix: str = ".mp4", frames: int = 8) -> "Path | None":
+    """造一个**真能被 opencv 解码**的小视频；做不到时返回 None。
+
+    ## 为什么需要它
+
+    `_fake_file(".mp4")` 写的是 64 字节的 `\\x00` —— 那不是视频，抽帧必然失败。
+    用它测「视频画面任务能不能跑」，测到的是「解码失败那条分支」，
+    而不是「抽帧成功后画面任务能不能跑」。两者是**不同**的断言，都得有，
+    而且要各自有各自的样本。
+
+    ★ 造不出（没装 cv2 / 编解码器不支持）时返回 `None`，由调用方落 `untested`——
+      「本机造不出视频」不等于「被测代码不对」。
+    """
+    try:
+        import cv2
+        import numpy as np
+    except Exception:  # noqa: BLE001
+        return None
+    fd, name = tempfile.mkstemp(suffix=suffix)
+    p = Path(name)
+    try:
+        w, h = 64, 48
+        writer = cv2.VideoWriter(str(p), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (w, h))
+        if not writer.isOpened():
+            return None
+        for i in range(frames):
+            frame = np.full((h, w, 3), 40 + i * 8, dtype=np.uint8)
+            writer.write(frame)
+        writer.release()
+        return p if p.stat().st_size > 0 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 # ─────────────────────────────────────────────────────────── A 就绪读数
 
 def group_a():
@@ -203,12 +237,77 @@ def group_c():
             client_factory=lambda env=None: _Stub())
         r2 = fn2({"kind": "video", "uri": str(vid)},
                  ["scene_semantics", "mark_symbol", "av_alignment"])
-        report(len(r2["observations"]) == 3,
-               "C3 ★ 视频三个任务（含 av_alignment）各一条观察",
-               str(len(r2["observations"])))
+
+        # ★★ 2026-10-30 改判据：视频**不再**预期三个任务各一条。
+        #
+        #   旧断言 `== 3` 建立在两条**被实测证伪**的假设上：
+        #     ① mp4 可以同时当 image 传（scene_semantics / mark_symbol 需要 image）；
+        #     ② mp4 可以同时当 audio 传（av_alignment 需要 video+audio）。
+        #
+        #   实测（真网关）：
+        #     · 当 image 传 → 网关看不到图，两个画面任务只能回「缺介质 image」；
+        #     · 当 audio 传 → `unsupported audio format. format=mp4`（直接拒整条请求）。
+        #
+        #   现在的实现：画面任务吃**抽出来的帧图**，av_alignment 只传 video。
+        #
+        #   ★ 而 `vid` 是 64 字节的 `\x00`，抽不出帧 —— 所以**这一支测的是
+        #     「抽帧失败时必须说清」**，不是「画面任务能不能跑」。
+        #     抽帧成功那一支在 C4 单独测（真视频样本）。
+        tasks_seen = {o.get("task") for o in r2["observations"]}
+        report("scene_semantics" not in tasks_seen and "mark_symbol" not in tasks_seen,
+               "C3a ★★ 抽帧失败 → 画面两个任务**不做**（不许拿 mp4 冒充 image）",
+               repr(sorted(tasks_seen)))
+        report("抽帧" in (r2.get("reason") or ""),
+               "C3b ★★ 抽帧失败必须在 reason 里说清（不是笼统「未测」）",
+               (r2.get("reason") or "")[:70])
+        report("av_alignment" in tasks_seen,
+               "C3c 音轨那条仍照常发起（它有 video，缺 audio 由客户端如实回 untested）",
+               repr(sorted(tasks_seen)))
     finally:
         img.unlink(missing_ok=True)
         vid.unlink(missing_ok=True)
+
+    # ── C4 ★★★ 抽帧**成功**那一支：真视频样本，画面任务必须真的跑
+    real_vid = _fake_video()
+    if real_vid is None:
+        untested("C4 抽帧成功后画面任务照常做",
+                 "本机造不出可解码的 mp4（缺 cv2 或编解码器）")
+    else:
+        try:
+            fn3 = MA.build_analyze(
+                resolve_path=lambda ref: real_vid, env=FULL_ENV,
+                client_factory=lambda env=None: _Stub())
+            r3 = fn3({"kind": "video", "uri": str(real_vid)},
+                     ["scene_semantics", "mark_symbol", "av_alignment"])
+            seen3 = {o.get("task") for o in r3["observations"]}
+            report("scene_semantics" in seen3 and "mark_symbol" in seen3,
+                   "C4a ★★★ 抽帧成功后画面两个任务都跑（这是视频链路真的通）",
+                   repr(sorted(seen3)))
+            report(r3.get("status") == "ok",
+                   "C4b ★★ 抽帧成功 → 整体 ok",
+                   repr(r3.get("status")))
+            # ★ C4c 用**真客户端语义**测，不用 Stub。
+            #
+            #   打桩客户端对每个任务都回 ok+一条观察，所以它**绕过了**
+            #   `TASK_MEDIA` 的介质闸门（那道闸门在真客户端里）。
+            #   拿 Stub 测「av_alignment 缺音轨要说清」，测到的是「Stub 说它做了」——
+            #   这不是被测代码的行为，是桩的行为。
+            #
+            #   所以这一条直接调真客户端的任务判定，用**假 transport** 拦在发请求之前。
+            from tools.multimodal_client import GatewayClient
+            real = GatewayClient.from_env(
+                "vod", model="gemini-3.8-flash",
+                env={**FULL_ENV, "MULTIMODAL_VOD_API_KEY": "k",
+                     "MULTIMODAL_VOD_API_TOKEN": "t"},
+            )
+            need = MA  # 只为让 lint 知道 MA 仍被使用
+            t_res = real.analyze_task("av_alignment", {"video": real_vid})
+            report(t_res.get("status") == "untested"
+                   and "audio" in (t_res.get("reason") or ""),
+                   "C4c ★★★ 音画对齐缺音轨时必须说清（报告里不许读成「对齐没问题」）",
+                   "%s / %s" % (t_res.get("status"), (t_res.get("reason") or "")[:50]))
+        finally:
+            real_vid.unlink(missing_ok=True)
 
 
 # ─────────────────────────────────────────────────────────── D 路径
@@ -238,8 +337,22 @@ def group_d():
     # D4 ★★ 非媒体载体 → {}
     report(MA._media_map("free_text", Path("/tmp/x")) == {},
            "D4 ★ 文本载体没有多模态介质映射（不硬塞）")
-    report(set(MA._media_map("video", Path("/tmp/x"))) == {"video", "audio"},
-           "D5 ★ 视频同时映射为 video 与 audio（mp4 里两者都有）")
+
+    # ★★ 2026-10-30 改判据：视频**不再**映射成 audio。
+    #
+    #   旧断言写的是 `== {"video", "audio"}`，理由是「mp4 里两者都有」。
+    #   那句话对**文件内容**成立，对**网关的格式判据**不成立 ——
+    #   实测 vod 网关逐字回：`unsupported audio format. format=mp4`。
+    #   它按文件容器判格式，不看你把它标成什么。
+    #
+    #   把 mp4 标成 audio 的代价不是「音轨那一路失败」，是**整条请求被拒**：
+    #   连同一批里的画面任务都跑不了。所以这里断言的是「不硬塞 audio」。
+    vmap = MA._media_map("video", Path("/tmp/x"))
+    report("video" in vmap,
+           "D5a ★ 视频映射里有 video（整段送模型那条路仍在）", repr(sorted(vmap)))
+    report("audio" not in vmap,
+           "D5b ★★ 视频不许硬塞成 audio（mp4 会被网关按格式拒掉整条请求）",
+           repr(sorted(vmap)))
 
 
 # ─────────────────────────────────────────────────────────── E 降级
@@ -247,7 +360,19 @@ def group_d():
 def group_e():
     from base import media_analyze as MA
 
-    vid = _fake_file(".mp4")
+    # ★★ 2026-10-30：这里必须用**可解码**的视频。
+    #
+    #   改前用的是 `_fake_file(".mp4")`（64 字节 `\x00`）—— 抽帧必然失败，
+    #   于是画面任务被如实摘掉，`tasks` 只剩空集，E3「其余画面任务照常做」
+    #   就永远红。而它红的原因是**样本不可解码**，不是被测代码不对。
+    #
+    #   要测的是「只配 tokenhub 时 av_alignment 被跳过、其余照常」——
+    #   前提是其余任务**本来能做**，所以样本必须能给到画面。
+    vid = _fake_video()
+    if vid is None:
+        untested("E1/E2/E3 只配 tokenhub 时的降级",
+                 "本机造不出可解码的 mp4（缺 cv2 或编解码器）")
+        return
     try:
         fn = MA.build_analyze(
             resolve_path=lambda ref: vid, env=PARTIAL_ENV,
@@ -262,8 +387,9 @@ def group_e():
                "E2 ★★★ 跳过时**说清原因**（vod 网关未配置）"
                "—— 静默少一个任务会让人以为音画已经看过",
                (r.get("reason") or "")[:50])
-        report(len(tasks) == 2,
-               "E3 其余两个画面任务照常做", repr(sorted(tasks)))
+        report("scene_semantics" in tasks and "mark_symbol" in tasks,
+               "E3 ★★ 其余画面任务照常做（跳过一条不许连带砍掉别的）",
+               repr(sorted(tasks)))
     finally:
         vid.unlink(missing_ok=True)
 

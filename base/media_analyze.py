@@ -166,11 +166,10 @@ def build_analyze(
         # 视频要 av_alignment，而它只有 vod 支持 —— 未配 vod 时必须
         # **明说缺的是音轨那条**，而不是笼统「未测」。
         want = [t for t in tasks if t]
+        dropped = ""
         if kind == "video" and not ready["video"]["ready"]:
             want = [t for t in want if t != "av_alignment"]
-            dropped = "av_alignment"
-        else:
-            dropped = ""
+            dropped = "av_alignment 未做：vod 网关未配置"
 
         media = _media_map(kind, path)
         if not media:
@@ -179,6 +178,27 @@ def build_analyze(
                 "reason": "载体 %r 没有对应的多模态介质映射" % (kind,),
                 "observations": [],
             }
+
+        # ★★ 2026-10-30：视频抽不出帧时，画面那两个任务**必须**如实落 untested。
+        #
+        #   改前它们会进 `client.analyze(want, media)`，然后每个任务各自回
+        #   「缺介质 image（本任务需要 image）」—— 那句话把责任说成「调用方没给图」，
+        #   而真实原因是「抽帧失败」。两者要修的东西完全不同：前者查参数，
+        #   后者查解码器/编解码支持。所以在这里就把它们摘出来，单独说清。
+        if kind == "video" and "image" not in media:
+            frame_tasks = [t for t in want if t in ("scene_semantics", "mark_symbol")]
+            if frame_tasks:
+                want = [t for t in want if t not in frame_tasks]
+                dropped = "；".join(filter(None, [
+                    dropped,
+                    "抽帧失败（场景语义/标志识别未做：拿不到视频画面）",
+                ]))
+
+        if not want:
+            # 全都做不了 —— 但**不许**静默返回空观察。
+            return {"status": "untested",
+                    "reason": dropped or "没有可执行的多模态任务",
+                    "observations": []}
 
         try:
             client = _make_client(env=env, client_factory=client_factory)
@@ -201,10 +221,13 @@ def build_analyze(
 
         out = _flatten(raw, want)
         if dropped:
-            # 把「音轨那条没做」写进 reason，而不是让它静默少一个任务
-            out["reason"] = ((out.get("reason") or "") +
-                             ("；av_alignment 未做：vod 网关未配置" if not out.get("reason")
-                              else "；av_alignment 未做：vod 网关未配置"))
+            # ★ 把「哪条任务没做、为什么」写进 reason，而不是让它静默少一个任务。
+            #   改前这里是两句**完全相同**的三元表达式（`if not ... else ...`
+            #   两边一样），于是 `out["reason"]` 永远只有「音轨未做」这一种 ——
+            #   抽帧失败、网关未配都进不来。两个原因要修的东西不同，必须分开说。
+            existing = out.get("reason") or ""
+            out["reason"] = (existing + "；" + dropped) if existing else dropped
+
         return out
 
     return analyze
@@ -216,13 +239,100 @@ def _media_map(kind: Optional[str], path: Path) -> Dict[str, Path]:
     ★ 与 `multimodal_client.TASK_MEDIA` 同口径：
       `scene_semantics` / `mark_symbol` 只吃 `image`，
       `av_alignment` 吃 `video` + `audio`。
-    视频这一路把**同一份文件**同时当 video 与 audio 传 —— 因为 mp4 里两者都有。
+
+    ## ★★ 2026-10-30 修：视频**必须**抽帧，不能把 mp4 当 image
+
+    改前这里对 video 只返回 `{"video": path, "audio": path}`。后果是实测出来的：
+
+        scene_semantics → untested「缺介质 image（本任务需要 image）」
+        mark_symbol     → untested「缺介质 image」
+        av_alignment    → error「unsupported audio format. format=mp4」（网关直接拒）
+
+    也就是**视频这一路三个任务全军覆没**，而 `_video_unit` 又把正文写成空串
+    （没有 ASR），于是整条视频链路最终的结论是「未审查」——
+    看起来像「视频功能还没做」，实际是「做了，但两个介质假设都错了」。
+
+    现在按任务需要分别喂：
+      · `scene_semantics` / `mark_symbol` → 抽出来的**帧图**（`image`）
+      · `av_alignment`                   → 整段 `video`（音轨那一路见 `_audio_map`）
+
+    ## 音轨：mp4 不能当 audio 传
+
+    网关的报错逐字是 `unsupported audio format. format=mp4` —— 它按**文件容器**
+    判格式，不看你叫它什么。所以 `av_alignment` 只传 `video`，
+    而 `TASK_MEDIA` 要求 `("video","audio")` 两个都在才跑。
+
+    ★ 这是一个**如实的三态**，不是待办：
+      本仓没有音轨分离能力（`DEFAULT_ASR_ENGINE = None`，也没有 ffmpeg 依赖）。
+      硬塞 mp4 当 audio 会让网关拒掉整条请求 —— 连画面都看不到。
+      所以把 audio 留空，让 `analyze_task` 落 `untested` 并说清「缺音轨」。
+      **「音画对齐没做」必须能看见**，否则报告里那一节会读成「对齐没问题」。
     """
     if kind == "image":
         return {"image": path}
     if kind == "video":
-        return {"video": path, "audio": path}
+        frame = extract_frame(path)
+        media: Dict[str, Path] = {"video": path}
+        if frame is not None:
+            media["image"] = frame
+        return media
     return {}
+
+
+#: 抽帧最多试几个时间点。★ 3 个：覆盖「开头 / 中段 / 结尾」，
+#: 一次抽失败还能往后退。再多的边际收益低于解码成本。
+FRAME_PROBES = 3
+
+
+def extract_frame(path: Path, *, at_ratio: float = 0.5) -> Optional[Path]:
+    """从视频里抽一帧存成 PNG，返回路径；抽不出返回 `None`。
+
+    ## 为什么用 opencv 而不是 ffmpeg
+
+    `ffmpeg` 在目标容器里**不存在**（实测 `which ffmpeg` → no-ffmpeg），
+    而 `opencv-python-headless` 是 `rapidocr` 的既有依赖 —— 装 OCR 就顺带有了。
+    再加一个二进制依赖只为抽一帧，是把「装不上」的风险放大到整条视频链路。
+
+    ## 为什么抽中段
+
+    广告视频的中段通常是产品特写与演示，首帧常是黑场或 logo 动画。
+    首帧抽到黑图会让 `scene_semantics` 得出「画面无内容」——
+    那与「真的没内容」无法区分。
+
+    ## 失败要说出来
+
+    抽不出帧不是「视频没问题」，是「画面没看成」。所以返回 `None` 时
+    调用方会把任务落 `untested` 并带原因，不许静默少一个任务。
+    """
+    try:
+        import cv2
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        cap = cv2.VideoCapture(str(path))
+        if not cap.isOpened():
+            cap.release()
+            return None
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        ratios = [at_ratio] + [r for r in (0.25, 0.75) if r != at_ratio]
+        ratios = ratios[:FRAME_PROBES]
+        frame = None
+        for ratio in ratios:
+            idx = max(0, int(total * ratio)) if total > 0 else 0
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, img = cap.read()
+            if ok and img is not None and getattr(img, "size", 0):
+                frame = img
+                break
+        cap.release()
+        if frame is None:
+            return None
+        out = path.with_suffix(".frame.png")
+        if not cv2.imwrite(str(out), frame):
+            return None
+        return out
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _make_client(*, env: Optional[Mapping[str, str]], client_factory):

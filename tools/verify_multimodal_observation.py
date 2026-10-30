@@ -236,11 +236,28 @@ def check_judge_entry():
             {"statement": "画面演示婴儿床", "confidence": 0.8,
              "region": "中央"}]}}})
     obs6 = res6.get("multimodal_observations") or []
-    report(len(obs6) == 1 and obs6[0]["status"] == "ok"
-           and obs6[0]["statement"] == "画面演示婴儿床"
-           and obs6[0]["confidence"] == 0.8
-           and obs6[0]["bbox"] == "中央",
+    # ★★ 2026-10-30 修：判据从「总条数 == 1」改成「按 task 定位那一条」。
+    #
+    #   旧判据写的时候 `DEFAULT_MEDIA_TASKS` 只有 `scene_semantics` 一个任务，
+    #   于是「1 条观察」等价于「那个任务的那一条」。后来 H8 那条断言
+    #   （"默认任务含 mark_symbol，否则标志/资质图标永远不识别"）把
+    #   `mark_symbol` 加进默认集合 —— 桩只回了 scene_semantics，
+    #   于是 mark_symbol 按契约落一条 untested 占位（**这是对的**：
+    #   少一个任务必须说出来，不许静默消失），总数就变成 2。
+    #
+    #   改后判据问的是它真正要问的：**那一条 ok 观察有没有逐字段落下来**。
+    #   总数不是这条断言的对象 —— 「有几个任务」由 H8 那条管。
+    scene = [o for o in obs6 if o.get("task") == "scene_semantics"]
+    report(len(scene) == 1 and scene[0]["status"] == "ok"
+           and scene[0]["statement"] == "画面演示婴儿床"
+           and scene[0]["confidence"] == 0.8
+           and scene[0]["bbox"] == "中央",
            "L4-6 正常观察逐字段落下来（statement/confidence/bbox）", repr(obs6)[:140])
+    # ★ 反向对照：另一条任务**必须**留下 untested 占位（不是消失）
+    report(any(o.get("task") == "mark_symbol" and o.get("status") == "untested"
+               for o in obs6),
+           "L4-6b ★ 桩没给的那个任务留 untested 占位（少一个任务要说出来）",
+           repr([(o.get("task"), o.get("status")) for o in obs6])[:120])
     report(obs6 and obs6[0].get("egress_status") == "authorized",
            "L4-7 观察带 egress_status（出境状态随观察走）")
 

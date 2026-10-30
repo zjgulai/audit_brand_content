@@ -423,6 +423,58 @@ def _unit(kind: str, uri: str, raw_sha256: str, text: str, parts: list[dict],
     return u
 
 
+def from_structured_record(rec: dict, *, uri: str = "structured:inline",
+                           raw_bytes: bytes | None = None,
+                           extra_fields: tuple[str, ...] = ()) -> dict:
+    """一条结构化记录（商品 JSON / 多维表格行）→ unit。kind = `structured_json`。
+
+    ## 为什么它与 `from_landing_page(label="structured")` 并存
+
+    后者吃的是**抓取批次**的中间产物（`抓取结果.json` + `要素提取.json` 两份文件），
+    它的 `raw_sha256` 指向那次 HTTP 抓取的原件。而网页/接口提交的结构化记录
+    **没有那次抓取** —— 调用方直接把字段递过来。硬套那条路会造出一个
+    「raw_sha256 指向一份不存在的原件」的 unit，那正是 H8 要挡的假数据。
+
+    两条路的**正文口径必须相同**（title + description_text，`fields-pipe-v1`），
+    否则同一份商品走抓取和走提交会得到两份不同的正文指纹。这一点由
+    `tests/` 里的对拍断言守，本函数不复制口径 —— 它调用同一个 `_compose`。
+
+    ## 覆盖边界
+
+    `covers` 只说「标题与描述」：结构化记录里**没有**的（图内文字、画面、
+    落地页正文）必须逐条写进 `does_not_cover`。少写一条的后果不是格式问题，
+    而是审核员看到「商品已审」时以为图片也看了。
+    """
+    if not isinstance(rec, dict):
+        raise TypeError("rec 必须是 dict，收到 %s" % type(rec).__name__)
+
+    fields = [("title", str(rec.get("title") or "")),
+              ("description_text", str(rec.get("description_text") or ""))]
+    for k in extra_fields:
+        fields.append((k, str(rec.get(k) or "")))
+
+    text, parts = _compose(fields, COMPOSITION_PROFILE)
+    omitted = [f for f, v in fields if not normalize(v)]
+
+    raw = raw_bytes if raw_bytes is not None else json.dumps(
+        rec, ensure_ascii=False, sort_keys=True,
+        separators=(",", ":")).encode("utf-8")
+
+    u = _unit("structured_json", uri, sha256_bytes(raw), text, parts,
+              COMPOSITION_PROFILE, {}, {},
+              {"raw_bytes": len(raw), "raw_pointer": None, "raw_verified": True,
+               "$raw_note": ("`raw_sha256` 是**整条记录**的规范化 JSON 指纹，"
+                             "不是某几个字段。价格/库存变了 raw 就变、"
+                             "正文没变 text 就不变 —— 两个指纹各答各的问题。")},
+              {"extractor": "structured-as-given", "lossy": True,
+               "covers": ["结构化记录的标题与描述"],
+               "does_not_cover": ["图内文字", "画面语义", "落地页正文",
+                                  "结构化记录里没有出现的字段"]},
+              None)
+    u["composition"]["omitted_empty_fields"] = omitted
+    return u
+
+
 def from_text(text: str, *, uri: str = "inline:text", raw_bytes: bytes | None = None,
               **routing) -> dict:
     """任意一段文字 → unit。`raw_sha256` 取 UTF-8 原文的指纹（不是归一化后的）。"""

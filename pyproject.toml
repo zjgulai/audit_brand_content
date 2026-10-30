@@ -7,6 +7,27 @@ dependencies = [
     "fastapi==0.115.6",
     "pydantic==2.10.4",
     "uvicorn==0.34.0",
+    # ★ 2026-10-30：容器内 OCR 引擎 + 视频抽帧。两者共用同一个 opencv 依赖。
+    #
+    #   为什么它们必须在**运行时依赖**里而不是 dev 组：
+    #     · `rapidocr` 是图片进件的正文来源（`base/media.py:ContainerOcrProvider`）。
+    #       不在镜像里 → `ocr_file()` 落 `provider_not_installed`，
+    #       每张图都判成「未审查」，而那与「图里没字」在旧读数里长得一样。
+    #     · `opencv-python-headless` 同时承担视频抽帧
+    #       （`base/media_analyze.py:extract_frame`）。目标容器**没有 ffmpeg**
+    #       （实测 `which ffmpeg` → no-ffmpeg），所以不能走 ffmpeg 那条路。
+    #
+    #   版本逐个钉死（与 ADR-0018 选型一致）：`uv sync --locked` 是 G-02 的门，
+    #   浮动版本会让「镜像重建后 OCR 换了引擎」这件事静默发生。
+    "rapidocr==3.10.0",
+    # ★ 2026-10-30：`rapidocr` 只是**适配层**，它自己不含推理后端。
+    #   只装 rapidocr 时 `probe()` 报 ready（包在），而第一次 analyze 抛
+    #   `ImportError: onnxruntime is not installed` —— 实测就是这样红的：
+    #   图片落 `parse_status=failed`，与「图里没字」无法区分。
+    #   `probe()` 已改成**连后端一起探**（见 base/media.py），两处都要有。
+    "onnxruntime==1.31.1",
+    "opencv-python-headless==4.11.0.86",
+    "numpy==2.2.6",
 ]
 
 [tool.uv]
