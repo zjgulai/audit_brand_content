@@ -433,6 +433,20 @@ def main():
         sid_u2, csrf_u2 = cookie_for(runtime, "u2")
         client_u2 = TestClient(app)
         client_u2.cookies.set("__Host-session", sid_u2)
+        # ★ 2026-11-01（ADR-0021 §1.5 / P3）：签发前 GET /api/v1/release/pending
+        #   必须能从 authority 列出该案，且携带 submitter_id 与 final_reviewer_id。
+        st_pend_pre, pend_pre = call(client_u2, "GET", "/api/v1/release/pending", None)
+        pend_row = next(
+            (r for r in (pend_pre or []) if isinstance(r, dict) and r.get("case_id") == case_id),
+            {},
+        )
+        report(st_pend_pre == 200
+               and pend_row.get("case_id") == case_id
+               and pend_row.get("submitter_id") == "u1"
+               and pend_row.get("final_reviewer_id") == "u1"
+               and pend_row.get("release_status") == "待放行",
+               "D5-8d ★★ 签发前 GET /release/pending 从权威列出案件且带 submitter_id/final_reviewer_id",
+               "%s %r" % (st_pend_pre, pend_row))
         token9 = runtime.session_store.issue_step_up(
             "u2", case_id, "sign", "n-d5-sign")
         st9, body9 = call(client_u2, "POST",
@@ -450,6 +464,26 @@ def main():
                                                     or {}).get("kb_snapshot_hash"),
                "D5-9 ★ 生产装配真实签发（signed/已放行/绑定 kb_snapshot_hash）",
                "%s %r" % (st9, rel9.get("status")))
+        st_pend_post, pend_post = call(client_u2, "GET", "/api/v1/release/pending", None)
+        report(st_pend_post == 200
+               and all((r or {}).get("case_id") != case_id for r in (pend_post or [])),
+               "D5-9c ★ 反向对照：已签发案件从 GET /release/pending 移出（不再混在待放行列表）",
+               "%s %r" % (st_pend_post, [r.get("case_id") for r in (pend_post or []) if isinstance(r, dict)]))
+        # ★ 2026-11-01（P3）：生产装配下（frozen 目录无 metrics.json）GET /metrics
+        #   必须调用 MetricsReadModel 从 authority 现算五个指标，不许返回空字典 {}。
+        st_m, body_m = call(client, "GET", "/metrics", None)
+        ms_dict = (body_m or {}).get("metrics") if isinstance(body_m, dict) else None
+        expected_m_keys = {
+            "recall_l4_l5", "false_positive_l4_l5", "uncovered_ratio",
+            "human_overturn_rate", "workflow_latency_ms",
+        }
+        report(st_m == 200
+               and isinstance(ms_dict, dict)
+               and expected_m_keys <= set(ms_dict)
+               and (ms_dict.get("uncovered_ratio") or {}).get("denominator") == 1
+               and (ms_dict.get("workflow_latency_ms") or {}).get("denominator") == 1,
+               "D5-14 ★★ 生产装配 GET /metrics 从权威现算五项可测指标（非空字典）",
+               "%s keys=%r" % (st_m, sorted(ms_dict) if isinstance(ms_dict, dict) else body_m))
         # 缺 step-up 必须 403 且权威 seq 不变（失败不落案）
         seq_before = runtime.authority.head()["seq"]
         live_version2 = (runtime.authority.state(case_id) or {}).get("version")

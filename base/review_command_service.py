@@ -813,6 +813,146 @@ class ReviewCommandService:
                                 str(r.get("appeal_id") or "")), reverse=True)
         return out
 
+    def list_release_pending(self, *, tenant=None):
+        """该租户处于「待放行」状态的案件列表（T-310 / ADR-0021 §1.5）。**不做 ACL。**
+
+        ★ 为什么必须从权威扫：`GET /api/v1/release/pending` 此前只读 frozen
+          `release-pending.json`（盘上不存在，恒 `[]`），导致前端 ReleasePage
+          只能走 fallback 分支，拿不到 `submitter_id`（`isSelfSub` 恒 false，
+          展示层自签拦截失效）。
+        ★ `final_reviewer_id` 优先取最新一条 `formal_reviews[-1]["author"]`
+          （结案后 `assignee` 可能被释放或保留，正式复核提交人才是 SoD 判据里的
+          最终复核人），没有 formal_reviews 时回落 `assignee`。
+        """
+        out = []
+        for aggregate_id in self.authority.aggregate_ids():
+            current = self.authority.state(aggregate_id)
+            ir = current.get("ir")
+            if not isinstance(ir, dict):
+                continue
+            if tenant is not None and current.get("tenant") != tenant:
+                continue
+            release = current.get("release")
+            rel_status_code = (
+                release.get("status") if isinstance(release, dict) else None
+            ) or "pending_release"
+            if rel_status_code != "pending_release":
+                continue
+            dec = ir.get("decision") or {}
+            rel_label = (
+                (release.get("release_status") if isinstance(release, dict) else None)
+                or dec.get("release_status")
+                or "待放行"
+            )
+            formals = current.get("formal_reviews") or []
+            final_reviewer = None
+            if isinstance(formals, list) and formals and isinstance(formals[-1], dict):
+                final_reviewer = formals[-1].get("author")
+            if not final_reviewer:
+                final_reviewer = current.get("assignee")
+            out.append({
+                "case_id": current.get("case_id"),
+                "tenant": current.get("tenant"),
+                "product_line": current.get("product_line"),
+                "state": dec.get("state"),
+                "release_status": rel_label,
+                "submitter_id": current.get("submitter_id"),
+                "final_reviewer_id": final_reviewer,
+                "case_version": int(current.get("version") or 0),
+                "ir_id": ir.get("ir_id"),
+                "_assignee": current.get("assignee"),
+                "_actionable": current.get("status") in ("unassigned", "released"),
+            })
+        return out
+
+    def compute_tenant_metrics(self, *, tenant, window="all"):
+        """从本租户 authority 案件聚合计算五个可测指标（Playbook §6.1 + T-451）。
+
+        ★ 边界诚实（AGENTS.md §2.4.1）：
+          - 分层抽检台账尚未接入 → `sampled_layers` 如实传 `[]`，`recall_l4_l5`
+            落 `status="未测"`，绝不伪造四层已抽样；
+          - BLOCK 案件未全部结案复核完 → `block_review_complete=False`，
+            `false_positive_l4_l5` 如实落 `status="未测"` 并附 `reviewed_coverage`；
+          - 样本数不足 `min_n`（30）→ 如实落 `status="样本不足"`，`ratio=None`；
+          - `uncovered_ratio`（`min_n=1`）与 `workflow_latency_ms` 的样本计数与
+            失败四分类计数全部从真实案件状态现算。
+        """
+        from base.metrics_read_model import MetricsReadModel
+
+        sev_rank = {"L0": 0, "L1": 1, "L2": 2, "L3": 3, "L4": 4, "L5": 5}
+        cases = []
+        for aggregate_id in self.authority.aggregate_ids():
+            current = self.authority.state(aggregate_id)
+            ir = current.get("ir")
+            if not isinstance(ir, dict):
+                continue
+            if current.get("tenant") != tenant:
+                continue
+            dec = ir.get("decision") or {}
+            cu_ref = ir.get("content_unit_ref") or {}
+            findings = [f for f in (ir.get("findings") or []) if isinstance(f, dict)]
+            confirmed = [
+                f for f in findings
+                if f.get("status") == "confirmed" or (
+                    f.get("status") is None and f.get("produced_by") == "rule"
+                )
+            ]
+            machine_max = "none"
+            best = -1
+            for f in findings:
+                s = str(f.get("severity") or "")
+                if sev_rank.get(s, -1) > best:
+                    best = sev_rank[s]
+                    machine_max = s
+            closed = current.get("status") == "closed"
+            human_max = None
+            human_conclusion = None
+            if closed:
+                h_best = -1
+                human_max = "none"
+                for f in confirmed:
+                    s = str(f.get("severity") or "")
+                    if sev_rank.get(s, -1) > h_best:
+                        h_best = sev_rank[s]
+                        human_max = s
+                formals = current.get("formal_reviews") or []
+                verdict = None
+                if formals and isinstance(formals[-1], dict):
+                    conc = formals[-1].get("conclusion")
+                    if isinstance(conc, dict):
+                        verdict = conc.get("verdict") or conc.get("state")
+                human_conclusion = verdict or dec.get("state")
+            snap = current.get("report_snapshot")
+            rc = snap.get("receipt") if isinstance(snap, dict) else None
+            timing = rc.get("workflow_timing") if isinstance(rc, dict) else None
+            appeals = [a for a in (current.get("appeals") or []) if isinstance(a, dict)]
+            appeal_result = appeals[-1].get("result") if appeals else None
+            cases.append({
+                "case_id": current.get("case_id"),
+                "state": dec.get("state"),
+                "run_state": (current.get("judgment") or {}).get("run_state") or "OK",
+                "failure_kind": cu_ref.get("failure_kind"),
+                "machine_max_sev": machine_max,
+                "human_max_sev": human_max,
+                "review_completed": closed,
+                "machine_conclusion": dec.get("state"),
+                "human_conclusion": human_conclusion,
+                "appeal_result": appeal_result,
+                "clean_candidate": False,
+                "workflow_timing": timing,
+            })
+        machine_high = [c for c in cases if c.get("machine_max_sev") in ("L4", "L5")]
+        block_total = len(machine_high)
+        block_reviewed = sum(1 for c in machine_high if c.get("review_completed") is True)
+        cov = {
+            "sampled_layers": [],
+            "block_total": block_total,
+            "block_reviewed": block_reviewed,
+            "block_review_complete": bool(block_total > 0 and block_reviewed == block_total),
+        }
+        model = MetricsReadModel(lambda _w: {"cases": cases, "coverage": cov})
+        return model.compute(window or "all")
+
     def read_your_write(self, reconcile_token, *, aggregate_id=None,
                         principal_id=None, tenant_id=None):
         if not isinstance(reconcile_token, str) or not reconcile_token:

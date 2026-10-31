@@ -1100,6 +1100,32 @@ def create_app(*, session_store=None, repository=None, principals=None,
     @app.get("/api/v1/release/pending")
     def release_pending(principal=Depends(principal_dep)):
         tenant = principal.get("tenant")
+        # ★ 2026-11-01（ADR-0021 §1.5 / P3）：优先从 authority 读待放行案件。
+        #   改前只读 frozen `release-pending.json`（盘上不存在，恒 `[]`），
+        #   导致前端 ReleasePage 退回 `/cases` fallback（无 `submitter_id`，
+        #   `isSelfSub` 恒 false）。服务层返回带 `submitter_id` 与
+        #   `final_reviewer_id` 的完整项，在此按 `can_read_content` 过滤可见性。
+        if review_command_service is not None:
+            try:
+                rows = review_command_service.list_release_pending(tenant=tenant)
+            except Exception:  # noqa: BLE001
+                rows = None
+            if rows is not None:
+                out = []
+                for row in rows:
+                    pseudo_case = {
+                        "tenant": row.get("tenant"),
+                        "product_line": row.get("product_line"),
+                        "submitter_id": row.get("submitter_id"),
+                        "assignee_id": row.get("_assignee"),
+                        "actionable": bool(row.get("_actionable")),
+                    }
+                    if can_read_content(principal, pseudo_case):
+                        clean = dict(row)
+                        clean.pop("_assignee", None)
+                        clean.pop("_actionable", None)
+                        out.append(clean)
+                return out
         return [row for row in repo.release_pending if row.get("tenant") == tenant]
 
     @app.get("/api/v1/cases/{id}/release-readiness")
@@ -1245,10 +1271,19 @@ def create_app(*, session_store=None, repository=None, principals=None,
         return [row for row in repo.sessions if row.get("tenant") == tenant]
 
     @app.get("/metrics")
-    def metrics(principal=Depends(internal_dep)):
+    def metrics(principal=Depends(internal_dep), window: Optional[str] = "all"):
         tenant = principal.get("tenant")
         if isinstance(repo.metrics, dict) and tenant in repo.metrics:
             return repo.metrics[tenant]
+        # ★ 2026-11-01（P3）：frozen `metrics.json` 无该租户条目时，
+        #   若装配了 `review_command_service`，从本租户 authority 案件
+        #   调用 `MetricsReadModel.compute()` 现算五个可测指标（含三态与样本数）。
+        if review_command_service is not None:
+            try:
+                return review_command_service.compute_tenant_metrics(
+                    tenant=tenant, window=window or "all")
+            except Exception:  # noqa: BLE001
+                return {}
         return {}
 
     implemented = register_write_routes(
