@@ -142,6 +142,34 @@ def main():
         report(not (written_names & forbidden),
                "E1 ★ 不写有 authority 回落的六件（写了会掩盖「权威有、页面旧」）",
                repr(sorted(written_names & forbidden)))
+
+        # ── F：★ 仓库**没有热读** —— 导出后必须重启才生效 ────────────────
+        #
+        # ★ 2026-10-31 生产实测踩过：导出脚本跑完、文件确实写进
+        #   /data/projection（36/24/24 条），但三个端点**仍然全空**。
+        #   原因是 `FileProjectionRepository.__init__` 里那个 `load()` 只在
+        #   构造时跑一次，之后没有任何 reload。而它是 create_production_app()
+        #   时构造的 —— 容器起来那一刻盘上是空的，于是永远空。
+        #
+        #   这条断言把这个顺序钉成判据：**先导出、再重启**。
+        #   我第一版部署就是「先部署、后导出、没重启」，看起来全做对了，
+        #   读数却是零 —— 与 §2.4.1 那个「读数比输入小」同一个形状。
+        live = tmp / "live"
+        write(live, built)
+        repo_before = FileProjectionRepository(live, strict=True,
+                                               require_cases=False)
+        # 构造之后再写一次（模拟「容器已起，之后才导出」）
+        (live / "rules.json").write_text("[]\n", encoding="utf-8")
+        report(len(repo_before.rules) == src_counts["rules.json"],
+               "F1 ★ 构造之后再改盘上文件，已构造的仓库**看不见**"
+               "（所以导出后必须重启，不是「等一会儿自己会好」）",
+               "构造时 %d 条，改盘后仍 %d 条"
+               % (src_counts["rules.json"], len(repo_before.rules)))
+        repo_after = FileProjectionRepository(live, strict=True,
+                                              require_cases=False)
+        report(repo_after.rules == [],
+               "F2 ★ 反向对照：重新构造才能读到新内容（证明 F1 不是「读不到」）",
+               repr(len(repo_after.rules)))
     except Exception as exc:  # noqa: BLE001
         print("UNTESTED: 跑不起来：%r" % (exc,))
         return 2
