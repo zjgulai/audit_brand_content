@@ -251,6 +251,11 @@ def main():
            and isinstance(new_state["ir"], dict),
            "R2 ingest_submission 写入 content/ir 且 version=1",
            repr(sorted(new_state)))
+    report(new_state.get("content_type") == "文本"
+           and new_state.get("content_stage") == "final_content"
+           and new_state.get("entry_channel") == "群消息",
+           "R2b ★ P2 四维正交字段（content_type/content_stage/entry_channel）落入 authority state",
+           repr((new_state.get("content_type"), new_state.get("content_stage"), new_state.get("entry_channel"))))
     report(result["submission_id"] == "s-1"
            and result["decision"]["state"] == new_state["ir"]["decision"]["state"]
            and events[0]["type"] == "review.ingest_submission",
@@ -327,6 +332,27 @@ def main():
     report(listed.status_code == 200
            and case_id in {row["case_id"] for row in listed.json()},
            "E4 GET /cases 能列出新案")
+    listed_row = next((row for row in (listed.json() or []) if row.get("case_id") == case_id), {})
+    got_detail = got.json() or {}
+    report(listed_row.get("content_type") == "文本"
+           and listed_row.get("content_stage") == "final_content"
+           and listed_row.get("entry_channel") == "群消息"
+           and got_detail.get("content_type") == "文本"
+           and got_detail.get("content_stage") == "final_content"
+           and got_detail.get("entry_channel") == "群消息",
+           "E4b ★ P2 GET /cases 与 GET /cases/{id} 均读回非空 content_type/content_stage/entry_channel",
+           repr((listed_row.get("content_type"), listed_row.get("content_stage"), listed_row.get("entry_channel"),
+                 got_detail.get("content_type"), got_detail.get("content_stage"), got_detail.get("entry_channel"))))
+    legacy_projected = AuthorityCaseSource._case({
+        k: v for k, v in stored.items()
+        if k not in ("content_type", "content_stage", "entry_channel")
+    })
+    report(legacy_projected is not None
+           and legacy_projected.get("content_type") is None
+           and legacy_projected.get("content_stage") is None
+           and legacy_projected.get("entry_channel") is None,
+           "E4c ★ 反向对照：旧 state 无四维字段时投影返回 None（不伪造默认值）",
+           repr((legacy_projected.get("content_type"), legacy_projected.get("content_stage"), legacy_projected.get("entry_channel"))))
     queued = client.get("/api/v1/queue")
     report(queued.status_code == 200
            and case_id not in {row["case_id"] for row in queued.json()},

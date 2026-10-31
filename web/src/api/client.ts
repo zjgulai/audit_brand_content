@@ -56,6 +56,8 @@ export interface CaseSummary {
   product_line?: string | null;
   assignee_id?: string | null;
   sample?: boolean | null;
+  content_type?: string | null;
+  content_stage?: string | null;
   entry_channel?: string | null;
   created_at?: string | null;
   title_or_excerpt?: string | null;
@@ -156,6 +158,9 @@ export interface ContentUnitData {
 
 export interface CaseDetail {
   case_id: string;
+  content_type?: string | null;
+  content_stage?: string | null;
+  entry_channel?: string | null;
   ir: {
     ir_id: string;
     ir_version: string;

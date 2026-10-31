@@ -131,6 +131,9 @@ def initial_state(case_id):
         "tenant": None,
         "product_line": None,
         "submitter_id": None,
+        "content_type": None,
+        "content_stage": None,
+        "entry_channel": None,
         "ingested_at": None,
     }
 
@@ -1179,6 +1182,17 @@ def _ingest_submission(state, actor, payload, now):
         "tenant": _nonempty(payload.get("tenant"), "tenant"),
         "product_line": _nonempty(payload.get("product_line"), "product_line"),
         "submitter_id": _nonempty(payload.get("submitter_id"), "submitter_id"),
+        # ★★ 2026-11-01（P2）：四维正交字段落入 state。
+        #   兼容旧快照/手工测试 payload：给了就剥空白写进去，没给留 None。
+        "content_type": (payload["content_type"].strip()
+                         if isinstance(payload.get("content_type"), str)
+                         and payload["content_type"].strip() else None),
+        "content_stage": (payload["content_stage"].strip()
+                          if isinstance(payload.get("content_stage"), str)
+                          and payload["content_stage"].strip() else None),
+        "entry_channel": (payload["entry_channel"].strip()
+                          if isinstance(payload.get("entry_channel"), str)
+                          and payload["entry_channel"].strip() else None),
         "ingested_at": _iso(now),
     })
     return submission_id, ir["ir_id"]

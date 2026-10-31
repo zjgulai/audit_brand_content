@@ -145,6 +145,8 @@ class CaseSummary(BaseModel):
     product_line: Optional[str] = None
     assignee_id: Optional[str] = None
     sample: Optional[bool] = None
+    content_type: Optional[str] = None
+    content_stage: Optional[str] = None
     entry_channel: Optional[str] = None
     created_at: Optional[str] = None
     title_or_excerpt: Optional[str] = None
@@ -155,6 +157,9 @@ class CaseSummary(BaseModel):
 class CaseDetail(BaseModel):
     case_id: str
     ir: ReviewIR
+    content_type: Optional[str] = None
+    content_stage: Optional[str] = None
+    entry_channel: Optional[str] = None
     review: Optional[Dict[str, Any]] = None
     content_unit: Optional[Dict[str, Any]] = None
     #: T-433/T-439：L1 多模态观察。
@@ -393,6 +398,15 @@ class AuthorityCaseSource:
             "multimodal_note": (state.get("multimodal_note")
                                 if isinstance(state.get("multimodal_note"), str)
                                 else None),
+            # ★★★★ 2026-11-01（P2）：同一张投影表里的**第四处**遗漏。
+            #   content_type / content_stage / entry_channel 现已落入 state，
+            #   在此原样透出；旧案件没有这三个键时返回 None，不猜。
+            "content_type": (state.get("content_type")
+                             if isinstance(state.get("content_type"), str) else None),
+            "content_stage": (state.get("content_stage")
+                              if isinstance(state.get("content_stage"), str) else None),
+            "entry_channel": (state.get("entry_channel")
+                              if isinstance(state.get("entry_channel"), str) else None),
         }
 
     def get_case(self, case_id):
@@ -526,6 +540,8 @@ def _summary(case):
         "product_line": case.get("product_line"),
         "assignee_id": case.get("assignee_id"),
         "sample": bool(case.get("sample")) if "sample" in case else None,
+        "content_type": case.get("content_type"),
+        "content_stage": case.get("content_stage"),
         "entry_channel": channel,
         "created_at": ir.get("created_at"),
         "title_or_excerpt": _extract_excerpt(case),
@@ -833,6 +849,11 @@ def create_app(*, session_store=None, repository=None, principals=None,
         require_read(principal, case)
         require_review_fresh()
         unit = case.get("content_unit") or case.get("content")
+        channel = case.get("entry_channel")
+        if not channel and isinstance(unit, dict):
+            ctx = unit.get("context") or {}
+            if isinstance(ctx, dict):
+                channel = ctx.get("entry_channel") or ctx.get("channel")
         # ★ T-439：观察从 case 顶层读（不是从 unit 里挖）。
         #   取不到时给 [] 且 note=None —— 与「有 note 但没观察」区分开：
         #   前者是「这条数据源没有这个字段」（旧案件），后者是「有字段但没看成」。
@@ -865,6 +886,9 @@ def create_app(*, session_store=None, repository=None, principals=None,
         return {
             "case_id": id,
             "ir": case["ir"],
+            "content_type": case.get("content_type"),
+            "content_stage": case.get("content_stage"),
+            "entry_channel": channel,
             "review": _review_summary(repo_ledger.get_case(id), store=repo_ledger, case_id=id),
             "content_unit": unit if isinstance(unit, dict) else None,
             "multimodal_observations": observations if isinstance(observations, list) else [],

@@ -813,6 +813,12 @@ class SubmissionIngestor:
             "tenant": tenant,
             "product_line": product_line,
             "submitter_id": principal.get("id"),
+            # ★ 2026-11-01（P2）：四维正交字段（content_type / content_stage / entry_channel）
+            #   必须随 payload 进 authority state。此前它们只用于校验与 submission_hash，
+            #   进完就丢，导致列表与详情永远返回 null。
+            "content_type": _nonempty(submission.get("content_type"), "content_type"),
+            "content_stage": _nonempty(submission.get("content_stage"), "content_stage"),
+            "entry_channel": _nonempty(submission.get("entry_channel"), "entry_channel"),
             "content": unit,
             "ir": ir,
             "kb_snapshot_hash": kb_snapshot_hash,
