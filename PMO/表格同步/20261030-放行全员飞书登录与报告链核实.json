@@ -1,0 +1,22 @@
+{
+  "事项名称": "放行全员飞书登录（主体目录自动登记）+ 报告发布断链核实 + media 挂载回填",
+  "关联执行票": "WBPM-0149",
+  "功能一级分类": "登录与身份入口",
+  "功能二级分类": "登录态",
+  "功能三级分类": "OAuth 完整登录",
+  "工作类型": [
+    "后端",
+    "部署运维",
+    "测试验收"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "/login",
+  "事项明细": "① 修登录 403：刘华丽（open_id ou_af95e2a43871579692afbb25a529e77e）扫码后 403 principal_not_authorized。定位过程排除租户门（REVIEW_TENANT_ALLOWLIST=1774a6c9fe58975e 与她一致、若租户不匹配报的是 tenant_not_allowed），真因是生产 principals.json 只有 u-zhoujian 一条，by_identity 查不到 → 403。委托方要求「放行所有人员飞书登录」，故加一层自动登记而非逐人抄 JSON。② 自动登记的三条规则：显式层优先且显式 revoked 不被自动复活（否则撤人等于没撤）；自动层禁止 signer/it/machine，能力只由 rbac 角色矩阵推导、配置里写别的直接拒；没配 = 关，行为与加这层之前逐字相同。③ 报告发布断链核实：先按「断链」假设查，实际报告链路没有断 —— verify_report_publishing 22/22 含 P1 端到端已绿，真原因是生产上从未有案件被结案过。真结案一条后立刻产出报告 rpfa4ef3517449d2ae。④ 部署中发现两个真缺陷：authz_version 未算（生产 require_authz_version=True，本地验的是 False，第一个真人扫码就 500）；docker-compose.yml 的 media 挂载原先只在服务器上、从未进版本库，git reset --hard 把它冲掉，运行中的容器还带老挂载所以没当场坏，下次重建才 502。",
+  "验收标准": "S1 生产上刘华丽 open_id 经自动登记得到 id=auto-6d694ad65bea5475、roles=[dp3]、product_lines=[吸奶器]、capabilities=[appeal.handle, case.review]、status=active、source=auto。S2 用该主体造会话后 GET /api/v1/me 返 200 且 principal/roles/product_lines 三项逐字相符；GET /api/v1/queue 返 200 且有案件。S3 自动登记必须落盘 /data/principals-auto.json 且权限 0600；审计 /data/logs/principal-auto-audit.jsonl 留一行 ok=true。S4 显式账号 u-zhoujian 必须仍走 explicit 分支（source=explicit），不被自动层覆盖。S5 未配 REVIEW_PRINCIPAL_AUTO_GRANT 时行为必须与改动前逐字相同（陌生人一律 None、显式表为空时 ready() 为假）。S6 自动登记不许给 signer/it/machine，也不许带 release.sign / release.revoke / takedown.* / admin.grant.* 能力。S7 落盘目录不可写必须构造期就拒（principal_auto_store_unwritable），不是等真人扫码时才 500。S8 compose 的 media 挂载必须在版本库里（grep 得到 data/media:/data/media），否则下次 reset 又丢。S9 tools/verify_principal_auto.py 必须全过。",
+  "状态依据": "提交 ce04b9d（自动登记层）、aa82233（authz_version 修复）、70f931c（compose 补 media 挂载），生产镜像 momcozy-audit:aa82233 已 tag 成 :local 并起容器，/readyz 200 七项全 true。★ 生产实测：容器内 PrincipalDirectory 以 require_authz_version=True 跑，刘华丽 open_id → auto-6d694ad65bea5475 / dp3 / [吸奶器] / [appeal.handle,case.review] / active / auto / name=刘华丽；by_id 同 id 可读回；eligible_assignee 对该品线为 True、另品线为 False。★ /data/principals-auto.json 权限 600 audit:audit，审计行 {event: principal_auto_registered, ok: true}。★ 显式仍优先：u-zhoujian → id=u-zhoujian source=explicit roles=[dp3]。★ 端到端：造会话后 /api/v1/me 200 {\"principal\":\"auto-6d694ad65bea5475\",\"roles\":[\"dp3\"],\"product_lines\":[\"吸奶器\"]}，/api/v1/queue 200 返案件，/api/v1/reports 200。★ 报告：结案 case-12ef9e176a770173e65e 后 /api/v1/reports 由 0 变 1，报告 rpfa4ef3517449d2ae 正文 1110 字符 7 段（结论 REVIEW/DP3、命中 U03:L2、画面语义候选、依据清单等），登录态下 200，匿名 401 是设计（走 can_read_report，不泄露 report_id 是否存在）。★ 自证：verify_principal_auto 39/39、verify_rbac 79/79、verify_password_login 10/10、verify_tenant_isolation 10/10、verify_production_app 85/85、verify_stage_gate_d5 23/23、verify_coverage 749 项 0 红、verify_deploy 14 过 0 败 1 未测（D14 未测＝生产 env 不在本机，属正常状态）。★ 过程中两次自证误报已修：A7 原本设计成「写不进盘也放行只留痕」，改判为必须抛（静默放行会让故障表现成「有时能进有时不能」）；B1b 反向对照原本写成「期望拒绝」的形状而失效。★ 已知遗留：verify_submission_pipeline 的 N6a/N6b 仍红，经 git stash 验证为既有问题，不在本票范围。",
+  "下一步行动": "① 若确认某些人不该有 dp3 领案权，在 principals.json 里显式登记并置 status=revoked —— 显式 revoked 会压过自动层，不会被复活。② 「全员 dp3」是委托方选定的默认，若后续要收缩到最小权限，需改 REVIEW_PRINCIPAL_AUTO_GRANT 的角色模板并重启（改模板会让已在登录态的人 authz_version 变化、需重登，这是预期行为）。③ 部署流程建议：服务器上的 compose 手改已不存在（media 挂载已入版本库），后续统一 git reset --hard + 重建即可。",
+  "阻塞原因": ""
+}
