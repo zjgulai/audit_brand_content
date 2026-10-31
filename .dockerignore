@@ -63,6 +63,16 @@ tools
 !tools/audit/report_render.mjs
 !tools/reply-cards/registry.mjs
 !tools/reply-cards/cards.mjs
+# ★ 2026-10-31：冻结投影导出脚本。
+#
+#   它不是「开发工具」—— 它是「把 research/governance 的源规则导出成
+#   /data/projection 下 API 能读的三件」的**部署动作**。不放进镜像的话，
+#   生产上 `/api/v1/rules` 等三个端点永远是 []，因为那个目录仓内没有生产者
+#   （唯一会写投影的 seed_projection.py 只写 reports/notifications/takedown）。
+#
+#   ★ 只放这一个脚本，不放它的验证器 —— 验证器是 CI 的事，不该进运行时镜像。
+#     这与上面那五条例外的判据一致：**进镜像的门槛是「运行时要用」**。
+!tools/build_frozen_projection.py
 tests
 .ua
 .vendor

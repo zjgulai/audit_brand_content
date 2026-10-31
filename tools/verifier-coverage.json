@@ -1269,6 +1269,14 @@
         "base/principal_directory.py",
         "api/production_app.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_frozen_projection.py",
+      "asserts": "冻结投影三件能不能真的喂出数据：A 导出脚本对真源产出 rules/control-points/routing 三件，且**条数 == 源数组长度**（少几条在页面上读起来像「规则就这么多」）· B 落盘后 FileProjectionRepository 读得到，且**端点要返回的那份数据形状对**（只断言「仓库有数据」不够，中间还隔着装配）· ★ C 反向对照：**不导出**时三件必须都是 [] —— 否则 B 在文件缺失时也恒真 · ★ D 反向对照：导出文件写成对象而非数组时 strict 仓库必须拒（不许静默当成空）· ★ E 不写有 authority 回落的六件（cases/appeals/release-pending/两个名单/sessions）—— 写了会让「权威里有、页面是旧快照」更难查。★ 为什么独立一个文件而不是补进 verify_review_api：那个用 InMemoryRepository 喂夹具，证明的是「端点过滤与鉴权对」，**不证明盘上那份文件存在且形状对** —— 这正是 2026-10-31 生产三条端点全空却全绿的原因（验证器的形状 ≠ 生产的形状）",
+      "subjects": [
+        "tools/build_frozen_projection.py",
+        "api/review_api.py"
+      ]
     }
   ],
   "exempt": [

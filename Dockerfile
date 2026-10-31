@@ -113,6 +113,28 @@ COPY tools/multimodal_client.py ./tools/multimodal_client.py
 COPY research/governance/skeleton/rules-v1.json ./research/governance/skeleton/rules-v1.json
 COPY research/governance/control-points-v1.json ./research/governance/control-points-v1.json
 COPY research/governance/routing-v1.json ./research/governance/routing-v1.json
+
+# ★★ 2026-10-31：冻结投影导出脚本。**部署动作，不是开发工具。**
+#
+#   `api/review_api.py` 的 `FileProjectionRepository` 从
+#   `REVIEW_FROZEN_PROJECTION_ROOT` 读 `rules.json` / `control-points.json` /
+#   `routing.json`，而**仓内没有生产者** —— 唯一会写投影的
+#   `web/scripts/seed_projection.py` 只写 reports / notifications / takedown-tasks。
+#
+#   后果（2026-10-31 生产实测）：
+#       GET /api/v1/rules          → []
+#       GET /api/v1/control-points → []
+#       GET /api/v1/routing        → []
+#   而同一个进程里引擎一直在用这三份数据（36 / 24 / 24 条）。
+#   判定在跑，页面在空。
+#
+#   有了它，换规则的动作是可复现的一条命令（见文件头 docstring），
+#   而不是「手工 cp 三个文件」。
+#
+#   ★ 只拷脚本本体，不拷 `tools/verify_frozen_projection.py` ——
+#     验证器属于 CI，不进运行时镜像。判据与上面那几条例外一致：
+#     **进镜像的门槛是「运行时要用」**。
+COPY tools/build_frozen_projection.py ./tools/build_frozen_projection.py
 COPY research/kb/外部标准库-v1.json ./research/kb/外部标准库-v1.json
 
 # 前端静态产物（阶段 1 的输⼊）
