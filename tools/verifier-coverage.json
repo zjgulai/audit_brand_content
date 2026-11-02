@@ -1277,6 +1277,14 @@
         "tools/build_frozen_projection.py",
         "api/review_api.py"
       ]
+    },
+    {
+      "verifier": "tools/verify_image_completeness.py",
+      "asserts": "镜像完整性（2026-10-30 一周内三次同源事故：a83592a lp_extract/lp_fetch、10429d3 multimodal_client、aeb7c50 .dockerignore 排除 tools/）：A Dockerfile 每条 COPY 的 src 都在构建上下文里且盘上存在 · B base/+api/ 顶层 import 闭包每个本地模块都被 COPY 覆盖；函数内二跳 import 单独一段，已人工确认的 CLI-only 进白名单（lark_find 在 sync_rules.py 函数内，sync_rules 是 CLI 生产不 import）· ★ C 反向对照：tools/ 下验证器被 .dockerignore 排除（A 不是恒真）· ★ C2 反向对照：!tools/redact.py 例外生效 · ★ D 反向对照：闭包外模块被判没 COPY 覆盖（B 不是恒真）· ★ D2 lp_extract 被 COPY 覆盖（真事故正向对照）· ★ D3 白名单被清空时 B2 必须真红（防「白名单被扩成 *」）。★ 为什么独立：验的是「本地能跑 ≠ 镜像里有」—— 本地 import 闭包与镜像 import 闭包是两个数，本地 verifier 全绿上生产就 ImportError，AGENTS.md §2.4.1 的又一变体。不跑 docker build（要联网要分钟级），纯静态扫描。",
+      "subjects": [
+        "Dockerfile",
+        ".dockerignore"
+      ]
     }
   ],
   "exempt": [

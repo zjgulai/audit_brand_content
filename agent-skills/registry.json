@@ -61,6 +61,30 @@
         "守衡已按长期停令关闭（PMO/shouheng-state/stop-lock），但规程本身仍在，",
         "因为将来恢复时要用同一份。"
       ]
+    },
+    {
+      "id": "three-state-readings",
+      "version": "1.0.0",
+      "path": "agent-skills/三态读数/SKILL.md",
+      "trigger_words": [
+        "写报告",
+        "登记状态",
+        "未测",
+        "三态",
+        "验收结论"
+      ],
+      "deliverable": "一份符合三态纪律（未测 ≠ 通过 ≠ 红）的报告或表格同步 JSON",
+      "not_for": [
+        "内容合规判定（那是 content-review）",
+        "卡片字段白名单（那是 tools/reply-cards/contract.md）",
+        "群回复语域（那是 shouheng-tone）"
+      ],
+      "$note": [
+        "★ 这个不管「怎么写话」，管的是「未测/通过/红三个词不许互代」。",
+        "本项目栽过 6 次（见 SKILL.md §六反模式），每次都是把「没测」写成「通过」。",
+        "★ 6.6 是「verify_field_contract 误报爆炸被删」这条教训 ——",
+        "  它教训的不是「不该扫」，而是「静态扫描判不出合法 vs 事故时宁可不做」。"
+      ]
     }
   ]
 }
