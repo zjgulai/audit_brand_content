@@ -147,29 +147,36 @@ export default function AppealsPage() {
   const renderStateBadge = (state: string) => {
     if (state === "open") {
       return (
-        <span className="badge badge--pending" data-status-badge="">
-          open（受理中，2 个工作日）
+        <span className="badge badge--pending" data-status-badge="" title="open">
+          受理中（2 个工作日）
         </span>
       );
     }
     if (state === "paused_version_invalidated") {
       return (
-        <span className="badge badge--warn" data-status-badge="">
-          paused（版本失效暂停）
+        <span className="badge badge--warn" data-status-badge="" title="paused_version_invalidated">
+          重审暂停（版本失效）
         </span>
       );
     }
     if (state === "stale") {
       return (
-        <span className="badge badge--sample" data-status-badge="">
-          stale（超 30 天未确认，长期保留）
+        <span className="badge badge--sample" data-status-badge="" title="stale">
+          超 30 天未确认（长期保留）
         </span>
       );
     }
     if (state === "migrated" || state === "resolved") {
       return (
-        <span className="badge badge--pass" data-status-badge="">
-          {state}
+        <span className="badge badge--pass" data-status-badge="" title={state}>
+          {state === "migrated" ? "已迁移新版本" : "已结案"}
+        </span>
+      );
+    }
+    if (state === "withdrawn") {
+      return (
+        <span className="badge badge--untested" data-status-badge="" title="withdrawn">
+          已撤销
         </span>
       );
     }
@@ -191,9 +198,6 @@ export default function AppealsPage() {
           <h1 id="appeals-page-title">
             {appealId ? `申诉详情 ${appealId}` : "申诉中心"}
           </h1>
-          <p className="hint">
-            对审查结论有异议时可在此发起申诉，通常在 2 个工作日内受理答复。
-          </p>
         </div>
         {appealId && (
           <Link to="/appeals" className="btn">
@@ -253,6 +257,42 @@ export default function AppealsPage() {
             <dd>{selected.reason}</dd>
             <dt>发起时间</dt>
             <dd className="font-data">{selected.opened_at ?? "未记录"}</dd>
+            {selected.paused_at && (
+              <>
+                <dt>暂停时间</dt>
+                <dd className="font-data">{selected.paused_at}</dd>
+              </>
+            )}
+            {selected.pause_reason && (
+              <>
+                <dt>暂停原因</dt>
+                <dd>{selected.pause_reason}</dd>
+              </>
+            )}
+            {selected.migrated_at && (
+              <>
+                <dt>迁移时间</dt>
+                <dd className="font-data">{selected.migrated_at}</dd>
+              </>
+            )}
+            {selected.stale_at && (
+              <>
+                <dt>超期保留时刻</dt>
+                <dd className="font-data">{selected.stale_at}</dd>
+              </>
+            )}
+            {selected.withdrawn_at && (
+              <>
+                <dt>撤销时间</dt>
+                <dd className="font-data">{selected.withdrawn_at}</dd>
+              </>
+            )}
+            {selected.withdraw_reason && (
+              <>
+                <dt>撤销理由</dt>
+                <dd>{selected.withdraw_reason}</dd>
+              </>
+            )}
           </dl>
 
           <div className="submit-field">

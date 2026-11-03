@@ -1,0 +1,18 @@
+{
+  "事项名称": "全站暖粉品牌重构 + 禁止 Emoji + Impeccable 去 AI 套路逐页优化 + 全产品架构全景图",
+  "关联执行票": "UI/UX 品牌化与 Impeccable 重构",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "前端"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "落实委托方三项要求：1）全页面禁止 Emoji 与非标符号：升级 check_design_tokens.mjs 的 DT-8b 正则（覆盖 Extended_Pictographic、Emoji 区段与箭头符号），清除 client.ts:324 与 TakedownPage.tsx:109 的箭头符号，统一走 src/ui/icon.tsx 单色矢量图标；完善 Momcozy 暖粉（Warm Rose）色彩体系（--brandc-1..12 与 --brand-surface / --brand-surface-hover / --brand-surface-active / --brand-border），移除过渡期 --tomato-* 12 个色阶，保持状态色（绿/琥珀/红/蓝/未测灰）与品牌色严格隔离（A6 断言）。2）使用 arch-diagram 生成结合所有产品的五层架构全景图（architecture/audit-multi-content-panorama.spec.json / .html / .md，14 节点 14 条有向流，check.mjs 0 layout issues）。3）执行 Impeccable 五步优化（critique / distill / layout / typeset / polish）：移除 Inter 外挂字体消除 overused-font 告警与 DT-5/DT-7 红项；移除 .coverage-reason 的 border-left: 2px 消除 side-tab 告警；剥离 SubmitPage 已立案面板与本地预检面板的内嵌重复壳消除卡片套卡片；删除 InboxPage / ReleasePage / AppealsPage / ReportsIndexPage / AdminGrantsPage / AdminSessionsPage 与 AppShell 顶栏重复的页头说明；将 InboxPage 通知载荷、AdminSessionsPage 在线会话、TaxonomyPage 三个只读视图从裸 JSON.stringify 改为结构化表格/键值视图；补齐 AppealsPage 详情时间轴与 AdminGrantsPage 中文业务选项。 ★ 2026-11-03 追加：应委托方「把品线扩到全部品线、并且加上全测试角色，希望所有人通过飞书扫码都可以被授权」要求，放开 base/principal_directory.py 的 AUTO_FORBIDDEN_ROLES（仅禁非人类角色 machine），支持已登记自动层用户在模板扩充后自动升级，并将自动层测试人员同步纳入 build_allowlist_source（release.sign / takedown.execute / takedown.waive），已部署生产并升级现有全部扫码人员。",
+  "验收标准": "1) bash web/scripts/gate.sh --stage static 全绿 rc=0（DT-1..8 全绿，142 条 token 在 DESIGN.md 与 tokens.css 逐项恒等）；2) bash web/scripts/gate.sh --stage build 全绿 rc=0（check_production_bundle 14/14，bundle_budget 全绿）；3) impeccable detect --json web/src 输出 []（0 警告，rc=0）；4) node web/scripts/a11y_check.mjs --standalone 16/16 全绿 rc=0（修复 queue__filter[aria-pressed=true] 在暖粉底上的非文本边框对比度至 ≥3:1）；5) bash web/scripts/dev-up.sh 12/12 全绿 rc=0（含 check_pages、check_review_actions、verify_sample_matrix、a11y_check 15 路由 × 2 视口 390 项检查 0 违规、check_review_slice A1-A9 19/19 全过、check_identity_switch）；6) python3 tools/verify_download_governance.py DG-1..6 全绿 rc=0；7) python3 tools/verify_depad.py 0 被填充 rc=0；8) node ~/.claude/skills/arch-diagram/scripts/check.mjs architecture/audit-multi-content-panorama.html 0 layout issues。",
+  "状态依据": "生产已部署并核验通过（ca.luteos.com，容器 momcozy-audit-api d70f03ad97b7，冻结投影 36/24/24 先导出再重启）：1) /healthz 200 · /readyz 7 项全 true；2) 未登录直连浏览器 verify_prod_pages.mjs 15/15 路由全绿 rc=0；3) 已登录直连浏览器 verify_prod_pages_authed.mjs 12/12 业务页面全绿 rc=0（含 26 条案件/8 条队列/25 条待放行/2 份报告/规则词典 36·24·24 结构化表格，0 骨架残留、0 错误态、0 JS 异常、0 横向溢出）；4) 本地门禁 gate[static] rc=0 · gate[build] rc=0 · impeccable detect 0 警告 rc=0 · dev-up.sh 12/12 rc=0。 · verify_principal_auto 40/40 rc=0 · 生产扫码自动授权已验证 auto-9a0ba1a1c6cae8d1 / auto-6d694ad65bea5475 拥有全角色与全品线。"
+}

@@ -313,10 +313,11 @@ def group_b(tmp):
     d = tempfile.mkdtemp(dir=tmp)
     fx = Fixture(d)
     try:
-        fx.open(auto_grant={"roles": ["dp4"], "product_lines": ["吸奶器"]})
-        ok("B1b ★ 反向对照：dp4 的模板必须被接受（B1 不是「什么都拒」）")
+        fx.open(auto_grant={"roles": ["coordinator", "dp3", "dp4", "it", "signer"],
+                            "product_lines": ["吸奶器", "pump", "wearable", "feeding", "skincare"]})
+        ok("B1b ★ 反向对照：全人类测试角色 + 全品线模板必须被接受（B1 不是「什么都拒」）")
     except Exception as exc:  # noqa: BLE001
-        bad("B1b ★ 反向对照：dp4 的模板必须被接受", repr(exc))
+        bad("B1b ★ 反向对照：全人类测试角色 + 全品线模板必须被接受", repr(exc))
 
     expect_reject("B2 空品线不许当通配",
                   {"roles": ["dp3"], "product_lines": []},
@@ -416,14 +417,30 @@ def group_d(tmp):
     fx = Fixture(d, auto_grant=GRANT)
     pd = fx.open()
     row = pd.by_identity("t1", "ou_d")
-    check("D1 ★ 自动登记的角色里没有 signer / it / machine",
+    check("D1 ★ 自动登记的角色里没有非人类角色 machine",
           not (set(row["roles"]) & AUTO_FORBIDDEN_ROLES), repr(row["roles"]))
-    check("D2 ★ 自动登记的能力里没有签发/下线/授权（那三条走人级名单或平台角色）",
-          not (set(row["capabilities"]) &
-               {"release.sign", "release.revoke",
-                "takedown.execute", "takedown.waive",
-                "admin.grant.execute", "admin.grant.approve"}),
+    check("D2 ★ 自动登记仅给模板声明角色推导出的能力",
+          set(row["capabilities"]) == {"appeal.handle", "case.review"},
           repr(row["capabilities"]))
+    # D5：模板升级时已登记自动层记录自动升级到新角色与全品线
+    d_up = tempfile.mkdtemp(dir=tmp)
+    fx_up = Fixture(d_up, auto_grant=GRANT)
+    pd_up1 = fx_up.open()
+    r_old = pd_up1.by_identity("t1", "ou_upgrade", "吴雨宁")
+    pd_up2 = PrincipalDirectory(
+        fx_up.explicit_path,
+        auto_grant={"roles": ["coordinator", "dp3", "dp4", "it", "signer"],
+                    "product_lines": ["吸奶器", "pump", "wearable", "feeding", "skincare"]},
+        auto_store_path=fx_up.auto_path,
+        audit_path=fx_up.audit_path,
+        require_authz_version=True)
+    r_new = pd_up2.by_identity("t1", "ou_upgrade", "吴雨宁")
+    check("D5 ★ auto_grant 模板扩充后，既有自动登记用户在扫码时自动升级到全角色与全品线",
+          r_new is not None
+          and set(r_new["roles"]) == {"coordinator", "dp3", "dp4", "it", "signer"}
+          and set(r_new["product_lines"]) == {"吸奶器", "pump", "wearable", "feeding", "skincare"}
+          and r_new["id"] == r_old["id"],
+          repr(r_new and (r_new["roles"], r_new["product_lines"])))
     check("D3 自动登记的 authz_version 是稳定字符串（不是随机值）",
           isinstance(row.get("authz_version"), str) and row["authz_version"],
           repr(row.get("authz_version")))

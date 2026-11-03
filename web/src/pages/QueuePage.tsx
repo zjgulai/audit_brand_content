@@ -274,11 +274,10 @@ export default function QueuePage() {
               所以这里必须说一句，否则用户会以为「没有新案件」） */}
         {(poll.phase === "refreshing" || shouldSurfaceFailures(poll.failures)) && (
           <div
-            className="hint"
+            className="hint queue__poll-hint"
             data-poll-status=""
             role="status"
             aria-live="polite"
-            style={{ padding: "0 0 var(--space-2)" }}
           >
             {poll.phase === "refreshing"
               ? "正在更新队列…"

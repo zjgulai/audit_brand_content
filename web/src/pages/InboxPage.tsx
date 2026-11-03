@@ -137,9 +137,6 @@ export default function InboxPage() {
       <div className="cases-page__head">
         <div>
           <h1 id="inbox-page-title">待办收件箱</h1>
-          <p className="hint">
-            集中查看分配给您的待办提醒与需品牌自决的案件。
-          </p>
           {/* ★ ADR-0021 · W-3：收件箱轮询状态。
               只在刷新中 / 连续失败时出现（不占位、不清空列表）。
               轮询失败时界面上还是旧数据 —— **看起来完全正常**，
@@ -195,10 +192,23 @@ export default function InboxPage() {
                   {n.acked_at ? `，已确认 (${n.acked_at})` : ""}
                 </span>
               </div>
-              {n.payload && (
-                <pre className="evidence__quote font-data">
-                  {JSON.stringify(n.payload, null, 2)}
-                </pre>
+              {n.payload && Object.keys(n.payload).length > 0 && (
+                <dl className="facts">
+                  {Object.entries(n.payload).map(([k, v]) => (
+                    <div key={k} className="facts__pair">
+                      <dt>{({ case_id: "关联案件", action: "触发动作", message: "说明", summary: "摘要", reason: "原因", task_id: "下线任务" } as Record<string, string>)[k] ?? k}</dt>
+                      <dd className={k.endsWith("_id") ? "font-data" : undefined}>
+                        {k === "case_id" && typeof v === "string" ? (
+                          <Link to={`/cases/${encodeURIComponent(v)}`}>{v}</Link>
+                        ) : typeof v === "object" && v !== null ? (
+                          <code>{JSON.stringify(v)}</code>
+                        ) : (
+                          String(v ?? "未记录")
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               )}
               {(n.unread !== false || !n.acked_at) && (
                 <div className="actions__row">

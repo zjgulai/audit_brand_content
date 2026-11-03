@@ -321,7 +321,7 @@ export class ApiError extends Error {
   constructor(status: number, body: Record<string, unknown> | null, path: string) {
     const message =
       (body && typeof body.message === "string" && body.message) ||
-      `${path} → HTTP ${status}`;
+      `${path}（HTTP ${status}）`;
     super(message);
     this.name = "ApiError";
     this.status = status;

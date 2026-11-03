@@ -365,7 +365,7 @@ try {
   await waitText("违规下架");
   await waitText("td-smoke-1");
   await click("开始执行");
-  await waitText("已执行 start → 当前状态：in_progress");
+  await waitText("已执行 start，当前状态：in_progress");
   await click("完成并回填证据");
   await waitText("完成下线证据回填");
   await fillInput("#td-ev-receipt", "AMZ-RM-CDP-001");

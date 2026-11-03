@@ -171,16 +171,17 @@ function dt6Hits(src) {
   return hits;
 }
 
-// ── DT-8 图标入口唯一 ────────────────────────────────────────────────────
+// ── DT-8 图标入口唯一 + 全站禁止 Emoji / Unicode 图标字符 ────────────────
 const DT8_RE = /import\s+[^;]*\bfrom\s+["']lucide-react["']/;
 const DT8_STAR_RE = /import\s+\*\s+as\s+\w+\s+from\s+["']lucide-react["']/;
+const DT8_EMOJI_RE = /[\p{Extended_Pictographic}\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}✓✗⚠●▲◐■○]/u;
 function dt8Hits(src, file) {
   const clean = stripComments(src);
   if (/\/icon\.tsx$/.test(file)) return [];         // 唯一允许的入口
   const hits = [];
   if (DT8_RE.test(clean)) hits.push("direct lucide import");
   if (DT8_STAR_RE.test(clean)) hits.push("import * as Icons");
-  if (/[←⚠↓]/.test(clean)) hits.push("Unicode 图标字符");
+  if (DT8_EMOJI_RE.test(clean)) hits.push("Unicode 图标字符");
   return hits;
 }
 

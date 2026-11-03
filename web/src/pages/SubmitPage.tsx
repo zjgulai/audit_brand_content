@@ -1,5 +1,4 @@
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { reviewWriteApi } from "../api/write-client";
 import StatusBadge from "../components/StatusBadge";
@@ -605,13 +604,6 @@ export default function SubmitPage() {
                · 下：本地预检（**不是判定**，只做正则预筛，明确标注） */}
       {createdCaseId ? (
         <div className="panel" data-submission-receipt="">
-          <div className="evidence__head">
-            <h2 className="panel__title">判定结果 · 已立案</h2>
-            <span className="font-data hint">案件号：{createdCaseId}</span>
-            <Link to={`/cases/${encodeURIComponent(createdCaseId)}`} className="btn">
-              独立页面打开 <Icon name="arrow-up-right" size={11} />
-            </Link>
-          </div>
           <CaseDetailPage embeddedCaseId={createdCaseId} />
         </div>
       ) : null}
@@ -641,15 +633,13 @@ export default function SubmitPage() {
           aria-label="本地预检结果（不是判定）"
           data-local-precheck=""
         >
-          <div className="cases-page__head">
-            <div>
-              <h2 className="panel__title">
-                本地预检（不是判定）
-                <span className="hint audit-result__tag">
-                  浏览器内 3 条正则粗筛，未经过后端规则引擎
-                </span>
-              </h2>
-            </div>
+          <div className="panel__head-inline">
+            <h2 className="panel__title">
+              本地预检（不是判定）
+              <span className="hint audit-result__tag">
+                浏览器内 3 条正则粗筛，未经过后端规则引擎
+              </span>
+            </h2>
           </div>
 
           <dl className="facts">

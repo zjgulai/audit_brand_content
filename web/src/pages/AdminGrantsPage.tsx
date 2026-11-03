@@ -188,9 +188,6 @@ export default function AdminGrantsPage() {
       <div className="cases-page__head">
         <div>
           <h1 id="admin-grants-title">授权治理</h1>
-          <p className="hint">
-            管理合规签发与违规下架的操作权限。权限变更需经提案、执行与审批三方确认。
-          </p>
         </div>
         <div className="queue__filters" role="tablist" aria-label="授权类别切换">
           <button
@@ -286,10 +283,10 @@ export default function AdminGrantsPage() {
                 value={productLine}
                 onChange={(e) => setProductLine(e.target.value)}
               >
-                <option value="pump">pump</option>
-                <option value="wearable">wearable</option>
-                <option value="feeding">feeding</option>
-                <option value="skincare">skincare</option>
+                <option value="pump">吸乳器（pump）</option>
+                <option value="wearable">穿戴吸乳器（wearable）</option>
+                <option value="feeding">哺育用品（feeding）</option>
+                <option value="skincare">母婴护理（skincare）</option>
               </select>
             </div>
             {tab === "takedown" && (
@@ -300,9 +297,9 @@ export default function AdminGrantsPage() {
                   value={platform}
                   onChange={(e) => setPlatform(e.target.value)}
                 >
-                  <option value="amazon">amazon</option>
-                  <option value="tiktok">tiktok</option>
-                  <option value="shopify">shopify</option>
+                  <option value="amazon">亚马逊（amazon）</option>
+                  <option value="tiktok">TikTok（tiktok）</option>
+                  <option value="shopify">独立站（shopify）</option>
                 </select>
               </div>
             )}

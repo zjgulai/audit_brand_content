@@ -32,8 +32,10 @@ import tempfile
 import threading
 from pathlib import Path
 
-#: 自动登记**不许**给的角色。见模块文档第 2 条。
-AUTO_FORBIDDEN_ROLES = frozenset({"signer", "it", "machine"})
+#: 自动登记**不许**给的角色。
+#: ★ 2026-11-03 委托方裁定：把品线扩到全部品线、并加上全测试角色（coordinator/dp3/dp4/it/signer），
+#:   希望所有人通过飞书扫码都可以被授权。因此仅禁止非人类主体 `machine`，放开全部人类测试角色。
+AUTO_FORBIDDEN_ROLES = frozenset({"machine"})
 
 
 class PrincipalDirectoryError(Exception):
@@ -369,15 +371,36 @@ class PrincipalDirectory:
             # ★ 显式 revoked 也在这里返回 None，且**不再往下走** ——
             #   否则「撤掉的人扫一次码就复活」。
             return explicit if explicit["status"] == "active" else None
-        found = self._auto.get((tenant_id, open_id))
-        if found is not None:
-            return found if found["status"] == "active" else None
+        row = self._auto.get((tenant_id, open_id))
+        if row is not None:
+            if row["status"] != "active":
+                return None
+            # ★ 2026-11-03：当 auto_grant 模板升级（例如扩充品线或新增全测试角色）时，
+            #   已登记的自动层记录在下次扫码登录时自动同步到最新模板的 roles / product_lines / capabilities，
+            #   避免早期扫码的测试人员永远停留在旧的窄权限上。
+            if self.auto_grant is not None:
+                want_roles = sorted(set(self.auto_grant["roles"]))
+                want_lines = sorted(set(self.auto_grant["product_lines"]))
+                if row["roles"] != want_roles or row["product_lines"] != want_lines:
+                    upgraded = self._auto_row(tenant_id, open_id, row.get("name") or display_name)
+                    self._persist_auto(upgraded)
+                    return self._auto.get((tenant_id, open_id))
+            return row
         if self.auto_grant is None:
             return None
         row = self._auto_row(tenant_id, open_id, display_name)
         # 先落盘再返回：跳不过去。写失败会抛 `principal_auto_store_unwritable`。
         self._persist_auto(row)
         return self._auto.get((tenant_id, open_id))
+
+    def active_principals(self):
+        """返回当前全部 active 主体（显式层 + 未被显式层覆盖的自动层）。"""
+        self._refresh()
+        out = [copy.deepcopy(r) for r in self._by_key.values() if r.get("status") == "active"]
+        for k, r in self._auto.items():
+            if k not in self._by_key and r.get("status") == "active":
+                out.append(copy.deepcopy(r))
+        return out
 
     def by_identity(self, tenant_id, open_id, display_name=None):
         """按 (tenant, open_id) 查主体。自动登记在这一跳里发生。

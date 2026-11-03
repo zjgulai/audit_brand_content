@@ -13,10 +13,6 @@
  * ========================================================================== */
 
 @import "./styles/tokens.css";
-/* ★ 2026-10-29：Inter 自托管字体（只带 latin 两个子集）。
-   放在 tokens 之后 —— @font-face 与 token 定义没有依赖关系，
-   但 token 里已经引用了 "Inter" 这个族名，先把名字的来源摆上更清楚。 */
-@import "./styles/inter-fonts.css";
 
 html {
   color: var(--text);
@@ -212,7 +208,7 @@ code {
 }
 
 .shell__nav-item:hover {
-  background: var(--sand-1);
+  background: var(--brand-surface-hover);
   color: var(--text);
 }
 
@@ -740,13 +736,13 @@ code {
 
 .queue__filter:hover {
   color: var(--text);
-  background: var(--sand-1);
+  background: var(--brand-surface-hover);
 }
 
 .queue__filter[aria-pressed="true"] {
-  border-color: transparent;
-  color: var(--on-brand);
-  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-text-on-surface);
+  background: var(--brand-surface);
   font-weight: 600;
 }
 
@@ -763,7 +759,7 @@ code {
 }
 
 .queue__row:hover {
-  background: var(--sand-1);
+  background: var(--brand-surface-hover);
 }
 
 /* ★ 2026-10-26：选中态原来靠「左侧 3px 品牌色条」，委托方明确不要这种形态。
@@ -774,7 +770,8 @@ code {
 }
 
 .queue__row[aria-current="true"] .queue__row-id {
-  color: var(--brand-text);
+  color: var(--brand-text-on-surface);
+  font-weight: 600;
 }
 
 .queue__row-top {
@@ -1003,6 +1000,8 @@ code {
 
 .unit-mark--active {
   outline: none;
+  background: var(--brand-surface-active);
+  color: var(--brand-text-on-surface);
   border-bottom: 2px solid var(--brand);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
@@ -1112,8 +1111,8 @@ code {
 
 .evidence__item--active {
   outline: none;
-  border-color: var(--brand);
-  background: var(--surface);
+  border-color: var(--brand-border);
+  background: var(--brand-surface);
 }
 
 .evidence__item:last-child {
@@ -1469,7 +1468,7 @@ code {
 }
 
 .cases-table tbody tr:hover {
-  background: var(--sand-1);
+  background: var(--brand-surface-hover);
 }
 
 /* 面板：任何「一段独立内容」的统一容器（2026-10-23 全站视觉刷新） */
@@ -2209,9 +2208,9 @@ code {
   gap: var(--space-4);
   flex-wrap: wrap;
   padding: var(--space-5);
-  border: var(--hairline) dashed var(--border-strong);
+  border: var(--hairline) dashed var(--brand-border);
   border-radius: var(--radius-panel);
-  background: var(--sand-1);
+  background: var(--brand-surface-hover);
   cursor: pointer;
   transition: background-color var(--motion) var(--ease),
               border-color var(--motion) var(--ease);
@@ -2487,8 +2486,10 @@ code {
 
 /* 「推断只是标注」那句：用左侧一道细线标成附注，不与正文抢位置 */
 .workflow-note {
-  border-left: var(--hairline) solid var(--border-strong);
-  padding-left: var(--space-3);
+  background: var(--surface-muted);
+  border: var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
   margin: var(--space-2) 0 0;
 }
 
@@ -2496,7 +2497,8 @@ code {
  *
  * 这条说明出现在**最容易被误读的那一格**：findings 为空、判定却是 REVIEW。
  * 所以它要有存在感，但不能抢「证据链」的位置 ——
- * 用左侧一道语义色细线 + 淡底，读起来是「附注」，不是「又一条结论」。
+ * 用语义淡底 + 0.5px 细边（遵守 DESIGN.md §6.2 不使用卡片左侧粗色条），
+ * 读起来是「附注」，不是「又一条结论」。
  *
  * ★ 颜色用 --info（待检测/信息），**不是** --warn：
  *   这不是警告，是一次口径解释。用 warn 会让人以为又出了个问题。
@@ -2505,11 +2507,11 @@ code {
   margin: var(--space-3) 0 0;
   padding: var(--space-3) var(--space-4);
   background: var(--info-surface);
-  border-left: 2px solid var(--info);
+  border: var(--hairline) solid var(--info-graphic);
   border-radius: var(--radius-control);
   font-size: var(--text-base);
   line-height: var(--leading-base);
-  color: var(--text);
+  color: var(--info-text);
 }
 
 /* ── 浏览器支持提示（#113 / TS-12）───────────────────────────────────────
@@ -2586,6 +2588,25 @@ code {
   align-items: center;
   padding-top: var(--space-3);
   border-top: var(--hairline) solid var(--border);
+}
+
+.queue__poll-hint {
+  padding: 0 0 var(--space-2);
+}
+
+.panel__head-inline {
+  margin-bottom: var(--space-3);
+}
+
+.taxonomy-card h3 code {
+  background: var(--brand-surface);
+  color: var(--brand-text-on-surface);
+  border: var(--hairline) solid var(--brand-border);
+  font-weight: 600;
+}
+
+.report-sections > h2 {
+  color: var(--brand-text-on-surface);
 }
 
 .login__alt-label {

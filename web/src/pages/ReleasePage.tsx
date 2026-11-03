@@ -310,9 +310,6 @@ export default function ReleasePage() {
         <div className="cases-page__head">
           <div>
             <h1 id="release-center-title">合规签发</h1>
-            <p className="hint">
-              复核完成后在此正式签发放行。提交人与复核人本人不可自签。
-            </p>
             {/* ★ ADR-0021 · W-3：列表态轮询状态。
                 只在刷新中 / 连续失败时出现（不占位）。详情态不轮询 ——
                 见 `usePolling` 那段的注释：签发表单填到一半被换掉是最坏的情况。 */}

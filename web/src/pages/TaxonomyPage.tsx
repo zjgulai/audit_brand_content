@@ -470,14 +470,38 @@ export default function TaxonomyPage() {
                   </p>
                 );
               }
+              const cols = Object.keys(list[0] ?? {}).slice(0, 6);
               return (
-                <ul className="notrun">
-                  {list.map((row, i) => (
-                    <li key={i} className="font-data">
-                      {JSON.stringify(row)}
-                    </li>
-                  ))}
-                </ul>
+                <div className="cases-table-wrap">
+                  <table className="cases-table">
+                    <thead>
+                      <tr>
+                        {cols.map((c) => (
+                          <th key={c} scope="col" className="font-data">
+                            {c}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((row, i) => (
+                        <tr key={i}>
+                          {cols.map((c) => {
+                            const val = (row as Record<string, unknown>)[c];
+                            const isId = c.endsWith("id") || c === "code" || c === "severity" || c === "layer";
+                            return (
+                              <td key={c} className={isId ? "font-data" : undefined}>
+                                {typeof val === "object" && val !== null
+                                  ? JSON.stringify(val)
+                                  : String(val ?? "—")}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               );
             })()
           )}

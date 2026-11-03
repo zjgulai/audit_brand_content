@@ -156,18 +156,6 @@
 | `--brandc-9` | #c25b6e | step 9（#C25B6E 图形主色） |
 | `--brandc-11` | #a34759 | Momcozy 玫瑰豆沙 #A34759（白字 5.83:1） |
 | `--brandc-12` | #6a2b3a | Momcozy 深酒红 #6A2B3A（高对比 10.4:1） |
-| `--tomato-1` | #fffcfc |  |
-| `--tomato-2` | #fff8f7 |  |
-| `--tomato-3` | #feebe7 |  |
-| `--tomato-4` | #ffdcd3 |  |
-| `--tomato-5` | #ffcdc2 |  |
-| `--tomato-6` | #fdbdaf |  |
-| `--tomato-7` | #f5a898 |  |
-| `--tomato-8` | #ec8e7b |  |
-| `--tomato-9` | #e54d2e |  |
-| `--tomato-10` | #dd4425 |  |
-| `--tomato-11` | #d13415 |  |
-| `--tomato-12` | #5c271f |  |
 | `--green-1` | #fbfefc |  |
 | `--green-2` | #f4fbf6 |  |
 | `--green-3` | #e6f6eb |  |
@@ -226,12 +214,16 @@
 | `--rule` | var(--sand-4) | 行内弱分隔（sand-4 #F3EEE9） |
 | `--border` | var(--sand-5) | 容器与面板外沿（sand-5 #EDE6DF） |
 | `--border-strong` | var(--sand-9) | 控件边框（sand-9 #857B73，≥3:1） |
+| `--divider` | #a8a09a | 区域分界（对白 2.57:1，对暖底 2.28:1） |
 | `--brand` | var(--brandc-11) | 品牌实心底（brandc-11 #A34759，对齐 mkt 深玫瑰豆沙） |
 | `--brand-hover` | var(--brandc-12) | 品牌 hover（brandc-12 #6A2B3A） |
 | `--brand-graphic` | var(--brandc-9) | 纯图形品牌色（brandc-9 #C25B6E） |
 | `--brand-text` | var(--brandc-11) | 品牌文字（brandc-11 #A34759） |
 | `--brand-text-on-surface` | var(--brandc-12) | 品牌淡底上的文字（brandc-12 #6A2B3A） |
 | `--brand-surface` | var(--brandc-3) | 品牌玫瑰淡底（brandc-3 #F9EEF0） |
+| `--brand-surface-hover` | var(--brandc-2) | 品牌玫瑰极淡悬停底（brandc-2 #FBF4F5） |
+| `--brand-surface-active` | var(--brandc-4) | 品牌玫瑰激活/高亮底（brandc-4 #F2DCE0） |
+| `--brand-border` | var(--brandc-6) | 品牌玫瑰细边框（brandc-6 #E2B8C0） |
 | `--brand-ring` | var(--brandc-8) | 焦点环（brandc-8 #C25B6E） |
 | `--ok` | var(--green-11) | 通过实心底（green-11） |
 | `--ok-graphic` | var(--green-9) | 通过图形色（green-9） |

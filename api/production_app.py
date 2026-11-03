@@ -118,8 +118,8 @@ PRODUCTION_WRITE_PATHS = {
     #      下一个人照着去找，只会以为是自己漏拉了。）
     "/api/v1/uploads",
 }
-def build_allowlist_source(projection):
-    """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。
+def build_allowlist_source(projection, directory=None):
+    """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权 + 自动登记的测试角色。
 
     返回 {capability: frozenset(principal_id)}。
 
@@ -130,20 +130,33 @@ def build_allowlist_source(projection):
     ★ **只收 state == "approved"**：撤权（T-315a）把 grant 迁出 approved 后
       人自动出局 —— S-b（撤权后新签被拒）的机制性来源。模块级函数是为了
       让 verify_grant_registry 直接 import 真身，而不是在验证器里养一份镜像。
+    ★ 2026-11-03：当 `directory` 开启了含 `signer` / `coordinator` 的全角色扫码自动授权时，
+      自动层 active 主体按其角色能力同步纳入 allowlist，使扫码测试人员可直接测试签发与下架。
     """
     empty = {"takedown.execute": frozenset(), "takedown.waive": frozenset(),
              "release.sign": frozenset()}
-    if projection is None:
+    if projection is None and directory is None:
         return empty
     try:
         out = {k: set() for k in empty}
-        for state in projection.list_grant_registries():
-            for grant in state.get("grants") or []:
-                if grant.get("state") != "approved":
+        if projection is not None:
+            for state in projection.list_grant_registries():
+                for grant in state.get("grants") or []:
+                    if grant.get("state") != "approved":
+                        continue
+                    cap = grant.get("capability")
+                    if cap in out and isinstance(grant.get("user_id"), str):
+                        out[cap].add(grant["user_id"])
+        if directory is not None and getattr(directory, "auto_grant", None):
+            for p in directory.active_principals():
+                if p.get("source") != "auto":
                     continue
-                cap = grant.get("capability")
-                if cap in out and isinstance(grant.get("user_id"), str):
-                    out[cap].add(grant["user_id"])
+                pid = p.get("id")
+                caps = set(p.get("capabilities") or [])
+                if isinstance(pid, str):
+                    for cap in out:
+                        if cap in caps:
+                            out[cap].add(pid)
         return {k: frozenset(v) for k, v in out.items()}
     except Exception:
         return empty
@@ -736,8 +749,8 @@ class ProductionRuntime:
     _report_authorize = staticmethod(can_read_report)
 
     def allowlist_source(self):
-        """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权。"""
-        return build_allowlist_source(self.projection)
+        """`rbac._ALLOWLIST_SOURCE` 的生产实现：读投影里的已批准授权 + 自动登记的测试角色。"""
+        return build_allowlist_source(self.projection, self.directory)
 
     def maintain_once(self):
         if self.service is None or self.authority is None:

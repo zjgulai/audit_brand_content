@@ -457,6 +457,18 @@
    "note": "浏览器扩展构建产物（非飞书下载物）；构建配方 .vendor/dsh-browser-main/extensions/dsh-browser/scripts/build.mjs，AGENTS.md §2.1 的 verify_browser_ext_artifact.py 会逐文件复核 sha256",
    "approved_by": "委托方 2026-10-17（自有素材基线同批；装配验证器时补漏登记）",
    "sha256": "30a4420e6e4dcb17fd7de560c5004346c2bc8cd971d2d5f5ee15326603e51321"
+  },
+  "web/public/fonts/inter-latin-ext-wght-normal.woff2": {
+   "source": "项目自有素材",
+   "note": "前端历史提交的自托管开源字体（非飞书下载物）；CSS 已停用 Inter 改走系统原生字体栈，保留登记以闭合 git 历史 blob 核验",
+   "approved_by": "委托方 2026-11-03",
+   "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956"
+  },
+  "web/public/fonts/inter-latin-wght-normal.woff2": {
+   "source": "项目自有素材",
+   "note": "前端历史提交的自托管开源字体（非飞书下载物）；CSS 已停用 Inter 改走系统原生字体栈，保留登记以闭合 git 历史 blob 核验",
+   "approved_by": "委托方 2026-11-03",
+   "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62"
   }
  },
  "prefixes": []

@@ -55,9 +55,6 @@ export default function ReportsIndexPage() {
       <div className="cases-page__head">
         <div>
           <h1 id="reports-index-title">报告索引</h1>
-          <p className="hint">
-            归档已生成的合规审查报告。
-          </p>
         </div>
         <span className="font-data hint">共 {(rows ?? []).length} 份报告</span>
       </div>
@@ -102,8 +99,8 @@ export default function ReportsIndexPage() {
                   <td className="font-data">{r.published_at ?? "未发布"}</td>
                   <td className="font-data">
                     {r.url ? (
-                      <a href={r.url} target="_blank" rel="noreferrer">
-                        {r.url}
+                      <a href={r.url} target="_blank" rel="noreferrer" title={r.url}>
+                        查看存档快照 <Icon name="arrow-up-right" size={11} />
                       </a>
                     ) : (
                       "未生成"

@@ -1,0 +1,580 @@
+{
+  "lang": "zh-CN",
+  "width": 1240,
+  "pageTitle": "audit_multi_content · 全产品与治理体系架构全景图",
+  "title": "AUDIT_MULTI_CONTENT  ·  {cy:Web 工作台} + {bl:守衡飞书机器人} 双面接入  ·  汇合于 {gr:合规判定与权威账本}  ·  {am:34 项自证门禁} 守底",
+  "subtitle": "来源：本仓源码实测（web/ · api/ · base/ · tools/ · research/ · ADR-0001…0021） · 结构：双产品入口 + API 网关 + 核心编排流水线 + 双账本与知识源 + 全仓自证门禁",
+  "layers": [
+    {
+      "id": "surface",
+      "label": "产品交互面（Web + 飞书 + 扩展）",
+      "color": "cyan"
+    },
+    {
+      "id": "gateway",
+      "label": "API 与鉴权网关（FastAPI）",
+      "color": "blue"
+    },
+    {
+      "id": "engine",
+      "label": "核心判定与工作流编排（base/）",
+      "color": "green"
+    },
+    {
+      "id": "authority",
+      "label": "双账本存储与受控外部源",
+      "color": "amber"
+    },
+    {
+      "id": "guard",
+      "label": "知识规则源与 34 项自证门禁",
+      "color": "purple"
+    }
+  ],
+  "flows": [
+    {
+      "id": "req",
+      "label": "送审 / 人工复核 / 签发请求",
+      "color": "cyan"
+    },
+    {
+      "id": "judge",
+      "label": "判定流水线与证据合成",
+      "color": "green"
+    },
+    {
+      "id": "ledger",
+      "label": "权威事件写盘与 SQLite 投影",
+      "color": "amber"
+    },
+    {
+      "id": "kb",
+      "label": "规则 / 飞书基线 / 多模态输入",
+      "color": "purple",
+      "dash": true
+    },
+    {
+      "id": "verify",
+      "label": "三态门禁反证（0 绿 / 1 红 / 2 未测）",
+      "color": "text",
+      "dash": true
+    }
+  ],
+  "groups": [
+    {
+      "id": "g-surface",
+      "label": "产品交互层 · 三个端侧入口",
+      "color": "cyan",
+      "x": 12,
+      "y": 184,
+      "w": 1216,
+      "h": 200
+    },
+    {
+      "id": "g-api",
+      "label": "API 网关与会话边界 · api/",
+      "color": "blue",
+      "x": 12,
+      "y": 468,
+      "w": 1216,
+      "h": 162
+    },
+    {
+      "id": "g-core",
+      "label": "核心合规判定与编排基座 · base/",
+      "color": "green",
+      "solid": true,
+      "x": 12,
+      "y": 714,
+      "w": 1216,
+      "h": 222
+    },
+    {
+      "id": "g-store",
+      "label": "双账本与多模态底座 · ADR-0001",
+      "color": "amber",
+      "x": 12,
+      "y": 1020,
+      "w": 1216,
+      "h": 168
+    },
+    {
+      "id": "g-verify",
+      "label": "知识规则源与 34 项自证门禁",
+      "color": "purple",
+      "x": 12,
+      "y": 1272,
+      "w": 1216,
+      "h": 164
+    }
+  ],
+  "nodes": [
+    {
+      "id": "web-app",
+      "short": "Web工作台",
+      "layer": "surface",
+      "x": 28,
+      "y": 210,
+      "w": 460,
+      "title": "内容审核 Web 工作台 · {cy:ca.luteos.com}",
+      "sub": "web/src · React 19 + Vite · 19 路由 / 13 页面",
+      "rows": [
+        {
+          "id": "w-work",
+          "name": "日常工作",
+          "ref": "submit/inbox/queue/cases",
+          "desc": "分诊队列 A1 + 证据 A7",
+          "color": "cyan",
+          "bright": true
+        },
+        {
+          "id": "w-disp",
+          "name": "合规处置",
+          "ref": "release/takedown/appeals",
+          "desc": "G-1 签发 · 召回 · 报告",
+          "color": "green"
+        },
+        {
+          "id": "w-gov",
+          "name": "知识治理",
+          "ref": "taxonomy/grants/sessions",
+          "desc": "七轴词典 · 授权 · 审计",
+          "color": "amber"
+        }
+      ],
+      "status": "ok",
+      "statusText": "在线"
+    },
+    {
+      "id": "shouheng",
+      "short": "守衡机器人",
+      "layer": "surface",
+      "x": 516,
+      "y": 210,
+      "w": 412,
+      "title": "守衡 · 飞书长连接机器人",
+      "sub": "tools/ws_daemon.mjs · agent/ · reply-cards/",
+      "rows": [
+        {
+          "id": "sh-card",
+          "name": "形态决策",
+          "ref": "replyTo + envelope.mjs",
+          "desc": "V2 卡片白名单校验",
+          "color": "cyan",
+          "bright": true
+        },
+        {
+          "id": "sh-watch",
+          "name": "基线巡检",
+          "ref": "prd_baseline.mjs",
+          "desc": "PRD 漂移 · 待收到期",
+          "color": "amber"
+        },
+        {
+          "id": "sh-gate",
+          "name": "重启闸门",
+          "ref": "restart_shouheng.sh",
+          "desc": "默认退 3 · stop-lock",
+          "color": "purple"
+        }
+      ],
+      "status": "off",
+      "statusText": "按停令关闭中"
+    },
+    {
+      "id": "ext-capture",
+      "short": "扩展与巡检",
+      "layer": "surface",
+      "x": 956,
+      "y": 210,
+      "w": 256,
+      "title": "浏览器扩展与落地页巡检",
+      "sub": "dsh-browser-ext/ · landing/",
+      "lines": [
+        "16 文件 sha256 重建锁定",
+        "momcozy.com 已发布页盘点",
+        "下载落仓外 0700 隔离区"
+      ],
+      "status": "done",
+      "statusText": "已锁定"
+    },
+    {
+      "id": "api-auth",
+      "short": "飞书OAuth",
+      "layer": "gateway",
+      "x": 28,
+      "y": 494,
+      "w": 256,
+      "title": "飞书扫码认证与会话",
+      "sub": "oauth.py · auth_session.py",
+      "lines": [
+        "唯一登录通道（撤除口令）",
+        "session.db 独立 · 30m/8h",
+        "租户 + 品线 + 角色边界"
+      ]
+    },
+    {
+      "id": "api-read",
+      "short": "只读API",
+      "layer": "gateway",
+      "x": 312,
+      "y": 494,
+      "w": 292,
+      "title": "只读查询网关 · {bl:review_api.py}",
+      "sub": "GET /cases · /queue · /reports",
+      "lines": [
+        "透出 workflow_timing 与 receipt",
+        "POST /version-diff 变更比对",
+        "C-103 只读端点零写副作用"
+      ]
+    },
+    {
+      "id": "api-write",
+      "short": "受控写API",
+      "layer": "gateway",
+      "x": 632,
+      "y": 494,
+      "w": 312,
+      "title": "受控写网关 · {bl:write_api.py}",
+      "sub": "POST /submissions · /decisions",
+      "lines": [
+        "幂等键校验 + Step-up 二次认证",
+        "自签拦截（提交人/终审人 SoD）",
+        "经 ReviewCommandService 落盘"
+      ]
+    },
+    {
+      "id": "api-admin",
+      "short": "治理API",
+      "layer": "gateway",
+      "x": 972,
+      "y": 494,
+      "w": 240,
+      "title": "治理与下线 · {bl:admin_api.py}",
+      "sub": "/grants · /takedown · /appeals",
+      "lines": [
+        "提案→执行→审批三主体分离",
+        "签发撤回派生下线任务",
+        "申诉版本失效暂停与迁移"
+      ]
+    },
+    {
+      "id": "orchestrator",
+      "short": "合规编排器",
+      "layer": "engine",
+      "x": 28,
+      "y": 740,
+      "w": 660,
+      "title": "全流程合规编排器 · {gr:base/orchestrator.py} + {gr:submission_service.py}",
+      "sub": "统一承接文本 / 商品页 / 图片 / 视频送审 · 产出不可变审查单 IR 与回执 Receipt",
+      "pipeline": [
+        "Normalizer 归一化",
+        "Intent 阶段推断",
+        "Media 抽帧/OCR/ASR",
+        "Judge 两段判定",
+        "Coverage 合成",
+        "Disposition 五标签"
+      ],
+      "lines": [
+        "五标签输出：BLOCK（违规拦截）· REVIEW（待人工复核）· PASS（审核通过）· 待自决 · 未审查",
+        "记录级溯源：每条 Finding 绑定原文 span/quote + 规则快照指纹 + workflow_timing 耗时"
+      ]
+    },
+    {
+      "id": "judge-core",
+      "short": "两段式引擎",
+      "layer": "engine",
+      "x": 744,
+      "y": 740,
+      "w": 468,
+      "title": "两段式判定引擎与变更检测 · {gr:base/judge_entry.py}",
+      "sub": "ADR-0006/0008/0009 · 词表、白名单、语境守卫三表物理分离",
+      "rows": [
+        {
+          "id": "j-lex",
+          "name": "规则词表",
+          "ref": "rules-v1.json (36条)",
+          "desc": "按类型过滤 + H01..B04 控制点",
+          "color": "green",
+          "bright": true
+        },
+        {
+          "id": "j-guard",
+          "name": "白名单/守卫",
+          "ref": "whitelist + guard",
+          "desc": "排除合规语境与禁用词误报",
+          "color": "cyan"
+        },
+        {
+          "id": "j-diff",
+          "name": "变更检测",
+          "ref": "change_detect.py",
+          "desc": "识别新增风险与消失的声明",
+          "color": "amber"
+        }
+      ]
+    },
+    {
+      "id": "ledger-auth",
+      "short": "权威事件账本",
+      "layer": "authority",
+      "x": 28,
+      "y": 1046,
+      "w": 368,
+      "title": "文件权威事件账本 · {am:BusinessEventStore}",
+      "sub": "business_event_store.py · review_reducer.py",
+      "lines": [
+        "Append-only 事件流 + WriterLease 单写锁",
+        "唯一事实源（案件、结论、签发、申诉、授权）",
+        "ReportStore 生成带过期签名的静态报告"
+      ]
+    },
+    {
+      "id": "ledger-proj",
+      "short": "SQLite投影",
+      "layer": "authority",
+      "x": 452,
+      "y": 1046,
+      "w": 348,
+      "title": "只读投影与检索库 · {am:ProjectionStore}",
+      "sub": "projection_store.py · 仓外 projection.sqlite",
+      "lines": [
+        "由权威事件流确定性重放生成，可随时重建",
+        "硬拒仓内路径（防止客户数据入公开仓）",
+        "支撑列表筛选、队列计数与 SLA 账龄统计"
+      ]
+    },
+    {
+      "id": "mm-gateway",
+      "short": "多模态与飞书源",
+      "layer": "authority",
+      "x": 828,
+      "y": 1046,
+      "w": 384,
+      "title": "多模态网关与飞书基线源 · {am:multimodal_provider.py}",
+      "sub": "media.py · feishu_index.py · Nowledge Mem",
+      "lines": [
+        "容器内 RapidOCR + faster-whisper ASR",
+        "外发 egress 门控：未授权零调用，缺能力判未测",
+        "飞书 PRD 基线指纹与云空间租户可达性索引"
+      ]
+    },
+    {
+      "id": "kb-spec",
+      "short": "七轴规范与KB",
+      "layer": "guard",
+      "x": 28,
+      "y": 1298,
+      "w": 400,
+      "title": "七轴分类规范与需求知识库 · {pu:research/}",
+      "sub": "governance/ · kb/ · agent-skills/",
+      "lines": [
+        "七轴分类基准（638 条）+ 24 控制点 + 路由表",
+        "自有规程入 agent-skills/（第三方入 skills/）",
+        "nmem 严格空间 audit-multi-content（9 类本体）"
+      ]
+    },
+    {
+      "id": "verifiers",
+      "short": "34项自证门禁",
+      "layer": "guard",
+      "x": 456,
+      "y": 1298,
+      "w": 756,
+      "title": "全仓 34 项自证门禁体系 · {pu:tools/verify_*.py} + {pu:web/scripts/check_*.mjs}",
+      "sub": "由 tools/verify_coverage.py 双向反证名册完整性 · 严守三态铁律：通过(0) ≠ 红(1) ≠ 未测(2)",
+      "lines": [
+        "引擎与知识库：verify_engine_contract · verify_kb · verify_brand_rules · verify_multimodal",
+        "前端与设计语言：check_design_tokens (DT-1..8) · check_pages · a11y_check · check_visual",
+        "红线与运维护栏：verify_download_governance (DG-1..6) · verify_secret_patterns · verify_depad"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "web-app.b@0.48",
+      "to": "api-auth.t@0.85",
+      "flow": "req",
+      "label": "扫码会话",
+      "mid": 426,
+      "labelPos": [
+        248,
+        412
+      ]
+    },
+    {
+      "from": "web-app.b@0.87",
+      "to": "api-read.t@0.4",
+      "flow": "req",
+      "label": "队列/详情/词典",
+      "arrow": "both",
+      "mid": 426,
+      "labelPos": [
+        380,
+        412
+      ]
+    },
+    {
+      "from": "web-app.b@0.98",
+      "to": "api-write.t@0.25",
+      "flow": "req",
+      "label": "送审/复核/签发",
+      "mid": 444,
+      "labelPos": [
+        600,
+        444
+      ]
+    },
+    {
+      "from": "shouheng.b@0.65",
+      "to": "api-write.t@0.75",
+      "flow": "req",
+      "label": "群内送审/查询",
+      "mid": 426,
+      "labelPos": [
+        825,
+        412
+      ]
+    },
+    {
+      "from": "ext-capture.b@0.5",
+      "to": "api-admin.t@0.5",
+      "flow": "req",
+      "label": "巡检/治理动作",
+      "mid": 426,
+      "labelPos": [
+        1088,
+        412
+      ]
+    },
+    {
+      "from": "api-read.b@0.3",
+      "to": "orchestrator.t@0.48",
+      "flow": "judge",
+      "label": "案件/版本比对",
+      "arrow": "both",
+      "mid": 672,
+      "labelPos": [
+        372,
+        656
+      ]
+    },
+    {
+      "from": "api-write.b@0.35",
+      "to": "orchestrator.t@0.88",
+      "flow": "judge",
+      "label": "ReviewCommand",
+      "mid": 668,
+      "labelPos": [
+        780,
+        656
+      ]
+    },
+    {
+      "from": "orchestrator.b@0.88",
+      "to": "judge-core.b@0.25",
+      "flow": "judge",
+      "label": "两段判定+变更比对",
+      "arrow": "both",
+      "mid": 958,
+      "labelPos": [
+        780,
+        974
+      ]
+    },
+    {
+      "from": "orchestrator.b@0.38",
+      "to": "ledger-auth.t@0.72",
+      "flow": "ledger",
+      "label": "追加权威事件+回执",
+      "mid": 988,
+      "labelPos": [
+        284,
+        974
+      ]
+    },
+    {
+      "from": "ledger-auth.b@0.8",
+      "to": "ledger-proj.b@0.25",
+      "flow": "ledger",
+      "label": "reducer 确定性投影",
+      "mid": 1206,
+      "labelPos": [
+        424,
+        1222
+      ]
+    },
+    {
+      "from": "ledger-proj.t@0.35",
+      "to": "api-read.b@0.78",
+      "flow": "ledger",
+      "label": "只读投影查询",
+      "via": [
+        [
+          574,
+          988
+        ],
+        [
+          716,
+          988
+        ],
+        [
+          716,
+          688
+        ],
+        [
+          540,
+          688
+        ]
+      ],
+      "labelPos": [
+        510,
+        688
+      ]
+    },
+    {
+      "from": "mm-gateway.t@0.5",
+      "to": "judge-core.b@0.75",
+      "flow": "kb",
+      "label": "OCR/ASR/视觉候选",
+      "mid": 988,
+      "labelPos": [
+        1058,
+        974
+      ]
+    },
+    {
+      "from": "kb-spec.t@0.72",
+      "to": "ledger-auth.b@0.72",
+      "flow": "kb",
+      "label": "规则快照与指纹",
+      "mid": 1242,
+      "labelPos": [
+        304,
+        1242
+      ]
+    },
+    {
+      "from": "verifiers.t@0.35",
+      "to": "ledger-proj.b@0.75",
+      "flow": "verify",
+      "label": "34 项门禁持续反证",
+      "mid": 1242,
+      "labelPos": [
+        720,
+        1242
+      ]
+    }
+  ],
+  "log": {
+    "title": "端到端合规数据流与门禁自证追踪（Live Trace）",
+    "live": {
+      "rows": 6
+    }
+  },
+  "footer": {
+    "cwd": "~/Project/audit_multi_content",
+    "cmd": "python3 tools/verify_coverage.py --controls && node web/scripts/check_design_tokens.mjs --check",
+    "note": "双击任意模块或连线可高亮上下游链路 · 导出命令：node ~/.claude/skills/arch-diagram/scripts/export.mjs"
+  }
+}

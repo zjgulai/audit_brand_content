@@ -46,9 +46,9 @@
   --sand-11: #635d59;
   --sand-12: #1d1d1f;
 
-  /* brand：Momcozy 品牌酒红（logo 实测 #6A2B3A）。
-     ★ 只用深色端承载文字与实心底；3/4 做 hover 底。
-     ★ 不删 tomato：状态红（red-*)与品牌色必须可区分（A6 前提）。 */
+  /* brand：Momcozy 暖粉玫瑰色阶（logo 实测 #6A2B3A / 玫瑰豆沙 #A34759）。
+     ★ 只用深色端承载文字与实心底；2/3/4 做暖粉悬停、选中与高亮底；6 做暖粉细边框。
+     ★ 状态红（red-*）与品牌玫瑰色相分离（A6 前提）。 */
   --brandc-1: #fdfbfb;
   --brandc-2: #fbf4f5;
   --brandc-3: #f9eef0;
@@ -58,20 +58,6 @@
   --brandc-9: #c25b6e;
   --brandc-11: #a34759;
   --brandc-12: #6a2b3a;
-
-  /* tomato：过渡性品牌色（存量元素迁移中） */
-  --tomato-1: #fffcfc;
-  --tomato-2: #fff8f7;
-  --tomato-3: #feebe7;
-  --tomato-4: #ffdcd3;
-  --tomato-5: #ffcdc2;
-  --tomato-6: #fdbdaf;
-  --tomato-7: #f5a898;
-  --tomato-8: #ec8e7b;
-  --tomato-9: #e54d2e;
-  --tomato-10: #dd4425;
-  --tomato-11: #d13415;
-  --tomato-12: #5c271f;
 
   /* green：通过 / 合规 */
   --green-1: #fbfefc;
@@ -174,12 +160,15 @@
      Radix 的 step 9 是**图形填充**（按钮底、指示器），不是「带白字的底」。
      带文字时用 step 11（4.98:1）。这条是被 a11y_check 的 90 项红打出来的，
      不是读文档读出来的。 */
-  --brand: var(--brandc-11);        /* #6A2B3A，白字 7.52:1 */
-  --brand-hover: var(--brandc-12);  /* hover 更深 */
+  --brand: var(--brandc-11);        /* #A34759，白字 5.83:1 */
+  --brand-hover: var(--brandc-12);  /* #6A2B3A，hover 更深 */
   --brand-graphic: var(--brandc-9); /* 纯图形用 */
   --brand-text: var(--brandc-11);   /* 白面/浅面正文 */
-  --brand-text-on-surface: var(--brandc-12); /* 品牌淡底上的文字 */
-  --brand-surface: var(--brandc-3);
+  --brand-text-on-surface: var(--brandc-12); /* 品牌淡底上的文字 9.9:1 */
+  --brand-surface: var(--brandc-3); /* #F9EEF0 品牌玫瑰淡底 */
+  --brand-surface-hover: var(--brandc-2); /* #FBF4F5 品牌玫瑰极淡悬停底 */
+  --brand-surface-active: var(--brandc-4); /* #F2DCE0 品牌玫瑰激活/高亮底 */
+  --brand-border: var(--brandc-6);  /* #E2B8C0 品牌玫瑰细边框 */
   --brand-ring: var(--brandc-8);
 
   /* 语义状态：每个都成对给出「实心 / 文字 / 淡底」三档 */
@@ -282,23 +271,10 @@
   --topbar-h: 3rem;
 
   /* ── 字体族 ───────────────────────────────────────────────────────── */
-  /* ★★ 2026-10-29 换成 Inter + 系统中文。
-   *
-   * 改前的栈以 `-apple-system` 打头：在 macOS 上落成 SF Pro，Windows 上落成
-   * 系统默认（Segoe UI / 雅黑），**两个平台观感不同**，且 SF Pro 的小字号
-   * 中宫偏紧，中文一混排就显挤。
-   *
-   * 现在：Inter 打头（自托管，见 `inter-fonts.css`），中文继续走系统栈 ——
-   * 苹方 / 雅黑都是各自平台上最好读的中文黑体，换成 web font 反而要让
-   * 国内用户多下一次几百 KB。所以**只统一拉丁，不统一中文**，这是刻意的。
-   *
-   * ★ Inter 后面跟了 `-apple-system` 作退路：woff2 没加载成功时
-   *   （老浏览器、被拦截）不能掉到 serif 去。
-   * ★ `system-ui` 放在最后而不是最前：放在前面会在部分 Linux 上
-   *   抢在 Inter 之前命中，等于白引字体。 */
-  --ui-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue",
-    Arial, sans-serif;
+  /* ★ 使用原生高质量无衬线与中文黑体栈，与 DESIGN.md §8 台账严格一致，
+     不引入 AI 套路外挂字体（如 Inter），避免额外二进制字体下载与 overused-font 告警。 */
+  --ui-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
   --ui-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 }

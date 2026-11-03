@@ -63,9 +63,6 @@ export default function AdminSessionsPage() {
       <div className="cases-page__head">
         <div>
           <h1 id="admin-sessions-title">安全审计</h1>
-          <p className="hint">
-            查看登录会话策略与安全审计日志说明。
-          </p>
         </div>
       </div>
 
@@ -77,16 +74,18 @@ export default function AdminSessionsPage() {
       )}
 
       <h2>安全与审计策略</h2>
-      <dl className="facts">
-        <dt>会话凭证保护</dt>
-        <dd>仅保存随机句柄，不含个人敏感信息，启用严格同源与加密传输保护</dd>
-        <dt>会话有效期</dt>
-        <dd>空闲 30 分钟或连续登录 8 小时后需重新验证身份</dd>
-        <dt>规则只读保护</dt>
-        <dd>网页端不直接修改审核规则与路由配置，越权请求自动拦截并记入审计日志</dd>
-        <dt>企业身份核验</dt>
-        <dd>生产环境强制校验飞书企业身份与租户归属</dd>
-      </dl>
+      <div className="panel">
+        <dl className="facts">
+          <dt>会话凭证保护</dt>
+          <dd>仅保存随机句柄，不含个人敏感信息，启用严格同源与加密传输保护</dd>
+          <dt>会话有效期</dt>
+          <dd>空闲 30 分钟或连续登录 8 小时后需重新验证身份</dd>
+          <dt>规则只读保护</dt>
+          <dd>网页端不直接修改审核规则与路由配置，越权请求自动拦截并记入审计日志</dd>
+          <dt>企业身份核验</dt>
+          <dd>生产环境强制校验飞书企业身份与租户归属</dd>
+        </dl>
+      </div>
 
       <h2>在线会话记录</h2>
       {sessions === null ? (
@@ -96,13 +95,38 @@ export default function AdminSessionsPage() {
           <p className="hint">当前无在线会话记录。</p>
         </div>
       ) : (
-        <ul className="notrun">
-          {sessions.map((s, idx) => (
-            <li key={idx} className="font-data">
-              {JSON.stringify(s)}
-            </li>
-          ))}
-        </ul>
+        <div className="cases-table-wrap">
+          <table className="cases-table">
+            <thead>
+              <tr>
+                <th scope="col">会话标识</th>
+                <th scope="col">登录主体</th>
+                <th scope="col">所属租户</th>
+                <th scope="col">角色 / 品线</th>
+                <th scope="col">建立 / 过期时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((s, idx) => {
+                const sid = String(s.session_id ?? s.id ?? `#${idx + 1}`);
+                const principal = String(s.principal ?? s.user_id ?? "未记录");
+                const tenant = String(s.tenant ?? "未记录");
+                const roles = Array.isArray(s.roles) ? s.roles.join("、") : String(s.roles ?? "默认");
+                const lines = Array.isArray(s.product_lines) ? s.product_lines.join("、") : "";
+                const timeInfo = String(s.expires_at ?? s.created_at ?? "有效期内");
+                return (
+                  <tr key={sid}>
+                    <td className="font-data">{sid.slice(0, 16)}</td>
+                    <td className="font-data">{principal}</td>
+                    <td className="font-data">{tenant}</td>
+                    <td>{roles}{lines ? `（${lines}）` : ""}</td>
+                    <td className="font-data">{timeInfo}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

@@ -106,7 +106,7 @@ export default function TakedownPage() {
       );
       setFlash({
         ok: true,
-        text: `下线任务 ${taskId} 已执行 ${action} → 当前状态：${updated.state}`,
+        text: `下线任务 ${taskId} 已执行 ${action}，当前状态：${updated.state}`,
       });
     } catch (cause: unknown) {
       const msg =
