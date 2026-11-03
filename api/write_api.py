@@ -310,10 +310,15 @@ def _ledger_call(fn):
     except LedgerConflict as exc:
         raise HTTPException(409, "%s: %s" % (exc.code, exc.detail))
     except LedgerNotFound as exc:
-        raise HTTPException(404, "%s: %s" % (exc.code, exc.detail))
-        if code == "not_original_signer":
+        # ★ 2026-11-03 修：这里原先是「先 raise 404，再判 not_original_signer」——
+        #   那个 if 在 raise 之后，**永远不执行**，于是 SoD 违规被映射成 404。
+        #   后果：调用方把「你没有权限撤回」读成「这个案子不存在」，
+        #   前者要提示换人，后者要提示刷新列表 —— 两种处置完全相反。
+        #   现在：先分类，再 raise。与 run_review_command 里那段（:426）同形。
+        if exc.code == "not_original_signer":
             # SoD 类：撤回只能由原签发人执行（T-315b / #123c）。
             raise HTTPException(403, "%s: %s" % (exc.code, exc.detail))
+        raise HTTPException(404, "%s: %s" % (exc.code, exc.detail))
     except LedgerValidation as exc:
         raise HTTPException(400, "%s: %s" % (exc.code, exc.detail))
 
@@ -1023,7 +1028,19 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
                 )
             except TD.TakedownError as exc:
                 raise HTTPException(400, "%s: %s" % (exc.code, exc.detail))
-            new = copy.deepcopy(task)
+            # ★ 2026-11-03 修：改前这里只写 `new["waived"] = checked`，**没有动 state**。
+            #   而 `TakedownPage.tsx:254` 判的是 `state === "waived"` ——
+            #   于是双人审批豁免之后，界面仍是一个红色的「failed（下线失败）」，
+            #   「改派 / 重新尝试 / 申请豁免」三个按钮照旧可点。
+            #   动作成功了、留痕也写了，读的人看见的却是另一件事。
+            #
+            #   ★ 为什么走 `TD.transition` 而不是直接赋值：迁移必须过那张封闭表
+            #     （`failed → waived` 是合法项，`completed → waived` 不是）。
+            #     直接赋值等于在路由层开出第二份状态机。
+            try:
+                new = TD.transition(task, "waived", action="waive")
+            except TD.TakedownError as exc:
+                raise HTTPException(409, "%s: %s" % (exc.code, exc.detail))
             new["waived"] = checked
             new["version"] = int(new.get("version") or 0) + 1
             save_task(new)

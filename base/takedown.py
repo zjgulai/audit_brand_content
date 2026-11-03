@@ -58,14 +58,27 @@ if _TOOLS not in sys.path:
 from bj_time import BJ as BJT, bj_today  # noqa: E402
 
 # ── 状态机 ──────────────────────────────────────────────
-STATES = ("pending", "in_progress", "completed", "failed")
+# ★ 2026-11-03：加 `waived`。改前这里只有四个状态，而 `api/write_api.py` 的
+#   waive 路由写的是 `new["waived"] = checked`（一个**布尔字段**），
+#   从未改 `state`。后果在前端可指认：`TakedownPage.tsx:254` 判
+#   `state === "waived"` 才渲染蓝色豁免徽标 —— 那个分支**永远走不到**，
+#   双人审批豁免过的任务在界面上仍然是一个红色的「failed（下线失败）」，
+#   而且「改派」「重新尝试」「申请豁免」三个按钮照旧全部可点。
+#
+#   这是本项目最忌讳的形状：动作成功了、留痕也写了，但**读的人看见的是另一件事**。
+STATES = ("pending", "in_progress", "completed", "failed", "waived")
 
 # 允许的迁移。**封闭集合** —— 不在表里的迁移一律拒。
 TRANSITIONS = {
     "pending":     {"in_progress", "failed"},
     "in_progress": {"completed", "failed"},
-    "failed":      {"in_progress", "pending", "completed"},  # retry / reassign 回到 in_progress 或 pending
-    "completed":   set(),                                     # 终态
+    "failed":      {"in_progress", "pending", "completed",
+                    "waived"},   # retry / reassign / waive
+    # ★ waived 与 completed 同为**终态**：豁免是「这条不下线了，且有两个人的
+    #   书面理由」。它不是「暂时不做」，所以不给它出口 —— 要恢复执行必须先
+    #   有人重新裁决，那是一次新的任务，不是这条任务的下一步。
+    "completed":   set(),
+    "waived":      set(),
 }
 
 # failed 之后的三种人工处置
@@ -80,6 +93,12 @@ EVIDENCE_REQUIRED = ("platform", "executed_by", "executed_at")
 STATE_EVENT = {
     "completed": "takedown_completed",
     "failed": "takedown_failed",
+    # ★ waived 刻意**不**发事件。
+    #   理由不是漏了，是这一格没有合适的收件人语义：completed/failed 是
+    #   「催办结束 / 需要重试」，要通知负责人；waived 是「两个审批人已经
+    #   书面决定这条不下线了」，它终结待办而不是产生待办。
+    #   `verify_notifications.py:253` 断言的是 STATE_EVENT 的**取值**都存在于
+    #   EVENT_TYPE —— 少一格不违反它，多出一个不在表里的值才违反。
 }
 
 # 取证方式：三选一（前两个是首选，截图是兜底）

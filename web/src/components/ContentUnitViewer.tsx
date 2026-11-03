@@ -44,12 +44,100 @@ interface Props {
   observations?: MultimodalObservation[];
   /** 没有任何观察时「为什么没看」。有三态才说得清，见组件内注释。 */
   observationNote?: string | null;
+  /** 案件 id —— 原件的读取按案件走（见下方「原件」那一块的注释）。 */
+  caseId?: string | null;
 }
 
 interface TextSegment {
   text: string;
   finding?: Finding;
   index?: number;
+}
+
+/**
+ * 送审原件（图片 / 视频）。
+ *
+ * ## 为什么它在这里，而之前没有
+ *
+ * 媒体进件那条链一直是完整的：上传落到 `<media_roots>/_uploads/`、提交时
+ * 那个路径进 `source.uri`、OCR / 多模态拿它出观察、建案件。**读不回来** ——
+ * 全仓没有任何一条路由把那个文件交给浏览器。于是审核员在详情页看到的只有
+ * 「OCR 提出来的一段文字」，看不到那张图。
+ *
+ * 那不是「少个功能」，是**判的对象看不见**：判定链的输入是一个他无法核对的转写件。
+ * 2026-11-03 补了 `GET /api/v1/cases/{case_id}/original`，这个组件是它的消费侧。
+ *
+ * ## 为什么按 caseId 取，不把路径交过来
+ *
+ * `source.uri` 是服务器绝对路径。放进接口响应等于把目录结构交给浏览器；
+ * 让前端拿路径回来取文件，等于开一个「读机器上任意路径」的入口。
+ * 所以前端只知道 case_id，路径只在服务端解析并校验仍在允许根内。
+ *
+ * ## 三态照实说
+ *
+ * 加载失败不许留白，也不许伪装成「没图」。读不出就说读不出，并给出下一步
+ * （刷新 / 找后端确认原件是否还在盘上）。
+ */
+function OriginalMedia({
+  caseId,
+  kind,
+}: {
+  caseId?: string | null;
+  kind: string;
+}) {
+  const [failed, setFailed] = useState<null | string>(null);
+
+  if (!caseId) {
+    return (
+      <div className="unit-original" data-unit-original="unavailable">
+        <div className="unit-original__state">
+          这条案件没有关联 id，无法定位原件
+        </div>
+      </div>
+    );
+  }
+
+  // ★ 路径与鉴权都在服务端：cookie 随请求走，`<img>` 天然带同源 cookie。
+  const src = `/api/v1/cases/${encodeURIComponent(caseId)}/original`;
+
+  return (
+    <div className="unit-original" data-unit-original={kind}>
+      <div className="unit-original__head">
+        <span className="unit-original__label">
+          送审原件{kind === "video" ? "（视频）" : ""}
+        </span>
+        <a
+          className="unit-original__label"
+          href={src}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          看全尺寸
+        </a>
+      </div>
+      <div className="unit-original__body">
+        {failed ? (
+          <div className="unit-original__state">
+            原件读取失败（{failed}）。它可能已从磁盘移除，或在允许的素材根之外。
+          </div>
+        ) : kind === "video" ? (
+          <video
+            src={src}
+            controls
+            preload="metadata"
+            onError={() => setFailed("无法解码或文件不存在")}
+          />
+        ) : (
+          <img
+            src={src}
+            alt="送审原件"
+            loading="lazy"
+            onError={() => setFailed("无法解码或文件不存在")}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 function segmentText(rawText: string, findings: Finding[]): TextSegment[] {
@@ -108,6 +196,7 @@ export default function ContentUnitViewer({
   onSelectFinding,
   observations,
   observationNote,
+  caseId,
 }: Props) {
   const [tab, setTab] = useState<"text" | "fields" | "boundary" | "semantics">(
     "text",
@@ -135,6 +224,10 @@ export default function ContentUnitViewer({
   const okObs = obs.filter((o) => o.status === "ok");
   const badObs = obs.filter((o) => o.status !== "ok");
   const noteText = (observationNote ?? "").trim();
+
+  // ★ 2026-11-03：媒体载体才有原件可看。文本载体的「原件」就是正文本身，
+  //   再放一个预览框只会挤占版面而没有任何新信息。
+  const isMediaKind = kind === "image" || kind === "video";
 
   const segments = useMemo(() => {
     if (typeof fullText !== "string" || !fullText) return [];
@@ -210,6 +303,10 @@ export default function ContentUnitViewer({
           </Button>
         </div>
       </div>
+
+      {isMediaKind && (
+        <OriginalMedia caseId={caseId} kind={kind} />
+      )}
 
       {doesNotCover.length > 0 && (
         <div className="unit-pane__boundary-bar">

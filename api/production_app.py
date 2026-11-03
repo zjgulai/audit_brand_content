@@ -1470,6 +1470,100 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
         return Response(content=out["content"], media_type="text/markdown; charset=utf-8",
                         headers={"Cache-Control": "private, max-age=0, must-revalidate"})
 
+    # ── ★★ 2026-11-03：送审原件的读取（图片 / 视频预览）───────────────
+    #
+    # ## 这条端点为什么之前不存在
+    #
+    # 媒体进件那条链是完整的：`POST /api/v1/uploads` 把字节写到
+    # `<media_roots[0]>/_uploads/`，返回绝对路径；提交时那个路径进
+    # `submission.source.uri`，`_build_media_unit` 校验它在允许的根内，
+    # 然后 OCR / 多模态拿它出观察、建案件。
+    #
+    # **读不回来。** 全仓没有任何一条路由把那个文件交给浏览器 ——
+    # 于是审核员在案件详情页看到的是「OCR 提出来的一段文字」，
+    # 看不到那张图本身。这不是「少个功能」，是**判的对象看不见**：
+    # 判定链的输入是一个他无法核对的转写件。
+    #
+    # ## 为什么按 case_id 取，而不是把路径交给前端
+    #
+    # `content_unit.source.uri` 是**服务器绝对路径**。把它放进接口响应，等于
+    # 把目录结构交给浏览器；让前端拿路径回来取文件，则等于开一个
+    # 「读机器上任意路径」的入口 —— 那正是 `_build_media_unit` 开头那段
+    # 注释警告的形状（与 §2.6 第 3 条凭据文件同形）。
+    #
+    # 所以：前端只知道 `case_id`，路径只在服务端解析，且**必须仍在允许根内**。
+    #
+    # ## 鉴权与授权
+    #
+    # · 未登录 → 401（与 `/static/reports/` 同口径：401 不泄露案件是否存在）
+    # · 登录但无权 → 404，**不是 403**。403 会让这条路径变成一个
+    #   「这个 case_id 存在」的枚举器。
+    # · 有权 → `can_read_content(principal, case)`，与案件详情同一条 ACL。
+    @app.get("/api/v1/cases/{case_id}/original", include_in_schema=False)
+    def case_original(case_id: str, request: Request):
+        cookie = request.cookies.get(COOKIE_NAME)
+        session = runtime.session_store.get_session(cookie) if cookie else None
+        if not session:
+            raise HTTPException(401, "缺少或无效 session")
+        try:
+            principal = runtime.directory.by_id(
+                session["principal"], session["tenant"])
+        except Exception:  # noqa: BLE001
+            raise HTTPException(503, "principal_directory_unavailable")
+        if not principal:
+            raise HTTPException(401, "无法解析 principal")
+
+        case = app.state.repository.get_case(case_id)
+        # ★ 不存在与无权同一个答案（见上）。
+        if case is None or not can_read_content(principal, case):
+            raise HTTPException(404, "案件不存在")
+
+        unit = case.get("content_unit") or case.get("content") or {}
+        source = unit.get("source") or {} if isinstance(unit, dict) else {}
+        kind = source.get("kind")
+        if kind not in ("image", "video"):
+            # 文本载体没有原件可看。这不是错误，是「这条案件没有原件」——
+            # 仍用 404，因为对浏览器而言它和「没有这个资源」是同一件事。
+            raise HTTPException(404, "这条案件没有可预览的原件")
+        raw_uri = source.get("uri")
+        if not isinstance(raw_uri, str) or not raw_uri.strip():
+            raise HTTPException(404, "原件路径缺失")
+
+        # ★ 路径必须仍在允许根内 —— 与进件侧同一条判据。
+        #   不加这一道，历史数据里一条越界的 uri 就成了任意文件读取。
+        roots = tuple(getattr(runtime.settings, "media_roots", ()) or ())
+        if not roots:
+            raise HTTPException(503, "未配置媒体根目录")
+        try:
+            target = Path(raw_uri).expanduser().resolve()
+            allowed = [Path(r).expanduser().resolve() for r in roots]
+        except OSError:
+            raise HTTPException(404, "原件不存在")
+        if not any(target == r or r in target.parents for r in allowed):
+            raise HTTPException(404, "原件不存在")
+        if not target.is_file():
+            raise HTTPException(404, "原件不存在")
+
+        media_type = {
+            "image": "image/jpeg",
+            "video": "video/mp4",
+        }.get(kind, "application/octet-stream")
+        # 按真实后缀修正（前面那个默认值只是兜底，不许把 png 报成 jpeg）
+        suffix = target.suffix.lower()
+        media_type = {
+            ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+            ".webp": "image/webp", ".gif": "image/gif",
+            ".mp4": "video/mp4", ".mov": "video/quicktime",
+            ".webm": "video/webm", ".m4v": "video/x-m4v",
+        }.get(suffix, media_type)
+
+        return FileResponse(
+            str(target),
+            media_type=media_type,
+            # ★ `private` + `no-store`：这是客户素材，不许落在共享缓存里。
+            headers={"Cache-Control": "private, no-store"},
+        )
+
     # ── ★★ 2026-10-30：静态资源压缩 ─────────────────────────────────────
     #
     # 实测：`https://ca.luteos.com/assets/index-*.js` 427 KB，响应头**没有**

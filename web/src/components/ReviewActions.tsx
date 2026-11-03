@@ -264,7 +264,7 @@ export default function ReviewActions({ detail, refresh }: Props) {
                       <strong>#{d.snapshot_seq}</strong> {d.draft_id}
                     </span>
                     <span className="hint">
-                      作者 <code>{d.author ?? "システム"}</code>，{d.snapshot_at}
+                      作者 <code>{d.author ?? "系统"}</code>，{d.snapshot_at}
                     </span>
                     {isPrimary && (
                       <span className="badge badge--pending" data-status-badge="">

@@ -690,21 +690,51 @@ def create_app(*, session_store=None, repository=None, principals=None,
             p.setdefault("product_lines", [])
             return p
 
-    app = FastAPI(title="Content Review API", version="1.0",
-                  openapi_version=openapi_version)
+    # ★ 2026-11-03：生产装配下**整组关闭** spec 与交互式文档。
+    #
+    #   实测（2026-11-03，`curl https://ca.luteos.com` 未带任何 cookie）：
+    #
+    #       /openapi.json        → 200 · 43,358 B
+    #       /api/openapi.json    → 200 · 43,358 B
+    #       /docs                → 200 · Swagger UI
+    #       /redoc               → 200 · ReDoc
+    #
+    #   也就是**匿名可以拿到全部 38 条路径、每个请求体的字段与错误码**。
+    #   这是面向互联网的合规系统，API 结构属于内部信息；更实际的风险是
+    #   它把「哪些写端点存在、各自要什么字段」直接交给扫描器。
+    #
+    #   ★ 只堵 `include_in_schema` 没有用（那只影响 spec 内容，不影响可达性）；
+    #     只堵 `/api/openapi.json` 也没有用 —— FastAPI 默认那条 `/openapi.json`
+    #     和 `/docs` 指向的是同一份东西。四个入口是一条链，必须一起关。
+    #
+    #   ★ 开发装配**保持不变**：`tools/verify_openapi_spec.py` 的 S1b 明确要求
+    #     「两个入口都 200 且逐字节相同」，那条断言本身是有价值的（它防的是
+    #     「别名与默认口漂移」），所以闸门放在装配层而不是删掉端点。
+    _spec_public = resolved_env == "dev"
+    app = FastAPI(
+        title="Content Review API", version="1.0",
+        openapi_version=openapi_version,
+        openapi_url=("/openapi.json" if _spec_public else None),
+        docs_url=("/docs" if _spec_public else None),
+        redoc_url=("/redoc" if _spec_public else None),
+    )
     app.openapi_version = openapi_version
 
-    # T-408（TS-10）：spec 有两个入口 —— FastAPI 默认的 `/openapi.json`
-    # 与票面/前端约定的 `/api/openapi.json`。
+    # T-408（TS-10）：开发装配下 spec 有两个入口 —— FastAPI 默认的
+    # `/openapi.json` 与票面/前端约定的 `/api/openapi.json`。
     #
     # ★ 为什么要有别名而不是改 `openapi_url`：改掉会让 `/openapi.json`
     #   消失，而 `tools/verify_review_api.py` 的 C0 段与若干脚本用它。
     #   两条并存、返回**同一份对象**（同一 app、同一缓存），不是复制一份。
     # ★ 别名只用 GET，并且 `include_in_schema=False` —— 否则 spec 里会出现
     #   「/api/openapi.json 返回一个 OpenAPI 文档」这种自指条目。
-    @app.get("/api/openapi.json", include_in_schema=False)
-    def openapi_alias():
-        return JSONResponse(content=app.openapi())
+    # ★ 生产装配不注册它（见上）。`app.openapi()` 在进程内仍可调用，
+    #   所以 `verify_openapi_spec.py` 的 prod 侧（走 `prod_app.openapi()`）
+    #   不受影响 —— 那条本来就不发 HTTP。
+    if _spec_public:
+        @app.get("/api/openapi.json", include_in_schema=False)
+        def openapi_alias():
+            return JSONResponse(content=app.openapi())
 
     from base.reviews_ledger import ReviewsLedger
     from base.finding_store import FindingStore

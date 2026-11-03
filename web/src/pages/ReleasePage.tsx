@@ -8,7 +8,6 @@ import {
   type CaseDetail,
   type CaseSummary,
 } from "../api/client";
-import { csrfHeaders } from "../api/auth-headers";
 import { usePolling } from "../hooks/usePolling";
 import { shouldSurfaceFailures } from "../hooks/polling.logic";
 import {
@@ -178,20 +177,19 @@ export default function ReleasePage() {
       //   读不到。所以这里用 `redirect: "manual"` 拿到 302，再从
       //   `Location` 头里取授权地址自己打开。
       //   这样既过了 CSRF，又不用把跨域页面读进 JS。
-      const res = await fetch(`${apiBase}/reauth/start`, {
-        method: "POST",
-        credentials: "same-origin",
-        redirect: "manual",
-        headers: {
-          "Content-Type": "application/json",
-          ...csrfHeaders("POST", document.cookie),
-        },
-        body: JSON.stringify({ case_id: caseId, action: actionMode, nonce }),
+      // ★ 2026-11-03：这段 HTTP 已搬进 `api/release-client.ts`（`startReauth`）。
+      //   页面不该知道 302、`redirect: "manual"`、CSRF 头这三件事 ——
+      //   原先这段裸 fetch 是 `check_api_centralization.mjs` 里登记的例外
+      //   （理由充分：`request()` 强制 `res.json()`，而本端点回 302），
+      //   但「例外」说的是**不能用通用封装**，不是「该留在页面里」。
+      //   页面现在只面对三种可区分的结局，不再面对一个 Response 对象。
+      const outcome = await releaseClient.startReauth({
+        caseId,
+        action: actionMode,
+        nonce,
       });
 
-      // 302 在 `redirect: "manual"` 下是 opaque 的，读不到 Location。
-      // 所以这里接受两种可读的成功信号：3xx（部分实现能读到）或 2xx 带 authorize_url。
-      if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+      if (outcome.kind === "redirected") {
         // ★ 拿不到 Location 时**不许假装成功**：告诉用户去新标签页看，
         //   而不是弹一句「已打开」然后什么都没发生。
         setResultMsg({
@@ -202,19 +200,14 @@ export default function ReleasePage() {
         });
         return;
       }
-      if (res.ok) {
-        const data = (await res.json().catch(() => null)) as
-          | { authorize_url?: string }
-          | null;
-        if (data?.authorize_url) {
-          window.open(data.authorize_url, "_blank", "noopener,noreferrer");
-          return;
-        }
+      if (outcome.kind === "url") {
+        window.open(outcome.url, "_blank", "noopener,noreferrer");
+        return;
       }
       // ★ 非 2xx 也要说清是**哪一步**没成，不许统一译成「未开启」。
       setResultMsg({
         ok: false,
-        text: `Step-Up 重定向未成功（HTTP ${res.status}）；请在下方填入一次性 step_up_token。`,
+        text: `Step-Up 重定向未成功（${outcome.message}）；请在下方填入一次性 step_up_token。`,
       });
     } catch (cause: unknown) {
       const why = cause instanceof Error ? cause.message : String(cause);

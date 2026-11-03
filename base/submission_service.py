@@ -783,9 +783,13 @@ class SubmissionIngestor:
                 kwargs["clock"] = self.clock
             judgment = self.judge_fn(unit, **kwargs)
         except Exception as exc:  # noqa: BLE001
+            # ★ 2026-11-03 修：原先这里是 `"%s: %s" % (type(exc).__name__, exc)`。
+            #   `str(exc)` 是**未审的内容** —— 它可能带文件路径、模型名、
+            #   甚至半个输入片段。而本项目的客户端就是业务方，不是我们自己。
+            #   现在只给异常类型名：足够定位「是解析炸了还是模型炸了」，
+            #   细节留在服务端日志里（`logs/` 有 request_id 可对）。
             raise SubmissionRejected(
-                "judgment_failed", 422,
-                "%s: %s" % (type(exc).__name__, exc)) from exc
+                "judgment_failed", 422, type(exc).__name__) from exc
         if not isinstance(judgment, dict) or judgment.get("run_state") != "OK":
             raise SubmissionRejected(
                 "judgment_failed", 422,

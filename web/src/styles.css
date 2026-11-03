@@ -2624,3 +2624,58 @@ code {
     justify-items: center;
   }
 }
+
+/* ── 2026-11-03：送审原件（图片 / 视频）───────────────────────────────
+ *
+ * ★ 为什么原件**常驻**而不是塞进标签页：
+ *   审核员判的对象就是这张图 / 这段视频。OCR 出来的文字是**转写件**，
+ *   不是原件 —— 把它收进第三个 tab，等于让人先看转写再决定要不要核对。
+ *   原件放在正文之上、跟着页面一起滚，阅读顺序就是「先看见它，
+ *   再看见系统对它说了什么」。布局本身表达主次，不靠一句提示。
+ *
+ * ★ 尺寸约束：宽到容器为止，高给一个上限（避免竖版长图把正文推到屏幕外）。
+ *   点开看全尺寸走浏览器原生的「在新标签页打开」，不自己做 lightbox ——
+ *   那是另一个组件要维护的东西，而它不解决判断问题。
+ */
+.unit-original {
+  margin: 0 0 var(--space-3);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--sand-1);
+  overflow: hidden;
+}
+
+.unit-original__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--hairline) solid var(--border);
+}
+
+.unit-original__label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.unit-original__body {
+  display: grid;
+  place-items: center;
+  background: var(--sand-2);
+}
+
+.unit-original__body img,
+.unit-original__body video {
+  display: block;
+  max-width: 100%;
+  max-height: 42vh;
+  object-fit: contain;
+}
+
+.unit-original__state {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}

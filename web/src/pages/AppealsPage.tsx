@@ -43,6 +43,20 @@ export default function AppealsPage() {
       setRows(Array.isArray(data) ? data : []);
       setError(null);
     } catch (e: unknown) {
+      // ★ 2026-11-03：失败时**必须**把列表从 null 里放出来。
+      //
+      //   渲染分支是 `rows === null ? <LoadingRows/> : ...`。改前这里只
+      //   `setError(...)`，`rows` 仍停在 null —— 于是 403/500 之后
+      //   **错误横幅与骨架屏同时出现**：读起来像「还没加载完，再等等」，
+      //   于是人会一直等一个永远不会来的请求。
+      //
+      //   这与 AdminGrantsPage 在 2026-10-30 生产上修过的是同一个缺陷
+      //   （那次实测截图：页面上已打印「权限受限」，同时仍有一个
+      //   `div.loading-rows[aria-busy=true]` 占着 1071×236 的版面）。
+      //   当时只修了那两个页面，申诉中心这一处漏下了。
+      //
+      //   错误已经有 `error` 那一处负责显示；列表的职责只是「别再转」。
+      setRows([]);
       const err = e as { message?: string };
       setError(err.message ?? String(e));
     }
