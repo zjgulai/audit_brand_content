@@ -46,6 +46,7 @@ const PAGE_TO_ROUTE_MAP = [
   { file: "InboxPage.tsx", route: "/inbox" },
   { file: "QueuePage.tsx", route: "/queue" },
   { file: "CasesPage.tsx", route: "/cases" },
+  { file: "MediaPage.tsx", route: "/media" },
   { file: "CaseDetailPage.tsx", route: "/cases/${FIRST_CASE}" },
   { file: "AppealsPage.tsx", route: "/appeals" },
   { file: "ReleasePage.tsx", route: "/release" },

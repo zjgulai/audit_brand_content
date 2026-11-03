@@ -268,7 +268,7 @@ echo "[10/12] 无障碍自动检查（全部工作台页面 15 条路由扫描 +
 node "${WEB}/scripts/a11y_check.mjs" \
   --base "http://127.0.0.1:${WEB_PORT}" \
   --enable-dev-identity 1 \
-  --pages "/login,/submit,/inbox,/queue,/cases,/cases/${FIRST_CASE},/appeals,/release,/release/${FIRST_CASE},/takedown,/reports,/reports/report-smoke,/taxonomy,/admin/grants,/admin/sessions" \
+  --pages "/login,/submit,/inbox,/queue,/cases,/media,/cases/${FIRST_CASE},/appeals,/release,/release/${FIRST_CASE},/takedown,/reports,/reports/report-smoke,/taxonomy,/admin/grants,/admin/sessions" \
   --out "${RUN_DIR}/a11y.json" \
   > "${RUN_DIR}/a11y.stdout" 2> "${RUN_DIR}/a11y.err"
 cat "${RUN_DIR}/a11y.stdout"
