@@ -1525,17 +1525,36 @@ def create_production_app(settings: ProductionSettings, *, oauth_provider=None):
             # 文本载体没有原件可看。这不是错误，是「这条案件没有原件」——
             # 仍用 404，因为对浏览器而言它和「没有这个资源」是同一件事。
             raise HTTPException(404, "这条案件没有可预览的原件")
-        raw_uri = source.get("uri")
-        if not isinstance(raw_uri, str) or not raw_uri.strip():
-            raise HTTPException(404, "原件路径缺失")
+
+        # ★★ 2026-11-03 生产实测更正：原件的真实路径在 `_media_local_path`，
+        #   **不在 `source.uri`**。
+        #
+        #   查生产 authority 里那 5 条媒体案件，`source.uri` 分别是
+        #   `submission:probe-media-9815304dcb33` / `submission:mm5-video-…` ——
+        #   都是**逻辑标识**，不是文件路径。真正落在盘上的是同一 unit 上的
+        #   `_media_local_path`（进件层写进去的已解析绝对路径）。
+        #
+        #   如果照 `source.uri` 取，这条端点对**每一条真实的媒体案件**都 404，
+        #   而在自证里用夹具造的案件可能恰好带真路径 —— 那种绿是假的。
+        #
+        #   ★ 为什么会有两个字段：`source.uri` 是契约字段（H8 要求非空），
+        #     表示「这条内容从哪来」；`_media_local_path` 是进件层的私有信息
+        #     （下划线开头 = 不属于契约），表示「原件此刻在哪」。两者语义不同，
+        #     不是一个字段的两种写法。
+        local = unit.get("_media_local_path")
+        if not isinstance(local, str) or not local.strip():
+            # ★ 不回落去猜 `source.uri`：猜错的表现是「显示了另一张图」，
+            #   不报错，只给错东西。做不到就说做不到。
+            raise HTTPException(
+                404, "这条案件没有记录原件路径（旧案件或进件时未落盘）")
 
         # ★ 路径必须仍在允许根内 —— 与进件侧同一条判据。
-        #   不加这一道，历史数据里一条越界的 uri 就成了任意文件读取。
+        #   不加这一道，历史数据里一条越界的路径就成了任意文件读取。
         roots = tuple(getattr(runtime.settings, "media_roots", ()) or ())
         if not roots:
             raise HTTPException(503, "未配置媒体根目录")
         try:
-            target = Path(raw_uri).expanduser().resolve()
+            target = Path(local).expanduser().resolve()
             allowed = [Path(r).expanduser().resolve() for r in roots]
         except OSError:
             raise HTTPException(404, "原件不存在")

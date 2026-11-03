@@ -29,7 +29,8 @@ export type IconName =
   | "history"
   | "user-check"
   | "chevron-left"
-  | "chevron-right";
+  | "chevron-right"
+  | "image";
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
@@ -169,6 +170,13 @@ export function Icon({ name, size = 12, label, className, ...rest }: IconProps) 
       {name === "chevron-right" && (
         <>
           <path d="M6 3.5L10.5 8 6 12.5" />
+        </>
+      )}
+      {name === "image" && (
+        <>
+          <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.4" />
+          <circle cx="5.5" cy="6.2" r="1.1" />
+          <path d="M2.4 11.4l3.1-3 2.4 2.2 2.3-2.4 3.4 3.2" />
         </>
       )}
       {name === "user-check" && (

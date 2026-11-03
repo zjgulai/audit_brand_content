@@ -72,6 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/inbox", label: "待办收件箱", icon: "inbox" },
       { to: "/queue", label: "待人工复核", icon: "clock" },
       { to: "/cases", label: "审核全景", icon: "search" },
+      { to: "/media", label: "素材库", icon: "image" },
     ],
   },
   {

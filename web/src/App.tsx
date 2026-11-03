@@ -12,6 +12,7 @@ const AdminSessionsPage = lazy(() => import("./pages/AdminSessionsPage"));
 const AppealsPage = lazy(() => import("./pages/AppealsPage"));
 const CasesPage = lazy(() => import("./pages/CasesPage"));
 const InboxPage = lazy(() => import("./pages/InboxPage"));
+const MediaPage = lazy(() => import("./pages/MediaPage"));
 const ReleasePage = lazy(() => import("./pages/ReleasePage"));
 const ReportsIndexPage = lazy(() => import("./pages/ReportsIndexPage"));
 const SubmitPage = lazy(() => import("./pages/SubmitPage"));
@@ -114,6 +115,15 @@ export default function App() {
           }
         />
         <Route path="/reports/:reportId" element={<ReportPage />} />
+        {/* P-13 素材库：已进件的图片 / 视频原件 */}
+        <Route
+          path="/media"
+          element={
+            <Suspense fallback={<p className="hint">加载素材库…</p>}>
+              <MediaPage />
+            </Suspense>
+          }
+        />
         {/* P-10 规则与分类规范 */}
         <Route path="/taxonomy" element={<TaxonomyPage />} />
         <Route path="/rules" element={<TaxonomyPage />} />

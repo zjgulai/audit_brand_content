@@ -152,6 +152,16 @@ class CaseSummary(BaseModel):
     title_or_excerpt: Optional[str] = None
     high_severity_count: Optional[int] = None
     coverage_state: Optional[str] = None
+    #: ★ 2026-11-03：载体种类。素材管理页要靠它在列表上区分「图片 / 视频 / 文本」，
+    #:   而在此之前 `GET /api/v1/cases` 完全不给这个字段 ——
+    #:   前端只能取详情才知道一条案件有没有原件，于是列表里所有行长得一样，
+    #:   媒体件混在文本件中间无从辨认。
+    #:
+    #: ★ 为什么从 `content_unit_ref` 取而不是 `content_unit.source`：
+    #:   `content_unit` 只在详情响应里返回（列表不带它 —— 带整个正文会让
+    #:   列表响应体积随文本长度线性增长）。`content_unit_ref.kind` 是 IR 里
+    #:   本来就有的单值，列表透出它没有额外代价。
+    content_kind: Optional[str] = None
 
 
 class CaseDetail(BaseModel):
@@ -547,6 +557,10 @@ def _summary(case):
         "title_or_excerpt": _extract_excerpt(case),
         "high_severity_count": high_cnt,
         "coverage_state": cov.get("coverage_state"),
+        # ★ 2026-11-03：载体种类（`content_unit_ref.kind`）。
+        #   取不到就是 None —— 不许回落成 "free_text"，
+        #   那会把「这条案件不知道是什么载体」显示成「文本」。
+        "content_kind": (ir.get("content_unit_ref") or {}).get("kind"),
     }
 
 

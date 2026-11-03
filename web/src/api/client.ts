@@ -63,6 +63,8 @@ export interface CaseSummary {
   title_or_excerpt?: string | null;
   high_severity_count?: number | null;
   coverage_state?: string | null;
+  /** ★ 2026-11-03：载体种类（后端 `content_unit_ref.kind`）。取不到即 `null`。 */
+  content_kind?: string | null;
 }
 
 export interface Finding {

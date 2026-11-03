@@ -2679,3 +2679,120 @@ code {
   color: var(--text-muted);
   font-size: var(--text-sm);
 }
+
+/* ── 2026-11-03：素材库（P-13）─────────────────────────────────────
+ *
+ * ★ 为什么是网格而不是表格：
+ *   素材靠「看一眼」识别。一行写「图片 · 2.1MB · 吸奶器」，人要读三遍
+ *   才知道要找的是哪一张；缩略图扫一眼就定位。布局承担识别，不靠标签文字。
+ *
+ * ★ 为什么卡片里没有描述性句子：
+ *   一张图、一个载体词、一个品线、一个状态 —— 四样都短。加一句
+ *   「点击查看详情」既占位又不增加信息：可点区域本身就是缩略图。
+ */
+.media-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.media-bar__field {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.media-bar__field--grow {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.media-bar select,
+.media-bar input {
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  background: var(--sand-1);
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-control);
+  padding: var(--space-2) var(--space-3);
+  min-height: 36px;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+
+.media-card {
+  border: var(--hairline) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--sand-1);
+  overflow: hidden;
+}
+
+.media-card__frame {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  background: var(--sand-2);
+  overflow: hidden;
+}
+
+.media-card__thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.media-card__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+.media-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-3) 0;
+}
+
+.media-card__kind {
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.media-card__line {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.media-card__state {
+  font-size: var(--text-sm);
+  color: var(--brand-text-on-surface);
+  margin-left: auto;
+}
+
+.media-card__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
