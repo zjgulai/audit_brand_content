@@ -1,0 +1,19 @@
+{
+  "事项名称": "飞书机器人 Guard（cli_aa600ebeed38dccf）长连接打通 + 多载体审核能力聚合与工作台同步建案",
+  "关联执行票": "Guard 飞书机器人与多模态审核入库",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "落实三项拍板决策（D-1 替换凭据复用守衡常驻底座；D-2 群内送审同步在工作台建案入账；D-3 群聊 @ 即触发、品线自动识别+缺省回落吸奶器并显式标注）：1）更新仓外凭据为 Guard 应用（cli_aa600ebeed38dccf，open_id=ou_c5c35c6322ac7b763fb62354aa4f3eb6），并在 tools/agent/feishu.mjs 中同时识别 @Guard 与 @守衡。2）新建生产级聚合审查与工作台建案桥接器 base/feishu_guard_ingest.py，将自由文案、广告双字段、结构化商品 JSON、飞书云文档链接、落地页 URL、群内图片、群内视频统一收敛为四维生产进件请求，经 SubmissionIngestor + ReviewCommandService 写入仓外 BusinessEventStore 与 ProjectionStore，实时返回工作台 case_id、五标签（BLOCK/REVIEW/PASS/待自决/未审查）、处置层（DP0–DP4）、19 个 active 控制点命中与 workflow_timing 阶段耗时。3）升级 tools/agent/tools.mjs 的 judge_copy 与 tools/agent/image_judgment.mjs，无缝衔接知识库 BM25 六态检索（evidence_chain）与工作台建案；经 restart_shouheng.sh 规范撤除停令并拉起长连接守护进程。",
+  "验收标准": "1) node tools/agent/feishu_guard_ingest.test.mjs 17/17 全绿 rc=0（含 E1 反向对照：仓内路径硬拒绝）；2) node tools/test_agent.mjs 50/50 全绿 rc=0；3) node tools/agent/judge_evidence_wiring.test.mjs 22/22 全绿 rc=0；4) node tools/agent/image_judgment.test.mjs 16/16 全绿 rc=0；5) node tools/agent/attachment_ingest.test.mjs 39/39 全绿 rc=0；6) node tools/verify_cards.mjs 253/253 全绿 rc=0；7) python3 tools/verify_outbound.py 70/70 全绿 rc=0；8) python3 tools/verify_download_governance.py DG-1..6 全绿 rc=0；9) python3 tools/verify_secret_patterns.py 0 命中 rc=0；10) python3 tools/verify_shouheng_ops.py 全绿 rc=0。",
+  "状态依据": "1) 飞书应用 Guard（cli_aa600ebeed38dccf）长连接已由 launchd（com.shouheng.lark）常驻运行，verify_shouheng_ops.py 退出码 0（全绿）；2) 群聊『守衡-交接』（oc_85e6a8fdb19d584ed68fcb12fbcf4eb5）可达性、群成员解析、长连接事件派发均已实测通过；3) 多载体审核与工作台建案端到端实测通过（17/17 项自证 + 全部关联门禁 0 红）。"
+}
