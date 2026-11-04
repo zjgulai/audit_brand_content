@@ -27,6 +27,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { plainifyCard } from '../agent/plain.mjs';
 
 /* ═══════════════════════════ 实测常量 ═══════════════════════════ */
 
@@ -52,19 +53,30 @@ export const REMOVED_IN_V2 = {
   image: 'V2 移除了 image。同上。',
 };
 
-/** 卡片头部配色 → 语义。颜色不是装饰，是「这条要不要停下看」的信号。 */
+/**
+ * 卡片头部配色 → 语义。颜色不是装饰，是「这条要不要停下看」的信号。
+ *
+ * 10 类 10 个互不相同的色（回执卡使用 Momcozy 暖粉系的 carmine + carmine-50 通栏底色）：
+ */
 export const TONE = {
   'query-answer': 'blue',        // 常规问答，可以略过
-  'correction': 'red',           // 我说错了，必须看
+  'data-table': 'turquoise',     // 数据表 —— 与 query-answer 区分，避免撞色
+  'correction': 'orange',        // 我说错了，必须看
   'capability-boundary': 'grey', // 能力边界，存档性质
-  'find-nothing': 'orange',      // 没找到，需要你补信息
+  'find-nothing': 'yellow',      // 没找到，需要你补信息
   'cannot-read': 'wathet',       // 输入我读不了
-  'receipt': 'grey',             // 只确认收到
+  'receipt': 'carmine',          // 只确认收到 —— 淡暗粉（Momcozy 品牌色族）
   'turn-diff': 'violet',         // 同一问题的两次回答不一样
   'evidence': 'green',           // 证据陈列
-  'alert': 'carmine',            // 我这侧坏了
+  'alert': 'red',                // 我这侧坏了
   'decision': 'purple',          // 要你做决定
 };
+
+/** 元素级 `background_style` 的闭集白名单（validateCard 强制校验） */
+export const BACKGROUND_STYLES = new Set([
+  'grey',       // 注脚/字段排的既有底色（探针 8/10 通过）
+  'carmine-50', // 回执卡的淡暗粉底 —— 与 TONE.receipt 同族
+]);
 
 /** 结论行的长度上限（字符）。超过说明结论没提炼出来，退化成正文了。 */
 export const VERDICT_MAX = 60;
@@ -135,12 +147,60 @@ export function columns(cols, opts = {}) {
   };
 }
 
+/** 「字段对象」里哪个键算标签、哪个算值 —— 唯一真源（兼容模型写 {name,value} 或 {label,note}） */
+export const LABEL_KEYS = ['label', 'name', 'title', 'key'];
+export const VALUE_KEYS = ['value', 'note', 'content', 'text'];
+
+export const flat1 = (v) => {
+  if (Array.isArray(v)) return v.map(flat1).filter(Boolean).join('\n');
+  if (v && typeof v === 'object') {
+    const kv = (k, val) => {
+      const txt = flat1(val).trim();
+      return txt ? `${k}：${txt}` : '';
+    };
+    if ('title' in v && 'content' in v) return `【${flat1(v.title)}】${flat1(v.content)}`;
+    const lk = LABEL_KEYS.find((k) => k in v && flat1(v[k]).trim());
+    if (lk) {
+      const rest = Object.entries(v).filter(([k]) => k !== lk);
+      const other = VALUE_KEYS.map((k) => rest.find(([r]) => r === k)).find(Boolean) ?? rest[0];
+      return other ? kv(flat1(v[lk]), other[1]) : flat1(v[lk]);
+    }
+    return Object.entries(v).map(([k, vv]) => kv(k, vv)).filter(Boolean).join('；');
+  }
+  return v === undefined || v === null ? '' : String(v);
+};
+
+export function fieldPair(v) {
+  if (v === null || v === undefined) return { label: '', value: '' };
+  if (typeof v !== 'object' || Array.isArray(v)) return { label: '', value: flat1(v).trim() };
+  const lk = LABEL_KEYS.find((k) => k in v && flat1(v[k]).trim());
+  if (!lk) return { label: '', value: flat1(v).trim() };
+  const rest = Object.entries(v).filter(([k]) => k !== lk);
+  const other = VALUE_KEYS.map((k) => rest.find(([r]) => r === k)).find(Boolean) ?? rest[0];
+  return { label: flat1(v[lk]).trim(), value: other ? flat1(other[1]).trim() : '' };
+}
+
 /** 一格字段排（用于边界声明：一行放 3–4 个短字段，而不是三句解释） */
 export function fieldRow(fields, opts = {}) {
   return columns(
-    fields.map((f) => ({ content: `**${f.label}**\n${f.value}` })),
+    fields.map((f) => {
+      const { label, value } = fieldPair(f);
+      return { content: label ? `**${label}**\n${flat1(value).trim() || '（未填）'}` : (flat1(value).trim() || '（未填）') };
+    }),
     { backgroundStyle: 'grey', horizontalSpacing: '8px', ...opts },
   );
+}
+
+/** 通栏色带 —— 把若干个元素放进一条带底色的整宽栏里（如回执卡的 carmine-50 底色） */
+export function band(elements, style) {
+  const els = (Array.isArray(elements) ? elements : [elements])
+    .map((e) => (typeof e === 'string' ? md(e) : e));
+  return {
+    tag: 'column_set',
+    flex_mode: 'none',
+    ...(style ? { background_style: style } : {}),
+    columns: [{ tag: 'column', width: 'weighted', weight: 1, elements: els }],
+  };
 }
 
 /** 折叠面板（探针 5/7 通过）。长证据默认收起——这是「中位数 791 字」的直接解法。 */
@@ -176,7 +236,7 @@ export function button(label, value = {}, type = 'default') {
  * 而不是静默省略（静默省略正是那条「等于没答」的 434 字回复的成因）。
  */
 const NA = '（未填）';
-const s = (v) => (v === undefined || v === null || v === '' ? NA : String(v));
+const s = (v) => flat1(v).trim() || NA;
 
 const card = (template, title, subtitle, elements) => ({
   schema: '2.0',
@@ -190,7 +250,10 @@ export function queryAnswer(d = {}) {
   const els = [md(s(d.verdict))];
   if (d.reasoning) els.push(md(s(d.reasoning)));
   if (d.fields?.length) els.push(fieldRow(d.fields));
-  if (d.evidence?.length) els.push(collapsible(`证据 · ${d.evidence.length} 条`, [s(d.evidence.join('\n'))]));
+  if (d.evidence?.length) {
+    const evArr = Array.isArray(d.evidence) ? d.evidence : [d.evidence];
+    els.push(collapsible(`证据 · ${evArr.length} 条`, [s(evArr.join('\n'))]));
+  }
   if (d.boundary) els.push(hr(), md(`*${s(d.boundary)}*`));
   return card(TONE['query-answer'], s(d.title ?? d.verdict), d.subtitle, els);
 }
@@ -203,7 +266,7 @@ export function dataTable(d = {}) {
   else els.push(md(`*（没有可列的行 —— 这次查询返回 0 条，不是我没画）*`));
   if (d.note) els.push(md(s(d.note)));
   if (d.fields?.length) els.push(fieldRow(d.fields));
-  return card(TONE['query-answer'], s(d.title), d.subtitle, els);
+  return card(TONE['data-table'], s(d.title), d.subtitle, els);
 }
 
 /** 03 更正 · 我说错了，第一行就是错在哪 */
@@ -219,9 +282,9 @@ export function correction(d = {}) {
 export function capabilityBoundary(d = {}) {
   const els = [md(s(d.verdict ?? '按「能做 / 受限 / 做不到」三栏给，不解释原因。'))];
   const cols = [];
-  if (d.can?.length) cols.push({ content: `**能做**\n${d.can.map((x) => `- ${x}`).join('\n')}` });
-  if (d.limited?.length) cols.push({ content: `**受限**\n${d.limited.map((x) => `- ${x}`).join('\n')}` });
-  if (d.cannot?.length) cols.push({ content: `**做不到**\n${d.cannot.map((x) => `- ${x}`).join('\n')}` });
+  if (d.can?.length) cols.push({ content: `**能做**\n${d.can.map((x) => `- ${s(x)}`).join('\n')}` });
+  if (d.limited?.length) cols.push({ content: `**受限**\n${d.limited.map((x) => `- ${s(x)}`).join('\n')}` });
+  if (d.cannot?.length) cols.push({ content: `**做不到**\n${d.cannot.map((x) => `- ${s(x)}`).join('\n')}` });
   if (cols.length) els.push(columns(cols));
   if (d.evidence) els.push(collapsible('依据', [s(d.evidence)]));
   if (d.boundary) els.push(hr(), md(`*${s(d.boundary)}*`));
@@ -257,10 +320,10 @@ export function cannotRead(d = {}) {
   return card(TONE['cannot-read'], s(d.title ?? '这条我读不了'), d.subtitle, els);
 }
 
-/** 07 回执 · 只确认，不解释。越短越好 */
+/** 07 回执 · 只确认，不解释。越短越好（carmine 表头 + carmine-50 淡暗粉色带） */
 export function receipt(d = {}) {
-  const els = [md(s(d.verdict ?? '收到了。'))];
-  if (d.fields?.length) els.push(fieldRow(d.fields));
+  const els = [band([md(s(d.verdict ?? '收到了。'))], 'carmine-50')];
+  if (d.fields?.length) els.push(fieldRow(d.fields, { backgroundStyle: 'carmine-50' }));
   if (d.note) els.push(md(s(d.note)));
   return card(TONE['receipt'], s(d.title ?? '已收到'), d.subtitle, els);
 }
@@ -277,17 +340,23 @@ export function turnDiff(d = {}) {
   return card(TONE['turn-diff'], s(d.title ?? '跟上一次答得不一样'), d.subtitle, els);
 }
 
-/** 09 证据 · 结论很短，证据很长 —— 默认收起 */
+/** 09 证据 · 结论很短，证据很长 —— 默认收起（支持四维审查 v2：信号灯表头 + 原生区域表格 + 免责贴条） */
 export function evidence(d = {}) {
   const els = [];
   if (d.verdict) els.push(md(s(d.verdict)));
-  const groups = d.groups?.length ? d.groups : [{ title: '证据', content: s(d.content) }];
+  if (d.reasoning) els.push(md(s(d.reasoning)));
+  if (d.columns?.length && d.rows?.length) els.push(table(d.columns, d.rows));
+  if (d.snippet) els.push(band([md(`【可直接复制给设计的合规免责贴条】\n${String(d.snippet).trim()}`)], 'grey'));
+  const _c = s(d.content).replace(/[（(]\s*未填\s*[）)]/g, '').trim();
+  const groups = d.groups?.length ? d.groups : (_c ? [{ title: '证据', content: s(d.content) }] : []);
   for (const g of groups) {
-    els.push(collapsible(`${g.title} · ${g.count ?? ''}`.trim(), [s(g.content)], g.expanded ?? false));
+    const hasCount = g.count !== undefined && g.count !== null && g.count !== '' && g.count !== 0;
+    els.push(collapsible(hasCount ? `${g.title} · ${g.count}` : String(g.title ?? ''), [s(g.content)], g.expanded ?? false));
   }
   if (d.fields?.length) els.push(fieldRow(d.fields));
-  if (d.boundary) els.push(hr(), md(`*${s(d.boundary)}*`));
-  return card(TONE['evidence'], s(d.title ?? '证据'), d.subtitle, els);
+  if (d.boundary) els.push(hr(), md(s(d.boundary)));
+  const tpl = d.tone && TEMPLATES.includes(d.tone) ? d.tone : TONE['evidence'];
+  return card(tpl, s(d.title ?? '证据'), d.subtitle, els);
 }
 
 /** 10 告警 · 我这侧坏了。绝不允许把内部记录当内容发出去 */
@@ -361,6 +430,10 @@ export function validateCard(c) {
       if (REMOVED_IN_V2[tag]) { E(`${q}.tag`, `V2 已移除该元素：${REMOVED_IN_V2[tag]}`); return; }
       if (!ALLOWED_TAGS.has(tag)) { E(`${q}.tag`, `不在实测白名单里：${tag}。白名单：${[...ALLOWED_TAGS].join(', ')}`); return; }
 
+      if (el.background_style !== undefined && !BACKGROUND_STYLES.has(el.background_style)) {
+        E(`${q}.background_style`, `未登记的底色 ${JSON.stringify(el.background_style)}；闭集：${[...BACKGROUND_STYLES].join(', ')}`);
+      }
+
       if (tag === 'markdown' && typeof el.content !== 'string') E(`${q}.content`, 'markdown 的 content 必须是字符串');
       if (tag === 'collapsible_panel') {
         if (!el.header?.title?.content) E(`${q}.header.title`, '折叠面板缺标题');
@@ -399,11 +472,11 @@ export function validateCard(c) {
   return { ok: errors.length === 0, errors, warnings };
 }
 
-/** 构建 + 校验，一步到位。校验不过直接抛，别把坏卡发出去。 */
+/** 构建 + 校验，一步到位。校验不过直接抛，别把坏卡发出去；出口统一由 plainifyCard 剥净未渲染 Markdown 符号。 */
 export function build(kind, data) {
   const fn = BUILDERS[kind];
   if (!fn) throw new Error(`未知卡片类型：${kind}；可选：${Object.keys(BUILDERS).join(', ')}`);
-  const c = fn(data);
+  const c = plainifyCard(fn(data));
   const v = validateCard(c);
   if (!v.ok) {
     const msg = v.errors.map((e) => `  ${e.path}: ${e.msg}`).join('\n');

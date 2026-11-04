@@ -12,8 +12,9 @@
  * 因此它不会腐烂 —— 改代码不改这里，自证会红。
  */
 import {
-  BUILDERS, BUILDER_SOURCE_NAME, build, validateCard, collapsible,
+  BUILDERS, BUILDER_SOURCE_NAME, build, validateCard, collapsible, band, flat1,
   VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, ALLOWED_TAGS, TEMPLATES, TONE, REMOVED_IN_V2,
+  BACKGROUND_STYLES,
 } from './cards.mjs';
 
 /* ═══════════════════ ① 内容级约束（去 AI 味，机械可查） ═══════════════════ */
@@ -119,6 +120,10 @@ export const COPY_RULES = [
       for (const m of s.matchAll(/([a-z][a-z0-9_]{4,})\s*[、,，]\s*\1\s*[、,，]\s*\1/g)) n += 1;
       // 连续两个「像工具名的东西 + 括号」也可能是 trace
       n += (s.match(/([a-z][a-z0-9_]{4,})\((\d+ms)?\)[^\n]{0,40}\1\(/g) ?? []).length;
+      // 思考模式把工具调用语法 <｜DSML｜ invoke> 当成正文吐出来
+      n += (s.match(/<[｜|]{1,2}\s*DSML\s*[｜|]{1,2}/g) ?? []).length;
+      // 第一人称工具自述（「不在我的工具里」等）
+      n += (s.match(/(我的工具|我这边.{0,6}工具|不在我的工具|我没有那个工具|没有这个工具|我的能力范围之外)/g) ?? []).length;
       return n ? Math.min(n, 9) : 0;
     },
   },
@@ -497,9 +502,9 @@ export function sampleCards() {
 }
 
 export {
-  build, validateCard, BUILDERS, BUILDER_SOURCE_NAME, collapsible,
+  build, validateCard, BUILDERS, BUILDER_SOURCE_NAME, collapsible, band, flat1,
   // 这三个上限以前只定义、不导出、不引用（grep 全仓库只有定义行）。
   // envelope.mjs 是它们现在唯一的执行点，所以必须从这里转出去。
   VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS,
-  ALLOWED_TAGS, TEMPLATES, TONE, REMOVED_IN_V2,
+  ALLOWED_TAGS, TEMPLATES, TONE, REMOVED_IN_V2, BACKGROUND_STYLES,
 };

@@ -15,8 +15,8 @@
  *   （当时 11 个工具全是 scope:'read'），但它听起来像「飞书没给权限」，
  *   于是委托方去查控制台。真正该放开的东西一直在这张表里，不在飞书那侧。
  *
- *   ⚠️ `scope` 这个字段**只是标注，不是闸门** —— 它被 `toolNames()` 拼进
- *   系统提示的工具横幅给模型看，全仓没有任何一行拿它做准入判断。
+ *   ⚠️ `scope` 这个字段**只是标注，不是闸门** —— 全仓没有任何一行拿它做准入判断，
+ *   它也**没有**进系统提示词（persona 的工具说明是手写段落，不消费 toolNames()）。
  *   真正的执行点在 lark_write.mjs 的三条纪律：**留痕 / 回读 / 删除前快照**
  *   （每条在 lark_write.test.mjs 里都有能红的断言）。
  *   别把 `scope: 'write'` 当成「挡得住」—— 它挡不住任何东西。
@@ -24,18 +24,44 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { config, REPO_ROOT } from './config.mjs';
 import { beijingDateTime } from './timefmt.mjs';
 import * as feishu from './feishu.mjs';
 import * as lw from './lark_write.mjs';
 import * as judgeEvidence from './judge_evidence.mjs';
+import { buildGuardVerdict, setPendingTurnVerdict } from './prd53.mjs';
 
 const execFileP = promisify(execFile);
 
-/** 运行期上下文：由 agent 在处理每条消息时注入，工具通过它感知「现在在哪个群、谁在说话」 */
-export const runtimeContext = { chatId: null, chatType: null, senderName: null, senderOpenId: null, messageId: null };
+/**
+ * P0-b：运行期上下文使用 AsyncLocalStorage 按会话异步链路隔离，彻底消除多群并发时的串台；
+ * 同时通过 Proxy 兼容单测在无异步上下文时直接读写 runtimeContext.chatId。
+ */
+const _defaultContext = { chatId: null, chatType: null, senderName: null, senderOpenId: null, messageId: null };
+export const contextStorage = new AsyncLocalStorage();
+
+export function runWithContext(ctx, fn) {
+  return contextStorage.run({ ..._defaultContext, ...ctx }, fn);
+}
+
+export const runtimeContext = new Proxy(_defaultContext, {
+  get(target, prop) {
+    const store = contextStorage.getStore();
+    return store ? store[prop] : target[prop];
+  },
+  set(target, prop, value) {
+    const store = contextStorage.getStore();
+    if (store) {
+      store[prop] = value;
+      return true;
+    }
+    target[prop] = value;
+    return true;
+  },
+});
 
 const defs = [];
 const register = (name, def) => defs.push({ name, ...def });
@@ -283,6 +309,7 @@ register('list_files', {
 
 const SEARCH_SKIP_DIRS = new Set([
   'node_modules', '.git', '.ua', '.vendor', 'dist', 'build', 'skills', '__pycache__',
+  '_evidence', '_chromeprof_cdp', '_chromeprof', '_cfprof_headful', '_cfprof_fetch', '_cfprof_headless=new', '_tools',
 ]);
 const SEARCH_TEXT_EXT = new Set([
   '.md', '.json', '.jsonl', '.mjs', '.js', '.ts', '.py', '.sh', '.txt',
@@ -581,11 +608,51 @@ register('run_readonly_command', {
 
     // ★ 测试缝：超时那条路必须能被真跑一遍，否则它只是「构造上应该对」。
     //   生产不设这个环境变量，就是 15 秒。
+    // ★ P1-2：改用 detached 独立进程组 + kill(-pid) 强杀整棵进程树，防止孙进程抱住 stdout 拖死 975 秒。
     const budget = Number(process.env.SHOUHENG_RO_TIMEOUT_MS) > 0
       ? Number(process.env.SHOUHENG_RO_TIMEOUT_MS) : 15_000;
     try {
-      const { stdout, stderr } = await execFileP('bash', ['-lc', cmd],
-        { cwd: REPO_ROOT, timeout: budget, maxBuffer: 1 << 20 });
+      const { stdout, stderr } = await new Promise((resolve, reject) => {
+        const child = spawn('bash', ['-lc', cmd], { cwd: REPO_ROOT, detached: true });
+        let out = '';
+        let err = '';
+        let killed = false;
+        let overflow = false;
+        const MAX_BUF = 1 << 20;
+        const killGroup = () => {
+          try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+          try { child.kill('SIGKILL'); } catch {}
+          try { child.stdout?.destroy(); child.stderr?.destroy(); } catch {}
+        };
+        const timer = setTimeout(() => {
+          killed = true;
+          killGroup();
+          reject(Object.assign(new Error(`Timeout after ${budget}ms`), { killed: true, stdout: out, stderr: err }));
+        }, budget);
+        child.stdout?.on('data', (chunk) => {
+          out += chunk.toString('utf8');
+          if (out.length > MAX_BUF) {
+            overflow = true;
+            clearTimeout(timer);
+            killGroup();
+            reject(Object.assign(new Error('maxBuffer exceeded'), {
+              code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER', stdout: out, stderr: err,
+            }));
+          }
+        });
+        child.stderr?.on('data', (chunk) => {
+          if (err.length < MAX_BUF) err += chunk.toString('utf8');
+        });
+        child.on('error', (e) => { clearTimeout(timer); reject(e); });
+        child.on('close', (code, sig) => {
+          clearTimeout(timer);
+          if (killed || overflow) return;
+          if (code === 0) resolve({ stdout: out, stderr: err });
+          else reject(Object.assign(new Error(`Command exited with code ${code}`), {
+            code, signal: sig, stdout: out, stderr: err,
+          }));
+        });
+      });
       return { command: cmd, status: 'ok', stdout: stdout.slice(0, 8000), stderr: stderr.slice(0, 2000) };
     } catch (e) {
       // 超时被 SIGTERM 杀掉 / 输出超过 maxBuffer —— 两种都**没有**完整输出
@@ -608,9 +675,9 @@ register('run_readonly_command', {
   },
 });
 
-/* ─────────────────────────── 内容合规判定（只读工具之一）─────────────────────────── */
+/* ─────────────────────────── 内容合规判定（生产聚合审查 + 工作台建案）─────────────────────────── */
 
-const JUDGE_PY = path.join(REPO_ROOT, 'research', 'governance', 'skeleton', 'judge.py');
+const JUDGE_PY = path.join(REPO_ROOT, 'base', 'feishu_guard_ingest.py');
 
 /**
  * 证据链这一步**自己抛异常**时的返回（2026-10-21 接线时加）。
@@ -674,12 +741,27 @@ register('judge_copy', {
         'found / none / probe_empty / partial / untested / disabled。' +
         '必须原样转述 `status` 与 `notice`：untested / partial / disabled 是「**没查成**」，' +
         '**不是**「库里没有」；只有 status=none 且 basis=engine_matched 才允许说知识库查不到。' +
-        '「找不到证据」与「证据为空」在这份返回里长得不一样，不要合并成一句。',
+        '「找不到证据」与「证据为空」在这份返回里长得不一样，不要合并成一句。\n' +
+        '★ 每次调用同步在内容审核工作台建案入账：返回工作台案件号 `case_id`（形如 case-xxx）、' +
+        '五标签 `label`（BLOCK/REVIEW/PASS/待自决/未审查）、处置层 `layer`（DP0–DP4）、' +
+        '`release_status`（恒为「待放行」）、`product_line_resolution` 与 `stage_resolution`。' +
+        '回复时必须把 `case_id`、`label`、`layer`、`release_status` 报给对方；' +
+        '若 `product_line_resolution.status !== "declared"`，必须在边界栏写明其 `note`（如自动识别或默认吸奶器建案）；' +
+        '严禁输出「已通过」「无需处理」「审批完成」等替人过门的词汇。',
       parameters: {
         type: 'object',
         properties: {
-          text: { type: 'string', description: '要判定的文案原文（Primary Text 与 Headline 拼起来即可）。必须逐字传入，不要改写或翻译。' },
-          product_line: { type: 'string', description: '品线，例如「吸奶器」。注意：当前规则库没有品线字段，它只进回执，不改变判定。' },
+          text: { type: 'string', description: '要判定的文案原文（Primary Text 与 Headline 拼起来即可，或飞书文档链接/商品 JSON）。必须逐字传入，不要改写或翻译。' },
+          carrier: {
+            type: 'string',
+            enum: ['free_text', 'ad_text', 'structured_json', 'feishu_doc', 'landing_url'],
+            description: '输入载体类型：默认 free_text；广告双字段用 ad_text；Shopify 商品 JSON 用 structured_json；飞书云文档链接用 feishu_doc；落地页链接用 landing_url。',
+          },
+          product_line: { type: 'string', description: '品线（五选一：吸奶器 / 婴儿车 / 背带 / 温奶器 / 哺乳内衣）。未提供时自动按内容关键词识别，仍无法识别时回落默认「吸奶器」并在 product_line_resolution 中标注。' },
+          content_stage: { type: 'string', enum: ['brief', 'final_content'], description: '内容阶段：brief（提纲/初稿）或 final_content（成稿）。未提供时自动推断或按从严口径 final_content 建案。' },
+          url: { type: 'string', description: '落地页 URL 或飞书文档链接（配合 landing_url 或 feishu_doc）。' },
+          doc_token: { type: 'string', description: '飞书云文档 token 或完整链接（配合 feishu_doc）。' },
+          fields: { type: 'object', description: '结构化字段对象（ad_text 传 {"Primary Text":..., "Headline":...}；structured_json 传 {"title":..., "description_text":...}）。' },
           locale: { type: 'string', description: '文案语种代码，例如 en / zh / de / fr / es。非 en/zh 时工具会在边界声明里提示词表覆盖不均。' },
           platform: { type: 'string', description: '投放平台，例如 Meta / TikTok。' },
           ad_id: { type: 'string', description: '外部广告 ID（如果是在审某条已有记录）。' },
@@ -688,9 +770,9 @@ register('judge_copy', {
       },
     },
   },
-  run: async ({ text, product_line, locale, platform, ad_id } = {}) => {
+  run: async ({ text, carrier, product_line, content_stage, url, doc_token, fields, locale, platform, ad_id } = {}) => {
     const body = String(text ?? '');
-    if (!body.trim()) return { error: '文案为空，无法判定' };
+    if (!body.trim() && !url && !doc_token && !fields) return { error: '文案为空，无法判定' };
     const tmp = path.join(
       os.tmpdir(),
       `judge-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
@@ -701,10 +783,18 @@ register('judge_copy', {
       fs.writeFileSync(tmp, body, 'utf8');
       const args = [JUDGE_PY, '--text-file', tmp, '--json', '--brief', '--receipt',
                     '--origin', 'shouheng'];
-      if (product_line) args.push('--product-line', String(product_line));
-      if (locale)       args.push('--locale', String(locale));
-      if (platform)     args.push('--platform', String(platform));
-      if (ad_id)        args.push('--ad-id', String(ad_id));
+      if (carrier)       args.push('--carrier', String(carrier));
+      if (product_line)  args.push('--product-line', String(product_line));
+      if (content_stage) args.push('--content-stage', String(content_stage));
+      if (url)           args.push('--url', String(url));
+      if (doc_token)     args.push('--doc-token', String(doc_token));
+      if (fields && typeof fields === 'object') args.push('--fields-json', JSON.stringify(fields));
+      if (locale)        args.push('--locale', String(locale));
+      if (platform)      args.push('--platform', String(platform));
+      if (ad_id)         args.push('--ad-id', String(ad_id));
+      if (runtimeContext.messageId)    args.push('--message-id', String(runtimeContext.messageId));
+      if (runtimeContext.senderOpenId) args.push('--sender-open-id', String(runtimeContext.senderOpenId));
+      if (runtimeContext.chatId)       args.push('--chat-id', String(runtimeContext.chatId));
       const { stdout } = await execFileP('python3', args, {
         cwd: REPO_ROOT, timeout: 30_000, maxBuffer: 1 << 24,
       });
@@ -718,9 +808,22 @@ register('judge_copy', {
       //   判定先算完；证据是**附加**的，取不到不能推翻判定，但必须在返回里说清楚是哪种「取不到」。
       let evidenceChain;
       try {
-        evidenceChain = await judgeEvidence.gatherEvidence(body, r, { enabled: config.kb.enabled });
+        const queryText = body.trim()
+          || (Array.isArray(r?.findings) ? r.findings.map((f) => f?.quote || '').filter(Boolean).join(' ') : '');
+        evidenceChain = await judgeEvidence.gatherEvidence(queryText || body, r, { enabled: config.kb.enabled });
       } catch (e) {
         evidenceChain = evidenceChainFailed(e);
+      }
+      if (r?.case_id && r?.label) {
+        const gv = buildGuardVerdict({
+          label: r.label,
+          layer: r.layer,
+          caseId: r.case_id,
+          findings: r.findings,
+          factCandidates: r.fact_candidates,
+        });
+        r.prd53_verdict = gv;
+        setPendingTurnVerdict(gv);
       }
       return { ...r, evidence_chain: evidenceChain };
     } catch (e) {
@@ -735,6 +838,52 @@ register('judge_copy', {
       };
     } finally {
       try { fs.unlinkSync(tmp); } catch { /* 临时文件清理失败不该影响判定结果 */ }
+    }
+  },
+});
+
+register('workbench_case_status', {
+  scope: 'read',
+  schema: {
+    type: 'function',
+    function: {
+      name: 'workbench_case_status',
+      description:
+        '查询内容审核工作台（ProjectionStore）中的案件状态、复核人、五标签结论、放行状态，或列出最近的案件队列。\n' +
+        '什么时候用：有人在群里问「case-xxx 审完了吗 / 现在什么状态 / 谁在复核」，或「列出最近待复核的单子 / 吸奶器品线的案件」。\n' +
+        '只读操作，不修改任何案件状态。',
+      parameters: {
+        type: 'object',
+        properties: {
+          case_id: { type: 'string', description: '要查的具体工作台案件编号，形如 case-4a5c13b861889db1ead3。不传则按过滤条件列出最近案件队列。' },
+          status_filter: { type: 'string', description: '可选状态过滤：unassigned（待领单）/ claimed（复核中）/ reviewed（已复核）/ released（已签发）/ closed（已结案）。' },
+          product_line: { type: 'string', description: '可选品线过滤（吸奶器 / 婴儿车 / 背带 / 温奶器 / 哺乳内衣）。' },
+          limit: { type: 'integer', description: '列表模式最多返回条数，默认 10，上限 50。' },
+        },
+        required: [],
+      },
+    },
+  },
+  run: async ({ case_id, status_filter, product_line, limit = 10 } = {}) => {
+    const args = [JUDGE_PY];
+    if (case_id && String(case_id).trim()) {
+      args.push('--query-case', String(case_id).trim());
+    } else {
+      args.push('--list-cases', '--limit', String(Math.max(1, Math.min(50, Number(limit) || 10))));
+      if (status_filter) args.push('--status-filter', String(status_filter).trim());
+      if (product_line)  args.push('--product-line', String(product_line).trim());
+    }
+    try {
+      const { stdout } = await execFileP('python3', args, {
+        cwd: REPO_ROOT, timeout: 15_000, maxBuffer: 1 << 22,
+      });
+      return JSON.parse(stdout);
+    } catch (e) {
+      return {
+        ok: false,
+        error: `工作台案件查询失败：${e?.message ?? e}`,
+        stderr: String(e?.stderr ?? '').slice(0, 1000),
+      };
     }
   },
 });

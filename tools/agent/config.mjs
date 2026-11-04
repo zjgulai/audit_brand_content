@@ -97,19 +97,45 @@ function loadLarkCred() {
   return { appId: j.app_id, appSecret: j.app_secret };
 }
 
-function loadLlmKey() {
-  return process.env.DEEPSEEK_API_KEY
-      || readDshCredential('DEEPSEEK_API_KEY')
-      || (() => { throw new Error('未找到 DEEPSEEK_API_KEY（环境变量与 DSH 凭据库均无）'); })();
+function loadLlmCred() {
+  const vodKey = process.env.VOD_API_KEY || readDshCredential('VOD_API_KEY');
+  if (vodKey) {
+    if (!process.env.MULTIMODAL_VOD_BASE_URL) {
+      process.env.MULTIMODAL_VOD_BASE_URL = 'https://mmu.vod-qcloud.com/v1';
+    }
+    if (!process.env.MULTIMODAL_VOD_API_TOKEN) {
+      process.env.MULTIMODAL_VOD_API_TOKEN = vodKey;
+    }
+    if (!process.env.MULTIMODAL_MODEL) {
+      process.env.MULTIMODAL_MODEL = 'gemini-3.1-flash-lite';
+    }
+  }
+  if (vodKey && !process.env.SHOUHENG_LLM_BASE_URL) {
+    return {
+      apiKey: vodKey,
+      baseUrl: 'https://mmu.vod-qcloud.com/v1',
+      model: process.env.SHOUHENG_LLM_MODEL || 'gemini-3.1-flash-lite',
+    };
+  }
+  const dsKey = process.env.DEEPSEEK_API_KEY
+    || readDshCredential('DEEPSEEK_API_KEY')
+    || vodKey
+    || (() => { throw new Error('未找到 VOD_API_KEY 或 DEEPSEEK_API_KEY（环境变量与 DSH 凭据库均无）'); })();
+  return {
+    apiKey: dsKey,
+    baseUrl: process.env.SHOUHENG_LLM_BASE_URL || 'https://api.deepseek.com',
+    model: process.env.SHOUHENG_LLM_MODEL || 'deepseek-flash',
+  };
 }
+
+const _llmCred = loadLlmCred();
 
 export const config = {
   lark: loadLarkCred(),
   llm: {
-    apiKey: loadLlmKey(),
-    baseUrl: process.env.SHOUHENG_LLM_BASE_URL || 'https://api.deepseek.com',
-    // deepseek-flash：快且便宜，适合群聊高频对话；复杂任务可切 deepseek-v4-pro
-    model: process.env.SHOUHENG_LLM_MODEL || 'deepseek-flash',
+    apiKey: _llmCred.apiKey,
+    baseUrl: _llmCred.baseUrl,
+    model: _llmCred.model,
     /** 单会话保留的最大历史轮数（超出后由记忆层压缩） */
     maxTurns: Number(process.env.SHOUHENG_MAX_TURNS || 24),
     /**

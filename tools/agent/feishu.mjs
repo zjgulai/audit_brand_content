@@ -13,8 +13,11 @@ import { config, attachmentDir } from './config.mjs';
 import { appendLifecycle } from './attachment_lifecycle.mjs';
 import {
   runImageJudgment, summarizeImageJudgment, compactJudgment,
+  runVideoJudgment, summarizeVideoJudgment,
 } from './image_judgment.mjs';
 import { beijingString } from './timefmt.mjs';
+import { plainifyForSend } from './plain.mjs';
+import { buildGuardVerdict, setPendingTurnVerdict } from './prd53.mjs';
 
 export const client = new Lark.Client({
   appId: config.lark.appId,
@@ -27,9 +30,19 @@ export const client = new Lark.Client({
   // 守衡自己的日志走 ws_daemon 的 log()，不依赖 SDK 这一行。
   loggerLevel: Lark.LoggerLevel.warn,
 });
+// P0-c：为飞书 SDK 底层 axios 实例设置 30 秒硬超时，防止飞书接口挂起导致会话锁永久死锁
+if (client?.httpInstance?.defaults) {
+  client.httpInstance.defaults.timeout = 30_000;
+}
 
 /** 机器人显示名（名字匹配用）。集中定义，避免多处硬编码写成不一致的字面量 */
 export const BOT_NAME = '守衡';
+export const BOT_NAMES = new Set(['守衡', 'Guard']);
+export const BOT_OPEN_IDS = new Set([
+  config.lark.appId,
+  'ou_c5c35c6322ac7b763fb62354aa4f3eb6', // Guard (cli_aa600ebeed38dccf)
+  'ou_8a19f4dc43e9e93b93220e646a9cb7dd', // 守衡 (cli_aa2243de0438dcd7)
+]);
 
 /* ─────────────────────────── mention 还原 ─────────────────────────── */
 
@@ -54,7 +67,7 @@ export function resolveMentions(text, mentions = []) {
       openId, unionId, userId,
       // 三者都没有时留原始值，便于排查而不是丢信息
       rawId:  openId || unionId || userId || (typeof idRaw === 'string' ? idRaw : JSON.stringify(idRaw ?? null)),
-      isBot:  openId === config.lark.appId || m.name === BOT_NAME,
+      isBot:  BOT_OPEN_IDS.has(openId) || BOT_NAMES.has(m.name),
       tenantKey: m.tenant_key,
     };
   });
@@ -179,6 +192,7 @@ export function postToPlain(contentJson) {
   const blocks = Array.isArray(d?.content) ? d.content : (Array.isArray(d?.content_v2) ? d.content_v2 : null);
   if (!blocks) return null;
   const lines = [];
+  if (typeof d?.title === 'string' && d.title.trim()) lines.push(d.title.trim());
   for (const para of blocks) {
     if (!Array.isArray(para)) continue;
     lines.push(para.map((n) => {
@@ -191,6 +205,37 @@ export function postToPlain(contentJson) {
     }).join(''));
   }
   return lines.join('\n');
+}
+
+/**
+ * 从 post（富文本）消息的段落节点中提取全部内嵌图片 image_key（组图 / A+ 页 / 轮播图场景，去重，上限 6 张）。
+ */
+export function extractPostImageKeys(contentJson, { maxImages = 6 } = {}) {
+  let d;
+  try { d = JSON.parse(contentJson ?? '{}'); } catch { return []; }
+  const blocks = Array.isArray(d?.content) ? d.content : (Array.isArray(d?.content_v2) ? d.content_v2 : null);
+  if (!blocks) return [];
+  const out = [];
+  const seen = new Set();
+  for (const para of blocks) {
+    if (!Array.isArray(para)) continue;
+    for (const n of para) {
+      if (n?.tag === 'img' && typeof n.image_key === 'string' && n.image_key.trim()
+          && !seen.has(n.image_key.trim())) {
+        seen.add(n.image_key.trim());
+        out.push(n.image_key.trim());
+        if (out.length >= maxImages) return out;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 从 post（富文本）消息的段落节点中提取内嵌图片的 image_key（例如「@Guard + 贴图 + 审核」混排发送）。
+ */
+export function extractPostImageKey(contentJson) {
+  return extractPostImageKeys(contentJson)[0] ?? null;
 }
 
 /**
@@ -308,6 +353,8 @@ const TEXT_ATTACHMENT_EXT = new Set([
 export const MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
 /** 图片走 OCR + 判定，体积上限比文本宽；仍远低于飞书 100MB。 */
 export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+/** 视频走多模态画面与音画对齐审查，体积上限 50MB。 */
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 /** 单次最多拼进上下文的字符数。超了必须**说出来**，不许静默截断。 */
 export const MAX_ATTACHMENT_CHARS = 40_000;
 
@@ -385,11 +432,12 @@ export async function downloadMessageResource({
  */
 export async function ingestAttachment(msg, {
   maxBytes = MAX_ATTACHMENT_BYTES, maxChars = MAX_ATTACHMENT_CHARS,
-  // ★ 测试注入点：默认走 base 的唯一图片判定入口；测试用桩证明它真的被调用。
+  // ★ 测试注入点：默认走 base 的唯一图片/视频判定入口；测试用桩证明它真的被调用。
   judgeImage = runImageJudgment,
+  judgeVideo = runVideoJudgment,
 } = {}) {
   const a = parseAttachment(msg);
-  const name = a.fileName || (a.type === 'image' ? '（图片）' : '（未命名附件）');
+  const name = a.fileName || (a.type === 'image' ? '（图片）' : (a.type === 'media' ? '（视频）' : '（未命名附件）'));
   const baseMeta = { name, type: a.type, size: null };
   const root = attachmentDir();
   let dir = null;
@@ -444,11 +492,12 @@ export async function ingestAttachment(msg, {
                   + '这是这条事件的内容问题，不是权限问题。' });
   }
   const isImage = a.type === 'image';
+  const isVideo = a.type === 'media';
   // ★ 图片侧**合成**的 failure_kind 只能落在 ContentUnit/ReviewIR 的合法域：
   //   fetch_error / parse_error / empty / unsupported。
   //   下载失败/超限 → fetch_error；空文件 → empty；入口/解析失败 → parse_error。
   //   自由值会让下游契约校验直接拒绝，且不会有人读得懂它属于哪一档。
-  if (!isImage && !isTextAttachment(a.fileName)) {
+  if (!isImage && !isVideo && !isTextAttachment(a.fileName)) {
     return finish('unsupported_type', { reason: 'attachment_type_unparsed', ...baseMeta,
              reply: `附件「${name}」我收到了，但这类文件的内容解析**这条链路还没接上**。`
                   + '这是能力边界，不是权限问题，也不是「不让下载」—— 下载是允许的。\n'
@@ -468,11 +517,11 @@ export async function ingestAttachment(msg, {
     try { fs.chmodSync(root, 0o700); } catch { /* 改不动权限时仍继续；DG-2 会报 */ }
     // mkdtemp 默认 0700；文件名不用用户给的名字（避免路径穿越），只保留扩展名。
     dir = fs.mkdtempSync(path.join(root, 'msg-'));
-    const effectiveMax = isImage ? MAX_IMAGE_BYTES : maxBytes;
+    const effectiveMax = isImage ? MAX_IMAGE_BYTES : (isVideo ? MAX_VIDEO_BYTES : maxBytes);
     // ★ 图片用中性后缀 `.img`：飞书附件没有可靠文件名/后缀，临时文件也不该
     //   冒充某个具体格式。base 的 image_file_row 已不按 suffix 拒绝，
     //   Vision 按**内容**解码；未知/坏字节会显式落 parse_error/未审查。
-    const ext = isImage ? '.img' : path.extname(a.fileName).toLowerCase();
+    const ext = isImage ? '.img' : (isVideo ? '.mp4' : path.extname(a.fileName).toLowerCase());
     const dest = path.join(dir, `attachment${ext}`);
     const got = await downloadMessageResource({
       messageId: msg.message_id, fileKey: a.fileKey, type: a.type, destPath: dest,
@@ -483,6 +532,13 @@ export async function ingestAttachment(msg, {
         const summary = `图片未审查（DP0）：文件超过读取上限（${got.size ?? '大小未知'} 字节），`
           + '没有下载/判定。这是未审查，不是「附件不支持」。';
         return finish('image_judge_failed', { reason: 'image_too_large', ...baseMeta,
+          size: got.size ?? null, parse_status: 'failed', failure_kind: 'fetch_error',
+          summary, reply: summary });
+      }
+      if (isVideo) {
+        const summary = `视频未审查（DP0）：文件超过读取上限（${got.size ?? '大小未知'} 字节），`
+          + '没有下载/判定。这是未审查，不是「附件不支持」。';
+        return finish('video_judge_failed', { reason: 'video_too_large', ...baseMeta,
           size: got.size ?? null, parse_status: 'failed', failure_kind: 'fetch_error',
           summary, reply: summary });
       }
@@ -498,6 +554,12 @@ export async function ingestAttachment(msg, {
         return finish('image_judge_failed', { reason: 'image_empty', ...baseMeta,
           parse_status: 'failed', failure_kind: 'empty', summary, reply: summary });
       }
+      if (isVideo) {
+        const summary = '视频未审查（DP0）：文件是空的（0 字节），没有进入判定。'
+          + '这是未审查，不是「附件不支持」。';
+        return finish('video_judge_failed', { reason: 'video_empty', ...baseMeta,
+          parse_status: 'failed', failure_kind: 'empty', summary, reply: summary });
+      }
       return finish('empty', { reason: 'attachment_empty', ...baseMeta,
                reply: `附件「${name}」取到了，但文件是空的（0 字节）。` });
     }
@@ -511,15 +573,55 @@ export async function ingestAttachment(msg, {
       } catch (e) {
         judged = { ok: false, error: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
       }
+      if (judged?.judgment?.label && !judged?.four_dim_audit) {
+        setPendingTurnVerdict(buildGuardVerdict({
+          label: judged.judgment.label,
+          layer: judged.judgment.layer,
+          caseId: judged.case_id ?? judged.judgment.case_id ?? null,
+          findings: Array.isArray(judged.judgment.findings) ? judged.judgment.findings : [],
+        }));
+      }
       const summary = summarizeImageJudgment(judged);
       // ★ 没有 unit 不能当成成功：缺 unit = 未审查，不是「判定通过」。
       const parseStatus = judged.unit?.parse_status ?? 'failed';
       const status = judged.ok && parseStatus !== 'failed' ? 'image_judged' : 'image_judge_failed';
       return finish(status, {
         reason: status, ...baseMeta, size: got.size,
+        case_id: judged.case_id ?? judged.judgment?.case_id ?? null,
+        four_dim_audit: judged.four_dim_audit ?? judged.judgment?.four_dim_audit ?? null,
         image_status: judged.row_status ?? null,
         parse_status: parseStatus,
         failure_kind: judged.unit?.failure_kind ?? 'parse_error',
+        judgment: compactJudgment(judged.judgment),
+        summary, reply: summary,
+        ...(judged.ok ? {} : { error: judged.error ?? 'unknown' }),
+      });
+    }
+    if (isVideo) {
+      let judged;
+      try {
+        judged = await judgeVideo({ filePath: dest, messageId: msg.message_id });
+      } catch (e) {
+        judged = { ok: false, error: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
+      }
+      if (judged?.prd53_verdict?.line) {
+        setPendingTurnVerdict(judged.prd53_verdict);
+      } else if (judged?.judgment?.label) {
+        setPendingTurnVerdict(buildGuardVerdict({
+          label: judged.judgment.label,
+          layer: judged.judgment.layer,
+          caseId: judged.case_id ?? judged.judgment.case_id ?? null,
+          findings: Array.isArray(judged.judgment.findings) ? judged.judgment.findings : [],
+        }));
+      }
+      const summary = summarizeVideoJudgment(judged);
+      const parseStatus = judged.unit?.parse_status ?? 'failed';
+      const status = judged.ok && parseStatus !== 'failed' ? 'video_judged' : 'video_judge_failed';
+      return finish(status, {
+        reason: status, ...baseMeta, size: got.size,
+        case_id: judged.case_id ?? null,
+        parse_status: parseStatus,
+        failure_kind: judged.unit?.failure_kind ?? (judged.ok ? null : 'parse_error'),
         judgment: compactJudgment(judged.judgment),
         summary, reply: summary,
         ...(judged.ok ? {} : { error: judged.error ?? 'unknown' }),
@@ -544,6 +646,13 @@ export async function ingestAttachment(msg, {
       const summary = `图片未审查（DP0）：没取到文件（${e?.message ?? e}）。\n`
         + '这是未审查，不是「附件不支持」，也不是「图片里没有内容」。';
       return finish('image_judge_failed', { reason: 'image_download_failed', ...baseMeta,
+        error: e?.message ?? String(e), parse_status: 'failed',
+        failure_kind: 'fetch_error', summary, reply: summary });
+    }
+    if (isVideo) {
+      const summary = `视频未审查（DP0）：没取到文件（${e?.message ?? e}）。\n`
+        + '这是未审查，不是「附件不支持」，也不是「视频里没有内容」。';
+      return finish('video_judge_failed', { reason: 'video_download_failed', ...baseMeta,
         error: e?.message ?? String(e), parse_status: 'failed',
         failure_kind: 'fetch_error', summary, reply: summary });
     }
@@ -615,14 +724,15 @@ export async function sendMarkdown(chatId, markdown) {
  * 失败时自动退化为普通发送，保证「答不上」不会变成「不答」。
  */
 export async function replyMarkdown(messageId, chatId, markdown) {
-  const text = chunkText(markdown)[0];   // 回复只发首块，其余走 sendMarkdown 补发
+  const firstChunk = chunkText(markdown)[0];   // 回复只发首块，其余走 sendMarkdown 补发
+  const text = plainifyForSend(firstChunk, { where: 'replyMarkdown' }).text;
   try {
     const r = await client.im.message.reply({
       path: { message_id: messageId },
       data: { msg_type: 'text', content: JSON.stringify({ text }) },
     });
-    if (markdown.length > text.length) {
-      const rest = await sendMarkdown(chatId, markdown.slice(text.length).replace(/^\n+/, ''));
+    if (markdown.length > firstChunk.length) {
+      const rest = await sendMarkdown(chatId, markdown.slice(firstChunk.length).replace(/^\n+/, ''));
       return { ok: true, messageIds: [r?.data?.message_id, ...rest.messageIds], mode: 'reply+send' };
     }
     return { ok: true, messageIds: [r?.data?.message_id], mode: 'reply' };

@@ -89,6 +89,15 @@ PRODUCT_LINE_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     ),
 }
 
+#: 进件失败 / 解析失败的回退标签与处置层。
+#: ★ 唯一来源是 base/decision_table.py 的契约词表 —— 桥接层**不产第二套判定**：
+#:   这些值只表达「没进判定链」（未审查/DP0），与 decision_table 对 parse_status=failed
+#:   的契约回退同源同字；J1 白名单语义是「判定逻辑只在判定表」，这里只做**透传**。
+from base.decision_table import (  # noqa: F401  # 契约同源声明
+    AUDIT_FALLBACK_LABEL,
+    AUDIT_FALLBACK_LAYER,
+)
+
 FEISHU_DOC_RE = re.compile(
     r"https?://[a-zA-Z0-9._-]+\.(?:feishu\.cn|larksuite\.com)/(docx|wiki)/([A-Za-z0-9_-]{10,})"
 )
@@ -619,15 +628,6 @@ def _legacy_bridge_fields(
     stage_res: Dict[str, Any],
 ) -> Dict[str, Any]:
     """生成与 `judge_evidence.mjs` 及既有单测兼容的 `verdict` / `hits` / `boundary_statement`。"""
-    disposition_map = {
-        "BLOCK": "auto_reject",
-        "REVIEW": "review",
-        "待自决": "review",
-        "PASS": "auto_pass",
-        "未审查": "unassessed",
-    }
-    disposition = disposition_map.get(label, "review")
-
     hits: List[Dict[str, Any]] = []
     rules_hit: List[str] = []
     control_codes_hit: List[str] = []
@@ -687,7 +687,6 @@ def _legacy_bridge_fields(
     total_issues = len(hits)
     return {
         "verdict": {
-            "disposition": disposition,
             "label": label,
             "layer": layer,
             "release_status": release_status,
@@ -736,8 +735,8 @@ def ingest_and_judge(
                     "ok": False,
                     "contract_version": CONTRACT_VERSION,
                     "carrier": "feishu_doc",
-                    "label": "未审查",
-                    "layer": "DP0",
+                    "label": AUDIT_FALLBACK_LABEL,
+                    "layer": AUDIT_FALLBACK_LAYER,
                     "release_status": "待放行",
                     "parse_status": "failed",
                     "failure_kind": extracted["failure_kind"],
@@ -755,8 +754,8 @@ def ingest_and_judge(
                 "ok": False,
                 "contract_version": CONTRACT_VERSION,
                 "carrier": "landing_url",
-                "label": "未审查",
-                "layer": "DP0",
+                "label": AUDIT_FALLBACK_LABEL,
+                "layer": AUDIT_FALLBACK_LAYER,
                 "release_status": "待放行",
                 "parse_status": "failed",
                 "failure_kind": extracted["failure_kind"],
@@ -800,8 +799,8 @@ def ingest_and_judge(
                 "ok": False,
                 "contract_version": CONTRACT_VERSION,
                 "carrier": "image",
-                "label": "未审查",
-                "layer": "DP0",
+                "label": AUDIT_FALLBACK_LABEL,
+                "layer": AUDIT_FALLBACK_LAYER,
                 "release_status": "待放行",
                 "parse_status": "failed",
                 "failure_kind": "fetch_error",
@@ -824,8 +823,8 @@ def ingest_and_judge(
                 "ok": False,
                 "contract_version": CONTRACT_VERSION,
                 "carrier": "video",
-                "label": "未审查",
-                "layer": "DP0",
+                "label": AUDIT_FALLBACK_LABEL,
+                "layer": AUDIT_FALLBACK_LAYER,
                 "release_status": "待放行",
                 "parse_status": "failed",
                 "failure_kind": "fetch_error",
@@ -970,8 +969,8 @@ def ingest_and_judge(
             "ok": False,
             "contract_version": CONTRACT_VERSION,
             "carrier": carrier,
-            "label": "未审查",
-            "layer": "DP0",
+            "label": AUDIT_FALLBACK_LABEL,
+            "layer": AUDIT_FALLBACK_LAYER,
             "release_status": "待放行",
             "parse_status": "failed",
             "failure_kind": "empty" if "empty" in exc.code or "0 字节" in exc.detail else "parse_error",
@@ -984,8 +983,8 @@ def ingest_and_judge(
             "ok": False,
             "contract_version": CONTRACT_VERSION,
             "carrier": carrier,
-            "label": "未审查",
-            "layer": "DP0",
+            "label": AUDIT_FALLBACK_LABEL,
+            "layer": AUDIT_FALLBACK_LAYER,
             "release_status": "待放行",
             "parse_status": "failed",
             "failure_kind": "parse_error",
@@ -1050,13 +1049,14 @@ def ingest_and_judge(
     if carrier == "image" and file_path:
         four_dim_audit = run_vlm_four_dim_audit(Path(file_path).expanduser().resolve(), unit.get("text") or "")
         if four_dim_audit and four_dim_audit.get("overall") == "发现违规需修改" and label == "REVIEW":
-            label = "BLOCK"
-            layer = "DP2"
+            # 桥接层不改写引擎标签（J1：判定逻辑只在 decision_table）。
+            # VLM 的更严结论降为 four_dim_audit 上的建议标记，随卡片呈现，供人工复核采纳。
+            four_dim_audit["overall"] = "发现违规需修改（VLM 建议，机器初筛为需人工确认）"
     elif carrier == "video" and file_path:
         four_dim_audit = run_vlm_video_four_dim_audit(Path(file_path).expanduser().resolve())
         if four_dim_audit and four_dim_audit.get("overall") == "发现违规需修改" and label == "REVIEW":
-            label = "BLOCK"
-            layer = "DP2"
+            # 桥接层不改写引擎标签（J1）：VLM 更严结论降为建议标记，随卡片呈现
+            four_dim_audit["overall"] = "发现违规需修改（VLM 建议，机器初筛为需人工确认）"
 
     if four_dim_audit and four_dim_audit.get("short_title"):
         kind_tag = "视频审查" if carrier == "video" else "图片审查"

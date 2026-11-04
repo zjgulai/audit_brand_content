@@ -25,10 +25,12 @@
  * 并且降级理由写进正文（对方要能看出格式为什么变了）。
  */
 import {
-  BUILDERS, VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, collapsible,
-  build, validateCard, renderText,
+  BUILDERS, VERDICT_MAX, BOUNDARY_MAX, MAX_SECTIONS, collapsible, flat1,
+  build, validateCard, renderText, BY_KIND,
 } from './registry.mjs';
 import { lintCopy } from './registry.mjs';
+import { stripEngineJargon, scrubCardData } from './jargon.mjs';
+import { conclusionLine, consumePendingTurnVerdict } from '../agent/prd53.mjs';
 
 /** 卡片块的开头标记。选这个形态是因为它在 markdown 里不构成任何语法，误触概率低。 */
 export const CARD_MARK = '[[card:';
@@ -104,14 +106,66 @@ export function extractCardBlock(text) {
   try { data = JSON.parse(rest.slice(b0, end + 1)); }
   catch (e) { data = null; if (!e) throw e; }
 
-  const tail = rest.slice(end + 1).replace(/\s*```\s*$/, '').trim();
-  const blockEnd = at + CARD_MARK.length + close + 2 + end + 1;
+  const srcPrefix = at + CARD_MARK.length + close + 2;
+  const closeMark = '[[/card]]';
+  const closeAt = rest.indexOf(closeMark, end + 1);
+  const tail = (closeAt >= 0 ? rest.slice(end + 1, closeAt) : rest.slice(end + 1))
+    .replace(/\s*```\s*$/, '')
+    .replace(/^\s*```[a-zA-Z]*\s*/, '')
+    .trim();
+  const blockEnd = closeAt >= 0 ? srcPrefix + closeAt + closeMark.length : (srcPrefix + end + 1);
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
     return { kind, data: null, before: src.slice(0, at).trim(), after: tail,
              blockStart: at, blockEnd, error: '对象不是合法 JSON 或不是对象' };
   }
   return { kind, data, before: src.slice(0, at).trim(), after: tail,
            blockStart: at, blockEnd, error: null };
+}
+
+const CODE_WRITTEN_TITLE = new Set([
+  'correction', 'capability-boundary', 'find-nothing', 'alert', 'decision',
+  'cannot-read', 'receipt', 'turn-diff', 'evidence',
+]);
+
+export function verdictSlotOf(kind) {
+  const fields = BY_KIND.get(kind)?.fields;
+  if (!fields) return null;
+  if ('title' in fields || CODE_WRITTEN_TITLE.has(kind)) return 'title';
+  if ('verdict' in fields) return 'verdict';
+  return null;
+}
+
+export const VERDICT_GROUP_TITLE = '逐条问题';
+
+export function applyVerdictLine(kind, data, verdict) {
+  const none = (why) => ({ data, action: 'none', slot: null, moved: null, why });
+  if (!verdict || !verdict.line) return none('无权威结论行');
+
+  let out = { ...data };
+  if (verdict.block && (kind === 'evidence' || Array.isArray(out.groups))) {
+    const groups = Array.isArray(out.groups) ? out.groups : [];
+    const existingIdx = groups.findIndex((g) => String(g?.content ?? '').includes(verdict.block));
+    if (existingIdx >= 0) {
+      out.groups = groups.map((g, i) => (i === existingIdx ? { ...g, expanded: true } : g));
+    } else {
+      out.groups = [{ title: VERDICT_GROUP_TITLE, content: verdict.block, expanded: true }, ...groups];
+    }
+  }
+
+  const slot = verdictSlotOf(kind);
+  if (!slot) return { data: out, action: 'no-slot', slot: null, moved: null, why: `「${kind}」没有结论格` };
+
+  const cur = s(out[slot]).trim();
+  if (cur === verdict.line) return { data: out, action: 'already', slot, moved: null, why: '结论格已是权威结论行' };
+
+  let moved = null;
+  if (cur) {
+    const [next, to] = foldIn(kind, out, `（原${slot}）${cur}`);
+    out = next;
+    moved = { field: slot, to: to ?? '(无格可放)', chars: len(cur), why: '权威结论行置顶，原抬头移入补充区' };
+  }
+  out[slot] = verdict.line;
+  return { data: out, action: 'forced', slot, moved, why: '已置顶权威结论行' };
 }
 
 /* ═══════════════ ② 执行上限 ═══════════════ */
@@ -157,7 +211,9 @@ const FALLBACK_SLOT = {
 function foldIn(kind, d, text) {
   const field = FOLD_FIELD[kind];
   if (field) {
-    if (Array.isArray(d[field])) return [{ ...d, [field]: [...d[field], text] }, field];
+    if (kind === 'query-answer' || Array.isArray(d[field])) {
+      return [{ ...d, [field]: [...(Array.isArray(d[field]) ? d[field] : (d[field] ? [d[field]] : [])), text] }, field];
+    }
     return [{ ...d, [field]: d[field] ? `${d[field]}\n${text}` : text }, field];
   }
   const slot = FALLBACK_SLOT[kind];
@@ -258,7 +314,7 @@ export function enforceLimits(kind, data, extra = []) {
   if (Array.isArray(d.fields) && d.fields.length > cap) {
     const extraFields = d.fields.slice(cap);
     d.fields = d.fields.slice(0, cap);
-    const [next, to] = foldIn(kind, d, extraFields.map((f) => `${f.label}：${f.value}`).join('\n'));
+    const [next, to] = foldIn(kind, d, extraFields.map((f) => flat1(f)).filter(Boolean).join('\n'));
     d = next;
     moved.push({ field: 'fields', to: to ?? '(无格可放)', chars: extraFields.length, why: `字段超过 ${cap} 个` });
   }
@@ -271,6 +327,13 @@ export function enforceLimits(kind, data, extra = []) {
       field: '块外正文', to: to ?? '(无格可放)', chars: len(text),
       why: to ? `卡片块之外的正文已并入 ${to}` : '卡片块之外有正文，但这个类型没有能承载它的格子（已在日志记录，未发进群）',
     });
+  }
+
+  // 剥除卡片数据里裸露的内部引擎赋值黑话与残留信封标记
+  const jargonRemoved = [];
+  d = scrubCardData(d, jargonRemoved);
+  for (const r of jargonRemoved) {
+    moved.push({ field: 'jargon', to: '(已剥除)', chars: len(r), why: `剥除内部引擎黑话行：${r.slice(0, 40)}` });
   }
 
   // 正文格里的内部记录 → 折叠区。放在最后，保证前面几轮搬进来的内容也被查一遍。
@@ -344,7 +407,7 @@ export function capSections(card, max = MAX_SECTIONS) {
  * @returns {{mode:'card'|'text', card?:object, data?:object, kind?:string,
  *            text:string, reason:string|null, moved:Array, lint:Array, dropped:boolean}}
  */
-export function toCardOrText(reply) {
+export function toCardOrText(reply, { verdict = null } = {}) {
   const raw = s(reply);
   const blk = extractCardBlock(raw);
 
@@ -396,8 +459,17 @@ export function toCardOrText(reply) {
   // 模型多写的话通常是有用的补充，但**不能留在块外** ——
   // 留在块外，群里看到的就是「一张卡 + 一段重复的话」。
   const extra = [blk.before, blk.after].filter(Boolean);
+  const pendingVerdict = consumePendingTurnVerdict();
+  const effectiveVerdict = verdict
+    ?? (blk.before ? conclusionLine(blk.before) : null)
+    ?? ((blk.kind === 'evidence' || blk.kind === 'query-answer') ? pendingVerdict : null);
   const built = (() => {
-    const { data, moved } = enforceLimits(blk.kind, blk.data, extra);
+    let { data, moved } = enforceLimits(blk.kind, blk.data, extra);
+    if (effectiveVerdict?.line) {
+      const vr = applyVerdictLine(blk.kind, data, effectiveVerdict);
+      data = vr.data;
+      if (vr.moved) moved.push(vr.moved);
+    }
     try {
       // 先按数据把长度上限执行掉、再建卡，最后按**建出来的卡**数顶层段落。
       // 顺序不能颠倒：段落数只有卡建出来才存在。

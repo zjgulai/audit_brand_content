@@ -53,6 +53,13 @@ from __future__ import annotations
 PARSE_STATUSES = ("ok", "partial", "failed")
 FAILURE_KINDS = ("fetch_error", "parse_error", "empty", "unsupported")
 COVERAGE_STATES = ("missing", "partial", "full")
+
+#: 契约回退标签（parse_status=failed / 进件失败时的对外结论）。
+#: ★ 收口于此的原因：bridge 层（base/feishu_guard_ingest.py）需要对「没进判定链」
+#:   的案件回显同一对 标签/层，字面量写两处必然漂移（AGENTS.md §2.4.8）。
+#:   定义在判定表（J1 白名单内），消费方 import 使用 —— 判定词汇只有一个家。
+AUDIT_FALLBACK_STATE = "未审查"
+AUDIT_FALLBACK_LAYER = "DP0"
 STATUSES = ("confirmed", "candidate", "rejected", "superseded")
 SEVERITIES = ("L0", "L1", "L2", "L3", "L4", "L5")
 AUTHORITY_STATES = ("ok", "missing", "expired", "conflict")

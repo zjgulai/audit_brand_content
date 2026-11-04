@@ -387,7 +387,15 @@ async function request(url, { auth, timeoutMs = 20_000, retries = 3 } = {}) {
     //   失败响应若也带 quota 同样吸收（429 时它尤其有用）。
     absorbQuota(body);
 
-    if (res.ok) return body ?? { _raw: txt.slice(0, 500) };
+    if (res.ok) {
+      if (!body || typeof body !== 'object') {
+        throw Object.assign(new Error(
+          '知识库返回 HTTP 200 但响应不是合法 JSON（例如 ngrok 隧道过期拦截页）。'
+          + '这是「没查成（untested）」，绝不是「库里没有」。',
+        ), { code: 'INVALID_JSON' });
+      }
+      return body;
+    }
 
     const code = body?.error?.code ?? `HTTP_${res.status}`;
     const msg = body?.error?.message ?? (txt || '').slice(0, 200);

@@ -23,6 +23,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
 const PYTHON = path.join(REPO_ROOT, '.venv', 'bin', 'python');
 const MEDIA_PY = path.join(REPO_ROOT, 'base', 'media.py');
+const GUARD_INGEST_PY = path.join(REPO_ROOT, 'base', 'feishu_guard_ingest.py');
 
 /** OCR + 判定可能比纯文本慢；给足超时，但不要无限等。 */
 export const IMAGE_JUDGE_TIMEOUT_MS = 180_000;
@@ -83,6 +84,27 @@ export async function runImageJudgment({
     }
     // ★ CLI 输出是**扁平**的；`findings` 是**数量**（明细在 ir），不是数组。
     //   归一成既有 {judgment, unit} 形状，调用方与测试不必知道 CLI 的字段布局。
+    let caseId = r.case_id ?? null;
+    let productLine = r.product_line ?? null;
+    let fourDimAudit = r.four_dim_audit ?? null;
+    if (!caseId && exec === execFileP && fs.existsSync(GUARD_INGEST_PY)) {
+      try {
+        const ingestArgs = [
+          GUARD_INGEST_PY, '--carrier', 'image',
+          '--file-path', String(filePath),
+          '--url', String(built.uri),
+          ...(messageId ? ['--message-id', String(messageId)] : []),
+          '--json', '--brief',
+        ];
+        const { stdout: ingestOut } = await execFileP(PYTHON, ingestArgs, {
+          cwd: REPO_ROOT, timeout: timeoutMs, maxBuffer: 1 << 25,
+        });
+        const ing = JSON.parse(ingestOut);
+        if (ing?.case_id) caseId = ing.case_id;
+        if (ing?.product_line) productLine = ing.product_line;
+        if (ing?.four_dim_audit) fourDimAudit = ing.four_dim_audit;
+      } catch { /* 建案附属步骤异常不阻断基础 OCR 判定返回 */ }
+    }
     const judgment = {
       label: r.label ?? null,
       layer: r.layer ?? null,
@@ -91,6 +113,9 @@ export async function runImageJudgment({
       findings: r.findings,          // number（CLI）或 array（测试桩）
       ir: r.ir ?? null,
       receipt: r.receipt ?? null,
+      ...(caseId ? { case_id: caseId } : {}),
+      ...(productLine ? { product_line: productLine } : {}),
+      ...(fourDimAudit ? { four_dim_audit: fourDimAudit } : {}),
     };
     const unit = {
       unit_id: r.unit_id ?? null,
@@ -101,6 +126,8 @@ export async function runImageJudgment({
     return {
       ok: true, judgment, unit, unit_id: r.unit_id ?? null,
       uri: built.uri,
+      ...(caseId ? { case_id: caseId } : {}),
+      ...(fourDimAudit ? { four_dim_audit: fourDimAudit } : {}),
       // CLI 不返回 row_status；不要编一个。image_status 在 meta 里会是 null。
       row_status: null, elapsed_ms: r.elapsed_ms ?? null,
     };
@@ -125,6 +152,8 @@ export function compactJudgment(j) {
     layer: j.layer ?? null,
     release_status: j.release_status ?? null,
     run_state: j.run_state ?? null,
+    ...(j.case_id ? { case_id: j.case_id } : {}),
+    ...(j.four_dim_audit ? { four_dim_audit: j.four_dim_audit } : {}),
     // CLI 的 findings 是数量；测试桩是数组。两种都收，明细不塞上下文。
     findings_total: total,
     findings: findings.slice(0, 10).map((f) => ({
@@ -153,9 +182,11 @@ export function summarizeImageJudgment(result) {
   const j = result.judgment ?? {};
   const u = result.unit ?? {};
   const parse = u.parse_status ?? 'unknown';
+  const caseId = j.case_id ?? result.case_id ?? null;
   const head = `判定：label=${j.label ?? '未知'} / layer=${j.layer ?? '未知'} / `
     + `release_status=${j.release_status ?? '未知'}`
     + (j.run_state ? ` / run_state=${j.run_state}` : '')
+    + (caseId ? ` / case_id=${caseId}` : '')
     + `；parse_status=${parse}`;
   const fail = parse === 'failed'
     ? `\n未审查（DP0）：failure_kind=${u.failure_kind ?? 'unknown'}`
@@ -175,3 +206,94 @@ export function summarizeImageJudgment(result) {
     + '**does_not_cover**；coverage partial，空命中/证据不足只能 REVIEW。'
     + '**不许说「已通过」或「合规」。**';
 }
+
+/**
+ * 群内视频文件（message_type=media）生产审查与工作台建案入口。
+ */
+export async function runVideoJudgment({
+  filePath, messageId = '', pageUri = null, timeoutMs = IMAGE_JUDGE_TIMEOUT_MS,
+  exec = execFileP,
+} = {}) {
+  if (!filePath) return { ok: false, error: '缺少视频路径' };
+  const uri = messageId ? `feishu-message:${messageId}` : pageUri;
+  if (!uri) {
+    return { ok: false, error: '缺少稳定 URI（messageId / pageUri）—— 不允许回落到本地 file://' };
+  }
+  const pyBin = fs.existsSync(PYTHON) ? PYTHON : 'python3';
+  if (!fs.existsSync(GUARD_INGEST_PY)) {
+    return { ok: false, error: `未找到 ${GUARD_INGEST_PY}` };
+  }
+  const args = [
+    GUARD_INGEST_PY, '--carrier', 'video',
+    '--file-path', String(filePath),
+    '--url', String(uri),
+    ...(messageId ? ['--message-id', String(messageId)] : []),
+    '--json', '--brief',
+  ];
+  try {
+    const { stdout } = await exec(pyBin, args, {
+      cwd: REPO_ROOT, timeout: timeoutMs, maxBuffer: 1 << 25,
+    });
+    const r = JSON.parse(stdout);
+    const judgment = {
+      label: r.label ?? '未审查',
+      layer: r.layer ?? 'DP0',
+      release_status: r.release_status ?? '待放行',
+      run_state: r.run_state ?? 'OK',
+      findings: r.findings ?? [],
+      receipt: r.receipt ?? null,
+      ...(r.case_id ? { case_id: r.case_id } : {}),
+      ...(r.product_line ? { product_line: r.product_line } : {}),
+    };
+    const unit = {
+      unit_id: r.unit_id ?? null,
+      parse_status: r.parse_status ?? (r.ok ? 'partial' : 'failed'),
+      failure_kind: r.failure_kind ?? (r.ok ? null : 'parse_error'),
+      reason: r.error ?? r.multimodal_note ?? null,
+    };
+    return {
+      ok: Boolean(r.ok),
+      case_id: r.case_id ?? null,
+      product_line: r.product_line ?? null,
+      prd53_verdict: r.prd53_verdict ?? null,
+      judgment,
+      unit,
+      unit_id: r.unit_id ?? null,
+      uri: String(uri),
+      elapsed_ms: r.elapsed_ms ?? null,
+      ...(r.ok ? {} : { error: r.error ?? '视频审查未完成' }),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: `${e?.name ?? 'Error'}: ${e?.message ?? e}`,
+      code: e?.code ?? null,
+      stderr: String(e?.stderr ?? '').slice(0, 1000),
+    };
+  }
+}
+
+export function summarizeVideoJudgment(result) {
+  if (!result?.ok) {
+    return `视频判定**未完成**：${result?.error ?? '未知错误'}。\n`
+      + '这是**未审查（DP0）**，不是「附件不支持」，也不是「视频没有风险」。\n'
+      + '不许给出合规结论；照实说这次没判成。';
+  }
+  const j = result.judgment ?? {};
+  const u = result.unit ?? {};
+  const parse = u.parse_status ?? 'partial';
+  const caseId = j.case_id ?? result.case_id ?? null;
+  const head = `判定：label=${j.label ?? '未知'} / layer=${j.layer ?? '未知'} / `
+    + `release_status=${j.release_status ?? '待放行'}`
+    + (j.run_state ? ` / run_state=${j.run_state}` : '')
+    + (caseId ? ` / case_id=${caseId}` : '')
+    + `；parse_status=${parse}`;
+  const raw = j.findings;
+  const n = Array.isArray(raw) ? raw.length : (typeof raw === 'number' ? raw : 0);
+  const hits = n ? `\n命中 ${n} 条。` : '\n命中：0 条（parse_status=partial 永不 PASS）。';
+  return `${head}${hits}\n`
+    + '覆盖边界：只覆盖**视频画面（多模态读取）**；'
+    + '**口播文案（本仓无本地 ASR 语音转写）**与**画面逐帧 OCR** **does_not_cover**；'
+    + 'coverage partial，空命中只能 REVIEW。**不许说「已通过」或「合规」。**';
+}
+

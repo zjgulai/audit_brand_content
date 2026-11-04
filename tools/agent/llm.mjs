@@ -267,10 +267,34 @@ export async function chat(messages, { tools, model = config.llm.model, maxToken
 
 /** 收口：**一次失败恰好落一行** `llm_failures.jsonl`（原先哪里都不留痕）。 */
 function finishFailure({ error, layer, chain, attempts, retryable, model, baseUrl }) {
-  const out = { ok: false, error, layer, chain, attempts, retryable };
+  const out = { ok: false, error, layer, chain, attempts, retryable, model };
   recordFailure({ model, base_url: baseUrl, layer, retryable, n_attempts: attempts.length,
                   attempts, chain, key_fp: keyFingerprint() });
   return out;
+}
+
+/**
+ * 对话层多模型回落链（同网关按序切换，防单模型 429 限流或维护导致群内失联）。
+ */
+export const FALLBACK_MODELS = Object.freeze([
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.8-flash',
+]);
+
+export async function chatWithFallback(messages, opts = {}) {
+  const primary = opts.model || config.llm.model;
+  const chain = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
+  let lastRes = null;
+  for (const model of chain) {
+    const r = await chat(messages, { ...opts, model });
+    if (r.ok) return { ...r, modelUsed: model };
+    lastRes = r;
+    // 若是 401/402（整把 Key 没钱或失效），换同网关另一个模型也一样，直接跳出由上层走本地生产引擎直出卡片兜底
+    const status = r.attempts?.[r.attempts.length - 1]?.status;
+    if (status === 401 || status === 402 || status === 403) break;
+  }
+  return lastRes;
 }
 
 /** 便捷：纯文本问答，无工具 */

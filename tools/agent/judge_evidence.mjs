@@ -349,6 +349,7 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
   }
 
   // ── 第一轮：措辞表达库（判「能不能这么说」的主库）
+  kb.clearMemo?.();
   const failed = [];
   let okQueries = 0;
   for (const q of picked.queries) {
