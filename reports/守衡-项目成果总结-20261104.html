@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内容合规审查 Agent · 项目成果总结（2026-11-04）</title>
+<style>
+  :root {
+    --ink: #1a1d21;
+    --ink-2: #4a4f57;
+    --ink-3: #878e99;
+    --paper: #fafaf8;
+    --card: #ffffff;
+    --line: #e5e3de;
+    --accent: #0f5c4e;
+    --accent-soft: #e7f1ee;
+    --warn: #9a4a12;
+    --warn-soft: #f8ede2;
+    --bad: #8c2f2f;
+    --bad-soft: #f6e7e7;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.85;
+  }
+  .page { max-width: 880px; margin: 0 auto; padding: 56px 28px 96px; }
+
+  /* ---------- 头部 ---------- */
+  header { border-bottom: 3px solid var(--ink); padding-bottom: 24px; margin-bottom: 36px; }
+  .kicker { font-size: 12.5px; letter-spacing: .18em; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 12px; letter-spacing: .01em; }
+  .meta { font-size: 13px; color: var(--ink-3); }
+  .meta code { font-family: var(--mono); font-size: 12px; }
+
+  /* ---------- 结论块 ---------- */
+  .verdict {
+    background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    padding: 20px 24px; margin: 0 0 40px; border-radius: 0 8px 8px 0;
+  }
+  .verdict .label { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: var(--accent); margin-bottom: 6px; }
+  .verdict p { margin: 0; font-size: 16.5px; font-weight: 500; }
+
+  /* ---------- 结构 ---------- */
+  section { margin-bottom: 44px; }
+  h2 {
+    font-size: 20px; margin: 0 0 18px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--line); letter-spacing: .01em;
+  }
+  h2 .no { color: var(--accent); margin-right: 8px; font-variant-numeric: tabular-nums; }
+  h3 { font-size: 16px; margin: 26px 0 10px; }
+  p { margin: 0 0 12px; color: var(--ink-2); }
+  strong { color: var(--ink); }
+  code { font-family: var(--mono); font-size: 12.5px; background: #f0efeb; padding: 1px 5px; border-radius: 4px; }
+  ul { margin: 0 0 12px; padding-left: 1.4em; color: var(--ink-2); }
+  ol { margin: 0 0 12px; padding-left: 1.6em; color: var(--ink-2); }
+  li { margin-bottom: 5px; }
+  li::marker { color: var(--accent); }
+
+  /* ---------- 表格 ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 20px; font-size: 14px; background: var(--card); }
+  th {
+    text-align: left; font-weight: 600; font-size: 12.5px; letter-spacing: .06em;
+    color: var(--ink-3); border-bottom: 2px solid var(--ink); padding: 8px 12px; white-space: nowrap;
+  }
+  td { border-bottom: 1px solid var(--line); padding: 9px 12px; vertical-align: top; }
+  tr:last-child td { border-bottom: 1px solid var(--ink); }
+
+  /* ---------- 状态徽标 ---------- */
+  .st { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 99px; white-space: nowrap; }
+  .st-done  { background: var(--accent-soft); color: var(--accent); }
+  .st-partial { background: var(--warn-soft); color: var(--warn); }
+  .st-unconf { background: var(--warn-soft); color: var(--warn); }
+  .st-fail  { background: var(--bad-soft); color: var(--bad); }
+  .st-off { background: #eceae5; color: var(--ink-2); }
+
+  /* ---------- 指标带 ---------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0 8px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 12px; }
+  .stat .n { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .stat .t { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+
+  /* ---------- 提示条 ---------- */
+  .note { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 12px 0; font-size: 14px; color: var(--ink-2); }
+  .note.red { border-left: 4px solid var(--bad); }
+  .note.red .tag { color: var(--bad); }
+  .note.green { border-left: 4px solid var(--accent); }
+  .note.green .tag { color: var(--accent); }
+  .note .tag { font-weight: 700; font-size: 12px; letter-spacing: .1em; margin-right: 8px; }
+
+  footer { margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-3); }
+  @media print { body { background: #fff; } .page { padding: 24px 0; max-width: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <div class="kicker">AUDIT MULTI CONTENT · 项目成果总结</div>
+  <h1>内容合规审查 Agent<br>项目成果总结</h1>
+  <div class="meta">生成日期 2026-11-04 · 数字为当日实跑读数，非转抄 · 复现命令随文给出</div>
+</header>
+
+<div class="verdict">
+  <div class="label">一句话结论</div>
+  <p>已完成：判定引擎 + Web 审核工作台（生产 <code>ca.luteos.com</code>）+ 守衡飞书机器人（2026-10-26 按委托方要求停机），配套 142 个自证检查器与 21 份 ADR。四类模态已于 2026-10-30 在生产逐类验收。P0–P3 生产能力缺口 8 项已于 2026-11-01 修复上线（WBPM-0150）。2026-11-03 新增四笔提交：全站暖粉品牌重构与扫码全角色全品线自动授权上线、上线前审查第一批 P0/P1 修复、素材库媒体原件可见（新增第 15 页 MediaPage）、a11y 页面覆盖补齐使验收棘轮恢复成立。</p>
+</div>
+
+<section>
+  <h2><span class="no">01</span>项目是什么</h2>
+  <table>
+    <tr><th style="width:110px">项</th><th>内容</th></tr>
+    <tr><td>委托方</td><td>Momcozy 内容治理团队</td></tr>
+    <tr><td>本仓定位</td><td>内容合规审查 Agent + 守衡飞书机器人的单仓：代码、调研产物、产品化基座、Web 工作台、自证体系</td></tr>
+    <tr><td>核心原则</td><td><strong>Agent 只补证据，不替人过门</strong>（ADR-0005）。判定权在人手上，机器给的是「依据是什么、依据到哪、哪里没测到」</td></tr>
+    <tr><td>决策优先级</td><td>事实 &gt; 可复核 &gt; 边界诚实 &gt; 覆盖完整 &gt; 速度 &gt; 好看</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="no">02</span>规模读数（2026-11-04）</h2>
+  <div class="stats">
+    <div class="stat"><div class="n">1,212</div><div class="t">已入库文件（净 +3）</div></div>
+    <div class="stat"><div class="n">510</div><div class="t">markdown 文档（不变）</div></div>
+    <div class="stat"><div class="n">527</div><div class="t">提交数（+4）</div></div>
+    <div class="stat"><div class="n">21</div><div class="t">ADR 决策记录</div></div>
+    <div class="stat"><div class="n">142</div><div class="t">自证检查器</div></div>
+    <div class="stat"><div class="n">149</div><div class="t">覆盖登记条目</div></div>
+    <div class="stat"><div class="n">15</div><div class="t">Web 页面（+1）</div></div>
+    <div class="stat"><div class="n">60</div><div class="t">base 引擎模块</div></div>
+  </div>
+  <p style="font-size:13px;color:var(--ink-3)">提交历史于 2026-10-19 重写过一次：58 张客户素材图移出公开仓历史。与 11-03 报告相比：文件 1,209→1,212（新增 4 个：表格同步 json、架构全景图 html/spec.json、MediaPage.tsx；删除 1 个：inter-fonts.css），提交 523→527（11-03 四笔），Web 页面 14→15。其余不变。</p>
+</section>
+
+<section>
+  <h2><span class="no">03</span>成果分述</h2>
+
+  <h3>3.1 判定引擎 <code>base/</code> <span class="st st-done">已完成</span></h3>
+  <ul>
+    <li>两段式判定（词表命中 → 语境守卫），处置分层 PASS / REVIEW / BLOCK（ADR-0006 至 0009）。</li>
+    <li>核心模块：<code>judge_entry.py</code> 判定入口、<code>orchestrator.py</code> 编排、<code>release_gate.py</code> 放行闸、<code>media.py</code> 媒体。</li>
+    <li>引擎契约自证通过（<code>verify_engine_contract.py</code>，2026-11-04 退 0，验收 227/227）。</li>
+  </ul>
+
+  <h3>3.2 Web 审核工作台 <code>web/</code> + <code>api/</code> <span class="st st-done">已完成</span></h3>
+  <ul>
+    <li>15 页 React + Vite：队列、案件、素材库、申诉、放行、下线、名单治理、报告、收件箱全链路。第 15 页 <code>MediaPage.tsx</code>（素材库）为 2026-11-03 新增。</li>
+    <li>三个后端 API：<code>production_app.py</code>、<code>review_api.py</code>、<code>write_api.py</code>。</li>
+    <li>全站暖粉品牌重构（2026-11-03 上线，<code>4093d8d</code>）：Momcozy 暖粉色彩体系、禁止 Emoji 与箭头、移除 Inter 外挂字体、Impeccable detect 0 警告。</li>
+    <li>飞书扫码登录为唯一入口（2026-10-30 撤掉密码登录）；2026-11-03 扫码自动授权放开全部 5 个人类测试角色与 5 条产品线，存量账号自动升级。</li>
+  </ul>
+
+  <h3>3.3 守衡飞书机器人 <span class="st st-off">已停机</span></h3>
+  <ul>
+    <li>已完成：链路打通、卡片语域规程、回复模版白名单（实测得出，非抄文档）。</li>
+    <li>2026-10-26 按委托方要求停机，走闸门并留痕（<code>PMO/shouheng-state/stop-lock</code>）。恢复需重装 launchd 服务。</li>
+  </ul>
+
+  <h3>3.4 知识库与规则库 <code>research/</code> <span class="st st-done">已完成</span></h3>
+  <ul>
+    <li>规则库完整设计：内部证据 01–05、外部调研 R1–R8、可执行骨架、错题本。</li>
+    <li>冻结投影导出进镜像（2026-10-31）：规则词典 36 条、控制点 24 条、路由 24 条落 <code>/data/projection</code>。</li>
+    <li>三个反直觉事实已登记：判定只吃 26 条规则，分类基准 638 条影响不了判决；品牌禁用词直接接引擎有 6–10% 误报；样本表是聊天转录，不是判例库。</li>
+  </ul>
+
+  <h3>3.5 媒体审核：四类模态 <span class="st st-partial">部分完成</span></h3>
+  <p>2026-10-30 生产验收。<strong>四类都能进件、都产出合法 ContentUnit、都走完判定链并落成案件。</strong></p>
+  <table>
+    <tr><th>类</th><th>判定</th><th>层</th><th>正文来源</th><th>观察数</th></tr>
+    <tr><td>文档（飞书链接）</td><td>BLOCK</td><td>DP2</td><td>飞书正文</td><td>0（无需）</td></tr>
+    <tr><td>图片</td><td>REVIEW</td><td>DP3</td><td>容器内 OCR（rapidocr）</td><td>6</td></tr>
+    <tr><td>视频</td><td>未审查</td><td>DP0</td><td>无 ASR</td><td>12</td></tr>
+    <tr><td>结构化记录</td><td>BLOCK</td><td>DP2</td><td>标题与描述</td><td>0（无需）</td></tr>
+  </table>
+  <div class="note">
+    <span class="tag">边界如实</span>视频结论是「未审查」不是「通过」—— <code>parse_status=partial</code> 时只判已覆盖部分，设计上不许把只看一半的载体报成通过。音画对齐未验证（刻意边界，不是待办）。<code>.docx/.pdf</code> 直传是产品边界，不是技术缺口。
+  </div>
+  <p>2026-11-03 新增：媒体原件可见 —— <code>GET /api/v1/cases/{id}/original</code>，审核员此前只看得到 OCR 转写件；未登录 401，无权与不存在同为 404（<code>9ea4ae3</code>、<code>973b57a</code>）。</p>
+
+  <h3>3.6 生产部署与上线 <span class="st st-done">已完成</span></h3>
+  <ul>
+    <li>2026-10-26 部署至 <code>ca.luteos.com</code>（六阶段方案、七条回滚阈值）；上线前修掉 4 个 P0。</li>
+    <li>2026-11-01（WBPM-0150）：P0–P3 生产能力缺口 8 项修复并上线。P0-1 签发指纹 hex64、P0-2 外部绑定同源指纹、P0-3 品线集合判定、P0-4 上传写路径 201、P0-5 报告真算、P1 冻结投影 36/24/24、P2 四维字段落盘、P3 队列与指标现算。</li>
+    <li>2026-11-03 四笔（<code>4093d8d</code> / <code>973b57a</code> / <code>9ea4ae3</code> / <code>97d1298</code>）：
+      <ul>
+        <li><strong>品牌重构 + 扫码自动授权</strong>：暖粉色彩、禁 Emoji、去 Inter 字体、Impeccable 0 警告；扫码自动授权放开 5 角色 × 5 品线，已部署生产并升级现有全部扫码人员。</li>
+        <li><strong>上线前审查第一批 P0/P1</strong>：OpenAPI spec 生产整组关闭（匿名原可读 4 入口 × 47 条路径）；SoD 违规 404 改回 403（判断原先在 raise 之后永不执行）；<code>judgment_failed</code> 不回显异常原文；下线豁免加 <code>waived</code> 终态；申诉中心错误横幅；<code>startReauth</code> 下沉 api 层。</li>
+        <li><strong>素材库</strong>：MediaPage 第 15 页 + <code>/original</code> 端点修正读错字段。</li>
+        <li><strong>a11y 覆盖补齐</strong>：素材库纳入 #112，验收棘轮恢复成立。</li>
+      </ul>
+    </li>
+    <li>2026-11-04 本会话复核：生产 <code>/readyz</code> HTTP 200，7 项检查全 true；验收棘轮 <code>--run</code> 实跑退 0。</li>
+  </ul>
+  <div class="note green">
+    <span class="tag">验收</span>全量验收棘轮 passed=127 failed=0 untested=9（machine=4 manual=5），地板 127 未倒退 —— <strong>2026-11-04 本会话 <code>verify_acceptance_ratchet.py --run</code> 实跑退 0</strong>。另：引擎契约 227/227、覆盖反证 749 项、凭据扫描 0 命中、depad 0 填充，全部当日实跑。
+  </div>
+
+  <h3>3.7 自证体系 <span class="st st-done">已完成</span> <span style="font-size:12px;color:var(--ink-3)">—— 本项目最大特色</span></h3>
+  <ul>
+    <li>142 个检查器（140 py + 2 mjs），149 条「谁验什么」登记，登记表自身被反向对照。</li>
+    <li>三态退出码不可互代：全过退 0 / 有红退 1 / 读不出退 2。<strong>未测 ≠ 通过 ≠ 红。</strong>已沉淀为规程 <code>agent-skills/三态读数/SKILL.md</code>（2026-11-02）。</li>
+    <li>本轮亲历一例：棘轮检查器不带 <code>--run</code> 时从 stdin 读执行器输出 —— 首跑退 2（未测），带 <code>--run</code> 才实跑退 0。两个读数都是真的，不可互代。</li>
+    <li>每个检查器带反向对照（<code>--controls</code>）：坏样本必须红、好样本必须绿。</li>
+  </ul>
+
+  <h3>3.8 治理与文档 <span class="st st-done">已完成</span></h3>
+  <ul>
+    <li>21 份 ADR：数据权威、溯源、敏感样本准入 → 基座接口冻结、容器内 OCR 选型。</li>
+    <li>README 是唯一入口且有执行点：<code>verify_doc_reachability.py</code> 断言每份第一方文档都走得到。</li>
+    <li>全产品五层架构全景图（2026-11-03 入库）：<code>architecture/audit-multi-content-panorama.spec.json</code> / <code>.html</code>，14 节点 14 条有向流，check.mjs 0 layout issues。</li>
+    <li>事故与教训全部落盘：填充态、陈旧字节码、bash 3.2 中文陷阱、管道 <code>$?</code> 陷阱等。</li>
+  </ul>
+
+  <h3>3.9 记忆与知识图谱（nmem）<span class="st st-done">已完成</span></h3>
+  <ul>
+    <li>四层记忆语料（L1–L4），SOP 层级映射有自证（N0–N9）。</li>
+    <li>2026-10-31 委托方 ⌘5 查验确认图谱可见，8/8 通过。</li>
+    <li>知识图谱刻意不建的裁定已落盘：三条候选路径全部实测不通。</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="no">04</span>本次实跑的验证读数（2026-11-04）</h2>
+  <table>
+    <tr><th>检查</th><th>范围</th><th>结果</th></tr>
+    <tr><td><code>verify_engine_contract.py</code></td><td>引擎契约</td><td><span class="st st-done">通过 · 退 0</span>（227/227）</td></tr>
+    <tr><td><code>verify_coverage.py</code></td><td>覆盖登记表双向反证</td><td><span class="st st-done">通过 · 退 0</span>（749 项）</td></tr>
+    <tr><td><code>verify_secret_patterns.py</code></td><td>仓内文本凭据扫描</td><td><span class="st st-done">通过 · 退 0</span>（扫 1,192 文件，0 命中）</td></tr>
+    <tr><td><code>verify_depad.py</code></td><td>生成物可读性</td><td><span class="st st-done">通过 · 退 0</span>（7,873 文件，0 填充；未触发 <code>--fix</code>）</td></tr>
+    <tr><td><code>verify_acceptance_ratchet.py --run</code></td><td>验收棘轮（追加）</td><td><span class="st st-done">通过 · 退 0</span>（passed=127 failed=0 untested=9）</td></tr>
+    <tr><td>生产 <code>/readyz</code></td><td>生产可用性（追加）</td><td><span class="st st-done">已验证</span>（HTTP 200，7 项全 true）</td></tr>
+  </table>
+  <div class="note">
+    <span class="tag">口径说明</span>棘轮检查器不带 <code>--run</code> 时从 stdin 读执行器输出，本会话首跑退 2（未测）；带 <code>--run</code> 才是实跑退 0。两个读数都是真的，三态不可互代。
+  </div>
+  <p style="font-size:13.5px"><strong>未验证：</strong>其余 136+ 个检查器本轮未跑 —— 本报告不宣称「自证全绿」。<strong>未验证：</strong>生产容器镜像 tag —— 只探了 readyz，未登生产核对；最近记录为 <code>momcozy-audit:2456e30</code>（11-01）与容器 <code>d70f03ad97b7</code>（11-03 表格同步文件）；确认方法：登录生产 <code>docker ps</code> 看 tag。<strong>未验证：</strong>11-03 四笔提交的生产页面级验收（15/15 + 12/12）引自 <code>PMO/表格同步/20261103-全站暖粉品牌重构与去AI套路.json</code>，本会话只复核 readyz 一项。<strong>跳过：</strong>其余检查器只跑任务指定的四个代表性自证，其余不宣称。</p>
+</section>
+
+<section>
+  <h2><span class="no">05</span>当前状态与未决事项</h2>
+  <table>
+    <tr><th>项</th><th style="width:120px">状态</th><th>说明</th></tr>
+    <tr><td>生产工作台</td><td><span class="st st-done">已完成</span></td><td><code>ca.luteos.com</code>，扫码全员放开；readyz 2026-11-04 实测 200；镜像 tag 未复核</td></tr>
+    <tr><td>11-03 四笔提交（品牌重构 / P0P1 / 素材库 / a11y）</td><td><span class="st st-done">已完成</span></td><td>已入库；生产状态引自表格同步文件，本会话只复核 readyz</td></tr>
+    <tr><td>验收棘轮</td><td><span class="st st-done">已验证</span></td><td><code>--run</code> 实跑退 0：passed=127 failed=0 untested=9（2026-11-04 读数）</td></tr>
+    <tr><td>四类模态</td><td><span class="st st-partial">部分完成</span></td><td>视频无 ASR；音画对齐未验证（刻意边界，不是待办）</td></tr>
+    <tr><td>媒体原件可见</td><td><span class="st st-done">已完成</span></td><td><code>/original</code> 端点 + MediaPage（2026-11-03）</td></tr>
+    <tr><td>守衡机器人</td><td><span class="st st-off">已停机</span></td><td>按委托方 2026-10-26 要求；恢复需重装 launchd 服务</td></tr>
+    <tr><td>真实身份全链路</td><td><span class="st st-unconf">未确认</span></td><td>走查清单已就绪，等委托方用真实飞书账号走「登录→提交→判定→复核→报告→放行」</td></tr>
+    <tr><td>P3 剩余三项</td><td><span class="st st-off">未开始</span></td><td>正式人员配置、可测数聚合接线、冻结回归集法务签署 —— 按业务排期</td></tr>
+  </table>
+</section>
+
+<footer>
+  本报告按 ASD-STE100（简化技术中文）原则写：关键信息先行、一句一事、状态词固定、验证状态如实。<br>
+  Markdown 版：<code>reports/守衡-项目成果总结-20261104.md</code> · 生成于 2026-11-04 · 每个数字可用随文命令复现。
+</footer>
+
+</div>
+</body>
+</html>
