@@ -1360,6 +1360,86 @@ def reduce_command(old_state, command, actor, expected_version, payload=None,
         ir["findings"][index] = updated
         state["ir"] = ir
         detail.update({"finding_id": finding_id, "finding_status": decision})
+    elif command == "review_and_close":
+        # ★★ 2026-11-04：一键「审完并结案」。
+        #
+        #   改前一个审核员要做四步：认领 → 存草稿 → 逐条裁决 candidate →
+        #   填 review_notes 提交。而生产上的 26 条案件全都在 100 字符以内、
+        #   25/26 的 finding 已由规则层自动确认 —— 四步流程与它要处理的对象
+        #   完全不成比例。审核变成了走流程，不是做判断。
+        #
+        #   这个命令把四步压成一次状态迁移：
+        #     ① 未认领 → 直接认领（assignee = 当前人），已认领给别人 → 拒
+        #     ② 未裁决的 finding 按 `verdict` 一次性处理完
+        #     ③ 写 formal_review 并置 status=closed
+        #
+        #   ★ `verdict` 只有两个值，语义是「我认不认机器给的判定」：
+        #     agree    → 未裁决的一条都不留（confirmed 保持，candidate → confirmed）
+        #     overturn → candidate → rejected（人不同意机器的候选）
+        #     **不接受第三个值**：一旦允许逐条细调，就退回到四步了。
+        #
+        #   ★ 与 `submit_review` 的分工：那个仍是「逐条裁决 + 自己写结论文本」
+        #     的严格路径，一条代码都没动。这个是在它之上加的**快路径**，
+        #     两者写出的 formal_review 形状相同（都带 review_notes 与 adjudications），
+        #     所以报告、台账、申诉读到的都是同一种东西。
+        if state["status"] == "closed":
+            raise LedgerConflict("case_closed", "案件已结案，不能重复结案")
+        if state["status"] == "claimed" and state.get("assignee") != actor:
+            raise LedgerConflict(
+                "not_assignee",
+                "案件已被 %r 认领，先改派再结案" % (state.get("assignee"),))
+        if state["status"] != "claimed":
+            state.update({
+                "status": "claimed", "assignee": actor,
+                "claimed_at": _iso(now), "last_activity": _iso(now),
+                "lease_expires": now + int(lease_seconds),
+            })
+        verdict = payload.get("verdict")
+        if verdict not in ("agree", "overturn"):
+            raise LedgerValidation(
+                "bad_verdict", "verdict 必须是 agree/overturn，收到 %r" % (verdict,))
+        notes = payload.get("review_notes")
+        if not isinstance(notes, str) or not notes.strip():
+            raise LedgerValidation("bad_conclusion", "review_notes 必须是非空字符串")
+        ir = state.get("ir")
+        adjudicated = []
+        if isinstance(ir, dict) and isinstance(ir.get("findings"), list):
+            for finding in ir["findings"]:
+                if not isinstance(finding, dict):
+                    # ★ fail-closed：坏数据不许当成「已裁决」放过去。
+                    raise LedgerValidation(
+                        "bad_finding", "ir.findings 里有非对象条目，拒绝结案")
+                if finding.get("status") not in ("confirmed", "rejected"):
+                    finding["status"] = (
+                        "confirmed" if verdict == "agree" else "rejected")
+                    finding["adjudicated_by"] = actor
+                    finding["adjudicated_at"] = _iso(now)
+                    finding["adjudication_reason"] = notes
+                    adjudicated.append(finding.get("finding_id"))
+            state["ir"] = ir
+        formal_id = "formal-" + _hash({
+            "case_id": state["case_id"], "actor": actor,
+            "version": state["version"] + 1,
+            "notes": notes, "verdict": verdict,
+        })[:16]
+        formal = {
+            "formal_id": formal_id, "case_id": state["case_id"],
+            "author": actor, "submitted_at": _iso(now),
+            "from_draft_id": state["primary_draft_id"],
+            # ★ 形状与 submit_review 写出的那份对齐：`review_notes` 是报告与
+            #   台账读的那一格，少它会让两种结案在报告里长得不一样。
+            "conclusion": {
+                "review_notes": notes,
+                "verdict": verdict,
+                "adjudicated_finding_ids": adjudicated,
+                "path": "review_and_close",
+            },
+        }
+        state["formal_reviews"].append(formal)
+        state["status"] = "closed"
+        state["lease_expires"] = None
+        detail.update({"formal_id": formal_id, "verdict": verdict,
+                       "adjudicated": adjudicated})
     elif command == "submit_review":
         _require_claim(state, actor, expected_version, now)
         conclusion = payload.get("conclusion")

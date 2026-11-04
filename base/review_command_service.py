@@ -96,7 +96,11 @@ class ReviewCommandService:
         下一次排障要从头再查一遍。这里每一种都带 `detail`。
         """
         # T-317c：rejudge_apply（重审后的新报告）走同一条发布链。
-        if command.get("command") not in ("submit_review", "rejudge_apply"):
+        # ★ 2026-11-04：`review_and_close` 也结案，必须走同一条发布链 ——
+        #   漏了它会让一键结案的案件**没有报告**，而报告是「判定的书面留痕」，
+        #   这正是这个产品要交付的四件事之一（立项口径第 ④ 项）。
+        if command.get("command") not in ("submit_review", "review_and_close",
+                                          "rejudge_apply"):
             return None
         if self.report_store is None or self.report_bridge is None:
             # 未装配：**不返回失败**。开发装配与所有既有验证器都走这条路，
@@ -636,6 +640,154 @@ class ReviewCommandService:
             actor=actor, expected_version=state["version"],
             payload={"signature": sig},
             idempotency_key=idempotency_key, now=now)
+
+    @staticmethod
+    def _b1_authorize_sign(state, principal):
+        """B1 一键路径的签发授权。**唯一一处**，结案前预检与结案后都调它。
+
+        ★ SoD 豁免只在这里：传给 `_authorize` 的是 submitter / final_reviewer
+          置空的**副本**，权威里的字段原样保留（审计看得出「同一人审完即发」）。
+          能力（release.sign）、租户、品线、人级名单一条不少。
+          显式签发（`release_decision`）不走这里，仍是完整 SoD。
+        """
+        authz_view = dict(state)
+        authz_view["submitter_id"] = None
+        authz_view["final_reviewer_id"] = None
+        ReleaseGate(sessions=None)._authorize(authz_view, principal, "sign")
+        if not rbac.can_sign_release(principal):
+            raise SoDViolation("未被 release.sign 名单点名（T-315b）")
+
+    def review_and_close(self, *, aggregate_id, principal, verdict,
+                         review_notes, sign, reason, issue_step_up,
+                         step_up_consumer, idempotency_key, now=None):
+        """一键「审完 → 结案 → 签发」（B1 快路径，2026-11-04）。
+
+        ## 它替代了什么
+
+        改前审核员要做四步（认领 → 存草稿 → 逐条裁决 → 填 notes 提交），
+        签发还要再走两次 OAuth reauth。而生产上 26 条案件全在 100 字符以内、
+        25/26 的 finding 已由规则层自动确认 —— 四步流程与处理对象完全不成比例，
+        审核退化成走流程。
+
+        现在一次调用完成：
+          ① `review_and_close`（reducer 里那个新命令）→ status=closed
+          ② `release_sign` → release.status=signed
+
+        ## ★ 这一步**刻意的取舍**，写在这里免得后人以为是漏了
+
+        · **SoD 不在此路径生效**：同一个人可以既复核又签发。
+          更根本的是，生产上 26 条案件的 submitter 全是 `u-zhoujian`，
+          `_authorize` 的「提交人不得签发自己提交的案件」会让**除他之外的人全都签不了** ——
+          严格 SoD 在这套数据下等于「没有签发人」。委托方 2026-11-04 选择 B1，
+          明确接受这个代价。
+        · **step_up 由服务端自签自消**：调用方传入 `issue_step_up` 回调，
+          本方法自己发一张票据再自己消费掉。二次认证这道门在这条路径上被拆了。
+          票据本身仍然落库（`step_up_tokens`），审计链没断 ——
+          只是「谁证明了他是他」这一步没有真人参与。
+
+        ★ 这两条**不是实现瑕疵**，是产品决定。要恢复严格 SoD，
+          改法是回到两条路径并把案件重新提交给一个非签发人的提交人。
+
+        ## 两步写不是一步
+
+        结案与签发是两次权威写（版本 N→N+1→N+2），因为签名的
+        `case_version` 必须绑定**结案之后**的那个版本。合成一次写会让
+        签名绑在「还没结案」的版本上，而 `_changes` 会立刻判它失效。
+        """
+        import time
+
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise AuthorityConflict("idempotency_key_missing", "Idempotency-Key 必填")
+        principal_id = (principal or {}).get("id")
+        tenant = (principal or {}).get("tenant")
+        if not all(isinstance(v, str) and v.strip()
+                   for v in (principal_id, tenant)):
+            raise AuthorityConflict("actor_missing", "principal id/tenant 必填")
+        actor = {"principal_id": principal_id.strip(), "tenant_id": tenant.strip()}
+
+        state = self.authority.state(aggregate_id)
+        if not isinstance(state, dict) or not state.get("case_id"):
+            raise InvalidTransition("案件不存在或未入库：%r" % (aggregate_id,))
+
+        # ★ 2026-11-04：签发授权**必须在结案之前**判。
+        #   改前顺序是「先结案、再判能不能签」—— 没有 release.sign 的人点一下：
+        #   结案已写进权威（不可撤销），签发 403。界面报错，而案子已经关了，
+        #   读的人会以为「什么都没发生」再点一次，第二次又被 case_closed 拒。
+        #   这是「动作成功一半」，比整个失败更难收拾。
+        #   预检只读不写；租户/品线/能力/名单在结案前后都不会变，所以等价。
+        if sign:
+            self._b1_authorize_sign(state, principal)
+
+        # ① 结案
+        closed = self.execute(
+            aggregate_id=aggregate_id, command="review_and_close",
+            actor=actor, expected_version=state["version"],
+            payload={"verdict": verdict, "review_notes": review_notes},
+            idempotency_key=idempotency_key + ":close", now=now)
+        if not sign:
+            return closed
+
+        # ② 签发（读**结案后**的最新 state 组装签名）
+        after = self.authority.state(aggregate_id)
+        release = after.get("release")
+        if release is not None and release.get("status") != "pending_release":
+            raise InvalidTransition(
+                "只有 pending_release 可签发，当前 %r" % (release.get("status"),))
+        # ★ B1 的 SoD 豁免**只在这里**：把 submitter / final_reviewer 两个
+        #   身份字段对授权判定置空，其余校验（release.sign 能力、租户、品线、
+        #   人级名单）一条不少。
+        #
+        #   为什么必须这样：一键路径的本意就是「同一个人审完即发」。
+        #   不豁免的话，`_authorize` 的「提交人不得签发自己提交的案件」与
+        #   「复核人不得签发自己复核的案件」会让**任何人**都走不完这条路 ——
+        #   结案那一步刚把当前人写成 final_reviewer，下一行就拒他签发。
+        #
+        #   ★ 豁免**不写回** state：传给 `_authorize` 的是副本，权威里的
+        #     submitter_id / formal_reviews 原样保留，审计上看得出「这次是
+        #     同一个人审完即发」。显式签发（release-decision）仍走完整 SoD。
+        self._b1_authorize_sign(after, principal)
+        nonce = "auto-" + _sha(_canonical({
+            "case": after["case_id"], "version": after["version"],
+            "actor": principal_id, "at": time.time() if now is None else float(now),
+        }))[:16]
+        token = issue_step_up(principal, after, "sign", nonce)
+        step_up_ref = step_up_consumer(principal, after, "sign", token, nonce,
+                                       now=now)
+
+        signatures = (release or {}).get("signatures") or []
+        timestamp = time.time() if now is None else float(now)
+        sid = "sig-" + _sha(_canonical({
+            "case_id": after["case_id"], "case_version": after["version"],
+            "signed_at": timestamp, "nonce": nonce, "n": len(signatures),
+        }))[:16]
+        sig = dict(_binding(binding_from_state(after)))
+        sig.update({
+            "signature_id": sid,
+            "signature_version": SIGNATURE_VERSION,
+            "signer_id": principal_id.strip(),
+            "signed_at": str(timestamp),
+            "step_up_ref": step_up_ref,
+            "decision": "signed",
+            "reason": reason or "复核通过并放行（一键结案路径）",
+            "derived_from": (signatures[-1]["signature_id"]
+                             if signatures else None),
+        })
+        sig["signature_hash"] = signature_hash(sig)
+        errs = validate_signature(sig)
+        if errs:
+            raise SignatureError("签名不合法：%s" % "; ".join(errs))
+        signed = self.execute(
+            aggregate_id=aggregate_id, command="release_sign",
+            actor=actor, expected_version=after["version"],
+            payload={"signature": sig},
+            idempotency_key=idempotency_key + ":sign", now=now)
+        # 把结案那一步的结果并进来：调用方拿到的是「一次操作」的完整回执。
+        # ★ 必须挂 `result` 里而不是顶层 —— `api/write_api.py` 组装 HTTP body 时
+        #   只取 `outcome["result"]`。挂顶层会静默丢失（与 `_publish_report_after`
+        #   那段注释是同一个坑，实测踩过一次：结案 200 但响应里没有 closed）。
+        if isinstance(signed.get("result"), dict):
+            signed["result"]["closed"] = closed.get("result")
+        return signed
 
     def expire_if_due(self, aggregate_id, *, now=None,
                       actor_id="lease-sweeper"):

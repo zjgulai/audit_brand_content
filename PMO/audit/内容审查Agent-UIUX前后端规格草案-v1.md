@@ -599,6 +599,7 @@ metrics_snapshots, control_points, routing, rule_class_switches, authority_confl
 | GET | `/api/v1/release/pending` | 待签发列表 |
 | GET | `/api/v1/cases/{id}/release-readiness` | 四前置/义务 |
 | POST | `/api/v1/cases/{id}/release-decision` | sign/reject（唯一受控入口） |
+| POST | `/api/v1/cases/{id}/review-and-close` | agree/overturn + sign（B1 一键结案；**SoD 与真人 step-up 在此路径显式放弃**，委托方 2026-11-04 选定） |
 | POST | `/api/v1/cases/{id}/release-revoke` | 撤回 |
 | GET | `/api/v1/takedown-tasks` | 下线任务列表 |
 | POST | `/api/v1/takedown-tasks/{id}/start` | 开始 |

@@ -118,6 +118,12 @@ export default function ReviewActions({ detail, refresh }: Props) {
     (f) => f.status === "candidate",
   );
 
+  // ★ 2026-11-04：一键按钮做到哪一步，按**当前身份**决定。
+  //   没有 signer 角色的审核员（如 dp3）点「放行」会被后端预检拒（403、不写任何东西）——
+  //   与其给他一个注定失败的按钮，不如直接给「审完并结案」，放行留给签发人。
+  //   这里只决定**文案与 sign 参数**，不是授权判定：后端 `_b1_authorize_sign` 才是权威。
+  const canSign = Boolean(current?.roles?.includes("signer"));
+
   const getWriteApi = async () => {
     const mod = await import("../api/write-client");
     return mod.reviewWriteApi;
@@ -385,6 +391,44 @@ export default function ReviewActions({ detail, refresh }: Props) {
         }}
         placeholder="只记录人工复核意见；不改变机器标签，也不代表放行。"
       />
+
+      {/* ── 一键结案（B1）：把「认领 → 存草稿 → 逐条裁决 → 提交」压成一次点击 ──
+          ★ 为什么它在最上面、且是 primary：
+            审核员的动作是「看完了，我认/我不认」，不是「先认领再存草稿再提交」。
+            四个按钮并列会让人以为四步都必须走 —— 而其中三步只是流程开销。
+          ★ 它不隐藏下面那组按钮：那组是**严格路径**（自己写结论文本、
+            逐条裁决），仍有用途。让需要它的人能找到，不需要的人看不见重点。
+      */}
+      <div className="actions__row actions__row--primary-path">
+        <Button
+          variant="primary"
+          data-risk-action="review-and-close"
+          data-action="review-and-close"
+          disabled={busy !== null || !note.trim() || review === null}
+          onClick={() =>
+            startIntent(canSign ? "审完并放行" : "审完并结案", async (key) => {
+              const api = await getWriteApi();
+              return api.reviewAndClose(
+                detail.case_id,
+                {
+                  verdict: "agree",
+                  reviewNotes: note.trim(),
+                  sign: canSign,
+                  reason: note.trim(),
+                },
+                key,
+              );
+            })
+          }
+        >
+          {canSign ? "审完并放行" : "审完并结案"}
+        </Button>
+        <span className="hint actions__hint">
+          {canSign
+            ? "一次完成复核、结案与签发；下方的分步按钮仍可用于逐条裁决。"
+            : "一次完成复核与结案；放行由签发人完成。"}
+        </span>
+      </div>
 
       <div className="actions__row">
         <Button

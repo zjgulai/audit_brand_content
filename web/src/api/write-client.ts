@@ -4,6 +4,7 @@ import {
   type DraftMutation,
   type LedgerMutation,
   type ReferenceMutation,
+  type ReviewAndCloseMutation,
   type SubmitMutation,
 } from "./client";
 
@@ -192,6 +193,39 @@ export const reviewWriteApi = {
       body,
       idempotencyKey,
     }),
+
+  /**
+   * 一键「审完 → 结案 → 签发」（B1）。
+   *
+   * ★ 为什么它是独立方法而不是 `submitConclusion` 的一个 flag：
+   *   两者的**结果形状**不同（这个带 release / signature / closed），
+   *   合成一个方法会让返回类型变成联合类型，调用方每次都要窄化。
+   *
+   * ★ `sign: false` = 只结案不放行。界面在「我要审但还不能发布」时用它。
+   */
+  reviewAndClose: (
+    caseId: string,
+    body: {
+      verdict: "agree" | "overturn";
+      reviewNotes: string;
+      sign: boolean;
+      reason?: string;
+    },
+    idempotencyKey: string,
+  ) =>
+    request<ReviewAndCloseMutation>(
+      `/cases/${encodeURIComponent(caseId)}/review-and-close`,
+      {
+        method: "POST",
+        body: {
+          verdict: body.verdict,
+          review_notes: body.reviewNotes,
+          sign: body.sign,
+          reason: body.reason ?? null,
+        },
+        idempotencyKey,
+      },
+    ),
 
   submitConclusion: (
     caseId: string,

@@ -157,6 +157,11 @@ function dt4Hits(cssText) {
 }
 
 // ── DT-6 品牌红只用于高风险动作 ─────────────────────────────────────────
+//
+// ★ 2026-11-04：`review-and-close` 入白名单。它不是放宽判据 ——
+//   「审完并放行」一次完成结案 + 签发 + 对外发布，风险**不低于**
+//   `release-decision`（后者只做其中第三步）。把它排除在外会让界面
+//   把一个不可逆动作画成普通按钮，那才是这条断言要防的事。
 const DT6_RE = /<Button\b[^>]*\bvariant\s*=\s*["'{]+(?:primary|default)\b/;
 function dt6Hits(src) {
   const clean = stripComments(src);
@@ -164,7 +169,7 @@ function dt6Hits(src) {
   const tagRe = /<Button\b[^>]*>/g;
   let m;
   while ((m = tagRe.exec(clean))) {
-    if (DT6_RE.test(m[0]) && !/data-risk-action\s*=\s*["'{]+(?:submit|release-decision)\b/.test(m[0])) {
+    if (DT6_RE.test(m[0]) && !/data-risk-action\s*=\s*["'{]+(?:submit|release-decision|review-and-close)\b/.test(m[0])) {
       hits.push(m[0].replace(/\s+/g, " ").slice(0, 80));
     }
   }

@@ -284,6 +284,21 @@ export interface ReferenceMutation extends LedgerMutation {
   reference: FragmentReference;
 }
 
+/**
+ * 一键结案（B1）的响应：结案回执 + （若带签发）签发容器与签名。
+ *
+ * ★ `closed` 是**结案那一步**的结果，不是本步的。合并成一次点击后，
+ *   调用方仍要能分别看清「结案成的什么」与「签发成的什么」——
+ *   把它们揉平会让「签发失败但结案成功」这件事在界面上看不出来。
+ */
+export interface ReviewAndCloseMutation extends LedgerMutation {
+  status?: string;
+  release?: Record<string, unknown> | null;
+  signature?: Record<string, unknown> | null;
+  closed?: Record<string, unknown> | null;
+  report?: Record<string, unknown> | null;
+}
+
 export interface SubmitMutation extends LedgerMutation {
   formal: {
     formal_id: string;

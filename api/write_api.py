@@ -111,6 +111,14 @@ class TakedownWaive(BaseModel):
     original_signer: Optional[str] = None
 
 
+class ReviewAndCloseBody(BaseModel):
+    """一键结案（B1）。`verdict` 只有两个值 —— 见 reducer 的 review_and_close。"""
+    verdict: str = "agree"
+    review_notes: str = ""
+    sign: bool = True
+    reason: Optional[str] = None
+
+
 class ReleaseDecisionBody(BaseModel):
     decision: str
     version: int
@@ -265,6 +273,7 @@ IMPLEMENTED_WRITE_PATHS = {
     "/api/v1/takedown-tasks/{id}/retry",
     "/api/v1/takedown-tasks/{id}/reassign",
     "/api/v1/takedown-tasks/{id}/waive",
+    "/api/v1/cases/{id}/review-and-close",
     "/api/v1/cases/{id}/release-decision",
     "/api/v1/cases/{id}/release-revoke",
     # T-313d：通知 read/ack（写自己的收件箱；GET 的 authority 分支在 review_api）。
@@ -1065,6 +1074,71 @@ def register_write_routes(app, *, principal_dep, review_command_service=None,
         if not ref:
             raise StepUpError("step-up token 无效（过期/已用/绑定不符）")
         return ref
+
+    def _issue_step_up(principal, state, action, nonce, now=None):
+        """服务端自签一张 step-up 票据（B1 一键结案路径专用）。
+
+        ★ 这是一个**明确的取舍**，不是实现偷懒：
+          `review_and_close` 把「复核 + 签发」合成一次点击，于是没有第二次
+          飞书 OAuth reauth 的机会。票据仍然落库、仍然被消费、审计链不断，
+          但「谁证明了他是他」这一步没有真人参与。
+          委托方 2026-11-04 选择 B1 时接受这个代价。
+
+        ★ 只在 review_and_close 里用。**不要**把它接到 release-decision 上 ——
+          那条是「显式签发」，它必须继续要求真 step-up。
+        """
+        store = app.state.session_store
+        if store is None:
+            raise StepUpError("没有 session store —— step-up 无法签发")
+        return store.issue_step_up(
+            principal.get("id"), state.get("case_id"), action, nonce, now=now)
+
+    @app.post("/api/v1/cases/{id}/review-and-close")
+    def review_and_close(id: str, request: Request, body: ReviewAndCloseBody,
+                         principal=Depends(principal_dep),
+                         idempotency_key: Optional[str] = Header(
+                             None, alias="Idempotency-Key")):
+        """一键「审完 → 结案 → 签发」（B1）。
+
+        一次点击取代原来四步（认领 → 存草稿 → 逐条裁决 → 填 notes 提交）
+        再加两次 OAuth reauth。取舍写在
+        `ReviewCommandService.review_and_close` 的 docstring 里：
+        SoD 与真人 step-up 在这条路径上被显式放弃，委托方 2026-11-04 选定。
+
+        `sign=False` 时只结案不签发（留给「我审完了但还不放行」的场景）。
+        """
+        require_enabled("/api/v1/cases/{id}/review-and-close")
+        case = case_or_404(id)
+        require_review(principal, case)
+        if review_command_service is None:
+            raise HTTPException(501, "capability_not_enabled")
+        try:
+            outcome = review_command_service.review_and_close(
+                aggregate_id=id, principal=principal,
+                verdict=body.verdict, review_notes=body.review_notes,
+                sign=bool(body.sign),
+                reason=body.reason or "",
+                issue_step_up=_issue_step_up,
+                step_up_consumer=_consume_step_up,
+                idempotency_key=idempotency_key)
+        except (SoDViolation, StepUpError, InvalidTransition,
+                SignatureError) as exc:
+            code = type(exc).__name__
+            status = {"SoDViolation": 403, "StepUpError": 403,
+                      "InvalidTransition": 409,
+                      "SignatureError": 400}[code]
+            raise HTTPException(status, "%s: %s" % (code, exc))
+        except (LedgerConflict, LedgerValidation, AuthorityConflict) as exc:
+            raise_command_http(exc, "review_and_close")
+        response = dict(outcome["result"])
+        response.update({
+            "authority_snapshot": outcome["authority_snapshot"],
+            "reconcile_token": outcome["reconcile_token"],
+            "projection_lag": outcome["projection_lag"],
+            "replayed": outcome["replayed"],
+        })
+        return JSONResponse(content=response,
+                            status_code=outcome["http_status"])
 
     @app.post("/api/v1/cases/{id}/release-decision")
     async def release_decision(id: str, request: Request, body: ReleaseDecisionBody,

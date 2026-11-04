@@ -584,6 +584,7 @@ WRITE_PATHS = (
     "/api/v1/appeals",
     "/api/v1/appeals/{id}/migrate",
     "/api/v1/appeals/{id}/withdraw",
+    "/api/v1/cases/{id}/review-and-close",
     "/api/v1/cases/{id}/release-decision",
     "/api/v1/cases/{id}/release-revoke",
     "/api/v1/takedown-tasks/{id}/start",

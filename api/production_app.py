@@ -53,6 +53,7 @@ PRODUCTION_WRITE_PATHS = {
     # 已由 T-310a 消除（D1 裁定口径，判定时点写入 state）；
     # 生产分支走 ReviewCommandService.release_decision，状态落
     # state["release"]，不再落内存 gate —— C3j 断言随之翻转为「必须在册」。
+    "/api/v1/cases/{id}/review-and-close",
     "/api/v1/cases/{id}/release-decision",
     "/api/v1/cases/{id}/release-revoke",
     # T-315c：撤权端点（grant_revoke 命令；能力判定在路由 + reducer 两层）。
