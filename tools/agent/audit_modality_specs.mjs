@@ -44,7 +44,7 @@ export const AUDIT_MODALITY_SPECS = Object.freeze({
     ]),
     emptyRow: Object.freeze(['全图', '未见明显局部违规', '转工作台人工复核']),
     snippetLabel: '【可直接复制给设计的合规免责贴条】',
-    nextStep: Object.freeze({ rework: '改图后重审', escalate: '转工作台人工复核' }),
+    nextStep: Object.freeze({ rework: '改图后重审', escalate: '转工作台人工复核', pass: '人工确认后放行' }),
     tags: Object.freeze({ block: '需修改', pass: '初筛通过', review: '需人工确认' }),
     showProductLine: false,
     boundary: '已覆盖：图内文字(OCR) · 画面语义 · 视觉符号 · 区域级画面审计',
@@ -78,7 +78,7 @@ export const AUDIT_MODALITY_SPECS = Object.freeze({
     ]),
     emptyRow: Object.freeze(['全文扫描', '未命中已知字面违规词', '转工作台人工复核语境后放行']),
     snippetLabel: '【可直接复制的合规替换文案 / 免责贴条】',
-    nextStep: Object.freeze({ rework: '改词后重审', escalate: '转工作台人工复核' }),
+    nextStep: Object.freeze({ rework: '改词后重审', escalate: '转工作台人工复核', pass: '人工确认后放行' }),
     tags: Object.freeze({ block: '需修改', pass: '初筛未见违规', review: '需人工确认' }),
     showProductLine: true,
     boundary: '已覆盖：字面红线词 · 功效与安全宣称 · 品线与平台规范 · 法规条款核验（纯文本送审，不含配图与视频）',
@@ -103,7 +103,7 @@ export const AUDIT_MODALITY_SPECS = Object.freeze({
     ]),
     emptyRow: Object.freeze(['全片', '未见明显局部违规', '转工作台人工复核']),
     snippetLabel: '【可直接复制给剪辑师的合规免责字幕 / 替换口播词】',
-    nextStep: Object.freeze({ rework: '剪片后重审', escalate: '转工作台人工复核' }),
+    nextStep: Object.freeze({ rework: '剪片后重审', escalate: '转工作台人工复核', pass: '人工确认后放行' }),
     tags: Object.freeze({ block: '需修改', pass: '初筛未见违规', review: '需人工确认' }),
     showProductLine: true,
     boundary: '已覆盖：画面字幕(OCR) · 口播语音(ASR) · 音画一致性 · 时间轴分段审计',
@@ -223,6 +223,52 @@ function fallbackTextFd({ findings, productLine, productLineNote }) {
 }
 
 /**
+ * 五标签 + `overall` 大白话 → 卡片状态。纯函数，**结论标签只有一个出处**。
+ *
+ * ★ 这里的判据是一条被真事故证过的规矩：`overall` 是给人读的大白话，
+ *   用 `includes('违规')` 去猜状态会把「初筛未见明显违规」读成拦截 ——
+ *   「违规」两个字出现在**否定句**里。所以判「拦截」之前必须先排掉否定形式，
+ *   否则卡片会把一张干净的图打成红卡并叫人「改图后重审」。
+ *
+ * @param {string} label       生产引擎标签（BLOCK/REVIEW/PASS/PASS+SUGGEST/待自决/未审查）
+ * @param {string} overallText VLM/LLM 写的大白话结论
+ * @returns {{stateTag:string, isBlock:boolean, isPass:boolean, isUnreviewed:boolean}}
+ */
+export function classifyAuditState(label = 'REVIEW', overallText = '') {
+  const rawLabel = String(label ?? 'REVIEW').trim();
+  const ov = String(overallText ?? '').trim();
+
+  if (rawLabel === '未审查' || ov.includes('未审查') || ov.includes('未能读取')) {
+    return { stateTag: '未审查', isBlock: false, isPass: false, isUnreviewed: true };
+  }
+
+  // 「未见违规」「未发现违规」「无违规」「没有违规」「不含违规」都不是拦截。
+  const hasNegatedViolation = /(?:未见|未发现|无|没有|不含)[^，。；\n]{0,6}违规/.test(ov);
+  const ovBlock = ov.includes('需修改') || ov.includes('发现违规')
+    || (ov.includes('违规') && !hasNegatedViolation);
+  const ovPass = (ov.includes('未见') || ov.includes('未发现'))
+    && !ov.includes('确认') && !ov.includes('需修改');
+
+  if (rawLabel === 'BLOCK' || ovBlock) {
+    return { stateTag: 'BLOCK', isBlock: true, isPass: false, isUnreviewed: false };
+  }
+  if (rawLabel === 'PASS' || rawLabel === 'PASS+SUGGEST' || ovPass) {
+    return {
+      stateTag: rawLabel === 'PASS+SUGGEST' ? 'PASS+SUGGEST' : 'PASS',
+      isBlock: false,
+      isPass: true,
+      isUnreviewed: false,
+    };
+  }
+  return {
+    stateTag: rawLabel === '待自决' ? '待自决' : 'REVIEW',
+    isBlock: false,
+    isPass: false,
+    isUnreviewed: false,
+  };
+}
+
+/**
  * 把一份 `four_dim_audit` 渲染成三种构建器共用的卡片数据。
  *
  * @param {object} p
@@ -231,6 +277,7 @@ function fallbackTextFd({ findings, productLine, productLineNote }) {
  * @param {string} p.label     五标签
  * @param {string|null} p.caseId
  * @param {string|null} p.productLine
+ * @param {string|null} p.productLineCategory  给人看的品类名（可超出五品线，如「婴儿监护仪」）
  * @param {string|null} p.productLineNote
  * @param {object|undefined} p.evChain  证据链；`undefined` = 不适用（不出一行），`null` = 取不到
  * @param {Array} p.findings
@@ -243,6 +290,7 @@ export function renderFourDimAuditPayload({
   label = 'REVIEW',
   caseId = null,
   productLine = null,
+  productLineCategory = null,
   productLineNote = null,
   evChain,
   findings = [],
@@ -257,10 +305,14 @@ export function renderFourDimAuditPayload({
   if (!data) return null;
 
   const overall = clean(data.overall || HUMAN_LABEL[label] || '需人工确认');
-  const isBlock = overall.includes('修改') || overall.includes('违规');
-  const isPass = overall.includes('未见') && !overall.includes('确认');
-  const tone = isBlock ? 'red' : (isPass ? 'green' : 'orange');
-  const tagLabel = isBlock ? spec.tags.block : (isPass ? spec.tags.pass : spec.tags.review);
+  const { stateTag, isBlock, isPass, isUnreviewed } = classifyAuditState(label, overall);
+  const tone = isUnreviewed ? 'wathet' : (isBlock ? 'red' : (isPass ? 'green' : 'orange'));
+  const actionTag = isUnreviewed
+    ? '未能读取'
+    : (isBlock ? spec.tags.block : (isPass ? spec.tags.pass : spec.tags.review));
+  // 状态标签必须在抬头里**显式**说清楚，不靠读者从措辞里猜。
+  // 「未审查」只有状态、没有动作词 —— 它没有「需修改/初筛通过」这种可执行含义。
+  const tagLabel = isUnreviewed ? '未审查' : `${stateTag} ${actionTag}`;
 
   const oneLine = clean(data.one_line || overall);
   const shortTitle = asText(data.short_title) ? clean(data.short_title).slice(0, 18) : oneLine.slice(0, 18);
@@ -298,13 +350,17 @@ export function renderFourDimAuditPayload({
 
   const fields = [{ label: '审查结论', value: overall }];
   if (spec.showProductLine) {
-    const pl = asText(productLine);
+    // 先认品类名：「婴儿监护仪」比「吸奶器」有用得多 —— 后者只是建案队列。
+    const pl = asText(productLineCategory) || asText(productLine);
     fields.push({
       label: '识别品线',
       value: pl ? clean(pl) : clean(productLineNote || '未能识别（按通用规则审查）'),
     });
   }
-  fields.push({ label: '下一步', value: isBlock ? spec.nextStep.rework : spec.nextStep.escalate });
+  const nextStep = isBlock
+    ? spec.nextStep.rework
+    : (isPass ? (spec.nextStep.pass ?? '人工确认后放行') : spec.nextStep.escalate);
+  fields.push({ label: '下一步', value: nextStep });
   if (caseId) fields.push({ label: '工作台单号', value: caseId });
 
   const snippet = asText(data.copy_paste_snippet);
@@ -323,7 +379,8 @@ export function renderFourDimAuditPayload({
   };
 }
 
-const HUMAN_LABEL = Object.freeze({
+/** 五标签的中文说法。**导出**是因为三张卡的降级分支都读它；各写一份必然漂移。 */
+export const HUMAN_LABEL = Object.freeze({
   BLOCK: '发现违规需修改',
   REVIEW: '需人工确认',
   待自决: '需人工确认',

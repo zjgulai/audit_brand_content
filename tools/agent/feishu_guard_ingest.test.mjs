@@ -769,13 +769,15 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
 
 /* ── K. 模态专属审查卡：图片 / 文案 / 视频三套四维体检互不串台 ─────────── */
 {
-  const { AUDIT_MODALITY_SPECS, resolveModality } = await import('./audit_modality_specs.mjs');
+  const renderMod = await import('./audit_modality_specs.mjs');
+  const { AUDIT_MODALITY_SPECS, resolveModality } = renderMod;
   const prd53Mod = await import('./prd53.mjs');
   const stdCards = await import('./standard_cards.mjs');
   const cardsMod = await import('../reply-cards/cards.mjs');
   const envMod = await import('../reply-cards/envelope.mjs');
   const regMod = await import('../reply-cards/registry.mjs');
   const imgJudgment = await import('./image_judgment.mjs');
+  const judgeEvidence = await import('./judge_evidence.mjs');
 
   /** 卡片 → 一段可判读的文本（正文 + 表头 + 灰底带 + 边界），断言只看这里。 */
   const view = (card) => {
@@ -791,6 +793,9 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
     }
     return parts.join('\n');
   };
+
+  /** 直接调渲染器：三张卡（prd53 / standard_cards）都只是它的包装。 */
+  const renderPayload = (modality, fd, label) => renderMod.renderFourDimAuditPayload({ modality, fd, label });
 
   const textResult = (over = {}) => ({
     case_id: 'case-1111111111111111aaaa',
@@ -832,7 +837,7 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
     const shaped = envMod.toCardOrText(fromPrd53);
     const v = view(shaped.card);
     const must = [
-      '【文案审查 · 需修改】',
+      '【文案审查 · BLOCK 需修改】',
       '【文案四维体检】',
       '① 字面红线与医疗禁用词',
       '② 功效与安全宣称',
@@ -853,7 +858,7 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
     const fromStd = stdCards.buildAuditResultCard({ textJudgeResult: textResult() });
     const v2 = view(fromStd);
     T('K2b 文案卡（standard_cards 出口）与 prd53 出口逐项同字：抬头/四维/列名/边界',
-      v2.includes('【文案审查 · 需修改】') && v2.includes('【文案四维体检】')
+      v2.includes('【文案审查 · BLOCK 需修改】') && v2.includes('【文案四维体检】')
         && v2.includes('【④ 问题位置与改法（对表改字）】')
         && v2.includes('段落 / 位置') && v2.includes('【可直接复制的合规替换文案 / 免责贴条】')
         && v2.includes('已覆盖：字面红线词')
@@ -941,7 +946,7 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
     };
     const v = view(envMod.toCardOrText(prd53Mod.formatDirectAuditCardReply({ mediaGot: imageGot })).card);
     const must = [
-      '【图片审查 · 需修改】', '【四维快速体检】',
+      '【图片审查 · BLOCK 需修改】', '【四维快速体检】',
       '① 图内文字（OCR）', '② 画面语义', '③ 视觉符号',
       '【④ 区域级画面审计（对表改图）】',
       '画面位置', '发现的问题', '直接怎么改',
@@ -957,7 +962,7 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
   // K5 —— 出站边界闸：喂那张历史上的坏卡（文案抬头 + 图片边界），必须被就地改写。
   {
     const BAD = JSON.stringify({
-      title: '【文案审查 · 需人工确认】未见已知字面红线词',
+      title: '【文案审查 · REVIEW 需人工确认】未见已知字面红线词',
       verdict: '未命中已知禁用词',
       reasoning: '【马上怎么改】转人工\n\n【文案四维体检】\n· ① 字面红线与医疗禁用词：未见',
       groups: [{ title: '审查详情', content: '只覆盖**图内文字（OCR）**；画面语义未覆盖；空命中只能 REVIEW，不许说初筛未见违规（待人工复核）。' }],
@@ -976,7 +981,7 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
 
     // 反向对照（过纠）：图片卡里自己的合法行一个字都不许被删
     const good = envMod.toCardOrText(`[[card:evidence]]\n${JSON.stringify({
-      title: '【图片审查 · 需修改】x',
+      title: '【图片审查 · BLOCK 需修改】x',
       reasoning: '【四维快速体检】\n· ① 图内文字（OCR）：未见违规\n· ② 画面语义：正常',
       boundary: '已覆盖：图内文字(OCR) · 画面语义 · 视觉符号 · 区域级画面审计',
     })}`);
@@ -992,7 +997,7 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
 
     // 模态抬头不许被权威结论行覆写；模型自拟抬头仍然必须被置顶
     const keep = envMod.applyVerdictLine('evidence',
-      { title: '【文案审查 · 需修改】短标题' }, { line: '【审查结论：BLOCK】共发现 3 处必须修改（案件 case-x）。' });
+      { title: '【文案审查 · BLOCK 需修改】短标题' }, { line: '【审查结论：BLOCK】共发现 3 处必须修改（案件 case-x）。' });
     const overwrite = envMod.applyVerdictLine('evidence',
       { title: '模型自拟标题' }, { line: '【审查结论：BLOCK】共发现 3 处必须修改（案件 case-x）。' });
     T('K5d 模态抬头不被覆写，而模型自拟抬头仍被权威结论行置顶（G3 的形状）',
@@ -1058,6 +1063,251 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
     const bad = cases.filter(([, a, q, exp]) => submitsUserText(a, q) !== exp).map(([n]) => n);
     T('K7 文案直出的入站闸：只认「送审的就是用户这句话」，解释类提问不被审查卡吃掉',
       !bad.length, JSON.stringify({ bad }));
+  }
+
+  // K8 —— 五标签必须在抬头里**显式**写出来，且「初筛未见明显违规」绝不许被判成拦截。
+  {
+    const { classifyAuditState } = await import('./audit_modality_specs.mjs');
+    const states = [
+      ['REVIEW', '初筛未见明显违规', 'PASS', 'green', false],
+      ['REVIEW', '未见违规', 'PASS', 'green', false],
+      ['PASS', '初筛未见违规', 'PASS', 'green', false],
+      ['BLOCK', '发现违规需修改', 'BLOCK', 'red', false],
+      ['REVIEW', '发现违规', 'BLOCK', 'red', false],
+      ['REVIEW', '需人工确认', 'REVIEW', 'orange', false],
+      ['待自决', '需人工确认', '待自决', 'orange', false],
+      ['未审查', '素材未能读取', '未审查', 'wathet', true],
+      // overall 里写「未能读取」即使标签是 REVIEW 也必须落未审查
+      ['REVIEW', '素材未能读取', '未审查', 'wathet', true],
+    ];
+    const bad = [];
+    for (const [label, ov, tag, tone, unreviewed] of states) {
+      const r = renderPayload('image', { overall: ov, one_line: 'x', short_title: 't' }, label);
+      if (!r) { bad.push(`${label}/${ov}: 没出卡`); continue; }
+      if (!r.title.includes(`${tag}`)) bad.push(`${label}/${ov}: 抬头没写 ${tag} → ${r.title}`);
+      if (r.tone !== tone) bad.push(`${label}/${ov}: tone=${r.tone} 应为 ${tone}`);
+      if (unreviewed && r.tone !== 'wathet') bad.push(`${label}/${ov}: 未审查没用 wathet`);
+    }
+    // 逐条断言最要紧的两条：PASS 不许说改图，BLOCK 才说改图。
+    const passCard = renderPayload('image', { overall: '初筛未见明显违规', one_line: 'x', short_title: 't' }, 'REVIEW');
+    const passStep = passCard.fields.find((f) => f.label === '下一步')?.value;
+    const blockCard = renderPayload('image', { overall: '发现违规需修改', one_line: 'x', short_title: 't' }, 'BLOCK');
+    const blockStep = blockCard.fields.find((f) => f.label === '下一步')?.value;
+    T('K8 ★ 五标签显式写进抬头，且「初筛未见明显违规」出 PASS/绿卡/人工确认后放行（不是红卡改图）',
+      !bad.length && passStep === '人工确认后放行' && blockStep === '改图后重审'
+        && classifyAuditState('REVIEW', '初筛未见明显违规').isBlock === false
+        && classifyAuditState('REVIEW', '发现违规需修改').isBlock === true,
+      JSON.stringify({ bad, passStep, blockStep }));
+
+    // 反向对照：四张真标签各出各的抬头，两个字面一个都不许串。
+    const titles = ['【图片审查 · BLOCK 需修改】', '【文案审查 · REVIEW 需人工确认】',
+      '【图片审查 · PASS 初筛通过】', '【图片审查 · 未审查】'];
+    const textCard = renderPayload('text', { overall: '初筛未见明显违规', one_line: 'x', short_title: 't' }, 'REVIEW');
+    T('K8b ★ 反向对照：四种状态的抬头各说各的；文案 PASS 用文案自己的措辞「初筛未见违规」',
+      titles[0].includes('BLOCK') && titles[1].includes('REVIEW')
+        && textCard.title.startsWith('【文案审查 · PASS 初筛未见违规】'),
+      textCard.title);
+  }
+
+  // K8c —— 降级卡（没有四维、只有 summary）也必须带同一个状态标签与配色。
+  // 两个构建器各测一遍：它们是两份代码，一个对了不等于另一个也对。
+  {
+    const degradedStates = [
+      ['BLOCK', 'BLOCK', 'red'],
+      ['REVIEW', 'REVIEW', 'orange'],
+      ['PASS', 'PASS', 'green'],
+      ['未审查', '未审查', 'wathet'],
+    ];
+    const problems = [];
+    for (const [label, tag, tone] of degradedStates) {
+      // 刻意不给 four_dim_audit：走降级分支
+      const got = { type: 'image', carrier: 'image', judgment: { label, findings_total: 0 } };
+      const viaPrd = envMod.toCardOrText(prd53Mod.formatDirectAuditCardReply({ mediaGot: got })).card;
+      const viaStd = stdCards.buildAuditResultCard({ mediaGot: got });
+      for (const [who, c] of [['prd53', viaPrd], ['standard_cards', viaStd]]) {
+        const title = String(c?.header?.title?.content ?? '');
+        const tpl = String(c?.header?.template ?? '');
+        if (!title.includes(tag)) problems.push(`${who}/${label}: 抬头没写 ${tag} → ${title}`);
+        if (tpl !== tone) problems.push(`${who}/${label}: 配色 ${tpl} 应为 ${tone}`);
+      }
+    }
+    T('K8c ★ 降级卡也带显式状态标签与配色（两个构建器各测：一份对了不等于另一份也对）',
+      !problems.length, JSON.stringify(problems));
+  }
+
+  // K9 —— 子品类识别：Baby Monitor 不许被当成吸奶器审。
+  {
+    const bm = runGuardPy(['--text', 'BM04 baby monitor with parent unit and motion alert',
+      '--message-id', 'om_k9_bm']);
+    const st = runGuardPy(['--text', 'Bottle sterilizer and dryer with descaling tablet',
+      '--message-id', 'om_k9_st']);
+    const bag = runGuardPy(['--text', 'Breastmilk storage bag, 100 pcs', '--message-id', 'om_k9_bag']);
+    const pillow = runGuardPy(['--text', 'Pregnancy pillow for maternity sleep', '--message-id', 'om_k9_pil']);
+    T('K9 ★ 子品类识别：婴儿监护仪 / 消毒与洗瓶机 / 储奶袋 / 孕妇枕 各自出 display_category，而建案品线仍是工作台可建的「吸奶器」',
+      bm.ok && String(bm.display_category || '').includes('婴儿监护仪')
+        && st.ok && String(st.display_category || '').includes('消毒与洗瓶机')
+        && bag.ok && String(bag.display_category || '').includes('储奶袋')
+        && pillow.ok && String(pillow.display_category || '').includes('孕妇枕')
+        && [bm, st, bag, pillow].every((r) => r.product_line === '吸奶器')
+        && [bm, st, bag, pillow].every((r) => r.product_line_resolution?.status === 'default_fallback'),
+      JSON.stringify([bm, st, bag, pillow].map((r) => [r.display_category, r.product_line])));
+
+    // 反向对照：五品线自己命中时，display_category 必须等于品线，不许被子品类改写。
+    const trolley = runGuardPy(['--text', 'Lightweight baby stroller for travel', '--message-id', 'om_k9_b1']);
+    T('K9b ★ 反向对照：五品线命中（stroller）时 display_category 就是该品线，不是子品类',
+      trolley.display_category === trolley.product_line && trolley.product_line !== '吸奶器',
+      JSON.stringify([trolley.display_category, trolley.product_line]));
+
+    // 安全提醒必须按品类出，而不是按建案队列出：监护仪的红线不是「奶量」。
+    // 直接问 Python 的 PRODUCT_LINE_SAFETY_HINT，不拿源码做正则 —— 那种判据在改措辞时误报。
+    const hintOut = execFileSync('python3', ['-c',
+      'import json,sys; sys.path.insert(0,"."); '
+      + 'from base.feishu_guard_ingest import PRODUCT_LINE_SAFETY_HINT as H; '
+      + 'print(json.dumps({k:v for k,v in H.items()}, ensure_ascii=False))',
+    ], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 30_000 });
+    const hints = JSON.parse(hintOut);
+    const mon = String(hints['婴儿监护仪'] || '');
+    T('K9c 监护仪的安全提醒说的是 SIDS/看护，不是吸奶器的奶量倍增',
+      mon.includes('SIDS') && mon.includes('看护') && !mon.includes('奶量')
+        && String(hints['消毒与洗瓶机'] || '').length > 0
+        && String(hints['储奶袋与配件'] || '').length > 0,
+      mon);
+  }
+
+  // K10 —— 单句求审必须直出四维卡，解释类提问不许被吃掉。
+  {
+    const { isCopyAuditRequest, submitsUserText } = await import('./agent.mjs');
+    const mustDirect = [
+      'm5 pro是最好的吸奶器，这句话能过审吗？',
+      '帮我审一下这条 Amazon 五点描述，第五条写的是：FDA approved wearable breast pump. 这条能发吗',
+      '这段文案能过审吗？我们的吸奶器采用 100% 安全材质，绝不侧翻',
+      '这段能过审吗：「为什么选择我们」，因为我们是第一',
+    ];
+    const mustNot = [
+      '帮我解释一下 FDA approved 是什么意思',
+      '为什么 FDA approved 不能写',
+      '你能做什么',
+      '能发吗',
+      '吸奶器的品线规范是什么',
+      '帮我解释一下「FDA approved」是什么意思',
+    ];
+    const wrongDirect = mustDirect.filter((q) => isCopyAuditRequest(q) !== true);
+    const wrongNot = mustNot.filter((q) => isCopyAuditRequest(q) !== false);
+    T('K10 ★ 单句求审（含引号/无引号）触发直出卡；解释类与能力类提问不触发',
+      !wrongDirect.length && !wrongNot.length,
+      JSON.stringify({ wrongDirect, wrongNot }));
+
+    const subBad = [
+      [JSON.stringify({ text: 'm5 pro是最好的吸奶器' }), 'm5 pro是最好的吸奶器，这句话能过审吗？', true],
+    ].filter(([a, q, exp]) => submitsUserText(a, q) !== exp).map(([, q]) => q);
+    T('K10b ★ submitsUserText：模型只送引号里那句正文时也认（比例闸会把它稀释掉，包含关系不会）',
+      !subBad.length, JSON.stringify({ subBad }));
+  }
+
+  // K11 —— 多图合并：一张失败不许把原始 HTTP 报错写进 one_line。
+  {
+    const { mergeMultiImageAudit } = await import('./agent.mjs');
+    const okImg = {
+      idx: 0, status: 'image_judged', type: 'image', carrier: 'image',
+      judgment: { label: 'REVIEW' },
+      four_dim_audit: {
+        overall: '初筛未见明显违规', one_line: '图一画面干净，未见违规',
+        short_title: 'x', quick_fix: '无需修改',
+        region_rows: [{ region: '顶部', issue: '无', fix: '无' }],
+      },
+    };
+    const badImg = {
+      idx: 1, status: 'image_judge_failed', type: 'image', carrier: 'image',
+      summary: '图片未审查（DP0）：没取到文件（Request failed with status code 500）',
+      reply: '图片未审查（DP0）：没取到文件（Request failed with status code 500）',
+    };
+    const m = mergeMultiImageAudit([okImg, badImg], 'om_k11');
+    const card = envMod.toCardOrText(prd53Mod.formatDirectAuditCardReply({ mediaGot: m })).card;
+    // 表格行不在 markdown 里，`view` 只读列名 —— 明细必须直接读 table.rows。
+    const tableRows = (card?.body?.elements ?? []).filter((el) => el.tag === 'table')
+      .flatMap((el) => el.rows ?? []);
+    const rowHasFail = tableRows.some((r) => String(r.region).includes('图2')
+      && String(r.region).includes('未完成读取'));
+    const wholeCard = JSON.stringify(card ?? {});
+    T('K11 ★ 多图合并：一张失败一张成功时，正文只由判过的图构成，失败落一行干净明细',
+      m.four_dim_audit.one_line === '【图1】图一画面干净，未见违规'
+        && !JSON.stringify(m.four_dim_audit).includes('Request failed')
+        && rowHasFail && !wholeCard.includes('Request failed')
+        && wholeCard.includes('请单独重发该张图片送审'),
+      JSON.stringify({ one_line: m.four_dim_audit.one_line, tableRows }));
+
+    // 反向对照：全都失败 → 未审查（不是「需人工确认」），且抬头说未审查。
+    const allBad = mergeMultiImageAudit([badImg, { ...badImg, idx: 2 }], 'om_k11b');
+    const cardBad = envMod.toCardOrText(prd53Mod.formatDirectAuditCardReply({ mediaGot: allBad })).card;
+    const wholeBad = JSON.stringify(cardBad ?? {});
+    T('K11b ★ 反向对照：全部失败时标签是未审查，不是需人工确认，也不含任何 HTTP 报错',
+      allBad.judgment.label === '未审查'
+        && String(cardBad?.header?.title?.content ?? '').includes('未审查')
+        && !wholeBad.includes('Request failed')
+        && !wholeBad.includes('需人工确认'),
+      JSON.stringify({ label: allBad.judgment.label, title: cardBad?.header?.title?.content }));
+
+    // 反向对照：全部成功时不许凭空多出「未完成读取」行。
+    const allOk = mergeMultiImageAudit([okImg, { ...okImg, idx: 1 }], 'om_k11c');
+    T('K11c ★ 反向对照：全部成功时零失败行，且不误报未审查',
+      !(allOk.four_dim_audit.region_rows ?? []).some((r) => String(r.region).includes('未完成读取'))
+        && allOk.judgment.label !== '未审查',
+      JSON.stringify(allOk.four_dim_audit.region_rows));
+  }
+
+  // K12 —— 媒体证据探针必须带品类名，且能真的检索到该品类的知识库内容。
+  {
+    const { mediaEvidenceProbe } = await import('./agent.mjs');
+    const monitorGot = {
+      type: 'image', carrier: 'image',
+      product_line: '吸奶器',
+      product_line_resolution: { status: 'default_fallback', display_category: '婴儿监护仪（工作台归入通用/吸奶器队列）' },
+      judgment: { label: 'REVIEW', findings: [{ control_code: 'H01', quote: 'prevent SIDS' }] },
+      four_dim_audit: { one_line: '画面在演示婴儿睡眠场景', ocr_summary: 'Baby monitor with parent unit' },
+      summary: 'BM04 婴儿监护仪送审',
+    };
+    const probe = mediaEvidenceProbe(monitorGot);
+    T('K12 ★ 证据探针带品类名与命中原文（不带品类 → 检索不出词 → 证据链落 untested，像「库里没有」）',
+      probe.probeText.includes('婴儿监护仪')
+        && probe.probeText.includes('BM04')
+        && probe.hitsStub.hits[0]?.matched?.[0]?.matched_text === 'prevent SIDS',
+      probe.probeText.slice(0, 80));
+
+    // 反向对照：没有 quote 的 finding 不许产空 matched，否则空串会被当成查询词。
+    const emptyProbe = mediaEvidenceProbe({ four_dim_audit: {}, judgment: { findings: [{ control_code: 'X' }] } });
+    T('K12b ★ 反向对照：无 quote 的 finding 产出空 matched 数组，不产空串查询词',
+      Array.isArray(emptyProbe.hitsStub.hits[0]?.matched) && emptyProbe.hitsStub.hits[0].matched.length === 0,
+      JSON.stringify(emptyProbe.hitsStub));
+
+    // 端到端：远端不可达时，**带 localFallback 才有依据**；不带就是 untested。
+    // 这两半必须一起断言 —— 只断言「带的时候 found」的话，把参数删掉也仍然绿。
+    const savedUrl = process.env.SHOUHENG_KB_BASE_URL;
+    const savedKey = process.env.SHOUHENG_KB_API_KEY;
+    process.env.SHOUHENG_KB_BASE_URL = 'http://127.0.0.1:1';
+    process.env.SHOUHENG_KB_API_KEY = 'fake-key';
+    try {
+      const withFb = await judgeEvidence.gatherEvidence(probe.probeText, probe.hitsStub,
+        { enabled: true, localFallback: true });
+      const withoutFb = await judgeEvidence.gatherEvidence(probe.probeText, probe.hitsStub,
+        { enabled: true });
+      T('K12c ★ localFallback=true 才有本地依据（found）；不给就是 untested —— 图片/视频证据链必须显式传它',
+        withFb.status === 'found' && withFb.evidence_total > 0
+          && withoutFb.status === 'untested',
+        JSON.stringify({ with: withFb.status, without: withoutFb.status }));
+    } finally {
+      if (savedUrl === undefined) delete process.env.SHOUHENG_KB_BASE_URL;
+      else process.env.SHOUHENG_KB_BASE_URL = savedUrl;
+      if (savedKey === undefined) delete process.env.SHOUHENG_KB_API_KEY;
+      else process.env.SHOUHENG_KB_API_KEY = savedKey;
+    }
+
+    // 执行点：媒体那一处调用**必须**传 localFallback。K12c 证的是「传了才有用」，
+    // 这一条证的是「这里真的传了」—— 两半缺一条，改回不带参也不会红。
+    const agentSrc = fs.readFileSync(path.join(HERE, 'agent.mjs'), 'utf8');
+    const mediaCallOk = /gatherEvidence\(\s*$[\s\S]{0,200}?\{ enabled: config\.kb\.enabled, localFallback: true \}/m
+      .test(agentSrc);
+    T('K12d ★ 执行点：agent.mjs 的媒体证据调用点确实传了 localFallback: true',
+      mediaCallOk, '');
   }
 }
 

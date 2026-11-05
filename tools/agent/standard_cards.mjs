@@ -17,16 +17,10 @@
 import { build, renderText } from '../reply-cards/registry.mjs';
 import { plainify, plainifyCard, hasMdSymbols } from './plain.mjs';
 import { TEST_GROUP_CHAT_ID, assertTestGroupTarget } from './push_policy.mjs';
-import { resolveModality, renderFourDimAuditPayload, specFor } from './audit_modality_specs.mjs';
+import {
+  resolveModality, renderFourDimAuditPayload, specFor, classifyAuditState, HUMAN_LABEL,
+} from './audit_modality_specs.mjs';
 
-const HUMAN_LABEL = {
-  BLOCK: '发现违规需修改',
-  REVIEW: '需人工确认',
-  待自决: '需人工确认',
-  PASS: '初筛未见违规',
-  'PASS+SUGGEST': '初筛通过（附优化建议）',
-  未审查: '素材未能读取',
-};
 
 const HUMAN_STATUS = {
   unassigned: '待领单复核',
@@ -62,23 +56,31 @@ export function buildAuditResultCard({ mediaGot = null, textJudgeResult = null }
         label: rawLabel,
         caseId,
         productLine: mediaGot.product_line ?? j.product_line ?? null,
+        productLineCategory: mediaGot.product_line_resolution?.display_category
+          ?? mediaGot.display_category ?? null,
         productLineNote: mediaGot.product_line_resolution?.note ?? null,
         evChain: mediaGot.evidence_chain,
         cleanFn: clean,
       }));
     }
 
-    const humanLabel = HUMAN_LABEL[rawLabel] || '需人工确认';
-    const tone = rawLabel === 'BLOCK' ? 'red' : (rawLabel === 'PASS' ? 'green' : 'orange');
+    // 与四维卡同一个判据（`classifyAuditState`），不另写一份状态映射。
+    const { stateTag, isBlock, isPass, isUnreviewed } =
+      classifyAuditState(rawLabel, j.overall ?? '');
+    const humanLabel = isUnreviewed ? '素材未能读取' : (HUMAN_LABEL[stateTag] || '需人工确认');
+    const tone = isUnreviewed ? 'wathet' : (isBlock ? 'red' : (isPass ? 'green' : 'orange'));
+    const nextStep = isBlock
+      ? spec.nextStep.rework
+      : (isPass ? (spec.nextStep.pass ?? '人工确认后放行') : spec.nextStep.escalate);
     return build('evidence', {
       audit_modality: spec.key,
       tone,
-      title: `【${spec.cardNoun} · ${humanLabel}】${caseId ? `单号 ${caseId}` : '已完成初筛'}`,
+      title: `【${spec.cardNoun} · ${isUnreviewed ? '未审查' : `${stateTag} ${humanLabel}`}】${caseId ? `单号 ${caseId}` : '已完成初筛'}`,
       verdict: `【核心结论】${humanLabel}（命中 ${j.findings_total ?? 0} 处规则）`.slice(0, 58),
-      reasoning: `${spec.checklistHeading}\n· ① ${spec.dimensions[0].name}：已完成扫描\n· ② 下一步：${spec.nextStep.escalate}`,
+      reasoning: `${spec.checklistHeading}\n· ① ${spec.dimensions[0].name}：已完成扫描\n· ② 下一步：${nextStep}`,
       fields: [
         { label: '审查结论', value: humanLabel },
-        { label: '下一步', value: rawLabel === 'BLOCK' ? spec.nextStep.rework : spec.nextStep.escalate },
+        { label: '下一步', value: nextStep },
         ...(caseId ? [{ label: '工作台单号', value: caseId }] : []),
       ],
       boundary: spec.boundary,
@@ -93,6 +95,8 @@ export function buildAuditResultCard({ mediaGot = null, textJudgeResult = null }
       label: r.label ?? 'REVIEW',
       caseId: r.case_id ?? null,
       productLine: r.product_line ?? null,
+      productLineCategory: r.product_line_resolution?.display_category
+        ?? r.display_category ?? null,
       productLineNote: r.product_line_resolution?.note ?? null,
       evChain: r.evidence_chain,
       findings: Array.isArray(r.findings) ? r.findings.filter((f) => f && f.status !== 'candidate') : [],

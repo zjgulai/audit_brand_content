@@ -139,6 +139,48 @@ def workbench_data_root(env: Optional[Dict[str, str]] = None) -> Path:
     return (Path.home() / ".shouheng" / "workbench-data").resolve()
 
 
+#: 工作台五品线之外、但群里天天会送审的**子品类**。
+#: ★ 它只影响「卡片上写这叫什么东西」与「用哪条安全提醒审」，**不改变建案品线** ——
+#:   工作台 RBAC 与投影库只认 `VALID_PRODUCT_LINES`，把「婴儿监护仪」塞进 value
+#:   会让建案被拒。所以识别结果落在 `display_category`，`value` 仍是默认品线。
+#: ★ 这段存在的理由是一次真事故：一张 Baby Monitor 送审被识别成「吸奶器」，
+#:   于是安全提醒说的是「奶量倍增」，而它真正的红线是「不能暗示预防 SIDS」。
+EXTENDED_CATEGORY_KEYWORDS: Dict[str, Tuple[str, ...]] = {
+    "婴儿监护仪": (
+        "婴儿监护", "监护仪", "监视器", "看护器",
+        "baby monitor", "video monitor", "bm01", "bm03", "bm04", "bm08", "parent unit",
+    ),
+    "消毒与洗瓶机": (
+        "消毒器", "消毒机", "烘干机", "洗瓶机", "奶瓶清洗", "清洁片", "除垢片",
+        "sterilizer", "bottle washer", "descaling tablet", "detergent tablet", "kleanpal",
+    ),
+    "储奶袋与配件": (
+        "储奶袋", "母乳储存袋", "storage bag", "breastmilk storage",
+    ),
+    "孕妇枕与睡眠": (
+        "孕妇枕", "睡眠枕", "pregnancy pillow", "maternity pillow", "swaddle", "襁褓", "睡袋",
+    ),
+}
+
+
+def _keyword_hit_count(haystack: str, keywords: Tuple[str, ...]) -> Tuple[int, Optional[str]]:
+    """返回 `(命中词数, 第一个命中词)`。英文按词边界，中文按子串 —— 与五品线同一套读法。"""
+    hit_count = 0
+    first_kw: Optional[str] = None
+    for kw in keywords:
+        kw_low = kw.lower()
+        if re.match(r"^[a-z0-9\s-]+$", kw_low):
+            pat = r"(?<![a-z0-9])" + re.escape(kw_low) + r"(?![a-z0-9])"
+            found = bool(re.search(pat, haystack))
+        else:
+            found = kw_low in haystack
+        if found:
+            hit_count += 1
+            if first_kw is None:
+                first_kw = kw
+    return hit_count, first_kw
+
+
 def resolve_product_line(
     text: Optional[str] = None,
     *,
@@ -146,13 +188,17 @@ def resolve_product_line(
     uri: Optional[str] = None,
     fields: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """解析品线。返回 `{value, status, matched_keyword, declared, note}`。
+    """解析品线。返回 `{value, status, matched_keyword, declared, note, display_category}`。
 
     status 四档互不冒充：
     - `declared`                  调用方显式给出了合法的五品线之一
     - `invalid_declared_fallback` 调用方给了值但不在五品线内，回落默认「吸奶器」并明说
     - `inferred_keyword`          未声明，但从正文/字段/URL 关键词匹配到了具体品线
     - `default_fallback`          未声明且无品线词命中，回落默认「吸奶器」并明说
+
+    `display_category` 是**给人看**的品类名（可以超出五品线，如「婴儿监护仪」）；
+    `value` 始终是工作台可建的品线。两者分开的原因是工作台只认五品线（见
+    `EXTENDED_CATEGORY_KEYWORDS` 的注释）。
     """
     if isinstance(declared, str) and declared.strip():
         clean = declared.strip()
@@ -162,6 +208,7 @@ def resolve_product_line(
                 "status": "declared",
                 "matched_keyword": None,
                 "declared": clean,
+                "display_category": clean,
                 "note": f"使用显式指定的品线「{clean}」",
             }
         return {
@@ -169,6 +216,7 @@ def resolve_product_line(
             "status": "invalid_declared_fallback",
             "matched_keyword": None,
             "declared": clean,
+            "display_category": clean,
             "note": (
                 f"指定的品线「{clean}」不在工作台五品线（{'/'.join(VALID_PRODUCT_LINES)}）内，"
                 f"已按默认品线「{DEFAULT_PRODUCT_LINE}」建案"
@@ -192,24 +240,24 @@ def resolve_product_line(
 
     if haystack:
         for line_name in VALID_PRODUCT_LINES:
-            kws = PRODUCT_LINE_KEYWORDS.get(line_name, ())
-            hit_count = 0
-            first_kw: Optional[str] = None
-            for kw in kws:
-                kw_low = kw.lower()
-                if re.match(r"^[a-z0-9\s-]+$", kw_low):
-                    pat = r"(?<![a-z0-9])" + re.escape(kw_low) + r"(?![a-z0-9])"
-                    found = bool(re.search(pat, haystack))
-                else:
-                    found = kw_low in haystack
-                if found:
-                    hit_count += 1
-                    if first_kw is None:
-                        first_kw = kw
+            hit_count, first_kw = _keyword_hit_count(haystack, PRODUCT_LINE_KEYWORDS.get(line_name, ()))
             if hit_count > best_count:
                 best_count = hit_count
                 best_line = line_name
                 best_kw = first_kw
+
+    # 五品线没命中时再查子品类。**只在五品线零命中时查**：五品线是建案口径，
+    # 子品类只是显示名，让子品类覆盖五品线的匹配等于把「吸奶器」改成「储奶袋」建案。
+    ext_cat: Optional[str] = None
+    ext_kw: Optional[str] = None
+    if best_count == 0 and haystack:
+        ext_best = 0
+        for cat_name, kws in EXTENDED_CATEGORY_KEYWORDS.items():
+            hit_count, first_kw = _keyword_hit_count(haystack, kws)
+            if hit_count > ext_best:
+                ext_best = hit_count
+                ext_cat = cat_name
+                ext_kw = first_kw
 
     if best_line is not None and best_count > 0:
         return {
@@ -217,7 +265,21 @@ def resolve_product_line(
             "status": "inferred_keyword",
             "matched_keyword": best_kw,
             "declared": None,
+            "display_category": best_line,
             "note": f"未显式声明品线，按内容关键词「{best_kw}」自动识别为「{best_line}」",
+        }
+
+    if ext_cat is not None:
+        return {
+            "value": DEFAULT_PRODUCT_LINE,
+            "status": "default_fallback",
+            "matched_keyword": ext_kw,
+            "declared": None,
+            "display_category": f"{ext_cat}（工作台归入通用/吸奶器队列）",
+            "note": (
+                f"识别为「{ext_cat}」（关键词「{ext_kw}」）；"
+                f"工作台五品线内按默认品线「{DEFAULT_PRODUCT_LINE}」建案"
+            ),
         }
 
     return {
@@ -225,6 +287,7 @@ def resolve_product_line(
         "status": "default_fallback",
         "matched_keyword": None,
         "declared": None,
+        "display_category": f"通用母婴（未声明品线，默认{DEFAULT_PRODUCT_LINE}建案）",
         "note": f"未声明品线且内容无特定品线词，按默认品线「{DEFAULT_PRODUCT_LINE}」建案",
     }
 
@@ -397,6 +460,19 @@ def _detect_image_mime(raw: bytes) -> str:
     return "image/png"
 
 
+#: `overall` 的取值规则。**三个四维审查入口共用这一段**，各写一份必然漂移。
+#: ★ 它存在的理由是一次真事故：VLM 把「底部建议补一句免责声明」读成
+#:   「发现违规需修改」，卡片于是把一张合规的图打成红卡并叫人改图。
+#:   免责提醒是**常规动作**，不是违规 —— 这条把它写进判据，而不是靠模型自觉。
+OVERALL_RULE = (
+    "overall 取值规则：只有画面/文案中存在明确违规词、高烧/心率等医疗监测数据、"
+    "虚假认证图标或夸大数值时，才填「发现违规需修改」；"
+    "若仅存在功能宣称需要核对检测报告，填「需人工确认」；"
+    "若画面/文案本身合规、仅仅是常规提醒可以补充免责声明，必须填「初筛未见明显违规」。"
+    "严禁因为常规免责提醒而填「发现违规需修改」。"
+)
+
+
 def run_vlm_four_dim_audit(image_path: Path, ocr_text: str = "") -> Optional[Dict[str, Any]]:
     """调用多模态视觉大模型对图片做四维合规审查（图内文字OCR + 画面语义 + 视觉符号 + 区域级画面审计）。
 
@@ -427,6 +503,7 @@ def run_vlm_four_dim_audit(image_path: Path, ocr_text: str = "") -> Optional[Dic
             "你是一名跨境电商与母婴广告合规审核员。请对这张图片做【四维合规审查】，"
             "输出必须全部讲大白话（适合 ADHD 3秒扫完，每点只写 1 句核心人话；关键违规词用「」或【】括起来强调，严禁使用 *、**、`、# 等任何 Markdown 符号，严禁出现代码字段名）：\n"
             f"参考已提取的图内 OCR 文字：{ocr_hint if ocr_hint else '（无明显文字）'}\n\n"
+            + OVERALL_RULE + "\n"
             "请严格输出一行 JSON（不要多余解释）：\n"
             "{\n"
             '  "overall": "发现违规需修改 或 需人工确认 或 初筛未见明显违规",\n'
@@ -538,6 +615,7 @@ def run_vlm_video_four_dim_audit(video_path: Path) -> Optional[Dict[str, Any]]:
         prompt = (
             "你是一名跨境电商与母婴视频广告合规审核员。请同时看视频画面并听音轨口播，做【视频四维合规审查】。\n"
             "输出必须全部讲大白话（适合 ADHD 3秒扫完，每点只写 1 句核心人话；关键违规词用「」或【】括起来，严禁使用 *、**、`、# 等任何 Markdown 符号）：\n"
+            + OVERALL_RULE + "\n"
             "请严格输出一行 JSON（不要多余解释）：\n"
             "{\n"
             '  "overall": "发现违规需修改 或 需人工确认 或 初筛未见明显违规",\n'
@@ -650,11 +728,42 @@ PRODUCT_LINE_SAFETY_HINT: Dict[str, str] = {
     "背带": "背带禁止出现防窒息/髋关节发育等医疗暗示，须标注承重与月龄区间。",
     "温奶器": "温奶器禁止出现杀菌/消毒疗效承诺，温度须标注实测范围。",
     "哺乳内衣": "哺乳内衣禁止出现催乳/预防乳腺炎等功效暗示。",
+    "婴儿监护仪": (
+        "婴儿监护仪属辅助看护电子设备：严禁暗示可预防婴儿猝死（SIDS）"
+        "或监测生命体征/疾病，须声明不可替代成人直接看护。"
+    ),
+    "消毒与洗瓶机": (
+        "消毒与洗瓶机禁止出现「杀菌率 99.9%」「彻底灭菌」等无报告支撑的绝对化承诺，"
+        "须标注适用材质与实测除菌条件。"
+    ),
+    "储奶袋与配件": (
+        "储奶袋与配件禁止宣称「可长期常温保存母乳」「无菌」，"
+        "须标注材质等级、耐温范围与建议储存时长。"
+    ),
+    "孕妇枕与睡眠": (
+        "孕妇枕与睡眠类禁止暗示「预防妊娠纹」「缓解耻骨痛」等医疗功效，"
+        "须标注适用孕期与不可替代医嘱。"
+    ),
 }
 
 
 def _text_has_cjk(text: str) -> bool:
     return any("一" <= ch <= "鿿" for ch in text)
+
+
+def _display_category_of(pl_res: Dict[str, Any], product_line: str) -> str:
+    """取给人看的品类名（去掉「（工作台归入…）」那段解释）。
+
+    提醒词表按品类名索引，所以必须先剥掉括注 —— 否则「婴儿监护仪（工作台归入…）」
+    查不到表，卡片第三维又会退回一句通用话。
+    """
+    raw = str((pl_res or {}).get("display_category") or product_line or "").strip()
+    return raw.split("（", 1)[0].strip() or str(product_line or "").strip()
+
+
+def _safety_hint_for(pl_res: Dict[str, Any], product_line: str) -> str:
+    cat = _display_category_of(pl_res, product_line)
+    return PRODUCT_LINE_SAFETY_HINT.get(cat) or PRODUCT_LINE_SAFETY_HINT.get(product_line, "")
 
 
 def _text_location_label(f: Dict[str, Any]) -> str:
@@ -680,7 +789,9 @@ def _text_efficacy_hits(text: str) -> List[str]:
     return hits
 
 
-def _text_snippet_for(text: str, product_line: str, has_hits: bool) -> str:
+def _text_snippet_for(
+    text: str, product_line: str, has_hits: bool, pl_res: Optional[Dict[str, Any]] = None,
+) -> str:
     """可直接复制的替换件。英文文案给英文正文 + 中文说明，中文文案给中文。"""
     if _text_has_cjk(text):
         body = (
@@ -695,7 +806,8 @@ def _text_snippet_for(text: str, product_line: str, has_hits: bool) -> str:
         "Individual results vary; please follow the user manual."
     )
     lead = "Copy-paste replacement:" if has_hits else "Copy-paste disclaimer:"
-    note = f"（中文说明：{PRODUCT_LINE_SAFETY_HINT.get(product_line, '该品线禁止医疗与绝对化表述。')}）"
+    hint = _safety_hint_for(pl_res or {}, product_line) or '该品线禁止医疗与绝对化表述。'
+    note = f"（中文说明：{hint}）"
     return f"{lead}\n{body}\n{note}"
 
 
@@ -739,7 +851,7 @@ def _text_four_dim_deterministic(
         claim_summary = "未见明显夸大功效或安全承诺表述"
 
     # ③ 品线与平台特殊规范
-    hint = PRODUCT_LINE_SAFETY_HINT.get(product_line, "")
+    hint = _safety_hint_for(pl_res, product_line)
     pl_note = str(pl_res.get("note") or "").strip()
     platform_status = "需注意" if (claim_hits or claim_words) else "正常"
     platform_summary = "；".join(x for x in (pl_note, hint) if x) or "未触及平台特殊条款"
@@ -801,7 +913,7 @@ def _text_four_dim_deterministic(
         "symbol_status": platform_status, "visual_symbols": platform_summary,
         "region_rows": region_rows,
         "region_audit": [f"{r['region']}：{r['issue']} → {r['fix']}" for r in region_rows],
-        "copy_paste_snippet": _text_snippet_for(body, product_line, bool(confirmed or claim_words)),
+        "copy_paste_snippet": _text_snippet_for(body, product_line, bool(confirmed or claim_words), pl_res),
     }
 
 
@@ -845,7 +957,8 @@ def run_llm_text_four_dim_audit(
             "已由规则引擎给出命中清单。请在此基础上写【文案四维体检】。\n"
             "输出必须全部讲大白话（适合 ADHD 3秒扫完，每点只写 1 句核心人话；"
             "关键违规词用「」括起来强调，严禁使用 *、**、`、# 等任何 Markdown 符号，严禁出现代码字段名）：\n"
-            f"品线：{product_line}\n"
+            + OVERALL_RULE + "\n"
+            f"品线：{_display_category_of(pl_res, product_line)}\n"
             f"引擎命中：{json.dumps([{ 'code': f.get('control_code'), 'quote': f.get('quote') } for f in findings[:8] if isinstance(f, dict)], ensure_ascii=False)}\n"
             f"正文：\n{body[:4000]}\n\n"
             "请严格输出一行 JSON（不要多余解释）：\n"
@@ -917,6 +1030,16 @@ def run_llm_text_four_dim_audit(
         enriched["platform_status"], enriched["platform_summary"] = enriched["symbol_status"], enriched["visual_symbols"]
         enriched["model"] = model
         enriched["status"] = "ok"
+        # ★ 空证据不许被模型升级成拦截：标签不是 BLOCK、引擎零命中、正文也没有任何
+        #   功效/安全特征词时，「发现违规需修改」没有任何输入支撑 —— 它比依据大。
+        #   降成「需人工确认」而不是「初筛未见违规」：润色层没说它干净，我们只否掉最严那一档。
+        confirmed_all = [f for f in findings if isinstance(f, dict) and f.get("status") != "candidate"]
+        if (label != "BLOCK" and not confirmed_all and not _text_efficacy_hits(body)
+                and str(enriched.get("overall") or "").startswith("发现违规")):
+            enriched["overall"] = "需人工确认"
+            enriched["overall_downgraded"] = (
+                "引擎零命中且正文无功效特征词，润色层给的「发现违规需修改」无输入支撑，已降为需人工确认"
+            )
         return enriched
     except Exception:  # noqa: BLE001
         return det
@@ -1282,6 +1405,7 @@ def ingest_and_judge(
             "failure_kind": "empty" if "empty" in exc.code or "0 字节" in exc.detail else "parse_error",
             "error": f"{exc.code}: {exc.detail}",
             "product_line_resolution": pl_res,
+            "display_category": pl_res.get("display_category"),
             "stage_resolution": stage_res,
         }
     except Exception as exc:  # noqa: BLE001
@@ -1296,6 +1420,7 @@ def ingest_and_judge(
             "failure_kind": "parse_error",
             "error": f"{type(exc).__name__}: {exc}",
             "product_line_resolution": pl_res,
+            "display_category": pl_res.get("display_category"),
             "stage_resolution": stage_res,
         }
     finally:
@@ -1417,6 +1542,7 @@ def ingest_and_judge(
         "run_state": decision.get("run_state", "OK"),
         "product_line": resolved_pl,
         "product_line_resolution": pl_res,
+        "display_category": pl_res.get("display_category"),
         "content_stage": submission.get("content_stage"),
         "stage_resolution": stage_res,
         "extracted_text": (unit.get("text") or "")[:4000],

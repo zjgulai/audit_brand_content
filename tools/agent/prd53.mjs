@@ -9,7 +9,7 @@
  */
 import { mdTextSafe } from './plain.mjs';
 import {
-  resolveModality, renderFourDimAuditPayload, specFor,
+  resolveModality, renderFourDimAuditPayload, specFor, classifyAuditState, HUMAN_LABEL,
 } from './audit_modality_specs.mjs';
 
 export const STATES = ['BLOCK', 'REVIEW', 'PASS+SUGGEST', 'PASS', '待自决', '未审查'];
@@ -181,18 +181,24 @@ export function formatDirectAuditCardReply({ mediaGot = null, textJudgeResult = 
         label,
         caseId,
         productLine: mediaGot.product_line ?? j.product_line ?? null,
+        productLineCategory: mediaGot.product_line_resolution?.display_category
+          ?? mediaGot.display_category ?? null,
         productLineNote: mediaGot.product_line_resolution?.note ?? null,
         evChain: mediaGot.evidence_chain,
       })
       : null;
     if (payload) return `${openTag}\n${JSON.stringify(payload)}\n${closeTag}`;
 
-    const humanLabel = label === 'BLOCK'
-      ? '发现违规需修改'
-      : (label === '未审查' ? `${spec.receiptNoun}未能读取` : '需人工确认');
+    // 降级卡的抬头也要显式带状态标签 —— 与四维卡同一个判据，不另写一份。
+    const { stateTag, isBlock, isPass, isUnreviewed } =
+      classifyAuditState(label, mediaGot.judgment?.overall ?? '');
+    const humanLabel = isUnreviewed ? `${spec.receiptNoun}未能读取` : (HUMAN_LABEL[stateTag] || '需人工确认');
     const degraded = {
       audit_modality: spec.key,
-      title: `【${spec.cardNoun}：${humanLabel}】${caseId ? `单号 ${caseId}` : '已完成初筛'}`,
+      // 配色与四维卡同一套：未审查 wathet / 拦截 red / 通过 green / 其余 orange。
+      // 不写这一行，信封会给所有降级卡同一个默认色，「要不要停下看」这个信号就没了。
+      tone: isUnreviewed ? 'wathet' : (isBlock ? 'red' : (isPass ? 'green' : 'orange')),
+      title: `【${spec.cardNoun} · ${isUnreviewed ? '未审查' : `${stateTag} ${humanLabel}`}】${caseId ? `单号 ${caseId}` : '已完成初筛'}`,
       verdict: `结论：${humanLabel}（共命中 ${j.findings_total ?? 0} 条字面规则）`,
       groups: [
         {
@@ -218,6 +224,8 @@ export function formatDirectAuditCardReply({ mediaGot = null, textJudgeResult = 
       label: r.label ?? 'REVIEW',
       caseId: r.case_id ?? null,
       productLine: r.product_line ?? null,
+      productLineCategory: r.product_line_resolution?.display_category
+        ?? r.display_category ?? null,
       productLineNote: r.product_line_resolution?.note ?? null,
       evChain: r.evidence_chain,
       findings: Array.isArray(r.findings) ? r.findings.filter((f) => f && f.status !== 'candidate') : [],

@@ -207,7 +207,148 @@ export function submitsUserText(rawArgs, question) {
   if (b.length < 8) return false;
   const contained = b.includes(q) || q.includes(b);
   if (!contained) return false;
+  // 短句送审：用户写的是一句「这句话能过审吗」，模型只把引号里那句正文送来判。
+  // 此时比例会被提问句式稀释（`m5 pro是最好的吸奶器` 11 字 / 整句 19 字 = 0.58，
+  // 稍长一点的提问就掉到 0.35 以下），但 `q.includes(b)` 这条**已经证明**
+  // 送审正文就是用户自己的话 —— 那才是这条闸要判的东西。
+  // 解释类提问单独排除：那时模型送的通常只是被问的那个词，不是待审文案。
+  const isExplanation = /解释|是什么意思|为什么|怎么理解|区别/.test(q);
+  if (!isExplanation && q.includes(b) && b.length >= 10) return true;
   return Math.min(b.length, q.length) / Math.max(b.length, q.length) >= 0.5;
+}
+
+/**
+ * 用户这一句是不是在**求审一段文案**（而不是问知识、问能力、问解释）？
+ *
+ * 纯函数。它守的是一条真实的缺口：一轮工具循环里模型可以只写自己的话，
+ * 压根不调 `judge_copy` —— 于是这张卡不会出现，用户拿到的是模型自由发挥的排版。
+ * 今天 56 条送审里有 13 条正是这样：模型调了判定，却没用四维表。
+ *
+ * 判据两条同时成立：
+ *   ① 有求审的动词（能过审吗 / 能发吗 / 帮我审 / 合规吗 …）；
+ *   ② 有真被审的东西 —— 引号内正文，或去掉提问句式后仍 ≥10 字的产品/营销文案。
+ * 只有 ① 是「帮我解释一下 FDA approved 是什么意思」这种元提问，不许命中。
+ */
+export function isCopyAuditRequest(question) {
+  const q = String(question ?? '').trim();
+  if (q.length < 8) return false;
+  const asksForVerdict = /(能过审吗|能发吗|可以发吗|能不能发|合规吗|能上线吗|要不要改|帮我审|帮我卡一下|审一下|判一下)/.test(q);
+  if (!asksForVerdict) return false;
+
+  const quoted = [...q.matchAll(/[「“"'']([^」”"'']{6,})[」”"'']/g)].map((m) => m[1].trim());
+  // 元提问只在**引号之外**判：「帮我解释一下「FDA approved」是什么意思」是提问，
+  // 而「这段能过审吗：为什么选择我们，因为…」里的「为什么」是待审正文本身。
+  const outsideQuotes = q.replace(/[「“"'']([^」”"'']{6,})[」”"'']/g, ' ');
+  if (/(是什么意思|如何理解|怎么理解|你(能|会)做什么|你能干什么|为什么|解释)/.test(outsideQuotes)) {
+    return false;
+  }
+  if (quoted.some((t) => t.length >= 6)) return true;
+
+  // 没有引号时，把提问句式剥掉再看剩下多少字 —— 剩下的才是待审正文。
+  const residue = q
+    .replace(/(能过审吗|能发吗|可以发吗|能不能发|合规吗|能上线吗|要不要改|帮我审一下|帮我审|帮我卡一下|审一下|判一下)/g, '')
+    .replace(/[这那条段句文案广告描述是否可不可以请问帮忙一下的了吗？?。！!，,：:；;\s]/g, '');
+  return residue.length >= 10;
+}
+
+/* ─────────────────── 媒体证据探针（纯函数，可单独验）─────────────────── */
+
+/**
+ * 把一次媒体判定拼成 `gatherEvidence` 的入参。
+ *
+ * ★ 品类名必须进探针。一张 Baby Monitor 的 OCR 里没有「吸奶器」三个字；
+ *   探针只带 OCR 文本时，BM25 试不出任何词，证据链落 `untested` ——
+ *   读起来像「知识库里没有这个品类」，实际是我没告诉它该查哪个品类。
+ * ★ `findings` 里没有 `quote` 的条目不产空 matched，否则检索会把空串当查询词。
+ *
+ * @param {object} mediaGot
+ * @returns {{probeText:string, hitsStub:{hits:Array<object>}}}
+ */
+export function mediaEvidenceProbe(mediaGot) {
+  const fd = mediaGot?.four_dim_audit ?? {};
+  const category = mediaGot?.product_line_resolution?.display_category
+    ?? mediaGot?.display_category
+    ?? mediaGot?.product_line
+    ?? '吸奶器';
+  const probeText = [fd.ocr_summary, fd.one_line, mediaGot?.summary, category]
+    .filter((x) => typeof x === 'string' && x.trim()).join(' ');
+  const hitsStub = {
+    hits: (mediaGot?.judgment?.findings ?? []).map((f) => ({
+      rule_key: f?.rule_key ?? f?.control_code ?? 'MEDIA',
+      matched: f?.quote ? [{ matched_text: f.quote }] : [],
+    })),
+  };
+  return { probeText, hitsStub };
+}
+
+/* ─────────────────── 多图合并（纯函数，可单独验）─────────────────── */
+
+/**
+ * 把一组单图判定结果合并成一张卡片的 `mediaAuditGot`。
+ *
+ * ★ 判成的（`image_judged` + 有四维）与没读成的（`image_judge_failed`）必须分开。
+ *   失败那张的 `summary` 往往是一句原始 HTTP 报错 —— 如果让它参与 `one_line`，
+ *   整张卡的第一句话会变成「Request failed with status code 500」，而读者问的是
+ *   「这张图有什么问题」。失败只落一行明细（「未完成读取 / 请单独重发」）。
+ *
+ * ★ 一张都没判成时标签是**未审查**，不是「需人工确认」：没有任何结论产生过。
+ *
+ * @param {Array<object>} gotList 每张图 `feishu.ingestAttachment` 的结果（带 `idx`）
+ * @param {string} messageId
+ * @returns {object|null}
+ */
+export function mergeMultiImageAudit(gotList, messageId) {
+  const list = Array.isArray(gotList) ? gotList : [];
+  if (!list.length) return null;
+
+  const judgedOk = list.filter((g) => g?.status === 'image_judged' && g.four_dim_audit);
+  const judgedFailed = list.filter((g) => g?.status === 'image_judge_failed');
+  const first = judgedOk[0] ?? judgedFailed[0] ?? list[0];
+
+  const mergedRegions = judgedOk.flatMap((g) => {
+    const fd = g.four_dim_audit ?? {};
+    const rows = Array.isArray(fd.region_rows) && fd.region_rows.length
+      ? fd.region_rows
+      : (Array.isArray(fd.region_audit)
+        ? fd.region_audit.map((l) => ({ region: '全图', issue: String(l), fix: '—' }))
+        : []);
+    return rows.map((r) => ({ region: `图${g.idx + 1} · ${r.region}`, issue: r.issue, fix: r.fix }));
+  });
+  for (const g of judgedFailed) {
+    mergedRegions.push({
+      region: `图${g.idx + 1} · 未完成读取`,
+      issue: '该图下载或解析超时（未审查）',
+      fix: '请单独重发该张图片送审',
+    });
+  }
+
+  const perImg = judgedOk.map((g) => {
+    const fd = g.four_dim_audit ?? {};
+    return `【图${g.idx + 1}】${fd.one_line || String(g.summary ?? '').split('\n')[0] || '已完成初筛'}`;
+  }).join('\n');
+
+  const anyBlock = judgedOk.some((g) => (g.four_dim_audit?.overall ?? '').includes('需修改'));
+  const allFailed = judgedOk.length === 0 && judgedFailed.length > 0;
+  const worst = allFailed ? '素材未能读取' : (anyBlock ? '发现违规需修改' : '需人工确认');
+  const mergedLabel = allFailed ? '未审查' : (first.judgment?.label ?? (anyBlock ? 'BLOCK' : 'REVIEW'));
+
+  return {
+    ...first,
+    message_id: messageId,
+    judgment: { ...(first.judgment ?? {}), label: mergedLabel },
+    four_dim_audit: {
+      ...(first.four_dim_audit ?? { status: 'ok' }),
+      overall: worst,
+      short_title: `${list.length} 张图合并审查`,
+      one_line: perImg.split('\n')[0] || (allFailed ? '这几张图都没读成，需重新送审' : worst),
+      quick_fix: judgedOk.map((g) => (g.four_dim_audit?.quick_fix || '')).filter(Boolean).slice(0, 3).join('；')
+        || '按下方明细逐张处理',
+      region_rows: mergedRegions.length
+        ? mergedRegions
+        : [{ region: '全部图片', issue: '见各图分维结论', fix: '转工作台人工复核' }],
+      copy_paste_snippet: judgedOk.map((g) => (g.four_dim_audit?.copy_paste_snippet || '')).filter(Boolean)[0] ?? '',
+    },
+  };
 }
 
 /* ─────────────────── 主处理函数 ─────────────────── */
@@ -282,34 +423,7 @@ export async function handleMessage(event, { force = false } = {}) {
             message_type: 'image',
             content: JSON.stringify({ image_key: key }),
           }).then((r) => ({ idx, key, ...r }))));
-        const okList = gotList.filter((g) => g.status === 'image_judged' || g.status === 'image_judge_failed');
-        const first = okList[0] ?? gotList[0];
-        // 合并多张图的四维结果为一张聚合卡：区域前缀「图N ·」，正文按图汇总
-        const mergedRegions = okList.flatMap((g) => {
-          const fd = g.four_dim_audit ?? {};
-          const rows = Array.isArray(fd.region_rows) && fd.region_rows.length
-            ? fd.region_rows
-            : (Array.isArray(fd.region_audit) ? fd.region_audit.map((l) => ({ region: '全图', issue: String(l), fix: '—' })) : []);
-          return rows.map((r) => ({ region: `图${g.idx + 1} · ${r.region}`, issue: r.issue, fix: r.fix }));
-        });
-        const perImg = okList.map((g) => {
-          const fd = g.four_dim_audit ?? {};
-          return `【图${g.idx + 1}】${fd.one_line || g.summary?.split('\n')[0] || '已完成初筛'}`;
-        }).join('\n');
-        const worst = okList.some((g) => (g.four_dim_audit?.overall ?? '').includes('修改')) ? '发现违规需修改' : '需人工确认';
-        mediaAuditGot = {
-          ...first,
-          message_id: msg.message_id,
-          four_dim_audit: {
-            ...(first.four_dim_audit ?? { status: 'ok', overall: worst, one_line: perImg }),
-            overall: worst,
-            short_title: `${okList.length} 张图合并审查`,
-            one_line: perImg.split('\n')[0] || worst,
-            quick_fix: okList.map((g) => (g.four_dim_audit?.quick_fix || '')).filter(Boolean).slice(0, 3).join('；'),
-            region_rows: mergedRegions.length ? mergedRegions : [{ region: '全部图片', issue: '见各图分维结论', fix: '转工作台人工复核' }],
-            copy_paste_snippet: okList.map((g) => (g.four_dim_audit?.copy_paste_snippet || '')).filter(Boolean)[0] ?? '',
-          },
-        };
+        mediaAuditGot = mergeMultiImageAudit(gotList, msg.message_id);
         rawText = `${rawText}\n\n${imageTurnText(mediaAuditGot)}`;
       } else if (inlineImgKeys.length === 1) {
         const gotImg = await feishu.ingestAttachment({
@@ -531,16 +645,9 @@ export async function handleMessage(event, { force = false } = {}) {
     if (mediaAuditGot && (mediaAuditGot.four_dim_audit || mediaAuditGot.judgment)) {
       if (!mediaAuditGot.evidence_chain) {
         try {
-          const fd = mediaAuditGot.four_dim_audit ?? {};
-          const probeText = [fd.ocr_summary, fd.one_line, mediaAuditGot.summary].filter(Boolean).join(' ');
-          const hitsStub = {
-            hits: (mediaAuditGot.judgment?.findings ?? []).map((f) => ({
-              rule_key: f?.rule_key ?? f?.control_code ?? 'MEDIA',
-              matched: f?.quote ? [{ matched_text: f.quote }] : [],
-            })),
-          };
+          const { probeText, hitsStub } = mediaEvidenceProbe(mediaAuditGot);
           mediaAuditGot.evidence_chain = await judgeEvidence.gatherEvidence(
-            probeText, hitsStub, { enabled: config.kb.enabled },
+            probeText, hitsStub, { enabled: config.kb.enabled, localFallback: true },
           );
         } catch {
           mediaAuditGot.evidence_chain = { status: 'untested', evidence: [] };
@@ -641,6 +748,30 @@ export async function handleMessage(event, { force = false } = {}) {
       }
       if (reply !== null) break;
       // 循环继续：让模型看到工具结果后决定是继续查还是作答
+    }
+
+    // ★ 模型完全没调 `judge_copy`，但用户这一句就是求审文案 → 替它补一次。
+    //
+    //   这一步不是「多兜一层」，而是修一个可数的缺口：今天 56 条送审里有 13 条，
+    //   模型调了工具、然后用自己组织的排版回答，四维表压根没出现。
+    //   条件是三件事同时成立（缺一条都会误伤）：
+    //     ① 这一轮没走过 `judge_copy` —— 走过的话上面的直出分支已经管了；
+    //     ② 不是图片/视频送审 —— 媒体有自己的四维卡，不许被文案卡顶掉；
+    //     ③ `isCopyAuditRequest` 判它确实在求审。
+    if (reply === null && !mediaAuditGot && !llmError
+        && !toolTrace.some((t) => t.tool === 'judge_copy') && isCopyAuditRequest(question)) {
+      const t0 = Date.now();
+      const out = await executeTool('judge_copy', JSON.stringify({ text: question }));
+      toolTrace.push({ tool: 'judge_copy', ok: out.ok, ms: Date.now() - t0 });
+      if (out.ok && out.result && !out.result.error) {
+        const direct = formatDirectAuditCardReply({ textJudgeResult: out.result });
+        if (direct) {
+          consumePendingTurnVerdict();       // 结论行已进卡片抬头，别让信封再叠一条
+          reply = direct;
+          mem.append(sess, { role: 'assistant', content: direct });
+          console.log('[agent] ↩ 用户求审但模型未调判定：已补 judge_copy 并直出四维卡');
+        }
+      }
     }
 
     if (reply === null && !llmError) {

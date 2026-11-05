@@ -399,11 +399,31 @@ export function isTextAttachment(fileName) {
 export async function downloadMessageResource({
   messageId, fileKey, type, destPath, maxBytes = MAX_ATTACHMENT_BYTES,
 }) {
-  const r = await client.im.v1.messageResource.get({
-    path: { message_id: messageId, file_key: fileKey },
-    // 飞书这个接口只认 image / file 两档：图片走 image，其余（文件/语音/视频）走 file。
-    params: { type: type === 'image' ? 'image' : 'file' },
-  });
+  // 一次重试。取附件是网关切片的网络调用，组图里偶尔一张会 5xx / 连接被掐，
+  // 重试一次就能过 —— 而多图合并时一张读不到会把整张卡的 one_line 变成 HTTP 报错。
+  // 重试只针对**取流**这一步；写盘与超限判断各做一次，不重复落盘。
+  let r = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      await new Promise((res) => setTimeout(res, 400));
+    }
+    try {
+      r = await client.im.v1.messageResource.get({
+        path: { message_id: messageId, file_key: fileKey },
+        // 飞书这个接口只认 image / file 两档：图片走 image，其余（文件/语音/视频）走 file。
+        params: { type: type === 'image' ? 'image' : 'file' },
+      });
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      // 4xx 是确定性失败（没权限、key 过期），重试不会变好，还会多等 400ms。
+      const status = Number(e?.code ?? e?.status ?? e?.response?.status ?? NaN);
+      if (Number.isFinite(status) && status >= 400 && status < 500) break;
+    }
+  }
+  if (lastErr) throw lastErr;
   if (!r || typeof r.writeFile !== 'function') {
     throw new Error('SDK 没有返回可写流（messageResource.get 的响应形状变了）');
   }

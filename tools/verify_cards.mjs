@@ -833,7 +833,7 @@ head('O 模态 · 图片 / 文案 / 视频三套四维体检卡：同源、互�
   // ★ 这一段的形状是「**真的调两个构建器**然后逐字比」，不是 grep 名字。
   //   §2.4 那条教训在这里最贵：两个构建器共用一张表，只有把**两份产出**摆在一起
   //   才能证明它真的共用；grep 维度名会同时命中注释、测试夹具与表本身。
-  const { AUDIT_MODALITY_SPECS, resolveModality, foreignTokensFor } =
+  const { AUDIT_MODALITY_SPECS, resolveModality, foreignTokensFor, renderFourDimAuditPayload } =
     await import(path.join(HERE, 'agent', 'audit_modality_specs.mjs'));
   const { formatDirectAuditCardReply } = await import(path.join(HERE, 'agent', 'prd53.mjs'));
   const { buildAuditResultCard } = await import(path.join(HERE, 'agent', 'standard_cards.mjs'));
@@ -901,6 +901,30 @@ head('O 模态 · 图片 / 文案 / 视频三套四维体检卡：同源、互�
   const noModality = formatDirectAuditCardReply({ mediaGot: { type: 'media', judgment: { label: 'REVIEW' } } });
   if (noModality !== null) no('O3 模态不明不生成四维卡', 'resolveModality 读不出却仍然建了卡');
   else ok('O3 模态不明 → 不生成四维卡（type=media 不猜成视频）');
+
+  // O5 抬头必须显式写出结论状态（BLOCK / REVIEW / PASS / 未审查），
+  //    且「初筛未见明显违规」绝不许被判成拦截 —— 那是「违规」二字在否定句里。
+  {
+    const cases = [
+      ['REVIEW', '初筛未见明显违规', 'PASS', 'green', '人工确认后放行'],
+      ['BLOCK', '发现违规需修改', 'BLOCK', 'red', '改图后重审'],
+      ['REVIEW', '需人工确认', 'REVIEW', 'orange', '转工作台人工复核'],
+      ['未审查', '素材未能读取', '未审查', 'wathet', '转工作台人工复核'],
+    ];
+    const problems = [];
+    for (const [label, ov, tag, tone, step] of cases) {
+      const payload = renderFourDimAuditPayload({
+        modality: 'image', label, fd: { overall: ov, one_line: 'x', short_title: 't' },
+      });
+      if (!payload) { problems.push(`${label}: 没出卡`); continue; }
+      if (!payload.title.includes(tag)) problems.push(`${ov}: 抬头没写 ${tag}`);
+      if (payload.tone !== tone) problems.push(`${ov}: tone=${payload.tone} 应为 ${tone}`);
+      const got = payload.fields.find((f) => f.label === '下一步')?.value;
+      if (got !== step) problems.push(`${ov}: 下一步=${got} 应为 ${step}`);
+    }
+    if (problems.length) no('O5 抬头显式状态标签', problems.join('；'));
+    else ok('O5 抬头显式写出 BLOCK / REVIEW / PASS / 未审查，「初筛未见明显违规」是绿卡而非拦截');
+  }
 
   // O4 反向对照：自己把表中一个判别词塞进另一个模态 → 闸必须认得出来
   {

@@ -1,0 +1,19 @@
+{
+  "事项名称": "审查卡片抬头显式五标签（BLOCK/REVIEW/PASS/未审查）+ 根治今日56条真实送审复盘暴露的6处失真（含初筛未见明显违规误判红卡Bug、子品类识别、单句求审直出、多图容错与媒体本地三库回落）",
+  "关联执行票": "审查卡片显式五标签与今日56条送审复盘6项根治",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "1）卡片抬头显式五标签与子串反转Bug根治：在 tools/agent/audit_modality_specs.mjs 新增 classifyAuditState(label, overall)，排除『未见/未发现/无+违规』否定形式后再判拦截，使标题显式输出『【图片/文案/视频审查 · BLOCK 需修改】』『【… · REVIEW 需人工确认】』『【… · PASS 初筛通过/初筛未见违规】』『【… · 未审查】』，彻底修掉今天18次将『初筛未见明显违规』误判为红卡『需修改』的Bug；2）子品类识别诚实化：在 base/feishu_guard_ingest.py 新增 EXTENDED_CATEGORY_KEYWORDS（婴儿监护仪/BM04/BM08、消毒与洗瓶机、储奶袋与配件、孕妇枕与睡眠），输出 display_category 与对应品类安全红线（如监护仪禁暗示预防SIDS），不再将婴儿监护仪与消毒机误当吸奶器审；3）单句求审直出卡片：在 tools/agent/agent.mjs 新增 isCopyAuditRequest 与 submitsUserText 包含关系判据，解决『m5 pro是最好的吸奶器，这句话能过审吗？』漏调 judge_copy 退化为纯文本的问题；4）多图合并容错与下载重试：tools/agent/feishu.mjs 下载增加退避重试，agent.mjs 隔离单图下载失败，不再将英文HTTP报错塞进核心卡点；5）媒体证据链补齐 localFallback: true 与品类名探针，解决18张图片卡知识库恒 untested 的问题；6）三模态四维提示词统一 OVERALL_RULE 校准，常规免责提醒不再误标 BLOCK。",
+  "验收标准": "1) node tools/agent/feishu_guard_ingest.test.mjs 81/81 全绿 rc=0（新增 K8–K12d 共 15 项正反对照）；2) node tools/verify_cards.mjs 261/261 全绿 rc=0（含新增 O5 四状态抬头与绿卡回归）；3) node tools/agent/attachment_ingest.test.mjs 39/39 全绿 rc=0；4) node tools/agent/image_judgment.test.mjs 16/16 全绿 rc=0；5) python3 tools/verify_shouheng_ops.py 全绿 rc=0（PID 85169）；6) python3 tools/verify_depad.py 0 被填充 rc=0。",
+  "状态依据": "1) 已重启守衡生效（PID 68154 → 85169），并向测试群实发验证卡 om_x100b61f25db580a4b0e8111fb69d982（绿卡【文案审查 · PASS 初筛未见违规】）与 om_x100b61f25d389ca8b0f71ff0a7ad258（橙卡【文案审查 · REVIEW 需人工确认】识别品线：婴儿监护仪）。"
+}
