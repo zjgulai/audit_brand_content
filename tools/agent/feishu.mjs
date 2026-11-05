@@ -588,7 +588,9 @@ export async function ingestAttachment(msg, {
       return finish(status, {
         reason: status, ...baseMeta, size: got.size,
         case_id: judged.case_id ?? judged.judgment?.case_id ?? null,
+        carrier: 'image',
         four_dim_audit: judged.four_dim_audit ?? judged.judgment?.four_dim_audit ?? null,
+        product_line: judged.product_line ?? judged.judgment?.product_line ?? null,
         image_status: judged.row_status ?? null,
         parse_status: parseStatus,
         failure_kind: judged.unit?.failure_kind ?? 'parse_error',
@@ -620,6 +622,11 @@ export async function ingestAttachment(msg, {
       return finish(status, {
         reason: status, ...baseMeta, size: got.size,
         case_id: judged.case_id ?? null,
+        // ★ 视频的四维与品线必须在**这一跳**带上去：python 侧产出了，
+        //   丢掉它渲染器就只会走兜底分支，视频又被画成图片的四维。
+        carrier: 'video',
+        four_dim_audit: judged.four_dim_audit ?? judged.judgment?.four_dim_audit ?? null,
+        product_line: judged.product_line ?? judged.judgment?.product_line ?? null,
         parse_status: parseStatus,
         failure_kind: judged.unit?.failure_kind ?? (judged.ok ? null : 'parse_error'),
         judgment: compactJudgment(judged.judgment),

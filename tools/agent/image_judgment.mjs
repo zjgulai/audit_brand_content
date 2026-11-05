@@ -125,8 +125,10 @@ export async function runImageJudgment({
     };
     return {
       ok: true, judgment, unit, unit_id: r.unit_id ?? null,
+      carrier: 'image',
       uri: built.uri,
       ...(caseId ? { case_id: caseId } : {}),
+      ...(productLine ? { product_line: productLine } : {}),
       ...(fourDimAudit ? { four_dim_audit: fourDimAudit } : {}),
       // CLI 不返回 row_status；不要编一个。image_status 在 meta 里会是 null。
       row_status: null, elapsed_ms: r.elapsed_ms ?? null,
@@ -244,6 +246,9 @@ export async function runVideoJudgment({
       receipt: r.receipt ?? null,
       ...(r.case_id ? { case_id: r.case_id } : {}),
       ...(r.product_line ? { product_line: r.product_line } : {}),
+      // ★ python 侧产出了四维，这一跳原先把它丢了 —— 于是渲染器拿到 null，
+      //   掉进兜底分支，视频被画成图片的四维。现在原样带上来。
+      ...(r.four_dim_audit ? { four_dim_audit: r.four_dim_audit } : {}),
     };
     const unit = {
       unit_id: r.unit_id ?? null,
@@ -253,12 +258,14 @@ export async function runVideoJudgment({
     };
     return {
       ok: Boolean(r.ok),
+      carrier: 'video',
       case_id: r.case_id ?? null,
       product_line: r.product_line ?? null,
       prd53_verdict: r.prd53_verdict ?? null,
       judgment,
       unit,
       unit_id: r.unit_id ?? null,
+      ...(r.four_dim_audit ? { four_dim_audit: r.four_dim_audit } : {}),
       uri: String(uri),
       elapsed_ms: r.elapsed_ms ?? null,
       ...(r.ok ? {} : { error: r.error ?? '视频审查未完成' }),

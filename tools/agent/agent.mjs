@@ -21,7 +21,7 @@ import { detectTruncation, annotateTruncation, tailOf } from './truncate.mjs';
 import { parentIdOf, alreadyInHistory, buildQuoteBlock } from './thread.mjs';
 import { foldInto } from './outbound.mjs';
 import { recall as recallMemories } from './nmem_recall.mjs';
-import { formatDirectAuditCardReply } from './prd53.mjs';
+import { formatDirectAuditCardReply, consumePendingTurnVerdict } from './prd53.mjs';
 import * as judgeEvidence from './judge_evidence.mjs';
 
 /* ─────────────────── 去重：见过的事件不再处理 ─────────────────── */
@@ -180,8 +180,37 @@ export function videoTurnText(got) {
   ].join('\n');
 }
 
-/* ─────────────────── 主处理函数 ─────────────────── */
+/**
+ * 这一次 `judge_copy` 送审的是不是**用户自己那句话**？
+ *
+ * 纯函数。只回答一个问题：调用参数里的正文与用户这一轮说的话有没有实质重叠。
+ * 「帮我解释一下 FDA approved 是什么」也会让模型顺手调一次判定 —— 那种提问
+ * 应该得到解释，不该被一张审查卡整段吃掉。
+ *
+ * 判据保守取「送审正文是用户这句话的一大块」：去空白后一方包含另一方，
+ * **且**短的一方至少占长的一方一半。只要求「有重叠」会误伤 —— 用户问
+ * 「帮我解释一下 FDA approved 是什么」，模型顺手送审 `FDA approved` 也算重叠，
+ * 于是整段解释被一张卡吃掉。宁可不直出（让模型自己组织），也不要吃掉一次提问。
+ */
+export function submitsUserText(rawArgs, question) {
+  const q = String(question ?? '').replace(/\s+/g, '');
+  if (q.length < 8) return false;
+  let body = '';
+  try {
+    const a = JSON.parse(String(rawArgs ?? '{}'));
+    body = [a.text, a.url, a.doc_token, ...Object.values(a.fields ?? {})]
+      .filter((x) => typeof x === 'string' && x.trim()).join('\n');
+  } catch {
+    return false;
+  }
+  const b = body.replace(/\s+/g, '');
+  if (b.length < 8) return false;
+  const contained = b.includes(q) || q.includes(b);
+  if (!contained) return false;
+  return Math.min(b.length, q.length) / Math.max(b.length, q.length) >= 0.5;
+}
 
+/* ─────────────────── 主处理函数 ─────────────────── */
 /**
  * 处理一条飞书消息，返回要发出的回复文本（不负责发送）。
  * @param {object} event  im.message.receive_v1 的 data
@@ -585,7 +614,32 @@ export async function handleMessage(event, { force = false } = {}) {
           tool_call_id: tc.id,
           content: JSON.stringify(out.ok ? out.result : { error: out.error }).slice(0, 60_000),
         });
+
+        // ★ 这一轮只有一次 `judge_copy`，且**送审的就是用户那句话** → 直接出文案审查卡。
+        //
+        //   为什么必须直出：文案原先没有「直出」这一层，模型自己决定怎么排版，
+        //   而它手上唯一的模版参照是聊天历史里的**图片卡**，于是把「只覆盖图内文字（OCR）
+        //   ；画面语义未覆盖」那句边界抄进文案卡。出口闸会挡住那句，但**挡住不等于说对了**：
+        //   正确做法是让它根本没有自由发挥的机会。
+        //
+        //   两个条件缺一不可：
+        //     ① 这一轮工具调用恰好一次 —— 多工具轮（先查规则再判定）不抢，模型自己组织；
+        //     ② 送审正文与用户这句话**有实质重叠** —— 否则「帮我解释一下 FDA approved 是什么意思」
+        //        这类提问里模型顺手调一次判定，也会被一张审查卡吃掉整段回答。
+        if (toolCalls.length === 1 && name === 'judge_copy' && out.ok && out.result && !out.result.error
+            && submitsUserText(tc.function?.arguments, question)) {
+          const direct = formatDirectAuditCardReply({ textJudgeResult: out.result });
+          if (direct) {
+            // 权威结论行已经花在卡片抬头上了，消费掉它 —— 否则信封会再叠一条
+            // `【审查结论：…】` 到同一张卡的 title 上。
+            consumePendingTurnVerdict();
+            reply = direct;
+            mem.append(sess, { role: 'assistant', content: direct });
+            break;
+          }
+        }
       }
+      if (reply !== null) break;
       // 循环继续：让模型看到工具结果后决定是继续查还是作答
     }
 

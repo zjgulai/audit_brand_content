@@ -346,7 +346,13 @@ export function evidence(d = {}) {
   if (d.verdict) els.push(md(s(d.verdict)));
   if (d.reasoning) els.push(md(s(d.reasoning)));
   if (d.columns?.length && d.rows?.length) els.push(table(d.columns, d.rows));
-  if (d.snippet) els.push(band([md(`【可直接复制给设计的合规免责贴条】\n${String(d.snippet).trim()}`)], 'grey'));
+  if (d.snippet) {
+    // ★ 小标题可注入：图片卡的贴条是给设计的，视频卡的是给剪辑师的，文案卡的是替换文案。
+    //   缺省保留原字符串，于是其余类型的卡零影响。
+    const snippetHeading = s(d.snippetLabel).replace(/[（(]\s*未填\s*[）)]/g, '').trim()
+      || '【可直接复制给设计的合规免责贴条】';
+    els.push(band([md(`${snippetHeading}\n${String(d.snippet).trim()}`)], 'grey'));
+  }
   const _c = s(d.content).replace(/[（(]\s*未填\s*[）)]/g, '').trim();
   const groups = d.groups?.length ? d.groups : (_c ? [{ title: '证据', content: s(d.content) }] : []);
   for (const g of groups) {

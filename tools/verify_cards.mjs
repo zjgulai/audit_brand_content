@@ -827,6 +827,94 @@ head('N 附件 · 旧红线已废止，话术必须是能力边界');
   } else ok('N5 旧话术已清掉，且检测器喂旧文案会命中');
 }
 
+/* ─────────────── O 模态 · 三套四维体检卡各说各的，且同源 ─────────────── */
+head('O 模态 · 图片 / 文案 / 视频三套四维体检卡：同源、互斥、边界各自成立');
+{
+  // ★ 这一段的形状是「**真的调两个构建器**然后逐字比」，不是 grep 名字。
+  //   §2.4 那条教训在这里最贵：两个构建器共用一张表，只有把**两份产出**摆在一起
+  //   才能证明它真的共用；grep 维度名会同时命中注释、测试夹具与表本身。
+  const { AUDIT_MODALITY_SPECS, resolveModality, foreignTokensFor } =
+    await import(path.join(HERE, 'agent', 'audit_modality_specs.mjs'));
+  const { formatDirectAuditCardReply } = await import(path.join(HERE, 'agent', 'prd53.mjs'));
+  const { buildAuditResultCard } = await import(path.join(HERE, 'agent', 'standard_cards.mjs'));
+
+  const textOf = (card) => {
+    const parts = [card?.header?.title?.content ?? ''];
+    for (const el of card?.body?.elements ?? []) {
+      if (el.tag === 'markdown') parts.push(el.content);
+      else if (el.tag === 'table') parts.push((el.columns ?? []).map((c) => c.display_name).join(' | '));
+      else if (el.tag === 'column_set') {
+        for (const c of el.columns ?? []) for (const e of c.elements ?? []) if (e.tag === 'markdown') parts.push(e.content);
+      }
+    }
+    return parts.join('\n');
+  };
+
+  const FD = {
+    overall: '需人工确认', short_title: '测试标题', one_line: '一句话卡点。', quick_fix: '马上改两处',
+    ocr_status: '正常', ocr_summary: '一维描述',
+    scene_status: '需注意', scene_semantics: '二维描述',
+    symbol_status: '正常', visual_symbols: '三维描述',
+    region_rows: [{ region: 'R1', issue: '问题一', fix: '改法一' }],
+    copy_paste_snippet: '替换件正文',
+  };
+
+  const inputs = {
+    image: { type: 'image', carrier: 'image', judgment: { label: 'REVIEW' }, four_dim_audit: { ...FD, media_kind: 'image' } },
+    text: { carrier: 'text', judgment: { label: 'REVIEW' }, four_dim_audit: { ...FD, media_kind: 'text' } },
+    video: { carrier: 'video', judgment: { label: 'REVIEW' }, four_dim_audit: { ...FD, media_kind: 'video' } },
+  };
+
+  // O1 三个模态各出各的抬头、体检标题、表头与边界；判别词一个都不许串。
+  for (const [key, spec] of Object.entries(AUDIT_MODALITY_SPECS)) {
+    const got = inputs[key];
+    const fromStd = buildAuditResultCard({ mediaGot: got });
+    const fromPrd = formatDirectAuditCardReply({ mediaGot: got });
+    const block = fromPrd ? JSON.parse(fromPrd.split('\n')[1]) : null;
+    const v = textOf(fromStd);
+    const problems = [];
+    if (!v.includes(`【${spec.cardNoun} · `)) problems.push(`抬头不是【${spec.cardNoun} · …】`);
+    if (!v.includes(spec.checklistHeading)) problems.push(`缺体检标题 ${spec.checklistHeading}`);
+    if (!v.includes(spec.tableHeading)) problems.push(`缺表格标题 ${spec.tableHeading}`);
+    for (const d of spec.dimensions) if (!v.includes(d.name)) problems.push(`缺维度 ${d.name}`);
+    for (const c of spec.columns) if (!v.includes(c.display_name)) problems.push(`缺列名 ${c.display_name}`);
+    if (!v.includes(spec.snippetLabel)) problems.push(`缺替换件小标题 ${spec.snippetLabel}`);
+    if (!v.includes(spec.boundary)) problems.push('边界句不是本模态的权威值');
+    const foreign = foreignTokensFor(key).filter((t) => v.includes(t));
+    if (foreign.length) problems.push(`混进了别模态的说法：${foreign.join('、')}`);
+
+    if (!block) problems.push('prd53 出口没有产出卡片块');
+    else {
+      // O2 两份产出逐字同源：列名、边界、替换件小标题、体检标题必须完全一致
+      const same = JSON.stringify(block.columns.map((c) => c.display_name)) === JSON.stringify(spec.columns.map((c) => c.display_name))
+        && block.boundary === spec.boundary
+        && block.snippetLabel === spec.snippetLabel
+        && block.title.startsWith(`【${spec.cardNoun} · `);
+      if (!same) problems.push('prd53 与 standard_cards 两个出口没有共用同一张表');
+    }
+
+    if (problems.length) no(`O ${key} 卡`, problems.join('；'));
+    else ok(`O ${key} 卡：抬头/四维/列名/替换件/边界各自成立，且两出口同源`);
+  }
+
+  // O3 反向对照：模态读不出时**不许**生成四维卡（一张错的覆盖声明比没有卡更糟）
+  const noModality = formatDirectAuditCardReply({ mediaGot: { type: 'media', judgment: { label: 'REVIEW' } } });
+  if (noModality !== null) no('O3 模态不明不生成四维卡', 'resolveModality 读不出却仍然建了卡');
+  else ok('O3 模态不明 → 不生成四维卡（type=media 不猜成视频）');
+
+  // O4 反向对照：自己把表中一个判别词塞进另一个模态 → 闸必须认得出来
+  {
+    const leaked = { ...inputs.text, four_dim_audit: {
+      ...inputs.text.four_dim_audit, one_line: '这里误写了「区域级画面审计」',
+    } };
+    const v = textOf(buildAuditResultCard({ mediaGot: leaked }));
+    // 结论：构建器本身不拦正文（那是信封的活），但闸的判据必须能指出它
+    const caught = foreignTokensFor('text').some((t) => v.includes(t));
+    if (!caught) no('O4 跨模态词可被识别', '把「区域级画面审计」塞进文案卡后，判别词表认不出来 —— 那道闸是空转的');
+    else ok('O4 跨模态词可被判别词表识别（闸的前提条件成立）');
+  }
+}
+
 /* ─────────────── I 文档里的自证数不能是写死的 ─────────────── */
 head('I 数字 · 文档里写的自证项数必须等于实际项数');
 {

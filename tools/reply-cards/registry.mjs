@@ -367,6 +367,8 @@ export const REGISTRY = [
     fields: {
       verdict: '结论，短。',
       groups: '{title, content, count, expanded} 数组。**默认 expanded: false**。',
+      snippet: '灰底带里的一整段可直接复制的替换件（推 **images、文案、视频** 审查卡）。',
+      snippetLabel: '灰底带的小标题。缺省是「给设计的贴条」；审查卡按模态填。',
       fields: '可选。',
       boundary: '可选。',
     },

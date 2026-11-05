@@ -1,0 +1,19 @@
+{
+  "事项名称": "按介质分离图片/文本/视频三套四维审核卡片模版与出站跨模态边界净化闸（杜绝文字/视频送审套用图片 OCR 边界）",
+  "关联执行票": "三模态独立四维审核卡片模版（图片 / 文案 / 视频）",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "1）新建 tools/agent/audit_modality_specs.mjs 唯一三模态规格表，将图片（【四维快速体检】+【对表改图】+给设计的合规免责贴条）、文本（【文案四维体检】：①字面红线与医疗禁用词 · ②功效与安全宣称 · ③品线与平台特殊规范 · 知识库与法规依据 +【对表改字】+可复制合规替换文案/免责贴条）、视频（【视频四维体检】：①画面字幕与花字OCR · ②口播人声与音频宣称ASR · ③音画一致性与动作演示 · 知识库与法规依据 +【对表剪片】+给剪辑师的合规免责字幕/替换口播词）彻底分离，prd53.mjs 与 standard_cards.mjs 共用同一渲染器；2）base/feishu_guard_ingest.py 新增 run_llm_text_four_dim_audit 为全部文本载体生成文案四维体检结构；3）tools/agent/image_judgment.mjs 与 tools/agent/feishu.mjs 补齐视频分支 four_dim_audit 与 carrier='video' 透传；4）tools/agent/agent.mjs 对单工具 judge_copy 送审直出标准文案卡，tools/reply-cards/envelope.mjs 新增 enforceModalityBoundary 拦截并净化模型从历史记录抄入的图片 OCR 边界。",
+  "验收标准": "1) node tools/verify_cards.mjs 260/260 全绿 rc=0（含新增 O 段三模态同源、互斥、边界校验）；2) node tools/agent/feishu_guard_ingest.test.mjs 66/66 全绿 rc=0（含 K1–K7 三模态卡片与跨模态污染拦截正反例）；3) node tools/agent/attachment_ingest.test.mjs 39/39 全绿 rc=0；4) node tools/agent/image_judgment.test.mjs 16/16 全绿 rc=0；5) python3 tools/verify_shouheng_ops.py 全绿 rc=0（PID 68154）；6) python3 tools/verify_depad.py 0 被填充 rc=0。",
+  "状态依据": "1) 提交 18fd8a9 已合入 main（15 files changed）；2) 守衡已通过 bash tools/restart_shouheng.sh --yes 重启生效（PID 33174 → 68154），verify_shouheng_ops.py 全绿。"
+}

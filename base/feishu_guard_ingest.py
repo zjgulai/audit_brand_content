@@ -64,6 +64,9 @@ VALID_PRODUCT_LINES: Tuple[str, ...] = (
     "哺乳内衣",
 )
 
+#: 哪些载体产「文案四维体检」。图片/视频各自有另一套四维。
+TEXT_CARRIERS: Tuple[str, ...] = ("free_text", "ad_text", "structured_json", "feishu_doc", "landing_url")
+
 #: 五条品线的确定性识别词表（按特异性排序；英文词要求词边界避免子串误判）
 PRODUCT_LINE_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "吸奶器": (
@@ -616,6 +619,309 @@ def run_vlm_video_four_dim_audit(video_path: Path) -> Optional[Dict[str, Any]]:
         return None
 
 
+#: 文案的「功效与安全宣称」特征词。命中即说明这一维不是空的 —— 即使字面规则没抓到，
+#: 读者也该在卡上看见「这里被看过一眼」。英文按词边界，中文按子串。
+TEXT_EFFICACY_PATTERNS: Tuple[Tuple[str, str], ...] = (
+    (r"(?<![a-z0-9])(clinically|scientifically)\s+(proven|tested)(?![a-z0-9])", "临床/科学背书"),
+    (r"(?<![a-z0-9])\d{1,3}\s*%\s*(more|faster|longer|less)(?![a-z0-9])", "带数字的效果承诺"),
+    (r"(?<![a-z0-9])(100\s*%|completely|totally)\s*(safe|secure|risk[- ]free)(?![a-z0-9])", "绝对安全承诺"),
+    (r"(?<![a-z0-9])(prevent|prevent(s|ing)?|cure|cures|treat|treats|heal|heals)(?![a-z0-9])", "疾病治疗/预防表述"),
+    (r"(?<![a-z0-9])(fda|ce|iso)\s*(approved|certified|cleared)(?![a-z0-9])", "监管认证背书"),
+    (r"(?<![a-z0-9])(sids|mastitis|reflux|colic|jaundice|infection)(?![a-z0-9])", "疾病名"),
+    (r"(?<![a-z0-9])(hospital[- ]grade|medical[- ]grade|clinical[- ]grade)(?![a-z0-9])", "医疗级措辞"),
+    (r"(?<![a-z0-9])(alerts?\s+you\s+to\s+risks?|danger\s+zone|covered\s+face|face[- ]down\s+sleeping)", "对具体危险场景的安全承诺"),
+    (r"(零风险|无副作用|百分百|100%安全|绝对安全|彻底根除)", "绝对化表述"),
+    (r"(临床验证|临床证明|医学证明|科学验证|权威认证)", "医学背书"),
+    (r"(防窒息|预防窒息|治疗|治愈|根治|缓解疼痛|消炎)", "疾病治疗/预防表述"),
+    (r"(FDA认证|FDA批准|CE认证|医院级|医疗级)", "监管认证背书"),
+)
+
+#: 归属「功效与安全宣称」维度的控制点族（其余落入字面维度）。
+TEXT_CLAIM_CONTROL_CODES = frozenset({
+    "H01", "H02", "H03", "H04", "H05", "H07", "H09",
+    "M01", "M02", "M04", "M05", "M06", "M07",
+    "U01", "U03", "U04", "B01",
+})
+
+#: 品线的品类合规提醒（第三维「品线与平台特殊规范」的实词）。
+PRODUCT_LINE_SAFETY_HINT: Dict[str, str] = {
+    "吸奶器": "吸奶器属母婴用品：禁止出现医疗级/治疗/奶量倍增等承诺，性能须可测（如 mmHg）。",
+    "婴儿车": "婴儿车属儿童用品：禁止出现安全绝对化（如「绝不侧翻」），须标注适用年龄与承重。",
+    "背带": "背带禁止出现防窒息/髋关节发育等医疗暗示，须标注承重与月龄区间。",
+    "温奶器": "温奶器禁止出现杀菌/消毒疗效承诺，温度须标注实测范围。",
+    "哺乳内衣": "哺乳内衣禁止出现催乳/预防乳腺炎等功效暗示。",
+}
+
+
+def _text_has_cjk(text: str) -> bool:
+    return any("一" <= ch <= "鿿" for ch in text)
+
+
+def _text_location_label(f: Dict[str, Any]) -> str:
+    """把 finding 的 location 翻成运营能照着找的位置描述。**不猜段号** —— 猜错比给字符偏移更糟。"""
+    loc = f.get("location") if isinstance(f.get("location"), dict) else {}
+    start, end = loc.get("start"), loc.get("end")
+    if isinstance(start, int) and isinstance(end, int):
+        return f"字符 {start}-{end}"
+    kind = str(loc.get("kind") or "").strip()
+    return kind or "全文"
+
+
+def _text_efficacy_hits(text: str) -> List[str]:
+    hits: List[str] = []
+    low = text.lower()
+    for pat, label in TEXT_EFFICACY_PATTERNS:
+        try:
+            if re.search(pat, low if pat.isascii() else text):
+                if label not in hits:
+                    hits.append(label)
+        except re.error:  # pragma: no cover - 词表本身写错时不许静默失效
+            continue
+    return hits
+
+
+def _text_snippet_for(text: str, product_line: str, has_hits: bool) -> str:
+    """可直接复制的替换件。英文文案给英文正文 + 中文说明，中文文案给中文。"""
+    if _text_has_cjk(text):
+        body = (
+            "本产品为日常护理用品，非医疗器械，不能替代诊断或治疗；"
+            "个体体验存在差异，请按说明书使用。"
+        )
+        lead = "（以下替换文案可直接贴回广告：）" if has_hits else "（以下免责贴条可直接补在广告页脚：）"
+        return f"{lead}\n{body}"
+    body = (
+        "This product is a daily-care device, not a medical device. "
+        "It does not diagnose, treat, cure, or prevent any disease. "
+        "Individual results vary; please follow the user manual."
+    )
+    lead = "Copy-paste replacement:" if has_hits else "Copy-paste disclaimer:"
+    note = f"（中文说明：{PRODUCT_LINE_SAFETY_HINT.get(product_line, '该品线禁止医疗与绝对化表述。')}）"
+    return f"{lead}\n{body}\n{note}"
+
+
+def _text_four_dim_deterministic(
+    text: str,
+    *,
+    product_line: str,
+    findings: List[Dict[str, Any]],
+    pl_res: Dict[str, Any],
+    label: str,
+) -> Dict[str, Any]:
+    """纯确定性四维（不联网）。离线、无凭据、模型失败时都用这一份。"""
+    body = (text or "").strip()
+    confirmed = [f for f in findings if isinstance(f, dict) and f.get("status") != "candidate"]
+
+    literal_hits = [f for f in confirmed if str(f.get("control_code") or "") not in TEXT_CLAIM_CONTROL_CODES]
+    claim_hits = [f for f in confirmed if str(f.get("control_code") or "") in TEXT_CLAIM_CONTROL_CODES]
+    claim_words = _text_efficacy_hits(body)
+
+    # ① 字面红线与医疗禁用词
+    if literal_hits:
+        codes = "、".join(sorted({str(f.get("control_code") or "规则") for f in literal_hits}))
+        quotes = "、".join(f"「{str(f.get('quote') or '').strip()}」" for f in literal_hits[:3])
+        literal_status = "有风险"
+        literal_summary = f"命中 {codes}：{quotes}"
+    else:
+        literal_status = "正常"
+        literal_summary = "未命中已知字面禁用与医疗红线词"
+
+    # ② 功效与安全宣称
+    claim_bits: List[str] = []
+    if claim_hits:
+        claim_bits.append("、".join(f"「{str(f.get('quote') or '').strip()}」" for f in claim_hits[:3]))
+    if claim_words:
+        claim_bits.append("、".join(claim_words[:3]))
+    if claim_bits:
+        claim_status = "有风险" if label == "BLOCK" else "需注意"
+        claim_summary = f"出现{'；'.join(claim_bits)}——这类表述需要有来源或改成客观功能描述"
+    else:
+        claim_status = "正常"
+        claim_summary = "未见明显夸大功效或安全承诺表述"
+
+    # ③ 品线与平台特殊规范
+    hint = PRODUCT_LINE_SAFETY_HINT.get(product_line, "")
+    pl_note = str(pl_res.get("note") or "").strip()
+    platform_status = "需注意" if (claim_hits or claim_words) else "正常"
+    platform_summary = "；".join(x for x in (pl_note, hint) if x) or "未触及平台特殊条款"
+
+    # ④ 明细表
+    if confirmed:
+        region_rows = [
+            {
+                "region": _text_location_label(f),
+                "issue": f"命中「{str(f.get('quote') or '').strip()}」（{str(f.get('control_code') or '规则')}）",
+                "fix": f"删掉「{str(f.get('quote') or '').strip()}」或改为客观功能描述并补实测条件",
+            }
+            for f in confirmed[:5]
+        ]
+    elif claim_words:
+        region_rows = [{
+            "region": "全文·功效表述",
+            "issue": f"字面规则未命中，但出现{'、'.join(claim_words[:3])}，语境仍需人工判断",
+            "fix": "改为客观功能描述，并补一句不带疗效暗示的免责说明",
+        }]
+    else:
+        region_rows = [{
+            "region": "全文扫描",
+            "issue": "未命中已知字面违规词",
+            "fix": "转工作台人工复核语境后放行",
+        }]
+
+    total = len(confirmed)
+    if total:
+        overall = "发现违规需修改" if label == "BLOCK" else "需人工确认"
+        one_line = f"文案含 {total} 处需改表述，触碰字面红线或功效承诺，需修改后再投放。"
+        short_title = f"命中 {total} 处字面红线"
+        quick_fix = "删掉或替换命中的表述，改为客观功能描述并补充实测条件说明。"
+    else:
+        # 空命中不是合规：它只说明这套规则没命中。所以结论一律落「需人工确认」，
+        # 绝不产出「初筛未见违规」——那句话比输入大。
+        overall = "需人工确认"
+        one_line = ("未命中已知字面禁用词，但出现功效类表述，请人工确认语境。" if claim_words
+                    else "未命中已知字面禁用词；空命中不等于合规，请人工确认语境。")
+        short_title = "未见已知字面红线词" if not claim_words else "字面未命中但有效功效表述"
+        quick_fix = ("把功效类表述改成客观功能描述，并补一句免责说明。" if claim_words
+                     else "字面规则未命中不等于合规，转工作台人工复核语境。")
+
+    return {
+        "status": "ok",
+        "media_kind": "text",
+        "model": "deterministic",
+        "overall": overall,
+        "short_title": short_title,
+        "one_line": one_line,
+        "quick_fix": quick_fix,
+        # 两套键名都写：字面维度用 literal_*，同时把同一句话挂到 ocr_* ——
+        # JS 渲染器对文案读 literal_*，对手工构造的老数据读 ocr_*，两处都能出卡。
+        "literal_status": literal_status, "literal_summary": literal_summary,
+        "ocr_status": literal_status, "ocr_summary": literal_summary,
+        "claim_status": claim_status, "claim_summary": claim_summary,
+        "scene_status": claim_status, "scene_semantics": claim_summary,
+        "platform_status": platform_status, "platform_summary": platform_summary,
+        "symbol_status": platform_status, "visual_symbols": platform_summary,
+        "region_rows": region_rows,
+        "region_audit": [f"{r['region']}：{r['issue']} → {r['fix']}" for r in region_rows],
+        "copy_paste_snippet": _text_snippet_for(body, product_line, bool(confirmed or claim_words)),
+    }
+
+
+def run_llm_text_four_dim_audit(
+    text: str,
+    *,
+    product_line: str,
+    findings: List[Dict[str, Any]],
+    pl_res: Dict[str, Any],
+    label: str = "REVIEW",
+) -> Dict[str, Any]:
+    """文案的四维体检。
+
+    第一段是**确定性**的：只看引擎已经给出的 findings、品线解析与正文特征词，
+    不联网、不要凭据，因此离线与模型故障时都拿得到完整四维。
+
+    第二段是可选润色：`MULTIMODAL_VOD_API_TOKEN` 在场且正文够长时，请多模态网关
+    把四句话写得更像人话（标题、卡点、怎么改、三维描述、明细行、替换件）。
+    润色**任何一步失败整段丢弃**，回落第一段 —— 卡片不会因为模型挂了而消失，
+    也不会因为模型编了而说错覆盖范围。
+    """
+    det = _text_four_dim_deterministic(
+        text, product_line=product_line, findings=findings, pl_res=pl_res, label=label,
+    )
+
+    body = (text or "").strip()
+    if not body or len(body) < 20:
+        return det
+    if not (os.environ.get("MULTIMODAL_VOD_API_TOKEN") or "").strip():
+        return det
+    if os.environ.get("SHOUHENG_TEXT_LLM_AUDIT") == "0":
+        return det
+
+    try:
+        from tools.multimodal_client import GatewayClient
+
+        model = (os.environ.get("MULTIMODAL_MODEL") or "").strip() or "gemini-3.1-flash-lite"
+        client = GatewayClient.from_env("vod", model=model, timeout=35.0, retry_attempts=1)
+        prompt = (
+            "你是一名跨境电商与母婴广告合规审核员。下面是一段待审广告文案，"
+            "已由规则引擎给出命中清单。请在此基础上写【文案四维体检】。\n"
+            "输出必须全部讲大白话（适合 ADHD 3秒扫完，每点只写 1 句核心人话；"
+            "关键违规词用「」括起来强调，严禁使用 *、**、`、# 等任何 Markdown 符号，严禁出现代码字段名）：\n"
+            f"品线：{product_line}\n"
+            f"引擎命中：{json.dumps([{ 'code': f.get('control_code'), 'quote': f.get('quote') } for f in findings[:8] if isinstance(f, dict)], ensure_ascii=False)}\n"
+            f"正文：\n{body[:4000]}\n\n"
+            "请严格输出一行 JSON（不要多余解释）：\n"
+            "{\n"
+            '  "overall": "发现违规需修改 或 需人工确认 或 初筛未见明显违规",\n'
+            '  "short_title": "15字以内的直白核心问题标题",\n'
+            '  "one_line": "42字以内的一句话核心卡点",\n'
+            '  "quick_fix": "一句话直接告诉运营马上改哪两处",\n'
+            '  "ocr_status": "有风险 或 需注意 或 正常",\n'
+            '  "ocr_summary": "字面红线与医疗禁用词这一维看到了什么（1句话）",\n'
+            '  "scene_status": "有风险 或 需注意 或 正常",\n'
+            '  "scene_semantics": "功效与安全宣称这一维看到了什么（1句话）",\n'
+            '  "symbol_status": "有风险 或 需注意 或 正常",\n'
+            '  "visual_symbols": "品线与平台特殊规范这一维看到了什么（1句话）",\n'
+            '  "region_rows": [\n'
+            '    {"region": "第几段或字符区间", "issue": "命中的原句与问题", "fix": "建议替换写法"}\n'
+            "  ],\n"
+            '  "copy_paste_snippet": "可直接复制回广告的合规替换文案或免责贴条（英文文案给英文+中文说明，中文文案给中文）"\n'
+            "}"
+        )
+        payload = json.dumps({
+            "model": model,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+            "temperature": 0,
+        }, ensure_ascii=False).encode("utf-8")
+        resp = client.transport(
+            client.endpoint(),
+            {"Content-Type": "application/json", "Authorization": f"Bearer {client.api_key}"},
+            payload,
+            35.0,
+        )
+        if resp.status != 200 or not resp.body:
+            return det
+        body_obj = json.loads(resp.body)
+        content_str = (
+            ((body_obj.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        ).strip()
+        s_idx, e_idx = content_str.find("{"), content_str.rfind("}")
+        if s_idx < 0 or e_idx <= s_idx:
+            return det
+        parsed = json.loads(content_str[s_idx:e_idx + 1])
+        if not isinstance(parsed, dict) or not parsed.get("one_line"):
+            return det
+
+        raw_rows = parsed.get("region_rows")
+        region_rows = []
+        if isinstance(raw_rows, list):
+            for r in raw_rows:
+                if isinstance(r, dict) and (r.get("region") or r.get("issue")):
+                    region_rows.append({
+                        "region": str(r.get("region") or "全文").strip(),
+                        "issue": str(r.get("issue") or "—").strip(),
+                        "fix": str(r.get("fix") or "—").strip(),
+                    })
+
+        enriched = dict(det)
+        for k in ("overall", "short_title", "one_line", "quick_fix",
+                  "ocr_status", "ocr_summary", "scene_status", "scene_semantics",
+                  "symbol_status", "visual_symbols", "copy_paste_snippet"):
+            v = str(parsed.get(k) or "").strip()
+            if v:
+                enriched[k] = v
+        if region_rows:
+            enriched["region_rows"] = region_rows
+            enriched["region_audit"] = [f"{r['region']}：{r['issue']} → {r['fix']}" for r in region_rows]
+        # 字面维度与功效维度的两套键名保持一致，别让渲染器读到一份润色、一份确定性
+        enriched["literal_status"], enriched["literal_summary"] = enriched["ocr_status"], enriched["ocr_summary"]
+        enriched["claim_status"], enriched["claim_summary"] = enriched["scene_status"], enriched["scene_semantics"]
+        enriched["platform_status"], enriched["platform_summary"] = enriched["symbol_status"], enriched["visual_symbols"]
+        enriched["model"] = model
+        enriched["status"] = "ok"
+        return enriched
+    except Exception:  # noqa: BLE001
+        return det
+
+
 def _legacy_bridge_fields(
     *,
     label: str,
@@ -1057,8 +1363,22 @@ def ingest_and_judge(
         if four_dim_audit and four_dim_audit.get("overall") == "发现违规需修改" and label == "REVIEW":
             # 桥接层不改写引擎标签（J1）：VLM 更严结论降为建议标记，随卡片呈现
             four_dim_audit["overall"] = "发现违规需修改（VLM 建议，机器初筛为需人工确认）"
+    elif carrier in TEXT_CARRIERS:
+        # 文案也要有自己的四维：字面红线 / 功效与安全宣称 / 品线与平台规范 / 明细表。
+        # 确定性那一段永远可用；润色那一段失败就整段丢掉（见 run_llm_text_four_dim_audit）。
+        four_dim_audit = run_llm_text_four_dim_audit(
+            unit.get("text") or (submission.get("text") or ""),
+            product_line=resolved_pl,
+            findings=confirmed_findings,
+            pl_res=pl_res,
+            label=label,
+        )
 
-    if four_dim_audit and four_dim_audit.get("short_title"):
+    # ★ 权威结论行：只有图片/视频有四维抬头时才改写成【<模态>审查：…】。
+    #   文案**保持** `【审查结论：{label}】…（案件 {case_id}）。` —— 那条是
+    #   `buildGuardVerdict` 的同款形状，`feishu_guard_ingest.test.mjs` 的 G3 与
+    #   `tools.mjs` 的 pendingTurnVerdict 都按它对齐；文案卡的模态抬头由卡片 title 承担。
+    if four_dim_audit and four_dim_audit.get("short_title") and carrier in ("image", "video"):
         kind_tag = "视频审查" if carrier == "video" else "图片审查"
         verdict_line = f"【{kind_tag}：{four_dim_audit['overall']}】{four_dim_audit['short_title']}"
     elif label == "BLOCK":

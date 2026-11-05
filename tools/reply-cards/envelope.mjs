@@ -31,6 +31,7 @@ import {
 import { lintCopy } from './registry.mjs';
 import { stripEngineJargon, scrubCardData } from './jargon.mjs';
 import { conclusionLine, consumePendingTurnVerdict } from '../agent/prd53.mjs';
+import { AUDIT_MODALITY_SPECS, foreignTokensFor } from '../agent/audit_modality_specs.mjs';
 
 /** 卡片块的开头标记。选这个形态是因为它在 markdown 里不构成任何语法，误触概率低。 */
 export const CARD_MARK = '[[card:';
@@ -137,11 +138,31 @@ export function verdictSlotOf(kind) {
 
 export const VERDICT_GROUP_TITLE = '逐条问题';
 
+/**
+ * 抬头已经是**模态审查**卡时，权威结论行不再覆写 title。
+ *
+ * 为什么：直出审查卡的 title 自带模态与标签（`【文案审查 · 需修改】短标题`），
+ * 它本身就是结论行；再置顶一条 `【审查结论：BLOCK】…` 会把「这是哪种送审」盖掉，
+ * 读者看到的是两条结论里的后一条。而模型自拟的抬头（`{"title":"模型自拟标题"}`）
+ * 仍然必须被置顶 —— 那条没有模态，也没有结论。
+ */
+const MODALITY_TITLE_RE = /^【(图片审查|视频审查|文案审查)/;
+
+function titleIsModalityAudit(cur) {
+  return MODALITY_TITLE_RE.test(String(cur ?? '').trim());
+}
+
 export function applyVerdictLine(kind, data, verdict) {
   const none = (why) => ({ data, action: 'none', slot: null, moved: null, why });
   if (!verdict || !verdict.line) return none('无权威结论行');
 
   let out = { ...data };
+  const slot = verdictSlotOf(kind);
+
+  if (slot === 'title' && titleIsModalityAudit(out.title)) {
+    return { data: out, action: 'already', slot, moved: null, why: '结论格已是模态审查抬头' };
+  }
+
   if (verdict.block && (kind === 'evidence' || Array.isArray(out.groups))) {
     const groups = Array.isArray(out.groups) ? out.groups : [];
     const existingIdx = groups.findIndex((g) => String(g?.content ?? '').includes(verdict.block));
@@ -152,20 +173,20 @@ export function applyVerdictLine(kind, data, verdict) {
     }
   }
 
-  const slot = verdictSlotOf(kind);
-  if (!slot) return { data: out, action: 'no-slot', slot: null, moved: null, why: `「${kind}」没有结论格` };
+  const slot2 = verdictSlotOf(kind);
+  if (!slot2) return { data: out, action: 'no-slot', slot: null, moved: null, why: `「${kind}」没有结论格` };
 
-  const cur = s(out[slot]).trim();
-  if (cur === verdict.line) return { data: out, action: 'already', slot, moved: null, why: '结论格已是权威结论行' };
+  const cur = s(out[slot2]).trim();
+  if (cur === verdict.line) return { data: out, action: 'already', slot: slot2, moved: null, why: '结论格已是权威结论行' };
 
   let moved = null;
   if (cur) {
-    const [next, to] = foldIn(kind, out, `（原${slot}）${cur}`);
+    const [next, to] = foldIn(kind, out, `（原${slot2}）${cur}`);
     out = next;
-    moved = { field: slot, to: to ?? '(无格可放)', chars: len(cur), why: '权威结论行置顶，原抬头移入补充区' };
+    moved = { field: slot2, to: to ?? '(无格可放)', chars: len(cur), why: '权威结论行置顶，原抬头移入补充区' };
   }
-  out[slot] = verdict.line;
-  return { data: out, action: 'forced', slot, moved, why: '已置顶权威结论行' };
+  out[slot2] = verdict.line;
+  return { data: out, action: 'forced', slot: slot2, moved, why: '已置顶权威结论行' };
 }
 
 /* ═══════════════ ② 执行上限 ═══════════════ */
@@ -259,6 +280,80 @@ function scrubInternal(kind, d) {
 }
 
 /**
+ * 边界闸：一张审查卡的 `boundary` 是**闭集**，每个模态恰好一个合法值。
+ *
+ * 为什么必须有这一层：`boundary` 是唯一一个对读者声明「我看了什么」的槽。
+ * 声明错的代价不是难看 —— 是有人据此跳过人工复核。而这张卡可能是**模型自己**
+ * 拼的（聊天历史里全是图片卡，它就把图片那句边界抄过来），构建器管不到那条路。
+ *
+ * 判据只有一处：`audit_modality_specs.mjs` 的判别词表。本模态边界里出现**别的**
+ * 模态的独有说法 → 换成本模态的权威边界，原文进 `moved[]`（搬是搬，砍是砍）。
+ * 其余类型的卡（`receipt` / `alert` / `decision`…）没有 `audit_modality`，一个字不碰。
+ */
+const TITLE_TO_MODALITY = [
+  ['图片审查', 'image'],
+  ['视频审查', 'video'],
+  ['文案审查', 'text'],
+];
+
+/** 卡片自己声明的是哪个模态：先看机器键，再退到抬头。都读不出 → null（不碰）。 */
+function modalityOf(d) {
+  const k = d.audit_modality;
+  if (typeof k === 'string' && AUDIT_MODALITY_SPECS[k]) return k;
+  if (k === 'copy' && AUDIT_MODALITY_SPECS.text) return 'text';
+  const title = s(d.title).trim();
+  for (const [prefix, key] of TITLE_TO_MODALITY) if (title.startsWith(`【${prefix}`)) return key;
+  return null;
+}
+
+function enforceModalityBoundary(d) {
+  const key = modalityOf(d);
+  const spec = key ? AUDIT_MODALITY_SPECS[key] : null;
+  if (!spec) return { data: d, moved: [] };
+
+  const foreign = foreignTokensFor(spec.key);
+  const moved = [];
+  let out = { ...d };
+
+  // 正文里声明别的模态覆盖了什么：**整行拿掉**，不做词替换。
+  // 换词会造出一句没人写过的话，而那句假话会被读成结论；整行拿掉是诚实的空缺。
+  const stripForeign = (text, where) => {
+    const lines = s(text).split('\n');
+    const kept = [];
+    let dropped = 0;
+    for (const line of lines) {
+      if (foreign.some((t) => line.includes(t))) { dropped++; continue; }
+      kept.push(line);
+    }
+    if (!dropped) return text;
+    moved.push({
+      field: where, to: '(已删整行)', chars: dropped,
+      why: `${where} 里有 ${spec.key} 卡不该有的别的模态覆盖声明 → 整行删掉`,
+    });
+    return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  };
+
+  if (out.reasoning) out.reasoning = stripForeign(out.reasoning, 'reasoning');
+  if (Array.isArray(out.groups)) {
+    out.groups = out.groups.map((g, i) => (g && typeof g === 'object' && !Array.isArray(g)
+      ? { ...g, ...(g.content ? { content: stripForeign(g.content, `groups[${i}].content`) } : {}) }
+      : g));
+  }
+
+  const b = s(out.boundary);
+  const hit = foreign.filter((t) => b.includes(t));
+  const empty = !b.trim();
+  if (!hit.length && !empty) return { data: out, moved };
+
+  const why = empty
+    ? `边界槽是空的（${spec.key} 卡必须有覆盖声明）→ 已填成本模态的权威边界`
+    : `边界槽里出现 ${spec.key} 不覆盖的说法（${hit.join('、')}）→ 已换成本模态的权威边界`;
+  out = { ...out, boundary: spec.boundary };
+  moved.push({ field: 'boundary', to: 'boundary-restored', chars: len(b), why });
+  return { data: out, moved };
+}
+
+/**
  * 把字段搬到它该在的格子里。返回改过的 data 和一份搬迁记录。
  *
  * 只处理「搬得动」的情况。搬不动的（比如 correction 的 wrong 太长）
@@ -272,6 +367,11 @@ function scrubInternal(kind, d) {
 export function enforceLimits(kind, data, extra = []) {
   let d = { ...data };
   const moved = [];
+
+  // 模态边界先于长度上限：边界被换过之后再量长度才有意义。
+  const modal = enforceModalityBoundary(d);
+  d = modal.data;
+  moved.push(...modal.moved);
 
   // 结论超长：按句切，前 VERDICT_MAX 字留结论，其余进 boundary。
   if (d.verdict && len(d.verdict) > VERDICT_MAX) {

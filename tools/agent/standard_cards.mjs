@@ -17,6 +17,7 @@
 import { build, renderText } from '../reply-cards/registry.mjs';
 import { plainify, plainifyCard, hasMdSymbols } from './plain.mjs';
 import { TEST_GROUP_CHAT_ID, assertTestGroupTarget } from './push_policy.mjs';
+import { resolveModality, renderFourDimAuditPayload, specFor } from './audit_modality_specs.mjs';
 
 const HUMAN_LABEL = {
   BLOCK: '发现违规需修改',
@@ -50,140 +51,54 @@ export function buildAuditResultCard({ mediaGot = null, textJudgeResult = null }
     const rawLabel = j.label ?? 'REVIEW';
     const caseId = mediaGot.case_id ?? j.case_id ?? null;
     const fd = mediaGot.four_dim_audit ?? j.four_dim_audit ?? null;
+    const modality = resolveModality(mediaGot);
+    const spec = specFor(mediaGot);
+    if (!spec) return null;
 
-    const kindName = mediaGot.type === 'media' || String(mediaGot.reason || '').startsWith('video') ? '视频审查' : '图片审查';
     if (fd && fd.one_line) {
-      const overall = clean(fd.overall || HUMAN_LABEL[rawLabel] || '需人工确认');
-      const isBlock = overall.includes('修改') || overall.includes('违规');
-      const isPass = overall.includes('未见') && !overall.includes('确认');
-      const tone = isBlock ? 'red' : (isPass ? 'green' : 'orange');
-      const tagLabel = isBlock ? '需修改' : (isPass ? '初筛通过' : '需人工确认');
-      const shortTitle = clean(fd.short_title || fd.one_line).slice(0, 18);
-      const quickFix = clean(fd.quick_fix || fd.action_advice || '请按下方区域表格修改后重审');
-
-      const ocrBadge = fd.ocr_status ? `【${clean(fd.ocr_status)}】` : '';
-      const sceneBadge = fd.scene_status ? `【${clean(fd.scene_status)}】` : '';
-      const symBadge = fd.symbol_status ? `【${clean(fd.symbol_status)}】` : '';
-
-      const checkListMd = [
-        `【马上怎么改】${quickFix}`,
-        '',
-        '【四维快速体检】',
-        `· ① 图内文字（OCR）${ocrBadge}：${clean(fd.ocr_summary || '未见明显违规宣传词')}`,
-        `· ② 画面语义${sceneBadge}：${clean(fd.scene_semantics || '常规产品展示场景')}`,
-        `· ③ 视觉符号${symBadge}：${clean(fd.visual_symbols || '未见异常认证图标或高危符号')}`,
-        '',
-        '【④ 区域级画面审计（对表改图）】',
-      ].join('\n');
-
-      const regionRows = Array.isArray(fd.region_rows) && fd.region_rows.length
-        ? fd.region_rows.map((r) => [
-            clean(r.region || '画面区域'),
-            clean(r.issue || '—'),
-            clean(r.fix || '—'),
-          ])
-        : [['全图', '未见明显局部违规', '人工确认后可放行']];
-
-      return build('evidence', {
-        tone,
-        title: `【${kindName} · ${tagLabel}】${shortTitle}`,
-        verdict: `【核心卡点】${clean(fd.one_line)}`.slice(0, 58),
-        reasoning: checkListMd,
-        columns: [
-          { name: 'region', display_name: '画面位置', data_type: 'text' },
-          { name: 'issue', display_name: '发现的问题', data_type: 'text' },
-          { name: 'fix', display_name: '直接怎么改', data_type: 'text' },
-        ],
-        rows: regionRows,
-        ...(fd.copy_paste_snippet ? { snippet: clean(fd.copy_paste_snippet) } : {}),
-        fields: [
-          { label: '审查结论', value: overall },
-          { label: '下一步', value: isBlock ? '改图后重审' : '人工确认后放行' },
-          ...(caseId ? [{ label: '工作台单号', value: caseId }] : []),
-        ],
-        boundary: '已覆盖：图内文字(OCR) · 画面语义 · 视觉符号 · 区域级画面审计',
-      });
+      return build('evidence', renderFourDimAuditPayload({
+        modality: spec.key,
+        fd,
+        label: rawLabel,
+        caseId,
+        productLine: mediaGot.product_line ?? j.product_line ?? null,
+        productLineNote: mediaGot.product_line_resolution?.note ?? null,
+        evChain: mediaGot.evidence_chain,
+        cleanFn: clean,
+      }));
     }
 
     const humanLabel = HUMAN_LABEL[rawLabel] || '需人工确认';
-    const isVideo = mediaGot.type === 'media' || String(mediaGot.reason || '').startsWith('video');
     const tone = rawLabel === 'BLOCK' ? 'red' : (rawLabel === 'PASS' ? 'green' : 'orange');
     return build('evidence', {
+      audit_modality: spec.key,
       tone,
-      title: `【${kindName} · ${humanLabel}】${caseId ? `单号 ${caseId}` : '已完成初筛'}`,
+      title: `【${spec.cardNoun} · ${humanLabel}】${caseId ? `单号 ${caseId}` : '已完成初筛'}`,
       verdict: `【核心结论】${humanLabel}（命中 ${j.findings_total ?? 0} 处规则）`.slice(0, 58),
-      reasoning: isVideo
-        ? '【分维体检】\n· ① 视频画面：已完成多模态画面扫描\n· ② 口播与字幕：当前未开启本地语音转写，请人工核对口播词'
-        : '【分维体检】\n· ① 图内文字（OCR）：已完成扫描\n· ② 下一步：请转工作台由人工确认后放行',
+      reasoning: `${spec.checklistHeading}\n· ① ${spec.dimensions[0].name}：已完成扫描\n· ② 下一步：${spec.nextStep.escalate}`,
       fields: [
         { label: '审查结论', value: humanLabel },
-        { label: '下一步', value: rawLabel === 'BLOCK' ? '修改后重审' : '人工确认后放行' },
+        { label: '下一步', value: rawLabel === 'BLOCK' ? spec.nextStep.rework : spec.nextStep.escalate },
         ...(caseId ? [{ label: '工作台单号', value: caseId }] : []),
       ],
-      boundary: isVideo ? '已覆盖视频画面；口播音轨需人工核对' : '需人工最终确认后放行',
+      boundary: spec.boundary,
     });
   }
 
   if (textJudgeResult && !textJudgeResult.error) {
     const r = textJudgeResult;
-    const rawLabel = r.label ?? 'REVIEW';
-    const humanLabel = HUMAN_LABEL[rawLabel] || '需人工确认';
-    const isBlock = rawLabel === 'BLOCK';
-    const isPass = rawLabel === 'PASS';
-    const tone = isBlock ? 'red' : (isPass ? 'green' : 'orange');
-    const tagLabel = isBlock ? '需修改' : (isPass ? '初筛通过' : '需人工确认');
-    const caseId = r.case_id ?? null;
-    const findings = Array.isArray(r.findings)
-      ? r.findings.filter((f) => f && f.status !== 'candidate')
-      : [];
-    const total = findings.length;
-
-    const firstQuotes = findings.slice(0, 2).map((f) => `「${clean(f.quote)}」`).join('、');
-    const shortTitle = total > 0
-      ? `命中 ${firstQuotes} 等 ${total} 处风险`.slice(0, 20)
-      : '未见已知字面红线词';
-    const oneLine = total > 0
-      ? `【核心卡点】文案中出现 ${firstQuotes}，触碰合规红线，需修改后再投放。`.slice(0, 58)
-      : '【核心结论】未命中已知禁用词，请人工确认语境后放行。';
-
-    const quickFix = total > 0
-      ? `请替换或删掉 ${firstQuotes}，改为客观功能描述并补充实测条件说明。`
-      : '文案字面初筛通过，转人工复核签发即可。';
-
-    const rows = total > 0
-      ? findings.slice(0, 5).map((f, idx) => {
-          const quote = clean(f.quote || '问题片段');
-          const code = clean(f.control_code || f.rule_key || `第${idx + 1}处`);
-          const ref = Array.isArray(f.authority_ref) && f.authority_ref[0]
-            ? clean(f.authority_ref[0].entry_id || f.authority_ref[0].source || '平台广告规范')
-            : '平台合规规范';
-          return [
-            `第 ${idx + 1} 处（${code}）`,
-            `出现禁用/高危表述「${quote}」（依据：${ref}）`,
-            `删掉「${quote}」或改为客观事实描述`,
-          ];
-        })
-      : [['全文扫描', '未命中字面违规词', '人工确认语境后可放行']];
-
-    return build('evidence', {
-      tone,
-      title: `【文案审查 · ${tagLabel}】${shortTitle}`,
-      verdict: oneLine,
-      reasoning: `【马上怎么改】${quickFix}\n\n【问题位置与改法对照表】`,
-      columns: [
-        { name: 'region', display_name: '位置与规则', data_type: 'text' },
-        { name: 'issue', display_name: '发现的问题', data_type: 'text' },
-        { name: 'fix', display_name: '直接怎么改', data_type: 'text' },
-      ],
-      rows,
-      fields: [
-        { label: '审查结论', value: humanLabel },
-        { label: '品线', value: clean(r.product_line || '吸奶器') },
-        { label: '命中处数', value: `${total} 处` },
-        ...(caseId ? [{ label: '工作台单号', value: caseId }] : []),
-      ],
-      boundary: clean(r.product_line_resolution?.note || '已覆盖：19项活跃控制点与外部法规库'),
+    const payload = renderFourDimAuditPayload({
+      modality: 'text',
+      fd: r.four_dim_audit ?? null,
+      label: r.label ?? 'REVIEW',
+      caseId: r.case_id ?? null,
+      productLine: r.product_line ?? null,
+      productLineNote: r.product_line_resolution?.note ?? null,
+      evChain: r.evidence_chain,
+      findings: Array.isArray(r.findings) ? r.findings.filter((f) => f && f.status !== 'candidate') : [],
+      cleanFn: clean,
     });
+    return payload ? build('evidence', payload) : null;
   }
 
   return null;

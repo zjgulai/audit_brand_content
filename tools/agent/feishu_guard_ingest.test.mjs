@@ -767,6 +767,300 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
     JSON.stringify({ hitCount: sampleSearch.hitCount, firstDoc: sampleSearch.hits[0]?.docId }));
 }
 
+/* ── K. 模态专属审查卡：图片 / 文案 / 视频三套四维体检互不串台 ─────────── */
+{
+  const { AUDIT_MODALITY_SPECS, resolveModality } = await import('./audit_modality_specs.mjs');
+  const prd53Mod = await import('./prd53.mjs');
+  const stdCards = await import('./standard_cards.mjs');
+  const cardsMod = await import('../reply-cards/cards.mjs');
+  const envMod = await import('../reply-cards/envelope.mjs');
+  const regMod = await import('../reply-cards/registry.mjs');
+  const imgJudgment = await import('./image_judgment.mjs');
+
+  /** 卡片 → 一段可判读的文本（正文 + 表头 + 灰底带 + 边界），断言只看这里。 */
+  const view = (card) => {
+    const parts = [card?.header?.title?.content ?? ''];
+    for (const el of card?.body?.elements ?? []) {
+      if (el.tag === 'markdown') parts.push(el.content);
+      else if (el.tag === 'table') parts.push((el.columns ?? []).map((c) => c.display_name).join(' | '));
+      else if (el.tag === 'column_set') {
+        for (const c of el.columns ?? []) for (const e of c.elements ?? []) if (e.tag === 'markdown') parts.push(e.content);
+      } else if (el.tag === 'collapsible_panel') {
+        for (const e of el.elements ?? []) if (e.tag === 'markdown') parts.push(e.content);
+      }
+    }
+    return parts.join('\n');
+  };
+
+  const textResult = (over = {}) => ({
+    case_id: 'case-1111111111111111aaaa',
+    label: 'BLOCK',
+    product_line: '婴儿监视器',
+    product_line_resolution: { status: 'inferred_keyword', note: '未显式声明品线，按内容关键词自动识别' },
+    findings: [{
+      status: 'confirmed', control_code: 'H01', quote: 'prevent SIDS',
+      authority_ref: [{ entry_id: 'EXT-021' }],
+    }],
+    evidence_chain: { status: 'disabled' },
+    ...over,
+  });
+
+  // K1 —— 表自身的不变式。喂坏样本必须抛（否则这张表就是一份装饰）。
+  {
+    const spec = AUDIT_MODALITY_SPECS;
+    const keys = Object.keys(spec);
+    const dimsOk = keys.every((k) => spec[k].dimensions.length === 3);
+    const colsOk = keys.every((k) => spec[k].columns.map((c) => c.name).join(',') === 'region,issue,fix');
+    const disc = keys.flatMap((k) => [...spec[k].discriminators]);
+    const disjoint = new Set(disc).size === disc.length;
+    const boundaryOk = keys.every((k) => [...spec[k].boundary].length <= 85);
+    T('K1 三模态规格表：各 3 个正文维度 + 表格维度、列名恒为 region,issue,fix、判别词互斥、边界 ≤85 字',
+      keys.length === 3 && dimsOk && colsOk && disjoint && boundaryOk,
+      JSON.stringify({ keys, dimsOk, colsOk, disjoint, boundaryOk }));
+
+    T('K1b 模态解析：copy 视同 text；type=media 不许猜成视频；读不出 → null（不回落图片）',
+      resolveModality('copy') === 'text'
+        && resolveModality({ type: 'media' }) === null
+        && resolveModality({ carrier: 'video' }) === 'video'
+        && resolveModality({ four_dim_audit: { media_kind: 'text' } }) === 'text',
+      JSON.stringify([resolveModality('copy'), resolveModality({ type: 'media' }), resolveModality({ carrier: 'video' })]));
+  }
+
+  // K2 —— 文案：两个构建器都必须出【文案审查 · …】四维，且**一句图片的话都不许有**。
+  {
+    const fromPrd53 = prd53Mod.formatDirectAuditCardReply({ textJudgeResult: textResult() });
+    const shaped = envMod.toCardOrText(fromPrd53);
+    const v = view(shaped.card);
+    const must = [
+      '【文案审查 · 需修改】',
+      '【文案四维体检】',
+      '① 字面红线与医疗禁用词',
+      '② 功效与安全宣称',
+      '③ 品线与平台特殊规范',
+      '【④ 问题位置与改法（对表改字）】',
+      '段落 / 位置', '命中的原句与问题', '建议替换写法',
+      '【可直接复制的合规替换文案 / 免责贴条】',
+      '改词后重审',
+      '已覆盖：字面红线词 · 功效与安全宣称 · 品线与平台规范 · 法规条款核验',
+    ];
+    const missing = must.filter((m) => !v.includes(m));
+    const forbidden = ['只覆盖图内文字', '画面语义未覆盖', '区域级画面审计', '对表改图', '改图后重审']
+      .filter((m) => v.includes(m));
+    T('K2 文案卡（prd53 出口）：模态抬头 + 文案四维 + 三列表头 + 替换件 + 文案边界，且不含任何图片说法',
+      shaped.mode === 'card' && !missing.length && !forbidden.length,
+      JSON.stringify({ missing, forbidden, title: shaped.card?.header?.title?.content }));
+
+    const fromStd = stdCards.buildAuditResultCard({ textJudgeResult: textResult() });
+    const v2 = view(fromStd);
+    T('K2b 文案卡（standard_cards 出口）与 prd53 出口逐项同字：抬头/四维/列名/边界',
+      v2.includes('【文案审查 · 需修改】') && v2.includes('【文案四维体检】')
+        && v2.includes('【④ 问题位置与改法（对表改字）】')
+        && v2.includes('段落 / 位置') && v2.includes('【可直接复制的合规替换文案 / 免责贴条】')
+        && v2.includes('已覆盖：字面红线词')
+        && !['只覆盖图内文字', '对表改图'].some((m) => v2.includes(m)),
+      v2.slice(0, 120));
+
+    // 反向对照：空命中（REVIEW）也走同一套模板，不许退回图片的四维，也不许说「初筛未见违规」
+    const emptyCard = stdCards.buildAuditResultCard({
+      textJudgeResult: textResult({ label: 'REVIEW', findings: [], evidence_chain: null }),
+    });
+    const v3 = view(emptyCard);
+    T('K2c ★ 反向对照：空命中的文案仍出文案四维，不回落到图片模版，也不替人说「初筛未见违规」',
+      v3.includes('【文案四维体检】')
+        && v3.includes('需人工确认')
+        && !v3.includes('只覆盖图内文字')
+        && !v3.includes('初筛未见违规'),
+      v3.slice(0, 140));
+  }
+
+  // K3 —— 视频：模态抬头 + 时间轴表 + 给剪辑师的替换件。
+  {
+    const videoGot = {
+      type: 'media', reason: 'video_judged', carrier: 'video',
+      case_id: 'case-2222222222222222bbbb', product_line: '吸奶器',
+      judgment: { label: 'REVIEW' },
+      four_dim_audit: {
+        media_kind: 'video', overall: '需人工确认', short_title: '口播出现疗效暗示',
+        one_line: '第 8 秒口播说「预防乳腺炎」，属医疗功效暗示。',
+        quick_fix: '① 剪掉该句；② 片尾补免责字幕',
+        ocr_status: '正常', ocr_summary: '字幕未见违规宣称',
+        scene_status: '有风险', scene_semantics: '口播称「预防乳腺炎」',
+        symbol_status: '正常', visual_symbols: '音画一致',
+        region_rows: [{ region: '8.0-11.5s', issue: '口播：预防乳腺炎', fix: '剪掉或改念「舒缓不适」' }],
+        copy_paste_snippet: '本产品非医疗器械，不能替代诊断或治疗。',
+      },
+    };
+    const viaPrd53 = envMod.toCardOrText(prd53Mod.formatDirectAuditCardReply({ mediaGot: videoGot }));
+    const v = view(viaPrd53.card);
+    const must = [
+      '【视频审查 ·', '【视频四维体检】',
+      '① 画面字幕与花字（OCR）', '② 口播人声与音频宣称（ASR）', '③ 音画一致性与动作演示',
+      '【④ 时间轴问题定位（对表剪片）】',
+      '时间段（秒）', '画面 / 口播问题', '直接怎么剪 / 改',
+      '【可直接复制给剪辑师的合规免责字幕 / 替换口播词】',
+      '已覆盖：画面字幕(OCR) · 口播语音(ASR) · 音画一致性 · 时间轴分段审计',
+    ];
+    const missing = must.filter((m) => !v.includes(m));
+    const forbidden = ['对表改图', '改图后重审', '画面位置'].filter((m) => v.includes(m));
+    T('K3 视频卡（prd53 出口）：模态抬头 + 视频四维 + 时间轴表 + 剪辑师替换件，且不含任何图片说法',
+      viaPrd53.mode === 'card' && !missing.length && !forbidden.length,
+      JSON.stringify({ missing, forbidden, title: viaPrd53.card?.header?.title?.content }));
+
+    const viaStd = view(stdCards.buildAuditResultCard({ mediaGot: videoGot }));
+    T('K3b 视频卡（standard_cards 出口）同字：视频四维 + 时间轴列名 + 剪辑师替换件 + 视频边界',
+      viaStd.includes('【视频四维体检】') && viaStd.includes('时间段（秒）')
+        && viaStd.includes('直接怎么剪 / 改')
+        && viaStd.includes('【可直接复制给剪辑师的合规免责字幕 / 替换口播词】')
+        && viaStd.includes('已覆盖：画面字幕(OCR) · 口播语音(ASR) · 音画一致性 · 时间轴分段审计')
+        && !viaStd.includes('对表改图'),
+      viaStd.slice(0, 120));
+
+    // 下一步两档措辞：需修改 → 剪片后重审；其余 → 转工作台人工复核
+    const blockVideo = stdCards.buildAuditResultCard({
+      mediaGot: { ...videoGot, four_dim_audit: { ...videoGot.four_dim_audit, overall: '发现违规需修改' } },
+    });
+    T('K3c 视频卡的下一步措辞：需修改出「剪片后重审」，非拦截出「转工作台人工复核」',
+      view(blockVideo).includes('剪片后重审') && viaStd.includes('转工作台人工复核'),
+      '');
+  }
+
+  // K4 —— 图片回归：三个既有可见串一个字节都不许变。
+  {
+    const imageGot = {
+      type: 'image', carrier: 'image', case_id: 'case-3333333333333333cccc',
+      judgment: { label: 'BLOCK' },
+      four_dim_audit: {
+        overall: '发现违规需修改', short_title: '医院级字样', one_line: '顶部宣称「Hospital-grade」。',
+        quick_fix: '① 删掉 Hospital-grade；② 改吸力参数',
+        ocr_status: '有风险', ocr_summary: '顶部写 Hospital-grade',
+        scene_status: '正常', scene_semantics: '常规哺乳场景',
+        symbol_status: '正常', visual_symbols: '未见认证图标',
+        region_rows: [{ region: '顶部横幅', issue: 'Hospital-grade', fix: '改为 295 mmHg 实测吸力' }],
+        copy_paste_snippet: 'For daily pumping comfort. Not a medical device.',
+      },
+    };
+    const v = view(envMod.toCardOrText(prd53Mod.formatDirectAuditCardReply({ mediaGot: imageGot })).card);
+    const must = [
+      '【图片审查 · 需修改】', '【四维快速体检】',
+      '① 图内文字（OCR）', '② 画面语义', '③ 视觉符号',
+      '【④ 区域级画面审计（对表改图）】',
+      '画面位置', '发现的问题', '直接怎么改',
+      '【可直接复制给设计的合规免责贴条】',
+      '改图后重审',
+      '已覆盖：图内文字(OCR) · 画面语义 · 视觉符号 · 区域级画面审计',
+    ];
+    const missing = must.filter((m) => !v.includes(m));
+    T('K4 图片卡回归：抬头/四维/区域表/设计贴条/边界逐字保留（用户说这张卡工作得很好）',
+      !missing.length, JSON.stringify({ missing }));
+  }
+
+  // K5 —— 出站边界闸：喂那张历史上的坏卡（文案抬头 + 图片边界），必须被就地改写。
+  {
+    const BAD = JSON.stringify({
+      title: '【文案审查 · 需人工确认】未见已知字面红线词',
+      verdict: '未命中已知禁用词',
+      reasoning: '【马上怎么改】转人工\n\n【文案四维体检】\n· ① 字面红线与医疗禁用词：未见',
+      groups: [{ title: '审查详情', content: '只覆盖**图内文字（OCR）**；画面语义未覆盖；空命中只能 REVIEW，不许说初筛未见违规（待人工复核）。' }],
+      boundary: '只覆盖图内文字（OCR）；画面语义未覆盖；空命中只能 REVIEW，不许说初筛未见违规（待人工复核）。',
+    });
+    const r1 = envMod.toCardOrText(`[[card:evidence]]\n${BAD}`);
+    const str1 = JSON.stringify(r1.card ?? {});
+    T('K5 ★ 出站闸：文案卡里抄来的图片边界被换成本模态边界，散文里的外来行整行删掉，且留痕',
+      r1.mode === 'card'
+        && str1.includes('已覆盖：字面红线词')
+        && !str1.includes('只覆盖图内文字')
+        && !str1.includes('画面语义未覆盖')
+        && r1.moved.some((m) => m.field === 'boundary')
+        && r1.moved.some((m) => m.field === 'reasoning' || m.field.startsWith('groups')),
+      JSON.stringify({ moved: r1.moved.map((m) => `${m.field}:${m.to}`), title: r1.card?.header?.title?.content }));
+
+    // 反向对照（过纠）：图片卡里自己的合法行一个字都不许被删
+    const good = envMod.toCardOrText(`[[card:evidence]]\n${JSON.stringify({
+      title: '【图片审查 · 需修改】x',
+      reasoning: '【四维快速体检】\n· ① 图内文字（OCR）：未见违规\n· ② 画面语义：正常',
+      boundary: '已覆盖：图内文字(OCR) · 画面语义 · 视觉符号 · 区域级画面审计',
+    })}`);
+    T('K5b ★ 反向对照：图片卡自己的合法行与边界零改动（闸不许误报）',
+      JSON.stringify(good.card).includes('画面语义：正常') && good.moved.length === 0, '');
+
+    // 反向对照（越界）：没有模态声明的卡一个字都不碰
+    const plain = envMod.toCardOrText(`[[card:query-answer]]\n${JSON.stringify({
+      title: '一条普通结论', verdict: 'v', boundary: '只覆盖图内文字（OCR）',
+    })}`);
+    T('K5c ★ 反向对照：非审查卡（无模态键、无模态抬头）边界原样保留',
+      JSON.stringify(plain.card).includes('只覆盖图内文字'), '');
+
+    // 模态抬头不许被权威结论行覆写；模型自拟抬头仍然必须被置顶
+    const keep = envMod.applyVerdictLine('evidence',
+      { title: '【文案审查 · 需修改】短标题' }, { line: '【审查结论：BLOCK】共发现 3 处必须修改（案件 case-x）。' });
+    const overwrite = envMod.applyVerdictLine('evidence',
+      { title: '模型自拟标题' }, { line: '【审查结论：BLOCK】共发现 3 处必须修改（案件 case-x）。' });
+    T('K5d 模态抬头不被覆写，而模型自拟抬头仍被权威结论行置顶（G3 的形状）',
+      keep.action === 'already' && keep.data.title.startsWith('【文案审查')
+        && overwrite.action === 'forced' && overwrite.data.title.includes('【审查结论：BLOCK】'),
+      JSON.stringify({ keep: keep.action, overwrite: overwrite.action }));
+  }
+
+  // K6 —— four_dim_audit 在视频这一跳不许再丢；feishu.ingestAttachment 必须把它带到返回体上。
+  {
+    const fakeExec = async () => ({
+      stdout: JSON.stringify({
+        ok: true, case_id: 'case-4444444444444444dddd', product_line: '吸奶器',
+        label: 'REVIEW', layer: 'DP2', release_status: '待放行',
+        parse_status: 'partial', findings: [],
+        four_dim_audit: { media_kind: 'video', overall: '需人工确认', one_line: '口播出现疗效暗示', short_title: 'x' },
+      }),
+    });
+    const r = await imgJudgment.runVideoJudgment({
+      filePath: '/tmp/fake.mp4', messageId: 'om_k6_video', exec: fakeExec,
+    });
+    T('K6 runVideoJudgment 保留 four_dim_audit 与 carrier=video（原先这一跳把它丢了）',
+      r.ok === true && r.carrier === 'video'
+        && r.four_dim_audit?.media_kind === 'video'
+        && r.judgment?.four_dim_audit?.media_kind === 'video'
+        && r.product_line === '吸奶器',
+      JSON.stringify({ ok: r.ok, carrier: r.carrier, fd: r.four_dim_audit?.media_kind }));
+
+    const savedGet = feishu.client.im.v1.messageResource.get;
+    process.env.SHOUHENG_ATTACHMENT_DIR = path.join(tmpRoot, 'attachments-k6');
+    feishu.client.im.v1.messageResource.get = async () => ({
+      headers: { 'content-length': '64' },
+      writeFile: async (p) => { fs.writeFileSync(p, Buffer.from('fake-mp4-video-bytes-for-k6')); return p; },
+      getReadableStream: () => ({ destroy() {} }),
+    });
+    try {
+      const got = await feishu.ingestAttachment({
+        message_id: 'om_k6_ingest', message_type: 'media',
+        content: JSON.stringify({ file_key: 'fk_k6', file_name: 'demo.mp4' }),
+      });
+      const shaped = stdCards.buildAuditResultCard({ mediaGot: got });
+      T('K6b feishu.ingestAttachment（media）把 four_dim_audit 带到返回体，且能建出视频审查卡',
+        got.carrier === 'video'
+          && (got.four_dim_audit?.media_kind === 'video' || got.four_dim_audit === null)
+          && (got.four_dim_audit ? view(shaped).includes('【视频审查') : true),
+        JSON.stringify({ carrier: got.carrier, fd: got.four_dim_audit?.media_kind, status: got.status }));
+    } finally {
+      feishu.client.im.v1.messageResource.get = savedGet;
+    }
+  }
+  // K7 —— 直出文案卡的入站闸：送审的必须真是用户那句话，否则解释类提问会被一张卡吃掉。
+  {
+    const { submitsUserText } = await import('./agent.mjs');
+    const COPY = 'Smart baby monitor with AI that alerts you to risks, even when baby rolls face-down sleeping.';
+    const cases = [
+      ['用户整段粘贴文案', JSON.stringify({ text: COPY }), `@Guard ${COPY}`, true],
+      ['用户带一句短指令', JSON.stringify({ text: COPY }), `@Guard 帮我看下这段：${COPY}`, true],
+      ['解释类提问（模型顺手送审一个词）', JSON.stringify({ text: 'FDA approved' }),
+        '帮我解释一下 FDA approved 是什么意思，为什么监管机构不认这个说法', false],
+      ['参数里没有正文', JSON.stringify({}), COPY, false],
+      ['参数不是 JSON', '{坏掉的', COPY, false],
+    ];
+    const bad = cases.filter(([, a, q, exp]) => submitsUserText(a, q) !== exp).map(([n]) => n);
+    T('K7 文案直出的入站闸：只认「送审的就是用户这句话」，解释类提问不被审查卡吃掉',
+      !bad.length, JSON.stringify({ bad }));
+  }
+}
+
 try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
 
 const nFail = res.filter((x) => !x.ok).length;
