@@ -206,7 +206,7 @@ register('list_workspace', {
     type: 'function',
     function: {
       name: 'list_workspace',
-      description: '列出守衡所在工作区的顶层目录与文件。对方问「你都能看到什么」「项目里有什么」时调用。' +
+      description: '列出 Guard 所在工作区的顶层目录与文件。对方问「你都能看到什么」「项目里有什么」时调用。' +
                    '★ 特别提醒：**上游飞书文档的逐字副本就在 `PRD/feishu/` 下**' +
                    '（`内容审查Agent-PRD-v1.0.md`、`美国市场内容治理项目-一页纸计划书.md`、`索引-v1.json`）。' +
                    '别人发来一个飞书文档链接时，先 `list_files` / `search_workspace` 在工作区里找它的副本，' +
@@ -322,7 +322,7 @@ register('search_workspace', {
     type: 'function',
     function: {
       name: 'search_workspace',
-      description: '在守衡的工作区里做**全文检索**（不联网、不起子进程、自己剪掉大目录）。' +
+      description: '在 Guard 的工作区里做**全文检索**（不联网、不起子进程、自己剪掉大目录）。' +
                    '想问「某个词/某个 token 在不在工作区里」时用这个，**不要用 `grep -r` 扫全仓**。\n\n' +
                    '★ 返回值必须连着三个数一起读：`searched_files`（真扫了几个文件）、' +
                    '`skipped`、`stopped_early`。**只有当 `stopped_early === false` 且 ' +

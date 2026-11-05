@@ -60,14 +60,63 @@ DEFAULT_PRODUCT_LINE = "吸奶器"
 
 VALID_PRODUCT_LINES: Tuple[str, ...] = (
     "吸奶器",
-    "推车",
-    "背带",
-    "温奶器",
-    "哺乳内衣",
+    "婴幼儿",
+    "家纺",
+    "家居",
+    "喂养",
+    "服纺",
+    "护肤",
+    "孕产",
+    "快消",
 )
 
 #: 哪些载体产「文案四维体检」。图片/视频各自有另一套四维。
 TEXT_CARRIERS: Tuple[str, ...] = ("free_text", "ad_text", "structured_json", "feishu_doc", "landing_url")
+
+#: 三级分类 / 俗称 → GTM 品线族。
+#:
+#: ★ 2026-11-05：取值域收敛到 9 族之后，「推车」「哺乳内衣」「背带」「温奶器」
+#:   这些**三级分类**（商品品类）不再是合法品线值了。但它们仍会从两个地方进来：
+#:     · 模型按旧 schema 或按人的说话习惯直接声明（「这条是推车的」）；
+#:     · 历史案件与台账里就写着这些值（投影库实读：吸奶器 269 / 婴儿车 16 /
+#:       哺乳内衣 3 / 温奶器 3 / 背带 2）。
+#:   直接判 `invalid_declared_fallback` 会把它们一律降级成「吸奶器」——
+#:   于是推车文案挂上吸奶器的安全提醒去审（「禁止奶量倍增承诺」），
+#:   而它真正的红线是「禁止安全绝对化 / 须标适用年龄与承重」。
+#:
+#:   所以先查这张表：**能归族就归族**（status=declared_alias，note 里说清由谁归入），
+#:   查不到才回落。别名只是入口，落盘的值永远是 9 族之一。
+#:
+#:   依据是 research/governance/品线映射-v1.md §2.2（业务实际归属）：
+#:   「推车、背带、背巾、箱包 都归家纺品线」。
+PRODUCT_LINE_ALIASES: Dict[str, str] = {
+    # 母婴出行（家纺GTM组下的三级分类，见品线映射 §2.2）
+    "推车": "家纺", "婴儿车": "家纺", "婴儿推车": "家纺", "伞车": "家纺",
+    "溜娃神器": "家纺", "背带": "家纺", "背巾": "家纺", "腰凳": "家纺",
+    "孕妇枕": "家纺", "哺乳枕": "家纺", "襁褓睡袋": "家纺", "巾类": "家纺",
+    "箱包类": "家纺", "车类配件": "家纺", "床品": "家纺", "四件套": "家纺",
+    # 服纺（功能性服纺GTM组）
+    "哺乳内衣": "服纺", "哺乳文胸": "服纺", "孕妇内衣": "服纺", "授乳内衣": "服纺",
+    "文胸": "服纺", "运动内衣": "服纺", "塑身服": "服纺", "家居服": "服纺",
+    # 喂养（喂养电器GTM组）
+    "温奶器": "喂养", "暖奶器": "喂养", "热奶器": "喂养", "恒温壶": "喂养",
+    "调奶器": "喂养", "奶瓶消毒器": "喂养", "奶瓶清洗机": "喂养", "喂养电器": "喂养",
+    "奶瓶": "喂养", "吸奶器配件": "喂养",
+    # 婴幼儿（婴幼儿用品GTM组）
+    "婴儿背带": "婴幼儿", "婴儿秋千": "婴幼儿", "电动秋千": "婴幼儿",
+    "高脚椅": "婴幼儿", "餐椅": "婴幼儿", "监视器": "婴幼儿", "尿布桶": "婴幼儿",
+    "吸鼻器": "婴幼儿", "摇椅": "婴幼儿",
+    # 快消（快消GTM组）
+    "牙胶": "快消", "牙刷": "快消", "婴儿湿巾": "快消", "纸尿裤": "快消",
+    "拉拉裤": "快消", "洗护套装": "快消", "沐浴片": "快消", "沐浴炸弹": "快消",
+}
+
+
+def _resolve_alias(declared: str) -> Optional[str]:
+    """把三级分类/俗称归到 GTM 品线族。查不到返回 None（不做任何猜测）。"""
+    if declared in VALID_PRODUCT_LINES:
+        return declared
+    return PRODUCT_LINE_ALIASES.get(declared)
 
 #: 五条品线的确定性识别词表（按特异性排序；英文词要求词边界避免子串误判）
 #: 品线的确定性识别词表。**键必须是 9 族之一** —— 推断循环遍历的是
@@ -361,6 +410,22 @@ EXTENDED_CATEGORY_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     ),
 }
 
+#: 子品类 → 它所属的 GTM 品线族。
+#:
+#: ★ 2026-11-05：有了这张表，子品类才能**优先于族级关键词**判定。
+#:   原先的顺序是「先查 5 品线，零命中才查子品类」—— 在 5 品线口径下成立，
+#:   因为「婴儿监护仪」不在那 5 个里。改成 9 族之后，「baby monitor」里的
+#:   `parent unit` / 中文「监护」会被「婴幼儿」族的宽词先吃掉，
+#:   于是 display_category 退化成「婴幼儿」、SIDS 那条专属安全提醒再也取不到。
+#:   —— 这是改口径时自己引入的回退，被 K9 抓到。
+#:   子品类永远比族级更具体，所以判断顺序反过来：**先子品类，再族级**。
+EXTENDED_CATEGORY_FAMILY: Dict[str, str] = {
+    "婴儿监护仪": "婴幼儿",
+    "消毒与洗瓶机": "喂养",
+    "储奶袋与配件": "吸奶器",
+    "孕妇枕与睡眠": "家纺",
+}
+
 
 def _keyword_hit_count(haystack: str, keywords: Tuple[str, ...]) -> Tuple[int, Optional[str]]:
     """返回 `(命中词数, 第一个命中词)`。英文按词边界，中文按子串 —— 与五品线同一套读法。"""
@@ -390,14 +455,14 @@ def resolve_product_line(
     """解析品线。返回 `{value, status, matched_keyword, declared, note, display_category}`。
 
     status 四档互不冒充：
-    - `declared`                  调用方显式给出了合法的五品线之一
-    - `invalid_declared_fallback` 调用方给了值但不在五品线内，回落默认「吸奶器」并明说
+    - `declared`                  调用方显式给出了合法的品线族之一
+    - `declared_alias`            调用方给的是三级分类/俗称，已按 GTM 品线归族
+    - `invalid_declared_fallback` 调用方给了值但既不在域内、也不是已知别名，回落默认「吸奶器」并明说
     - `inferred_keyword`          未声明，但从正文/字段/URL 关键词匹配到了具体品线
     - `default_fallback`          未声明且无品线词命中，回落默认「吸奶器」并明说
 
-    `display_category` 是**给人看**的品类名（可以超出五品线，如「婴儿监护仪」）；
-    `value` 始终是工作台可建的品线。两者分开的原因是工作台只认五品线（见
-    `EXTENDED_CATEGORY_KEYWORDS` 的注释）。
+    `display_category` 是**给人看**的品类名（可以超出取值域，如「婴儿监护仪」）；
+    `value` 始终是取值域内的品线族。两者分开的原因是安全提醒按品类名索引。
     """
     if isinstance(declared, str) and declared.strip():
         clean = declared.strip()
@@ -410,6 +475,21 @@ def resolve_product_line(
                 "display_category": clean,
                 "note": f"使用显式指定的品线「{clean}」",
             }
+        _alias = _resolve_alias(clean)
+        if _alias:
+            # ★ 归族不等于「用户说了这个品线」—— status 单独一档，不混进 declared。
+            #   落盘 value 是族名，display_category 保留用户原话（卡片上照他说的写）。
+            return {
+                "value": _alias,
+                "status": "declared_alias",
+                "matched_keyword": None,
+                "declared": clean,
+                "display_category": clean,
+                "note": (
+                    f"「{clean}」是三级分类，按 GTM 品线归入「{_alias}」建案"
+                    f"（品线映射-v1.md §2.2）"
+                ),
+            }
         return {
             "value": DEFAULT_PRODUCT_LINE,
             "status": "invalid_declared_fallback",
@@ -417,8 +497,8 @@ def resolve_product_line(
             "declared": clean,
             "display_category": clean,
             "note": (
-                f"指定的品线「{clean}」不在工作台五品线（{'/'.join(VALID_PRODUCT_LINES)}）内，"
-                f"已按默认品线「{DEFAULT_PRODUCT_LINE}」建案"
+                f"指定的品线「{clean}」不在品线取值域（{'/'.join(VALID_PRODUCT_LINES)}）内，"
+                f"也不是已知的三级分类别名，已按默认品线「{DEFAULT_PRODUCT_LINE}」建案"
             ),
         }
 
@@ -433,6 +513,23 @@ def resolve_product_line(
                 parts.append(v)
     haystack = "\n".join(parts).lower()
 
+    # ★ 先查子品类，再查族。顺序在 2026-11-05 反过来了（理由见
+    #   EXTENDED_CATEGORY_FAMILY 的注释）：子品类永远比族级更具体，
+    #   让族级的宽词先命中会把「婴儿监护仪」退化成「婴幼儿」，
+    #   连带丢掉 SIDS 那条专属安全提醒。
+    #   子品类只决定 display_category 与族归属，不改变「这是哪个族」的正确性 ——
+    #   EXTENDED_CATEGORY_FAMILY 已经把每个子品类固定到它的族。
+    ext_cat: Optional[str] = None
+    ext_kw: Optional[str] = None
+    ext_best = 0
+    if haystack:
+        for cat_name, kws in EXTENDED_CATEGORY_KEYWORDS.items():
+            hit_count, first_kw = _keyword_hit_count(haystack, kws)
+            if hit_count > ext_best:
+                ext_best = hit_count
+                ext_cat = cat_name
+                ext_kw = first_kw
+
     best_line: Optional[str] = None
     best_count = 0
     best_kw: Optional[str] = None
@@ -445,18 +542,20 @@ def resolve_product_line(
                 best_line = line_name
                 best_kw = first_kw
 
-    # 五品线没命中时再查子品类。**只在五品线零命中时查**：五品线是建案口径，
-    # 子品类只是显示名，让子品类覆盖五品线的匹配等于把「吸奶器」改成「储奶袋」建案。
-    ext_cat: Optional[str] = None
-    ext_kw: Optional[str] = None
-    if best_count == 0 and haystack:
-        ext_best = 0
-        for cat_name, kws in EXTENDED_CATEGORY_KEYWORDS.items():
-            hit_count, first_kw = _keyword_hit_count(haystack, kws)
-            if hit_count > ext_best:
-                ext_best = hit_count
-                ext_cat = cat_name
-                ext_kw = first_kw
+    # 子品类命中：族由 EXTENDED_CATEGORY_FAMILY 定，display_category 保留子品类名。
+    if ext_cat is not None:
+        fam = EXTENDED_CATEGORY_FAMILY.get(ext_cat) or DEFAULT_PRODUCT_LINE
+        return {
+            "value": fam,
+            "status": "inferred_keyword",
+            "matched_keyword": ext_kw,
+            "declared": None,
+            "display_category": ext_cat,
+            "note": (
+                f"未显式声明品线，按内容关键词「{ext_kw}」识别为子品类「{ext_cat}」，"
+                f"归入品线「{fam}」建案"
+            ),
+        }
 
     if best_line is not None and best_count > 0:
         return {
@@ -467,6 +566,15 @@ def resolve_product_line(
             "display_category": best_line,
             "note": f"未显式声明品线，按内容关键词「{best_kw}」自动识别为「{best_line}」",
         }
+
+    return {
+        "value": DEFAULT_PRODUCT_LINE,
+        "status": "default_fallback",
+        "matched_keyword": None,
+        "declared": None,
+        "display_category": f"通用母婴（未声明品线，默认{DEFAULT_PRODUCT_LINE}建案）",
+        "note": f"未声明品线且内容无特定品线词，按默认品线「{DEFAULT_PRODUCT_LINE}」建案",
+    }
 
     if ext_cat is not None:
         return {
@@ -922,7 +1030,25 @@ TEXT_CLAIM_CONTROL_CODES = frozenset({
 
 #: 品线的品类合规提醒（第三维「品线与平台特殊规范」的实词）。
 PRODUCT_LINE_SAFETY_HINT: Dict[str, str] = {
+    # ── 族级（9 族全覆盖，缺一族就是一条静默的空洞）─────────────────
     "吸奶器": "吸奶器属母婴用品：禁止出现医疗级/治疗/奶量倍增等承诺，性能须可测（如 mmHg）。",
+    "婴幼儿": "婴幼儿用品须标注适用月龄与承重；禁止「绝对安全」「百分百防摔」等绝对化承诺，"
+             "涉及睡眠/看护的不得暗示可替代成人看护。",
+    "家纺": "家纺与出行用品（推车/背带/床品等）：禁止安全绝对化（如「绝不侧翻」），"
+           "须标注适用年龄、承重与材质等级；纺织品不得宣称抗菌/防过敏疗效，除非有检测报告。",
+    "家居": "家居用品禁止宣称「除甲醛」「杀菌」「零辐射」等无检测报告支撑的功效，"
+           "须标注材质与适用场景。",
+    "喂养": "喂养器具禁止出现杀菌/消毒疗效承诺与「无菌」绝对化表述，"
+           "温度须标注实测范围，材质须标注食品接触等级。",
+    "服纺": "服纺品类（内衣/家居服/塑身服）禁止催乳、预防乳腺炎、矫正体态等功效暗示；"
+           "贴身衣物须标注材质成分与尺码适用范围。",
+    "护肤": "护肤品类禁止宣称「治疗」「修复疾病」「医用级」等医疗功效，"
+           "功效表述须与备案一致，须提示敏感肌试用与个体差异。",
+    "孕产": "孕产用品禁止暗示可预防妊娠纹、缓解耻骨痛等医疗功效，"
+           "须标注适用孕期与「不可替代医嘱」。",
+    "快消": "快消品类（牙胶/湿巾/纸尿裤等）禁止宣称「可吞咽」「食品级可食用」「杀菌 99.9%」，"
+           "须标注适用月龄与材质安全等级。",
+    # ── 子品类级（有则优先于族级；它们比族级更具体）─────────────────
     "推车": "推车属儿童用品：禁止出现安全绝对化（如「绝不侧翻」），须标注适用年龄与承重。",
     "背带": "背带禁止出现防窒息/髋关节发育等医疗暗示，须标注承重与月龄区间。",
     "温奶器": "温奶器禁止出现杀菌/消毒疗效承诺，温度须标注实测范围。",

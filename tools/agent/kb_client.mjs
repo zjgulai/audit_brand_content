@@ -786,7 +786,7 @@ if (isMain) {
       }
     }
     else {
-      console.log(`守衡知识库客户端
+      console.log(`Guard 知识库客户端
 
   node tools/agent/kb_client.mjs cred      凭据摘要（不含明文 key）
   node tools/agent/kb_client.mjs quota     今日配额余额

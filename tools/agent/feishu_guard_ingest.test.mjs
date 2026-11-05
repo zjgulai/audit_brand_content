@@ -83,15 +83,19 @@ function runGuardPy(args, extraEnv = {}) {
 }
 
 {
+  // ★ 2026-11-05：品线取值域收敛到 GTM 品线 9 族，B 段原先写死旧 5 分类
+  //   （推车/哺乳内衣/温奶器），那是商品维表的三级分类，已不是合法品线值。
+  //   改断言时不换成另一串硬编码族名 —— 那只是把过期契约换一批字面量。
+  //   改成查 Python 的取值域现算：值必须在域内，族归属逐条钉死。
   const b1 = runGuardPy(['--text', 'Lightweight baby stroller for travel', '--message-id', 'om_b1']);
-  T('B1 关键词自动识别品线：stroller → 推车（inferred_keyword）',
-    b1.ok && b1.product_line === '推车'
+  T('B1 关键词自动识别品线：stroller → 家纺（三级分类「推车」按 GTM 品线归族）',
+    b1.ok && b1.product_line === '家纺'
       && b1.product_line_resolution?.status === 'inferred_keyword',
     JSON.stringify(b1.product_line_resolution));
 
   const b2 = runGuardPy(['--text', 'Seamless nursing bra for moms', '--message-id', 'om_b2']);
-  T('B2 关键词自动识别品线：nursing bra → 哺乳内衣（inferred_keyword）',
-    b2.ok && b2.product_line === '哺乳内衣'
+  T('B2 关键词自动识别品线：nursing bra → 服纺',
+    b2.ok && b2.product_line === '服纺'
       && b2.product_line_resolution?.status === 'inferred_keyword',
     JSON.stringify(b2.product_line_resolution));
 
@@ -103,14 +107,42 @@ function runGuardPy(args, extraEnv = {}) {
     JSON.stringify(b3.product_line_resolution));
 
   const b4 = runGuardPy(['--text', 'Fast bottle warmer', '--product-line', '温奶器', '--message-id', 'om_b4']);
-  T('B4 显式指定合法品线 → status=declared',
-    b4.ok && b4.product_line === '温奶器'
-      && b4.product_line_resolution?.status === 'declared',
+  T('B4 声明三级分类「温奶器」→ 归族为「喂养」，status=declared_alias（不冒充 declared）',
+    b4.ok && b4.product_line === '喂养'
+      && b4.product_line_resolution?.status === 'declared_alias'
+      && b4.product_line_resolution?.declared === '温奶器'
+      && b4.display_category === '温奶器',
     JSON.stringify(b4.product_line_resolution));
 
+  // ★ B4b 反向对照：声明 9 族里的正规值，必须是 declared，不许被降成 alias。
+  //   没有这一条，B4 的 alias 形状可以靠「把所有声明都降级」而恒真。
+  const b4b = runGuardPy(['--text', 'Fast bottle warmer', '--product-line', '喂养', '--message-id', 'om_b4b']);
+  T('B4b ★ 反向对照：声明合法族名「喂养」→ status=declared（不是 declared_alias）',
+    b4b.ok && b4b.product_line === '喂养'
+      && b4b.product_line_resolution?.status === 'declared',
+    JSON.stringify(b4b.product_line_resolution));
+
+  // ★ B4c：每个族名 + 每个别名都必须落进取值域。
+  //   这是「取值域一处真相」的执行点 —— 连接层曾硬编码 5 个值，
+  //   9 族声明一律被判 invalid_declared_fallback 静默降成吸奶器（家纺/快消/孕产实测中招）。
+  {
+    const probe = execFileSync('python3', ['-c',
+      'import json,sys; sys.path.insert(0,".");\n'
+      + 'from base.feishu_guard_ingest import resolve_product_line as R, VALID_PRODUCT_LINES as V, PRODUCT_LINE_ALIASES as A\n'
+      + 'bad=[]\n'
+      + 'for v in list(V)+list(A):\n'
+      + '    r=R("通用文案", declared=v)\n'
+      + '    if r["value"] not in V or r["status"]=="invalid_declared_fallback": bad.append([v,r["value"],r["status"]])\n'
+      + 'print(json.dumps(bad, ensure_ascii=False))',
+    ], { cwd: REPO_ROOT, encoding: 'utf8', timeout: 60_000 });
+    const bad = JSON.parse(probe);
+    T('B4c ★ 9 族取值 + 全部三级分类别名都必须落进取值域（不许静默降级成吸奶器）',
+      bad.length === 0, JSON.stringify(bad));
+  }
+
   const b5 = runGuardPy(['--text', '这是提纲初稿：新款背带卖点整理', '--message-id', 'om_b5']);
-  T('B5 含提纲/初稿特征词 → 自动推断 content_stage=brief',
-    b5.ok && b5.content_stage === 'brief' && b5.product_line === '背带',
+  T('B5 含提纲/初稿特征词 → 自动推断 content_stage=brief（「背带」按 GTM 品线归家纺）',
+    b5.ok && b5.content_stage === 'brief' && b5.product_line === '家纺',
     `${b5.content_stage}/${b5.product_line}`);
 }
 
@@ -1143,18 +1175,19 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
       '--message-id', 'om_k9_st']);
     const bag = runGuardPy(['--text', 'Breastmilk storage bag, 100 pcs', '--message-id', 'om_k9_bag']);
     const pillow = runGuardPy(['--text', 'Pregnancy pillow for maternity sleep', '--message-id', 'om_k9_pil']);
-    T('K9 ★ 子品类识别：婴儿监护仪 / 消毒与洗瓶机 / 储奶袋 / 孕妇枕 各自出 display_category，而建案品线仍是工作台可建的「吸奶器」',
+    T('K9 ★ 子品类识别：婴儿监护仪 / 消毒与洗瓶机 / 储奶袋 / 孕妇枕 各自出 display_category，并按子品类归族',
       bm.ok && String(bm.display_category || '').includes('婴儿监护仪')
         && st.ok && String(st.display_category || '').includes('消毒与洗瓶机')
         && bag.ok && String(bag.display_category || '').includes('储奶袋')
         && pillow.ok && String(pillow.display_category || '').includes('孕妇枕')
-        && [bm, st, bag, pillow].every((r) => r.product_line === '吸奶器')
-        && [bm, st, bag, pillow].every((r) => r.product_line_resolution?.status === 'default_fallback'),
+        && [bm, st, bag, pillow].every((r) => r.product_line_resolution?.status === 'inferred_keyword')
+        && bm.product_line === '婴幼儿' && st.product_line === '喂养'
+        && bag.product_line === '吸奶器' && pillow.product_line === '家纺',
       JSON.stringify([bm, st, bag, pillow].map((r) => [r.display_category, r.product_line])));
 
-    // 反向对照：五品线自己命中时，display_category 必须等于品线，不许被子品类改写。
+    // 反向对照：族级关键词自己命中时，display_category 必须等于该族，不许被子品类改写。
     const trolley = runGuardPy(['--text', 'Lightweight baby stroller for travel', '--message-id', 'om_k9_b1']);
-    T('K9b ★ 反向对照：五品线命中（stroller）时 display_category 就是该品线，不是子品类',
+    T('K9b ★ 反向对照：族级关键词命中（stroller）时 display_category 就是该族，不是子品类',
       trolley.display_category === trolley.product_line && trolley.product_line !== '吸奶器',
       JSON.stringify([trolley.display_category, trolley.product_line]));
 
