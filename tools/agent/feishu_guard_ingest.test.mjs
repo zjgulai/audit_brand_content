@@ -565,6 +565,174 @@ const tools = await import('./tools.mjs');
     '');
 }
 
+/* ── J. 工作流耗时巡检 + 定时巡检接线 + 判例回流闭环（P-1 周报规则缺口榜） ── */
+{
+  const stdCards = await import('./standard_cards.mjs');
+  const opsCardMod = await import('./ops_watch_card.mjs');
+  const plainMod = await import('./plain.mjs');
+  const cardsMod = await import('../reply-cards/cards.mjs');
+
+  const p1Weekly = stdCards.buildOpsDigestCard({
+    periodLabel: '本周周报',
+    cases: [
+      {
+        case_id: 'case-weekly-01',
+        product_line: '吸奶器',
+        label: 'BLOCK',
+        status: 'closed',
+        findings_preview: [{ control_code: 'H01', quote: 'cure mastitis' }],
+      },
+    ],
+    timingTrend: {
+      window_days: 7,
+      rows: [
+        { carrier: '群消息', n_current: 12, p50_ms: 4.2, p90_ms: 11.5, p90_delta_ms: -1.8 },
+      ],
+    },
+    ruleGapRanking: [
+      {
+        rank: 1,
+        control_code: 'H01',
+        rule_key: 'medical-cure',
+        count: 3,
+        direction: 'over_strict',
+        sample_quote: 'cure mastitis',
+      },
+    ],
+    gapUnattributed: { n: 1, why: { no_control_code: 1 } },
+  });
+  const p1WeeklyStr = JSON.stringify(p1Weekly);
+  T('J1 P-1 运营周报卡含各通道耗时趋势与判例回流「规则缺口榜」，且通过飞书 V2 schema 与 0 星号校验',
+    cardsMod.validateCard(p1Weekly).ok === true
+      && !plainMod.hasMdSymbols(p1WeeklyStr)
+      && p1WeeklyStr.includes('各通道耗时趋势')
+      && p1WeeklyStr.includes('规则缺口榜')
+      && p1WeeklyStr.includes('H01')
+      && p1WeeklyStr.includes('机器偏严/误报'),
+    '');
+
+  // J3: Python 端到端判例回流闭环验证（submit_review 与 review_and_close 分歧入队 + 幂等去重 + 规则缺口榜）
+  const pyBin = fs.existsSync(path.join(REPO_ROOT, '.venv', 'bin', 'python'))
+    ? path.join(REPO_ROOT, '.venv', 'bin', 'python')
+    : 'python3';
+  const pyFeedbackQueue = path.join(tmpRoot, 'feedback_queue.jsonl');
+  const pyOut = execFileSync(pyBin, [
+    '-c',
+    `
+import json, os, sys
+from pathlib import Path
+from base.business_event_store import BusinessEventStore, WriterLease
+from base.projection_store import ProjectionStore
+from base.review_command_service import ReviewCommandService
+from base.submission_service import SubmissionIngestor
+from base.ops_watch import collect_ops_stats
+
+root = Path(sys.argv[1])
+qpath = Path(sys.argv[2])
+lease = WriterLease(root / "authority_fb" / "writer.lease")
+lease.acquire()
+auth = BusinessEventStore(root / "authority_fb", lease=lease)
+proj = ProjectionStore(root / "db_fb" / "review.db")
+svc = ReviewCommandService(auth, proj, feedback_queue=qpath)
+ing = SubmissionIngestor()
+
+principal = {"id": "u1", "tenant": "t1", "open_id": "ou-1", "tenant_id": "t1", "roles": ["dp3"], "product_lines": ["吸奶器"]}
+sub1 = {
+    "submission_id": "sub-fb-1",
+    "content_type": "文本",
+    "content_stage": "final_content",
+    "entry_channel": "群消息",
+    "source": {"kind": "free_text"},
+    "text": "Our pump can cure disease and treat symptoms.",
+    "product_line": "吸奶器",
+}
+r1 = svc.execute_submission(ingestor=ing, submission=sub1, principal=principal, idempotency_key="idem-fb-1")
+cid1 = r1["result"]["case_id"]
+ver1 = r1["result"]["version"]
+actor = {"principal_id": "u1", "tenant_id": "t1"}
+
+# 人工通过 review_and_close 执行 overturn（机器 BLOCK -> 人工推翻）
+c1 = svc.execute(
+    aggregate_id=cid1,
+    command="review_and_close",
+    actor=actor,
+    expected_version=ver1,
+    payload={"verdict": "overturn", "review_notes": "实测为引用反例说明，非广告宣称"},
+    idempotency_key="idem-fb-close-1",
+)
+# 幂等重放同一结案命令，不应产生重复队列行
+svc.execute(
+    aggregate_id=cid1,
+    command="review_and_close",
+    actor=actor,
+    expected_version=ver1,
+    payload={"verdict": "overturn", "review_notes": "实测为引用反例说明，非广告宣称"},
+    idempotency_key="idem-fb-close-1",
+)
+
+# 第二单：机器 PASS，人工 submit_review 选 revise（漏报回流）
+sub2 = {
+    "submission_id": "sub-fb-2",
+    "content_type": "文本",
+    "content_stage": "final_content",
+    "entry_channel": "群消息",
+    "source": {"kind": "free_text"},
+    "text": "便携吸奶器日常容量 180ml。",
+    "product_line": "吸奶器",
+}
+r2 = svc.execute_submission(ingestor=ing, submission=sub2, principal=principal, idempotency_key="idem-fb-2")
+cid2 = r2["result"]["case_id"]
+claim2 = svc.execute(aggregate_id=cid2, command="claim", actor=actor, expected_version=r2["result"]["version"], payload={}, idempotency_key="idem-fb-claim-2")
+svc.execute(
+    aggregate_id=cid2,
+    command="submit_review",
+    actor=actor,
+    expected_version=claim2["result"]["version"],
+    payload={"conclusion": {"verdict_choice": "revise", "review_notes": "隐含未标明条件"}},
+    idempotency_key="idem-fb-submit-2",
+)
+
+stats = collect_ops_stats(db_path=root / "db_fb" / "review.db", queue_path=qpath, days=7)
+lines = [ln for ln in qpath.read_text(encoding="utf-8").splitlines() if ln.strip()]
+print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, ensure_ascii=False))
+`,
+    tmpRoot,
+    pyFeedbackQueue,
+  ], { encoding: 'utf8' });
+  const fbParsed = JSON.parse(pyOut.trim());
+  T('J2 ★ 判例回流闭环：submit_review / review_and_close 人机分歧自动入队、重放幂等去重、生成周报规则缺口榜',
+    fbParsed.lines_count === 2
+      && fbParsed.precedent?.ok === true
+      && fbParsed.precedent?.n_records === 2
+      && fbParsed.precedent?.n_attributed + fbParsed.precedent?.n_unattributed === fbParsed.precedent?.n_records
+      && Array.isArray(fbParsed.precedent?.ranking)
+      && fbParsed.precedent.ranking.length >= 2,
+    JSON.stringify(fbParsed));
+
+  const dbFile = path.join(tmpRoot, 'db_fb', 'review.db');
+  const watchRes = await opsCardMod.collectOpsWatchCard({ dbPath: dbFile, queuePath: pyFeedbackQueue });
+  const watchStr = JSON.stringify(watchRes.card ?? {});
+  T('J3 collectOpsWatchCard 真实读取投影库产出 P50/P90、失败率、超时率，且锁定测试群',
+    watchRes.ok === true && watchRes.untested === false
+      && watchStr.includes('失败率=') && watchStr.includes('超时率=')
+      && watchRes.chatId === 'oc_49a7cfb2861cffa4365ca8491f398d32',
+    watchRes.reason || '');
+
+  const digestRes = await opsCardMod.collectOpsDigestCard({
+    periodLabel: '本周周报',
+    days: 7,
+    dbPath: dbFile,
+    queuePath: pyFeedbackQueue,
+  });
+  const digestStr = JSON.stringify(digestRes.card ?? {});
+  T('J4 collectOpsDigestCard 串联投影库与反馈队列产出完整 P-1 周报卡（含规则缺口榜与耗时趋势）',
+    digestRes.ok === true && digestRes.untested === false
+      && digestStr.includes('规则缺口榜')
+      && digestStr.includes('待新增规则（漏报候选）')
+      && !plainMod.hasMdSymbols(digestStr),
+    '');
+}
+
 try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
 
 const nFail = res.filter((x) => !x.ok).length;

@@ -708,12 +708,14 @@ class ProductionRuntime:
                         judgment["ir"].get("media_fingerprints") or {},
                 }
 
+            from base.precedent_feedback import FeedbackQueue
             self.service = ReviewCommandService(
                 self.authority, self.projection,
                 report_store=self.report_store,
                 report_bridge=self.report_bridge,
                 external_binding_provider=_external_binding,
-                rejudge_fn=_rejudge)
+                rejudge_fn=_rejudge,
+                feedback_queue=FeedbackQueue())
             # T-314c：把「已批准的授权名单」注入 rbac。
             #
             # 改前 `TAKEDOWN_ALLOWLIST` 是模块级常量且两个名单都是空集 ——

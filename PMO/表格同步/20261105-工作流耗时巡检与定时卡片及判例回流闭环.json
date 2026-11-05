@@ -1,0 +1,19 @@
+{
+  "事项名称": "工作流稳定性耗时巡检（P50/P90/失败率/超时率）+ 定时巡检（P-1/P-2/P-4）正式接线 + 判例回流闭环（规则缺口榜）",
+  "关联执行票": "稳定运营三项闭环（耗时巡检 / 定时推送接线 / 判例回流）",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "1）核心审核工作流稳定性与阶段耗时巡检：在 base/ops_watch.py 与 tools/agent/ops_watch_card.mjs 中补齐各 carrier 的 P50/P90 耗时、失败率（failure_rate）、超时率（timeout_rate）与双窗口耗时趋势（compute_timing_trend），满足 n_timed + n_untimed == n 恒等式；任一指标超阈值即时推 P-4 运维卡到测试群。2）定时巡检正式接线：在 tools/ws_daemon.mjs 心跳 scheduledCardsWatch 中补上单飞锁、每日 09:30（>=09:25）P-1 运营日报（周一自动产出含耗时趋势与规则缺口榜的 P-1 运营周报）+ P-4 耗时卡、工作日 14:00/18:00 非零积压 P-2 SLA 催办卡，以及 llm_health_watch / ops_watch 异常即时 P-4 告警；移除未 import 的 executeTool 调用，全部经 push_policy 硬锁测试群。3）判例回流闭环：新建 base/precedent_feedback.py 并挂载到 base/review_command_service.py 的 _record_precedent_after（锁外、永不抛），当 submit_review 或 review_and_close 的人工复核结论与机器五标签不一致或驳回 candidate 时，按 candidate_id=formal_id 幂等写入 research/governance/_evidence/review_feedback_queue.jsonl，并由 rule_gap_ranking 汇总进 P-1 周报的『规则缺口榜』（满足 n_attributed + n_unattributed == n_records）。",
+  "验收标准": "1) node tools/agent/feishu_guard_ingest.test.mjs 48/48 全绿 rc=0（含 J1 P-1 周报耗时趋势与规则缺口榜 V2 校验、J2 submit_review/review_and_close 判例回流与重放幂等去重、J3 P50/P90/失败率/超时率实测、J4 端到端周报卡生成）；2) .venv/bin/python tools/verify_finding_adjudication.py 15/15 全绿 rc=0 且对真实反馈队列 0 副作用；3) .venv/bin/python tools/verify_workflow_timing.py 41/41 全绿 rc=0；4) node tools/verify_cards.mjs 253/253 全绿 rc=0；5) python3 tools/verify_coverage.py --controls 757/757 全绿 rc=0；6) python3 tools/verify_shouheng_ops.py 全绿 rc=0；7) python3 tools/verify_depad.py 0 被填充 rc=0。",
+  "状态依据": "1) base/precedent_feedback.py、base/ops_watch.py、base/review_command_service.py、api/production_app.py、tools/agent/ops_watch_card.mjs、tools/agent/standard_cards.mjs、tools/ws_daemon.mjs 已完成接线；2) 飞书 Guard 统一审查与建案自证 48/48 项通过（rc=0），全仓关联门禁全绿。"
+}

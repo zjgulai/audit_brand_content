@@ -680,8 +680,148 @@ const hb = setInterval(() => {
   // ★ 补发队列每拍一次（Q1-1d）：「网络恢复了没有」不用另做探针 ——
   //   补发那一次尝试本身就是探针（计划 §1.5）。队列空时它立刻返回，零成本。
   if (!DUMP_ONLY) void retryWatch('tick');
+  // ★ 定时巡检卡片（2026-11-05 加）：每日 09:30 北京时间 P-1 日报 + P-4 耗时巡检；
+  //   工作日 14:00/18:00 检查 SLA 积压非零才发 P-2。全部经 push_policy 硬锁测试群。
+  if (!DUMP_ONLY) void scheduledCardsWatch('tick');
 }, 5 * 60_000);
 hb.unref?.();
+
+/**
+ * ── ★ 定时巡检卡片触发器（2026-11-05，P-1/P-2/P-4 接线）────────────────────
+ *
+ * 委托方 2026-11-04 拍板：三张定时卡片先只在测试群推送，稳定后再定夺扩群。
+ * 硬闸门在 `push_policy.mjs`（assertTestGroupTarget），非测试群目标直接抛错。
+ *
+ * 触发时刻（北京时间，用 5 分钟心跳粒度近似）：
+ *   · 每日 09:30（>= 09:25 窗口）→ P-1 运营日报（周一升格为含耗时趋势与规则缺口榜的 P-1 运营周报）+ P-4 耗时巡检
+ *   · 工作日 14:00 / 18:00 窗口 → P-2 SLA 催办（积压非零才发，同日同时段去重）
+ *   · 每拍检查 llm_health_watch 与 ops_watch 指标突增/异常：异常即时发 P-4（按异常指纹当日去重）
+ *
+ * 状态文件 `ops-cards-watch.json` 记录已发标识，单飞锁防重入。
+ */
+import { collectOpsWatchCard, collectOpsDigestCard } from './agent/ops_watch_card.mjs';
+import { buildOpsDigestCard, buildSlaReminderCard, prepareScheduledPush } from './agent/standard_cards.mjs';
+import { checkLlmAndSystemHealth } from './agent/llm_health_watch.mjs';
+import { client } from './agent/feishu.mjs';
+
+const OPS_CARDS_STATE = path.join(stateDir(), 'ops-cards-watch.json');
+
+function loadOpsCardsState() {
+  try { return JSON.parse(fs.readFileSync(OPS_CARDS_STATE, 'utf8')); } catch { return {}; }
+}
+
+function saveOpsCardsState(st) {
+  try {
+    ensureDir(path.dirname(OPS_CARDS_STATE));
+    fs.writeFileSync(OPS_CARDS_STATE, JSON.stringify(st, null, 1));
+  } catch (e) { log(`   ⚠ 巡检卡片状态落盘失败：${e?.message ?? e}`); }
+}
+
+async function sendScheduledCard(kind, card, { source, chatId } = {}) {
+  const prepared = prepareScheduledPush(card, { targetChatId: chatId });
+  const r = await client.im.message.create({
+    params: { receive_id_type: 'chat_id' },
+    data: { receive_id: prepared.chatId, msg_type: 'interactive',
+            content: JSON.stringify(prepared.card) },
+  });
+  const messageId = r?.data?.message_id ?? null;
+  outbound.recordSend({
+    chatId: prepared.chatId, chatType: 'group',
+    messageIds: messageId ? [messageId] : [], text: prepared.text,
+    source, mode: 'scheduled-card', replyTo: null, ok: Boolean(messageId), error: null,
+  });
+  log(`   📋 定时卡片[${kind}] 已推送测试群 ${messageId ?? '(无 id)'}`);
+  return messageId;
+}
+
+let opsCardsInFlight = false;
+
+async function scheduledCardsWatch(reason) {
+  if (opsCardsInFlight) {
+    log('   · 定时巡检卡片上一拍仍在运行，本拍跳过（单飞）');
+    return;
+  }
+  opsCardsInFlight = true;
+  try {
+    const st = loadOpsCardsState();
+    const bjNow = new Date(Date.now() + 8 * 3600_000);
+    const bj = bjDate();
+    const bjHour = Number(bjNow.toISOString().slice(11, 13));
+    const bjMin = Number(bjNow.toISOString().slice(14, 16));
+    const bjWeekday = bjNow.getUTCDay(); // 0=周日, 1=周一
+    const afterMorning0930 = (bjHour === 9 && bjMin >= 25) || bjHour > 9;
+    const inSlaWindow = bjHour === 14 || bjHour === 18;
+    const isWeekday = bjWeekday >= 1 && bjWeekday <= 5;
+    let changed = false;
+
+    // 1. P-4 大模型额度/健康巡检：每日一次常规自检 + 异常即时告警（按异常码当日去重）
+    const health = await checkLlmAndSystemHealth();
+    const healthAbnormalKey = (!health.primaryHealthy || health.hasQuotaWarning)
+      ? `${bj}:${health.vod?.code || 'ok'}:${health.deepseek?.code || 'ok'}`
+      : null;
+    if (healthAbnormalKey && st.lastHealthAlertKey !== healthAbnormalKey) {
+      await sendScheduledCard('P-4-health-alert', health.prepared.card, { source: 'proactive-external' });
+      st.lastHealthAlertKey = healthAbnormalKey;
+      st.healthDay = bj;
+      changed = true;
+    } else if (st.healthDay !== bj && afterMorning0930) {
+      await sendScheduledCard('P-4-health', health.prepared.card, { source: 'proactive-external' });
+      st.healthDay = bj;
+      changed = true;
+    }
+
+    // 2. 工作流稳定性与耗时巡检：指标突增/超阈值即时推 P-4；每日 09:30 窗口推 P-1 日报/周报 + P-4 耗时卡
+    const watch = await collectOpsWatchCard();
+    if (!watch.untested && !watch.healthy) {
+      const breachKey = `${bj}:${(watch.stats?.breaches || []).join('|')}`;
+      if (st.lastOpsBreachKey !== breachKey) {
+        await sendScheduledCard('P-4-ops-breach', watch.card, { source: 'proactive-external' });
+        st.lastOpsBreachKey = breachKey;
+        changed = true;
+      }
+    }
+
+    if (afterMorning0930 && st.digestDay !== bj) {
+      if (!watch.untested) {
+        await sendScheduledCard('P-4-ops-timing', watch.card, { source: 'proactive-external' });
+        const periodLabel = bjWeekday === 1 ? '本周周报' : '今日日报';
+        const digest = await collectOpsDigestCard({ periodLabel, days: bjWeekday === 1 ? 7 : 1 });
+        if (!digest.untested) {
+          await sendScheduledCard('P-1-digest', digest.card, { source: 'proactive-external' });
+        }
+        st.digestDay = bj;
+        changed = true;
+      } else {
+        log(`   ⚠ 耗时巡检与日报未测（不置 digestDay，待后续心跳补跑）：${watch.reason}`);
+      }
+    }
+
+    // 3. P-2 SLA 催办：工作日 14:00 / 18:00 窗口，积压非零才发（同日同时段去重）
+    const slaSlotKey = `${bj}:${bjHour}`;
+    if (isWeekday && inSlaWindow && st.slaDay !== slaSlotKey) {
+      if (!watch.untested) {
+        const allCases = watch.stats?.cases ?? [];
+        const pending = allCases.filter((c) => c.status === 'unassigned' || c.status === 'claimed');
+        if (pending.length > 0) {
+          const card = buildSlaReminderCard({ cases: allCases });
+          await sendScheduledCard('P-2-sla', card, { source: 'proactive-external' });
+          st.slaDay = slaSlotKey;
+          changed = true;
+        } else {
+          log('   · SLA 巡检：无待领单/复核中积压，不推送（0 噪音）');
+          st.slaDay = slaSlotKey;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) saveOpsCardsState(st);
+  } catch (e) {
+    log(`   ⚠ 定时巡检卡片出错（不影响回话）: ${e?.message ?? e}`);
+  } finally {
+    opsCardsInFlight = false;
+  }
+}
 
 /**
  * 日志自轮转。

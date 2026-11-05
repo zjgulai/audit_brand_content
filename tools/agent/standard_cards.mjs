@@ -332,11 +332,15 @@ export function buildCannotReadCard({
 
 /**
  * P-1：【运营日报/周报】审核漏斗与高频雷区总结卡（面向运营负责人 / 合规PM）
+ * 支持注入耗时趋势（timingTrend）与判例回流「规则缺口榜」（ruleGapRanking / gapUnattributed）。
  */
 export function buildOpsDigestCard({
   periodLabel = '今日总结',
   cases = [],
   topPitfalls = [],
+  timingTrend = null,
+  ruleGapRanking = null,
+  gapUnattributed = null,
 } = {}) {
   const total = cases.length;
   const blockCount = cases.filter((c) => c.label === 'BLOCK').length;
@@ -380,17 +384,57 @@ export function buildOpsDigestCard({
     pitfalls.push('本期暂未触发高危字面红线词，图片医疗数值暗示（如高烧度数）仍需重点关注。');
   }
 
+  const reasoningLines = [
+    '【本期高频踩雷榜（可直接转发提醒设计/运营）】',
+    ...pitfalls.map((p) => `· ${p}`),
+  ];
+
+  if (timingTrend && Array.isArray(timingTrend.rows) && timingTrend.rows.length > 0) {
+    reasoningLines.push('', '【各通道耗时趋势（对比上一周期）】');
+    for (const r of timingTrend.rows.slice(0, 4)) {
+      const p50 = r.p50_ms != null ? `${r.p50_ms}ms` : '无读数';
+      const p90 = r.p90_ms != null ? `${r.p90_ms}ms` : '无读数';
+      const delta = r.p90_delta_ms != null
+        ? (r.p90_delta_ms > 0 ? `+${r.p90_delta_ms}ms` : `${r.p90_delta_ms}ms`)
+        : '持平';
+      reasoningLines.push(
+        `· ${clean(r.carrier)}（${r.n_current ?? 0} 单）：P50=${p50} · P90=${p90}（较上期 ${delta}）`
+      );
+    }
+  }
+
+  if (Array.isArray(ruleGapRanking)) {
+    reasoningLines.push('', '【规则缺口榜（人工复核与机器五标签分歧）】');
+    if (ruleGapRanking.length === 0) {
+      reasoningLines.push('· 本期暂无人工推翻或改判记录');
+    } else {
+      const dirLabel = {
+        over_strict: '机器偏严/误报',
+        under_strict: '机器偏松/漏报',
+        capability_gap: '解析盲区',
+        unknown: '方向待定',
+      };
+      for (const item of ruleGapRanking.slice(0, 3)) {
+        const dText = dirLabel[item.direction] || '分歧';
+        const sample = item.sample_quote ? `（例：「${clean(item.sample_quote).slice(0, 14)}」）` : '';
+        reasoningLines.push(
+          `· 第 ${item.rank} 名：${clean(item.control_code)} —— 分歧 ${item.count} 次（${dText}）${sample}`
+        );
+      }
+    }
+    if (gapUnattributed && Number(gapUnattributed.n) > 0) {
+      reasoningLines.push(`· 另有 ${gapUnattributed.n} 条分歧待归因控制点`);
+    }
+  }
+
+  reasoningLines.push('', '【各品线送审与积压分布】');
+
   const tone = pendingClaim >= 5 || blockCount >= 5 ? 'orange' : 'green';
   return build('evidence', {
     tone,
     title: `【审核${clean(periodLabel)}】共审 ${total} 单 · 需修改 ${blockCount} 单 · 待复核 ${pendingClaim} 单`,
     verdict: `【一句话盘点】本期送审 ${total} 单，拦截违规 ${blockCount} 单，待人工确认 ${reviewCount} 单。`.slice(0, 58),
-    reasoning: [
-      '【本期高频踩雷榜（可直接转发提醒设计/运营）】',
-      ...pitfalls.map((p) => `· ${p}`),
-      '',
-      '【各品线送审与积压分布】',
-    ].join('\n'),
+    reasoning: reasoningLines.join('\n'),
     columns: [
       { name: 'pl', display_name: '品线', data_type: 'text' },
       { name: 'tot', display_name: '送审总数', data_type: 'text' },

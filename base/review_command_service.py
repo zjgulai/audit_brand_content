@@ -20,7 +20,8 @@ class ReviewCommandService:
     def __init__(self, authority, projection, *,
                  report_store=None, report_bridge=None,
                  external_binding_provider=None, rejudge_fn=None,
-                 takedown_assignment_policy=None):
+                 takedown_assignment_policy=None,
+                 feedback_queue=None):
         self.authority = authority
         self.projection = projection
         # T-316d：报告落盘。两者都可为 None —— 那时结案只是不产出报告，
@@ -28,6 +29,9 @@ class ReviewCommandService:
         # 一行未动）。生产在 ProductionRuntime.start() 里注入真实实例。
         self.report_store = report_store
         self.report_bridge = report_bridge
+        # 判例回流闭环（2026-11-05）：None = 未装配（既有验证器零副作用，§2.4.4）；
+        # 生产在 ProductionRuntime.start() 里显式注入 FeedbackQueue() 实例。
+        self.feedback_queue = feedback_queue
         # WriterLease 只约束跨进程写者；FastAPI 同步 handler 会在线程池并发。
         # 权威提交 + 按序追投影必须在本进程再单飞，避免 seq2 先于 seq1 apply。
         self._lock = threading.RLock()
@@ -79,7 +83,42 @@ class ReviewCommandService:
             #   前端拿不到 report_id，用户以为没发出报告而去重试。
             #   （第一版就是挂顶层，实测 P1 红而权威里已经有数据。）
             response["result"]["report"] = report
+        # ★ 判例回流闭环在**锁外**、最后一步：人机结论不一致时追加候选记录到
+        #   research/governance/_evidence/review_feedback_queue.jsonl。
+        #   与报告发布同一条纪律：永不抛、不回滚权威、不改 http_status。
+        self._record_precedent_after(command, committed)
         return response
+
+    _PRECEDENT_ON = frozenset({"submit_review", "review_and_close"})
+
+    def _record_precedent_after(self, command, committed):
+        """结案后检测人机分歧并幂等追加到判例反馈队列。**永不抛。**"""
+        if command.get("command") not in self._PRECEDENT_ON:
+            return None
+        if not self.feedback_queue:
+            return None
+        try:
+            from base.precedent_feedback import FeedbackQueue, derive_feedback
+            case_id = command.get("aggregate_id")
+            case_state = self.authority.state(case_id)
+            detail = (committed.get("batch") or {}).get("result") or {}
+            rec = derive_feedback(
+                case_state, command=command.get("command"), detail=detail
+            )
+            if rec is None:
+                return {"ok": False, "detail": "no_formal_review"}
+            if rec.get("skip"):
+                return {"ok": True, "skipped": rec["skip"],
+                        "formal_id": rec.get("formal_id")}
+            queue = (self.feedback_queue
+                     if isinstance(self.feedback_queue, FeedbackQueue)
+                     else FeedbackQueue(
+                         None if self.feedback_queue is True else self.feedback_queue
+                     ))
+            return queue.append(rec)
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False,
+                    "detail": "precedent_failed:%s" % type(exc).__name__}
 
     def _publish_report_after(self, command, response):
         """结案 → 渲染 → 落盘 → 把 report 写回权威。**永不抛。**
