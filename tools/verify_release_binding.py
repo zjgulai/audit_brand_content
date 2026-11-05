@@ -109,7 +109,7 @@ def main(controls_only=False):
         #
         #   生产实测（case-f02841432752f61c822a）：`binding_from_state` 能过，
         #   紧接着 `_binding` 抛 `case.asr_output_hash 不是 64 位十六进制`。
-        #   PRD §5.4 写明业务主形态就是图片和视频 —— 等于主形态放不了行。
+        #   旧版 PRD §5.4（现 §1.1/§2.1）写明业务主形态就是图片和视频 —— 等于主形态放不了行。
         #
         #   ★ 为什么走 `judge_unit` 真链路而不是手搓 dict：手搓的 dict 只能
         #     证明「我会填这六个字段」，证明不了「生产者填得对」。这次的缺陷

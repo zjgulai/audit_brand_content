@@ -809,8 +809,12 @@ register('judge_copy', {
       let evidenceChain;
       try {
         const queryText = body.trim()
+          || String(r?.extracted_text ?? '').trim()
           || (Array.isArray(r?.findings) ? r.findings.map((f) => f?.quote || '').filter(Boolean).join(' ') : '');
-        evidenceChain = await judgeEvidence.gatherEvidence(queryText || body, r, { enabled: config.kb.enabled });
+        evidenceChain = await judgeEvidence.gatherEvidence(queryText || body, r, {
+          enabled: config.kb.enabled,
+          localFallback: true,
+        });
       } catch (e) {
         evidenceChain = evidenceChainFailed(e);
       }

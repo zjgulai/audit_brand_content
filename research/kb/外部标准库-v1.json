@@ -696,8 +696,8 @@
       "status": "ratified",
       "source_id": "S6",
       "条款位置": "Baby formula and feeding accessories > Supply-specific restrictions + Country-specific requirements（United Kingdom）",
-      "条款原文": "Ads for formula and feeding products are prohibited globally on Homepage and Fire Devices supply.",
-      "摘要": "配方奶与喂养用品在全球范围禁投首页与 Fire 设备供货位；同页英国条目另写明「Ads for infant formula are prohibited.」",
+      "条款原文": "Ads for baby formula are prohibited globally on Homepage, Fire Devices, and Alexa supply.",
+      "摘要": "配方奶在全球范围禁投首页、Fire 设备与 Alexa 供货位；同页英国条目另写明「Ads for infant formula are prohibited on all supply.」",
       "适用渠道": [
         "amazon"
       ],
@@ -710,7 +710,7 @@
       "对判定的意义": "★ 规则库没有对应条目：与 EXT-002 同属「供货位/市场禁投」，但这条把结论推到「英国市场婴儿配方奶广告不可投」的绝对口径——判定若只说「措辞违规」会低估后果。",
       "未确认标记": null,
       "clause_no": "S6-02",
-      "变更指纹": "sha256:fa2aaf7dd732b9f6",
+      "变更指纹": "sha256:52ae4fc9bde001a2",
       "origin": "stated",
       "确认人": "委托方裁定（2026-10-22）",
       "确认日期": "2026-10-22",

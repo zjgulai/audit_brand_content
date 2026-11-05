@@ -40,6 +40,7 @@
  * 这是这一整套设计要防的唯一一件事，所以状态必须分得开、且必须透传出去。
  */
 import * as kb from './kb_client.mjs';
+import { retrieveLocal } from './local_kb.mjs';
 
 /** 每个表述取回几个分片。分片会重复占位，5 个够看清一条规则的正文。 */
 export const EVIDENCE_TOPK = 5;
@@ -289,7 +290,7 @@ function buildGate(status, basis) {
  * @param {boolean}[opts.enabled] 知识库开关（默认读 config.kb.enabled，由调用方传入）
  * @returns {Promise<object>} 证据链结果，直接塞进 judge_copy 的返回值
  */
-export async function gatherEvidence(text, judgeResult, { enabled = true } = {}) {
+export async function gatherEvidence(text, judgeResult, { enabled = true, localFallback = false } = {}) {
   const picked = pickKeyPhrases(text, judgeResult, { max: MAX_WORDING_QUERIES });
   const reqs = evidenceRequirements(judgeResult);
 
@@ -348,10 +349,11 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
     };
   }
 
-  // ── 第一轮：措辞表达库（判「能不能这么说」的主库）
+  // ── 第一轮：措辞表达库（判「能不能这么说」的主库）+ 本地三库回落（含 2_内部正负样本库）
   kb.clearMemo?.();
   const failed = [];
   let okQueries = 0;
+  let usedLocalFallback = false;
   for (const q of picked.queries) {
     try {
       // 同一进程内 retrieve 有 memo：重复表述不会再花一次配额
@@ -369,11 +371,29 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
       });
       for (const h of r.hits) base.evidence.push(toEvidenceItem(h, r, q.phrase));
     } catch (e) {
-      failed.push({ query: q.phrase, error: e.message, code: e.code ?? null });
-      base.queries.push({
-        query: q.phrase, source: q.source, rule_key: q.rule_key,
-        ok: false, error: e.message, code: e.code ?? null,
-      });
+      if (localFallback) {
+        usedLocalFallback = true;
+        const rWord = retrieveLocal(kb.COLLECTIONS.wording, q.phrase, { topK: 3 });
+        const rSample = retrieveLocal(kb.COLLECTIONS.samples, q.phrase, { topK: 2 });
+        okQueries += 1;
+        base.queries.push({
+          query: q.phrase, source: q.source, rule_key: q.rule_key,
+          collection: rWord.collection, ok: true, fallback: 'local_kb_snapshot',
+          hitCount: rWord.hitCount + rSample.hitCount,
+          totalCandidates: rWord.totalCandidates + rSample.totalCandidates,
+          uniqueDocCount: rWord.uniqueDocCount + rSample.uniqueDocCount,
+          scoreKind: rWord.scoreKind, confidence: rWord.confidence, requestId: rWord.requestId,
+          ranking_caveat: rWord.ranking_caveat,
+        });
+        for (const h of rWord.hits) base.evidence.push(toEvidenceItem(h, rWord, q.phrase));
+        for (const h of rSample.hits) base.evidence.push(toEvidenceItem(h, rSample, q.phrase));
+      } else {
+        failed.push({ query: q.phrase, error: e.message, code: e.code ?? null });
+        base.queries.push({
+          query: q.phrase, source: q.source, rule_key: q.rule_key,
+          ok: false, error: e.message, code: e.code ?? null,
+        });
+      }
     }
   }
 
@@ -423,16 +443,40 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
         });
         if (hit) base.evidence.push(toEvidenceItem(hit, r, `外部标准 ${clauseNo}`));
       } catch (e) {
-        failed.push({ query: clauseNo, error: e.message, code: e.code ?? null,
-                      collection: kb.COLLECTIONS.standard });
-        base.external_ref_check.push({
-          clause_no: clauseNo, entry_id: ref?.条目ID ?? null,
-          ok: false, status: 'untested', error: e.message, code: e.code ?? null,
-        });
-        base.queries.push({
-          query: clauseNo, source: 'external_ref_check', rule_key: null,
-          collection: kb.COLLECTIONS.standard, ok: false, error: e.message, code: e.code ?? null,
-        });
+        if (localFallback) {
+          usedLocalFallback = true;
+          const rLocal = retrieveLocal(kb.COLLECTIONS.standard, clauseNo, { topK: 3 });
+          okQueries += 1;
+          const hit = rLocal.hits.find((h) => String(h?.text ?? '').includes(clauseNo)) ?? rLocal.hits[0] ?? null;
+          base.external_ref_check.push({
+            clause_no: clauseNo,
+            entry_id: ref?.条目ID ?? null,
+            link: ref?.链接 ?? null,
+            ok: !!hit,
+            status: hit ? 'present_local' : 'absent',
+            requestId: rLocal.requestId,
+            hitCount: rLocal.hitCount,
+            fallback: 'local_kb_snapshot',
+          });
+          base.queries.push({
+            query: clauseNo, source: 'external_ref_check', rule_key: null,
+            collection: rLocal.collection, ok: true, fallback: 'local_kb_snapshot',
+            hitCount: rLocal.hitCount, totalCandidates: rLocal.totalCandidates,
+            scoreKind: rLocal.scoreKind, confidence: rLocal.confidence, requestId: rLocal.requestId,
+          });
+          if (hit) base.evidence.push(toEvidenceItem(hit, rLocal, `外部标准 ${clauseNo}`));
+        } else {
+          failed.push({ query: clauseNo, error: e.message, code: e.code ?? null,
+                        collection: kb.COLLECTIONS.standard });
+          base.external_ref_check.push({
+            clause_no: clauseNo, entry_id: ref?.条目ID ?? null,
+            ok: false, status: 'untested', error: e.message, code: e.code ?? null,
+          });
+          base.queries.push({
+            query: clauseNo, source: 'external_ref_check', rule_key: null,
+            collection: kb.COLLECTIONS.standard, ok: false, error: e.message, code: e.code ?? null,
+          });
+        }
       }
     }
     base.standard_note =
@@ -494,6 +538,10 @@ export async function gatherEvidence(text, judgeResult, { enabled = true } = {})
   else if (failed.length) status = 'partial';
   else status = picked.basis === 'engine_matched' ? 'none' : 'probe_empty';
 
+  if (usedLocalFallback) {
+    base.local_fallback = true;
+    base.local_fallback_note = '远端 DSH 知识库不可达，本次证据链已自动回落到仓内本地三库快照（3_措辞表达库 + 2_内部正负样本库 186 条 + 1_外部标准库 62 条）。';
+  }
   return {
     ...base,
     status,

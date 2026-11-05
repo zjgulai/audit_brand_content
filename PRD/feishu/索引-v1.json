@@ -39,12 +39,13 @@
    "parent_node_token": "Ix5qwfQA1ivTuykOhtHcPHBKnGh",
    "owner_open_id": "ou_3eef3cc3fbecfdafa98cd74e608522c3",
    "node_create_time_bj": "2026-09-14 11:41:17",
-   "obj_edit_time_bj": "2026-10-26 17:22:10",
-   "chars": 4093,
-   "sha256": "24939fa512216737d2ec23f48011af4fa4abe24892a0ce129fc6d9b421677efb",
-   "size_bytes": 9133,
+   "obj_edit_time_bj": "2026-11-02 16:37:15",
+   "chars": 4278,
+   "sha256": "95d01bbcfb3ade1e489dddafd2c4b449ee11ece566f5f3453e67f2bd6610d9ae",
+   "size_bytes": 9590,
    "stored_as": "逐字原文（raw_content 原样，未做任何改写）",
    "prev_fingerprints": [
+    "24939fa512216737d2ec23f48011af4fa4abe24892a0ce129fc6d9b421677efb @ 2026-10-26 17:22:10 / 4093 字 / 9133 B —— 20261027T0125 那一版索引里的读数，20261105T1148 被本行取代；全份归档在 _history/美国市场内容治理项目-一页纸计划书@20261105T1148.md",
     "1f871b42fa909e70376317f9d78cabbe8286d66dcb1e1fc527a7c06b9937e60a @ 2026-09-24 19:10:54 / 3060 字 / 6844 B —— 09-23 18:06 那一版索引里的读数，20261027T0125 被本行取代；全份归档在 _history/美国市场内容治理项目-一页纸计划书@20261027T0125.md",
     "d78fdef6d7f2b61ec5d9bfd0c40758915841cd5ae91b63c8329ffcd3714b9460 @ 2026-09-20 12:06:40 / 2831 字 / 6367 B —— 09-21 11:30 那一版索引里记的读数，09-22 12:25 被本行取代",
     "8211abc09a731dc151e40ce6686142f9be8c377b202b753f1c03fd423aafabd2 @ 2026-09-22 11:12:14 / 2932 字 / 6540 B —— 09-22 那一版索引里记的读数，2026-09-24 被本行取代（上游新增 0924 进度段 + 「规则库」改「规则输入」）"

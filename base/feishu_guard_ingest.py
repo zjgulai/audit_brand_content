@@ -1099,6 +1099,7 @@ def ingest_and_judge(
         "product_line_resolution": pl_res,
         "content_stage": submission.get("content_stage"),
         "stage_resolution": stage_res,
+        "extracted_text": (unit.get("text") or "")[:4000],
         "findings": findings,
         "confirmed_findings_count": len(confirmed_findings),
         "fact_candidates": candidate_findings,

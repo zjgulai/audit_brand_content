@@ -501,6 +501,36 @@
    "kind": "history",
    "from_version": "v1.0",
    "maps_to": "11.2"
+  },
+  {
+   "file": "api/production_app.py",
+   "section": "5.4",
+   "kind": "history",
+   "from_version": "v1.0",
+   "maps_to": "2.1",
+   "why": "注释说明图片与视频是业务主形态（旧版 §5.4，新版见 §1.1 / §2.1）"
+  },
+  {
+   "file": "base/judge_entry.py",
+   "section": "5.4",
+   "kind": "history",
+   "from_version": "v1.0",
+   "maps_to": "2.1",
+   "why": "注释说明图片与视频是业务主形态（旧版 §5.4，新版见 §1.1 / §2.1）"
+  },
+  {
+   "file": "tools/agent/prd53.mjs",
+   "section": "5.3",
+   "kind": "current",
+   "heading": "结论输出规范"
+  },
+  {
+   "file": "tools/verify_release_binding.py",
+   "section": "5.4",
+   "kind": "history",
+   "from_version": "v1.0",
+   "maps_to": "2.1",
+   "why": "注释说明图片与视频是业务主形态（旧版 §5.4，新版见 §1.1 / §2.1）"
   }
  ]
 }

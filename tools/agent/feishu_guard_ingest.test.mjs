@@ -731,6 +731,40 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
       && digestStr.includes('待新增规则（漏报候选）')
       && !plainMod.hasMdSymbols(digestStr),
     '');
+
+  // J5: 远端 KB 断连（403/500）时开启 localFallback=true 自动回落仓内本地三库快照（措辞表达库+186条样本库+62条外部标准库）
+  const jeMod = await import('./judge_evidence.mjs');
+  const localKbMod = await import('./local_kb.mjs');
+  const savedKbUrl = process.env.SHOUHENG_KB_BASE_URL;
+  const savedKbKey = process.env.SHOUHENG_KB_API_KEY;
+  process.env.SHOUHENG_KB_BASE_URL = 'http://127.0.0.1:1'; // 不可达端口模拟隧道断连
+  process.env.SHOUHENG_KB_API_KEY = 'fake-key';
+  try {
+    const evFallback = await jeMod.gatherEvidence(
+      'Hospital-grade breast pump cures mastitis',
+      {
+        hits: [{ rule_key: 'T1.1.medical-cure', matched: [{ matched_text: 'cure' }] }],
+        receipt: { evidence_ref: [{ 条文号: 'S7-03', 条目ID: 'EXT-021' }] },
+      },
+      { enabled: true, localFallback: true },
+    );
+    T('J5 ★ 远端 KB 断连时 localFallback=true 自动回落仓内三库快照（status=found，含规则库+样本库+外部标准库）',
+      evFallback.status === 'found'
+        && evFallback.local_fallback === true
+        && evFallback.evidence_total >= 2
+        && evFallback.external_ref_check?.[0]?.status === 'present_local',
+      JSON.stringify({ status: evFallback.status, total: evFallback.evidence_total, ext: evFallback.external_ref_check }));
+  } finally {
+    if (savedKbUrl === undefined) delete process.env.SHOUHENG_KB_BASE_URL;
+    else process.env.SHOUHENG_KB_BASE_URL = savedKbUrl;
+    if (savedKbKey === undefined) delete process.env.SHOUHENG_KB_API_KEY;
+    else process.env.SHOUHENG_KB_API_KEY = savedKbKey;
+  }
+
+  const sampleSearch = localKbMod.retrieveLocal('2_内部正负样本库', '吸奶器', { topK: 3 });
+  T('J6 ★ 2_内部正负样本库（186条）在 local_kb 中可检索并返回真实案例分片',
+    sampleSearch.hitCount > 0 && sampleSearch.hits[0]?.docId?.startsWith('local-sample:'),
+    JSON.stringify({ hitCount: sampleSearch.hitCount, firstDoc: sampleSearch.hits[0]?.docId }));
 }
 
 try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}

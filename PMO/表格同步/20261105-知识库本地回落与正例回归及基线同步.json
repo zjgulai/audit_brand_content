@@ -1,0 +1,19 @@
+{
+  "事项名称": "知识库本地三库快照回落（解决远端断连 36 天）+ Shopify 107 条正例回归清零 secure 误报 + PRD 基线与 EXT-018 引文同步复绿",
+  "关联执行票": "知识库本地回落与正例回归 + PRD/外部标准库基线同步",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "1）知识库本地三库快照回落：新建 tools/agent/local_kb.mjs 索引仓内三库快照（3_措辞表达库：36条规则+81条语境守卫+52条改写建议；2_内部正负样本库：186条真实案例；1_外部标准库：62条外部条款），并在 tools/agent/judge_evidence.mjs 与 tools/agent/tools.mjs 中为 judge_copy 开启 localFallback，解决远端 ngrok 隧道断连 36 天导致判定依据恒 untested 及 2_内部正负样本库 0 消费者的问题；同时在 base/feishu_guard_ingest.py 透传 extracted_text 补齐 URL/飞书文档载体的检索词。2）Shopify 107 条正例商品描述回归与词首边界修复：在 base/rule_judge.py 新增 _compile_keyword_regex（非 CJK 词首强制左边界 (?<![^\\W_])），消除存量 427 条语料中 132 处 secure/securely/mercure 误命中 cure 的假阳性，使 Shopify 107 条正例的 BLOCK 数从 29 条降至 14 条真实医疗/临床/绝对化宣称。3）上游 PRD 基线与外部标准库引文同步：归档并重拉《美国市场内容治理项目-一页纸计划书》（4278字，sha256:95d01bbc…），在 PRD/feishu/章节引用-v1.json 补登 4 处 §5.3/§5.4 引用，同步更新 research/kb/外部标准库-v1.json 的 EXT-018（S6-02）亚马逊新原文与指纹（sha256:52ae4fc9bde001a2）。",
+  "验收标准": "1) node tools/agent/feishu_guard_ingest.test.mjs 50/50 全绿 rc=0（含 J5 远端断连自动回落本地三库、J6 186条样本库检索验证）；2) node tools/agent/judge_evidence_wiring.test.mjs 22/22 全绿 rc=0；3) python3 tools/verify_rule_judge.py 48/48 全绿 rc=0（含 B11b secure 0 命中、B11c cures/treats 正常命中）；4) python3 tools/verify_prd_baseline.py 28/28 全绿 rc=0（含 L3 上游指纹一致）；5) python3 tools/verify_external.py --offline 62/62 零失配；6) python3 tools/verify_engine_contract.py 227/227 全绿 rc=0；7) python3 tools/verify_depad.py 0 被填充 rc=0。",
+  "状态依据": "1) tools/agent/local_kb.mjs、tools/agent/judge_evidence.mjs、tools/agent/tools.mjs、base/feishu_guard_ingest.py、base/rule_judge.py、PRD/feishu/索引-v1.json、PRD/feishu/章节引用-v1.json、research/kb/外部标准库-v1.json 已完成更新并全套门禁通过。"
+}

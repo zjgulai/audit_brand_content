@@ -357,7 +357,7 @@ def judge_unit(unit, *, rule_snapshot="rules-v1", kb_snapshot="kb-unavailable",
             #   （`:149-153`），`media_placeholders()` 又对任何非空字符串
             #   原样透传。于是图片/视频案件走到签发一律
             #   `SignatureError: case.asr_output_hash 不是 64 位十六进制`
-            #   —— 媒体是业务主形态（PRD §5.4），等于主形态永远放不了行。
+            #   —— 媒体是业务主形态（旧版 PRD §5.4，现 §1.1/§2.1），等于主形态永远放不了行。
             #
             #   生产实测（case-f02841432752f61c822a）：`binding_from_state`
             #   能过，紧接着 `_binding` 就抛，且**没有任何自证会红**
