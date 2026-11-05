@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  本地知识库 · launchd 守护配置
+
+  安装：
+    cp tools/com.shouheng.kblocal.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.shouheng.kblocal.plist
+
+  卸载：
+    launchctl unload -w ~/Library/LaunchAgents/com.shouheng.kblocal.plist
+
+  ★ 与守衡（com.shouheng.lark）是**两个独立作业**，互不依赖：
+    守衡不起来不影响知识库，知识库不起来不影响守衡回话
+    （守衡那边会走 evidence_chain 的 untested 分支，照实说「没查成」）。
+
+  ★ KeepAlive 的语义与守衡那份**不同**，这是有意的：
+    守衡是 `{SuccessfulExit: false}` —— 它自己 exit 0 时**不**拉起
+    （因为它的 shutdown() 是 process.exit(0)，拉起会变成正常停机被当成死循环）。
+    本服务没有那条路径：它只有被 kill 或在异常时退出，
+    所以用 `KeepAlive: true` —— 无条件拉起才是对的。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.shouheng.kblocal</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/lute/Project/audit_multi_content/tools/kb_server/run_kb_local.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/lute/Project/audit_multi_content</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- 无条件拉起：本服务没有「正常停机」这条路径，退出就是异常 -->
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/lute/Project/audit_multi_content/PMO/logs/kb_local.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/lute/Project/audit_multi_content/PMO/logs/kb_local.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>LANG</key>
+    <string>zh_CN.UTF-8</string>
+    <key>KB_LOCAL_PORT</key>
+    <string>8420</string>
+  </dict>
+
+  <!-- 只绑回环、不监听外网，所以按后台服务分级即可 -->
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+</dict>
+</plist>

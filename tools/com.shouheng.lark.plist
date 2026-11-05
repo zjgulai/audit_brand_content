@@ -43,6 +43,20 @@
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>LANG</key>
     <string>zh_CN.UTF-8</string>
+    <!--
+      ★ 2026-11-05：知识库改连本地服务（tools/kb_server/）。
+
+      为什么用环境变量而不改凭据文件：`~/.dsh/credentials/shouheng-kb.json`
+      的文件名与路径语义是「远端凭据」。把 127.0.0.1 写进去会误导下一个人
+      以为那是另一台机器的地址。
+
+      kb_client.mjs 的 loadCred() 里，SHOUHENG_KB_LOCAL=1 是这条路的**唯一**开关，
+      且**不做静默回退** —— 远端连不上就悄悄改连本地，会让人以为还是那个库。
+    -->
+    <key>SHOUHENG_KB_LOCAL</key>
+    <string>1</string>
+    <key>SHOUHENG_KB_LOCAL_URL</key>
+    <string>http://127.0.0.1:8420</string>
   </dict>
 
   <!-- 进程变僵尸/卡死时由 launchd 处理 -->

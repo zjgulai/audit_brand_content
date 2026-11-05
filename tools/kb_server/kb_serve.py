@@ -222,8 +222,29 @@ class Handler(BaseHTTPRequestHandler):
     db_path: Path = DEFAULT_DB
     api_key: Optional[str] = None
 
-    def log_message(self, fmt, *args):          # 静音默认访问日志，只在出错时我们自己打
+    #: 访问台账 —— 「谁在什么时候查了什么」。加它不是为了好看：
+    #: 它是「Guard 到底有没有连本地库」这个问题的**唯一实测判据**。
+    #: 环境变量出现在 launchd 里，不等于进程真的用了它。
+    ACCESS_LOG = Path(os.environ.get("KB_LOCAL_ACCESS_LOG")
+                      or (Path.home() / ".shouheng" / "kb-local" / "access.jsonl"))
+
+    def log_message(self, fmt, *args):
         pass
+
+    def _access(self, path: str, q: str, status: int, n: int) -> None:
+        try:
+            self.ACCESS_LOG.parent.mkdir(parents=True, exist_ok=True)
+            with self.ACCESS_LOG.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({
+                    "at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+                    "path": path, "q": q, "status": status, "hits": n,
+                    "ua": (self.headers.get("User-Agent") or "")[:60],
+                    "pid": os.getpid(),
+                }, ensure_ascii=False) + "\n")
+        except Exception:                       # noqa: BLE001
+            # 台账写不进去不该让检索失败。但这条**不许静默**——
+            # 否则「没有访问记录」会被读成「没人访问过」，而实际是「没记下来」。
+            pass
 
     # ── 工具 ──
     def _send(self, code: int, obj: Any) -> None:
@@ -294,7 +315,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._err(400, "TOPK_TOO_LARGE", f"topK 超过上限（本地最大 {TOPK_MAX}）")
                 return
             try:
-                self._send(200, retrieve(self.db_path, coll, q, top_k))
+                res = retrieve(self.db_path, coll, q, top_k)
+                self._send(200, res)
+                self._access(f"/openapi/v1/kb/{coll}/retrieve", q, 200, res.get("hitCount", 0))
             except FileNotFoundError as e:
                 self._err(503, "NO_INDEX", str(e))
             except Exception as e:               # noqa: BLE001
