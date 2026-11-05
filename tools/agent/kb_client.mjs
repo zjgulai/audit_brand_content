@@ -112,6 +112,19 @@ export function loadCred() {
     return _cred;
   }
 
+  // ★ 本地知识库（2026-11-05 加）。**必须显式开启**，不做静默回退：
+  //   远端断了就悄悄改连本地，会让人以为「还是那个库」——
+  //   而两个库的内容来源、更新时刻、覆盖范围都不同。
+  //   判据只有一句话：设了 SHOUHENG_KB_LOCAL=1 才走这条。
+  if (process.env.SHOUHENG_KB_LOCAL === '1') {
+    _cred = {
+      baseUrl: (process.env.SHOUHENG_KB_LOCAL_URL || 'http://127.0.0.1:8420').replace(/\/+$/, ''),
+      apiKey: process.env.SHOUHENG_KB_LOCAL_KEY || 'local',
+    };
+    _credSource = 'local';
+    return _cred;
+  }
+
   let txt;
   try {
     txt = fs.readFileSync(CRED_PATH, 'utf8');
@@ -148,6 +161,10 @@ export function describeKb() {
       keyLen: c.apiKey.length,
       keyTail: c.apiKey.slice(-6),   // 够用来核对是哪一把，不足以复原
       source: _credSource,
+      // ★ 本地库与远端库不是同一个东西，报出来时必须能分辨
+      ...(_credSource === 'local'
+        ? { note: '本地知识库（tools/kb_server/）。内容来自本仓源数据，与远端 ngrok 库不是同一份。' }
+        : {}),
     };
   } catch (e) {
     return { error: e.message };
