@@ -44,8 +44,6 @@
         "keywords": [
           "treat",
           "cure",
-          "heal",
-          "remedy",
           "diagnos",
           "治疗",
           "治愈",
@@ -54,11 +52,18 @@
           "根治"
         ],
         "patterns": [
-          "\\b(treat|cure|heal|remedy|diagnos)\\w*\\b"
+          "\\b(treat\\w*|cures?|cured|curing|heal(s|ed|ing)?|remed(y|ies)|diagnos\\w*)\\b"
         ],
         "languages": [
           "en",
           "zh"
+        ],
+        "$change_20261105": [
+          "★ keywords 移除 heal 与 remedy；patterns 改为逐个列全词形。",
+          "理由：keywords 走**前缀匹配**（matcher.find_literal_all 允许后缀），heal 会命中 healthy / health / healthier；",
+          "而 remedy 作为前缀反而**漏掉** remedies（差一个字母）。实测 2 条真实已发布商品因 healthy 被判 BLOCK。",
+          "改后匹配通道从 keyword 变成 pattern，命中片段与位置不变；healthy / health / secure / mercure / retreat 全部不再命中。",
+          "两条判定引擎（base/rule_judge.py 的 RuleJudge 与 skeleton 的 score/judge）都读本字段，一处改动两边同时生效。"
         ]
       },
       "downgrade_band": {

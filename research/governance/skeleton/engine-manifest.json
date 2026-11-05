@@ -1,13 +1,13 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-10-21T13:21:47+00:00",
-  "engine_version": "418a6d1a3fbd81ed",
+  "generated_at": "2026-11-05T08:17:51+00:00",
+  "engine_version": "de00e7028bdc9e6c",
   "code_version": "d811f61fa4e1f79e",
   "artifacts": {
     "rules": {
       "file": "rules-v1.json",
-      "bytes": 103570,
-      "sha256": "6364948d8327adeeb28c15231a8556bccaa91b2363626d4d513180d930fb7930",
+      "bytes": 104293,
+      "sha256": "061b32d4644c9d326c01af39c994b348e83bc820d81f2990a73fa35673b5ec49",
       "why": "判险词 + 规则 + 兜底通道（唯一产生命中的来源）",
       "counts": {
         "rules": 36,

@@ -73,6 +73,56 @@ export const KNOWN_BASES = [
  *  而不是静默截断 —— 静默截断会让人以为全写进去了（§2.4：上限要有执行点）。 */
 export const MAX_RECORDS_PER_CALL = 500;
 
+/**
+ * `batch_get` 一次最多查多少条 —— **和写入上限不是同一个数**。
+ *
+ * ★ 2026-11-05 实测踩到：`batch_get` 的上限是 **100**，而写入是 500。
+ *   两者被当成同一个数之后，写 101–500 条时会出现一个最难发现的形态：
+ *
+ *     · 写入本身**成功**（107 条真的落表了）
+ *     · 回读报 `99992402 field validation failed: the max len is 100`
+ *     · 于是 `readback: 'untested'` —— 「写进去了没有」永远答不了
+ *
+ *   它不报错、不回滚、不丢数据，只是**把一次成功的写入记成未测**。
+ *   而本项目对「未测」的态度是「不许当成成功」，所以调用方会重试 ——
+ *   **重试会真的写两遍**。这才是真正的代价。
+ *
+ *   修法是回读分批，不是把写入上限降到 100（那会让 500 条的合法写入白跑）。
+ */
+export const MAX_RECORD_IDS_PER_BATCH_GET = 100;
+
+/** 把一批 id 切成 `batch_get` 吃得下的批次。空数组返回空数组（不是 `[[]]`）。 */
+export function chunkIdsForBatchGet(ids, cap = MAX_RECORD_IDS_PER_BATCH_GET) {
+  const list = (ids ?? []).map((x) => String(x).trim()).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < list.length; i += cap) out.push(list.slice(i, i + cap));
+  return out;
+}
+
+/**
+ * 按批次取回记录，拼成一个 `{ok, records, failures, requested, got}`。
+ *
+ * ★ `fetchBatch` 必须是**已经用 `call()` 包过的**函数（返回 `{ok,data}` 而不是抛）。
+ *   2026-11-05 自证第一次跑抓到：直接传裸的 SDK 方法时，SDK 在非 0 时是**抛异常**，
+ *   于是 `r.ok` 恒为 undefined → 每一批都进 `failures` → 一次正常的写入被记成 untested。
+ *   这是本项目记过的同一个形状：**包装层的契约不统一，把成功读成了失败。**
+ *
+ * `failures` 非空表示**有批次失败** —— 调用方必须把「取到的那部分」与
+ * 「没取到的那些」分开说，不许把部分当成全部。
+ */
+export async function batchGetAll(fetchBatch, { appToken, tableId, ids }) {
+  const batches = chunkIdsForBatchGet(ids);
+  const records = [];
+  const failures = [];
+  for (const b of batches) {
+    const r = await fetchBatch(b);
+    if (!r?.ok) { failures.push({ ids: b, code: r?.code, msg: r?.msg }); continue; }
+    records.push(...(r.data?.records ?? []));
+  }
+  return { ok: failures.length === 0, records, failures,
+    requested: (ids ?? []).length, got: records.length };
+}
+
 /* ─────────────────────────── 字段类型 ─────────────────────────── */
 
 /** 飞书多维表格字段类型号。允许用数字，也允许用中文名 —— 模型写错数字是常事。 */
@@ -633,14 +683,18 @@ export async function createRecords(ctx, appToken, table, records) {
       if (!r.ok) return r;
       const ids = (r.data.records ?? []).map((x) => x.record_id);
       // ② 回读：按返回的 id 取回来，逐字段比
-      const back = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-        { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: ids } });
+      // ★ 回读必须分批：`batch_get` 上限 100，而本函数允许写 500（见 MAX_RECORD_IDS_PER_BATCH_GET）。
+      const back = await batchGetAll(
+        (batchIds) => call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
+          { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: batchIds } }),
+        { appToken, tableId: t.table_id, ids });
       if (!back.ok) {
         return { record_ids: ids, readback: 'untested',
-          readback_detail: `写入返回 ${ids.length} 个 id，但回读失败（${back.msg}）—— `
+          readback_detail: `写入返回 ${ids.length} 个 id，但回读失败（${back.failures[0]?.msg ?? '未知'}）—— `
+            + `已取回 ${back.got}/${back.requested} 条。`
             + `所以「写进去了没有」我答不了，这是**未测**，不是成功` };
       }
-      const got = back.data.records ?? [];
+      const got = back.records;
       if (got.length !== records.length) {
         return { record_ids: ids, readback: 'mismatch',
           readback_detail: `写入 ${records.length} 条，回读到 ${got.length} 条` };
@@ -672,14 +726,16 @@ export async function updateRecords(ctx, appToken, table, records) {
     step: async () => {
       // ③ 改记录前留旧值（改错回不去，与删除同一类）。
       //    ★ 读不到旧值就**不改**：盖掉的那个值如果没搬走，就永远搬不走了。
-      const before = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-        { path: { app_token: appToken, table_id: t.table_id },
-          data: { record_ids: payload.map((p) => p.record_id) } });
+      const before = await batchGetAll(
+        (batchIds) => call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
+          { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: batchIds } }),
+        { appToken, tableId: t.table_id, ids: payload.map((p) => p.record_id) });
       if (!before.ok) {
         return bad('snapshot_failed',
-          `改之前读不到这些记录的旧值（${before.msg}）—— 没搬走旧值就不改，已中止`);
+          `改之前读不到这些记录的旧值（${before.failures[0]?.msg ?? '未知'}；已取回 ${before.got}/${before.requested}）`
+          + ` —— 没搬走旧值就不改，已中止`);
       }
-      const old = before.data.records ?? [];
+      const old = before.records;
       const pre = snapshotBefore('delete_records',
         { readable: true, records: old, requested: payload.map((p) => p.record_id) });
       if (!pre.ok) return bad('snapshot_failed', `改前快照凑不齐，已中止：${pre.reason}`);
@@ -688,14 +744,16 @@ export async function updateRecords(ctx, appToken, table, records) {
         { path: { app_token: appToken, table_id: t.table_id }, data: { records: payload } });
       if (!r.ok) return { ...r, ledger_extra: { pre_image: pre.snapshot } };
 
-      const back = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-        { path: { app_token: appToken, table_id: t.table_id },
-          data: { record_ids: payload.map((p) => p.record_id) } });
+      const back = await batchGetAll(
+        (batchIds) => call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
+          { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: batchIds } }),
+        { appToken, tableId: t.table_id, ids: payload.map((p) => p.record_id) });
       if (!back.ok) {
         return { ledger_extra: { pre_image: pre.snapshot }, readback: 'untested',
-          readback_detail: '改完回读失败 —— 「改成了没有」我答不了，这是未测' };
+          readback_detail: `改完回读失败（已取回 ${back.got}/${back.requested}）`
+            + ' —— 「改成了没有」我答不了，这是未测' };
       }
-      const got = Object.fromEntries((back.data.records ?? []).map((x) => [x.record_id, x.fields]));
+      const got = Object.fromEntries(back.records.map((x) => [x.record_id, x.fields]));
       const bads = [];
       for (const p of payload) {
         const v = verifyReadback(p.fields, got[p.record_id]);
