@@ -484,28 +484,31 @@ const tools = await import('./tools.mjs');
 
   const llmMod = await import('./llm.mjs');
   const healthWatch = await import('./llm_health_watch.mjs');
-  T('H5 对话层配置 3 级模型自动回落链（3.1-flash-lite → 3.5-flash → 3.8-flash）',
-    Array.isArray(llmMod.FALLBACK_MODELS) && llmMod.FALLBACK_MODELS.length === 3
+  T('H5 对话层配置 7 模型两级回落链（VOD 4 个 Gemini → TokenHub 3 个 GLM/MiniMax）',
+    Array.isArray(llmMod.FALLBACK_MODELS) && llmMod.FALLBACK_MODELS.length === 7
       && typeof llmMod.chatWithFallback === 'function',
     llmMod.FALLBACK_MODELS.join(' -> '));
 
   const mockHealth = await healthWatch.checkLlmAndSystemHealth({
     probeFn: async () => ({
       vodRes: {
-        name: '主用网关 · 腾讯云 VOD',
+        name: '主用中转站 · 腾讯云 VOD（Gemini 4 模型）',
         ok: true,
         code: 'ok',
         status: '正常在线',
         detail: '主模型 gemini-3.1-flash-lite 响应正常（HTTP 200）',
       },
-      dsRes: {
-        name: '备用通道 · DeepSeek 官方直连',
+      tokenhubRes: {
+        name: '异构兜底站 · TokenHub / Magpie（GLM / MiniMax 3 模型）',
         ok: false,
         code: 'insufficient_balance_402',
         status: '额度不足（HTTP 402）',
         detail: '账户余额不足（HTTP 402），需充值后恢复',
       },
     }),
+    // 本项只验「402 被认出来并且说清楚」。OCR 二进制是 gitignored 的本机件，
+    // 让它决定这条断言的红绿，等于把两个不相干的事实绑在一起。
+    ocrPresent: true,
   });
   T('H6 大模型额度/健康巡检器准确识别 402 余额不足并产出零特殊符号的 P-4 卡片（锁定测试群）',
     mockHealth.ok && mockHealth.primaryHealthy === true && mockHealth.hasQuotaWarning === true
@@ -513,6 +516,18 @@ const tools = await import('./tools.mjs');
       && !plainMod.hasMdSymbols(JSON.stringify(mockHealth.prepared?.card))
       && JSON.stringify(mockHealth.prepared?.card).includes('额度不足（HTTP 402）'),
     mockHealth.prepared?.card?.header?.title?.content);
+
+  // H6b 反向对照：OCR 缺席时**必须**报「主用异常」，不许因为模型通道正常就报全绿。
+  const noOcr = await healthWatch.checkLlmAndSystemHealth({
+    ocrPresent: false,
+    probeFn: async () => ({
+      vodRes: { name: '主用中转站', ok: true, code: 'ok', status: '正常在线', detail: 'HTTP 200' },
+      tokenhubRes: { name: '异构兜底站', ok: true, code: 'ok', status: '正常在线', detail: 'HTTP 200' },
+    }),
+  });
+  T('H6b ★ 反向对照：本地 OCR 缺席时 primaryHealthy 必须为 false（模型全好也不许报全绿）',
+    noOcr.primaryHealthy === false && noOcr.hasQuotaWarning === false,
+    JSON.stringify({ primaryHealthy: noOcr.primaryHealthy, hasQuotaWarning: noOcr.hasQuotaWarning }));
 }
 
 /* ── I. 全链路审计报告 P0 / P1 / P2 根治项自证 ───────────────────────── */
@@ -1600,6 +1615,226 @@ with zipfile.ZipFile(sys.argv[1], 'w') as z:
       && ofcMod.isOfficeAttachment('a.pdf') === false
       && ofcMod.isOfficeAttachment(null) === false,
     '');
+}
+
+/* ── N. P4：7 模型两级网关回落 + 分群分层发布闸门 ───────────────────────── */
+{
+  const llmMod = await import('./llm.mjs');
+  const { config } = await import('./config.mjs');
+  const pushPol = await import('./push_policy.mjs');
+  const stdCards = await import('./standard_cards.mjs');
+  const cardsMod = await import('../reply-cards/cards.mjs');
+  const plainMod = await import('./plain.mjs');
+  const http = await import('node:http');
+
+  /* N1 —— 名单本身。DeepSeek 必须在整条链与默认配置里都消失。 */
+  {
+    const vod = [...llmMod.VOD_MODELS];
+    const th = [...llmMod.TOKENHUB_MODELS];
+    const all = [...llmMod.FALLBACK_MODELS];
+    const expectVod = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'];
+    const expectTh = ['glm-5.3-flash', 'minimax-m3.1-flash', 'glm-5.3-flashx'];
+    // ★ DeepSeek 的判据是「在**配置**与**链**里都不出现」，不是「代码里搜不到这个词」：
+    //   注释和文档里写「DeepSeek 已废弃」是**对的**，把它也判红就成了 §2.1.1 那种误报。
+    const dsInChain = all.filter((m) => /deepseek/i.test(m));
+    const dsInDefault = [config.llm.baseUrl, config.llm.model]
+      .filter((v) => /deepseek/i.test(String(v ?? '')));
+    T('N1 7 模型名单：VOD 4 个 Gemini + TokenHub 3 个 GLM/MiniMax = 7，顺序即回落顺序，且链与默认配置里 0 个 deepseek',
+      vod.join(',') === expectVod.join(',')
+        && th.join(',') === expectTh.join(',')
+        && all.length === 7
+        && all.join(',') === [...expectVod, ...expectTh].join(',')
+        && dsInChain.length === 0 && dsInDefault.length === 0,
+      JSON.stringify({ vod, th, dsInChain, dsInDefault }));
+  }
+
+  /* N2 —— 模型 → 站的解析。这是「换模型不许换错 key/地址」的唯一一处。 */
+  {
+    const saved = { ...config.llm };
+    let r;
+    try {
+      config.llm.baseUrlOverridden = false;
+      config.llm.vodApiKey = 'vod-key-for-test';
+      config.llm.vodBaseUrl = 'https://vod.test/v1';
+      config.llm.tokenhubApiKey = '';
+      config.llm.magpieBaseUrl = 'http://127.0.0.1:3425/v1';
+      config.llm.tokenhubBaseUrl = 'https://tokenhub.test/v1';
+
+      const eGem = llmMod.resolveModelEndpoint('gemini-3.5-flash', config.llm);
+      const eGlm = llmMod.resolveModelEndpoint('glm-5.3-flash', config.llm);
+      const eMin = llmMod.resolveModelEndpoint('minimax-m3.1-flash', config.llm);
+      const eGlmx = llmMod.resolveModelEndpoint('glm-5.3-flashx', config.llm);
+      // 反向对照：vod 没 key 时主流模型必须改走代理，且带 `vod/` 前缀（否则代理选不出上游站）
+      config.llm.vodApiKey = '';
+      const eGemProxy = llmMod.resolveModelEndpoint('gemini-3.5-flash', config.llm);
+      // 反向对照：显式接管 baseUrl 时全部走它，不再分站
+      config.llm.baseUrlOverridden = true;
+      config.llm.baseUrl = 'https://override.test/v1';
+      config.llm.apiKey = 'override-key';
+      const eOverride = llmMod.resolveModelEndpoint('glm-5.3-flash', config.llm);
+
+      r = { eGem, eGlm, eMin, eGlmx, eGemProxy, eOverride };
+    } finally {
+      Object.assign(config.llm, saved);
+    }
+
+    T('N2 resolveModelEndpoint：4 个 Gemini 走 VOD 直连（key=vox），3 个 GLM/MiniMax 走 magpie；vod 无 key 时 Gemini 改走代理并带 vod/ 前缀；显式 baseUrl 覆盖时不再分站',
+      r.eGem.baseUrl === 'https://vod.test/v1' && r.eGem.apiKey === 'vod-key-for-test' && r.eGem.model === 'gemini-3.5-flash'
+        && r.eGlm.baseUrl === 'http://127.0.0.1:3425/v1' && r.eGlm.model === 'glm-5.3-flash'
+        && r.eMin.station === 'tokenhub' && r.eMin.model === 'minimax-m3.1-flash'
+        && r.eGlmx.station === 'tokenhub'
+        && r.eGemProxy.baseUrl === 'http://127.0.0.1:3425/v1'
+        && r.eGemProxy.model === 'vod/gemini-3.5-flash'
+        && r.eOverride.baseUrl === 'https://override.test/v1'
+        && r.eOverride.apiKey === 'override-key'
+        && r.eOverride.model === 'glm-5.3-flash',
+      JSON.stringify(r));
+  }
+
+  /* N3 —— 跨站回落。**这是本次修的那个 bug 的判据。**
+   *
+   * 本机回环假网关：`gemini-*` 一律 402（这一站余额耗尽），其余 200。
+   * 旧代码在这里 `break`，整条链返回失败 —— 明明后三个模型是活的。
+   */
+  {
+    const srv = http.createServer((req, resp) => {
+      let buf = '';
+      req.on('data', (c) => { buf += c; });
+      req.on('end', () => {
+        let model = '';
+        try { model = JSON.parse(buf).model ?? ''; } catch { /* 非 JSON */ }
+        if (String(model).startsWith('gemini')) {
+          resp.writeHead(402, { 'Content-Type': 'application/json' });
+          resp.end(JSON.stringify({ error: { code: 'insufficient_balance', message: 'free trial quota exhausted' } }));
+          return;
+        }
+        resp.writeHead(200, { 'Content-Type': 'application/json' });
+        resp.end(JSON.stringify({
+          choices: [{ message: { role: 'assistant', content: '兜底站答的' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 3, completion_tokens: 2 },
+        }));
+      });
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    const port = srv.address().port;
+
+    const saved = { ...config.llm };
+    let res;
+    try {
+      config.llm.baseUrlOverridden = false;
+      config.llm.vodApiKey = 'vod-key-for-test';
+      config.llm.vodBaseUrl = `http://127.0.0.1:${port}`;
+      config.llm.tokenhubApiKey = '';
+      config.llm.magpieBaseUrl = `http://127.0.0.1:${port}`;
+      res = await llmMod.chatWithFallback([{ role: 'user', content: 'ping' }], { maxTokens: 8 });
+    } finally {
+      Object.assign(config.llm, saved);
+      await new Promise((r) => srv.close(r));
+    }
+
+    const tried = res?.fallbackFrom ?? [];
+    // 只数**真发过请求**的那几跳。`skipped: station_dead` 是决定跳过，不是一次尝试 ——
+    // 把两者算在一起，「跳过 3 个同站模型」这条判据就恒真了。
+    const vodTried = tried.filter((t) => t.station === 'vod' && t.skipped === undefined);
+    const vodSkipped = tried.filter((t) => t.station === 'vod' && t.skipped === 'station_dead');
+    T('N3 ★ 反向对照：VOD 全站 402 时 chatWithFallback 不许 abort，必须跨到 magpie 站并成功（旧代码在这里 break 成整链失败）',
+      res?.ok === true
+        && res.stationUsed === 'tokenhub'
+        && ['glm-5.3-flash', 'minimax-m3.1-flash', 'glm-5.3-flashx'].includes(res.modelUsed)
+        && res.message?.content === '兜底站答的'
+        // 同站只试一次：402 之后跳过剩下 3 个 Gemini，不浪费三次超时
+        && vodTried.length === 1
+        && vodSkipped.length === 3,
+      JSON.stringify({ ok: res?.ok, stationUsed: res?.stationUsed, modelUsed: res?.modelUsed,
+        vodTried: vodTried.length, vodSkipped: vodSkipped.length }));
+  }
+
+  /* N4 —— Python 侧三条四维链。视频链不许出现无 audio 的兜底模型。 */
+  {
+    const out = execFileSync('python3', ['-c', `
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import base.feishu_guard_ingest as g
+print(json.dumps({
+  "video": [list(p) for p in g.VIDEO_FOUR_DIM_CHAIN],
+  "image_text": [list(p) for p in g.IMAGE_TEXT_FOUR_DIM_CHAIN],
+  "vod": list(g.VOD_FOUR_DIM_MODELS),
+  "tokenhub": list(g.TOKENHUB_FOUR_DIM_MODELS),
+}, ensure_ascii=False))
+`, REPO_ROOT], { encoding: 'utf8', timeout: 60_000 });
+    const ch = JSON.parse(out);
+    const videoModels = ch.video.map((p) => p[1]);
+    const itModels = ch.image_text.map((p) => p[1]);
+    const audioBlind = ['glm-5.3-flash', 'minimax-m3.1-flash', 'glm-5.3-flashx'];
+    T('N4 视频四维链只含 VOD 的 4 个 Gemini（有 audio），绝不含 GLM/MiniMax（audio 0）；图片与文案链两站共 7 个模型',
+      videoModels.length === 4
+        && ch.video.every(([s]) => s === 'vod')
+        && audioBlind.every((m) => !videoModels.includes(m))
+        && itModels.length === 7
+        && audioBlind.every((m) => itModels.includes(m)),
+      JSON.stringify({ videoModels, itModels }));
+  }
+
+  /* N5 —— 分群分层发布闸门。 */
+  {
+    const TID = pushPol.TEST_GROUP_CHAT_ID;
+    const biz = 'oc_business_group_for_test';
+    const kinds = ['reactive_audit', 'quick_ack', 'scheduled_digest', 'proactive_ops_alert'];
+    const bizVerdict = Object.fromEntries(kinds.map((k) => [k, pushPol.checkChannelPolicy(biz, k).allowed]));
+    const testVerdict = Object.fromEntries(kinds.map((k) => [k, pushPol.checkChannelPolicy(TID, k).allowed]));
+    const unknownKind = pushPol.checkChannelPolicy(biz, 'made_up_kind');
+    T('N5 P4 分层放行：正式业务群放行被动送审与接单回执、硬拦定时日报与运维告警；测试群四类全放行；未知类别默认拒绝',
+      bizVerdict.reactive_audit === true && bizVerdict.quick_ack === true
+        && bizVerdict.scheduled_digest === false && bizVerdict.proactive_ops_alert === false
+        && kinds.every((k) => testVerdict[k] === true)
+        && pushPol.classifyChatTier(TID) === 'test_ops'
+        && pushPol.classifyChatTier(biz) === 'business_prod'
+        && unknownKind.allowed === false,
+      JSON.stringify({ bizVerdict, testVerdict, unknownKind }));
+  }
+
+  /* N6 —— 发布准入指标进 P-1 日报卡，且卡片仍然过 V2 校验、零 Markdown 符号。 */
+  {
+    const metrics = pushPol.buildReleaseReadinessMetrics({
+      cases: [
+        { label: 'BLOCK', confirmed_findings_count: 2 },
+        { label: 'PASS' },
+        { label: 'PASS', kb_hit: true },
+      ],
+      timingTrend: {
+        rows: [
+          { carrier: '群消息', n_current: 10, p50_ms: 1000, p90_ms: 3000 },
+          { carrier: '图片', n_current: 5, p50_ms: 2000, p90_ms: 6000 },
+        ],
+      },
+      outboundEntries: [
+        { mode: 'reply-card', ok: true },
+        { mode: 'quick-receipt-card', ok: true },
+        { mode: 'reply', ok: true },
+        { mode: 'reply-card', ok: false },
+      ],
+    });
+    const card = stdCards.buildOpsDigestCard({
+      periodLabel: '今日日报',
+      cases: [{ label: 'BLOCK', product_line: '吸奶器', status: 'unassigned', confirmed_findings_count: 1 }],
+      releaseReadiness: metrics,
+    });
+    const str = JSON.stringify(card);
+    // 反向对照：不给 releaseReadiness 时这段**不许**出现（否则它是恒定输出，不是指标）
+    const noMetrics = JSON.stringify(stdCards.buildOpsDigestCard({ periodLabel: '今日日报', cases: [] }));
+    T('N6 P-1 日报卡带【Agent 发布准入指标】三行读数（各带分母），过 V2 校验且 0 未渲染 Markdown 符号；不给指标时该段不出现',
+      cardsMod.validateCard(card).ok === true
+        && !plainMod.hasMdSymbols(str)
+        && str.includes('Agent 发布准入指标')
+        && str.includes('66.7%（2/3）')
+        && str.includes('整体 P50 1333ms')
+        && !noMetrics.includes('Agent 发布准入指标'),
+      JSON.stringify({
+        validate: cardsMod.validateCard(card).ok,
+        md: plainMod.hasMdSymbols(str),
+        metrics,
+      }));
+  }
 }
 
 try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}

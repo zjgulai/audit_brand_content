@@ -779,6 +779,156 @@ OVERALL_RULE = (
     "严禁因为常规免责提醒而填「发现违规需修改」。"
 )
 
+#: ── 四维审查的两级模型梯队（2026-11-06 加）────────────────────────────
+#:
+#: 主流站（VOD）：4 个 Gemini。**五模态全通**，text/image/audio/video/pdf 都收。
+VOD_FOUR_DIM_MODELS: Tuple[str, ...] = (
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
+)
+#: 异构兜底站（TokenHub / 本机 magpie 代理）：GLM 与 MiniMax 共 3 个。
+#: ★ **没有 audio**（清单里 `glm-5.3-flash` 的 audio 输入组合数为 0）。
+TOKENHUB_FOUR_DIM_MODELS: Tuple[str, ...] = (
+    "glm-5.3-flash",
+    "minimax-m3.1-flash",
+    "glm-5.3-flashx",
+)
+
+#: 站名 → 环境变量名（网关地址, 凭据）。与 `tools/multimodal_client.GATEWAY_ENV` 同一口径。
+#: ★ `magpie` 是本机聚合代理，它自己持有上游凭据，因此没配 key 时用占位串也要能发出去。
+FOUR_DIM_STATION_ENV: Dict[str, Tuple[str, str]] = {
+    "vod": ("MULTIMODAL_VOD_BASE_URL", "MULTIMODAL_VOD_API_TOKEN"),
+    "magpie": ("SHOUHENG_MAGPIE_BASE_URL", "MULTIMODAL_TOKENHUB_API_KEY"),
+}
+
+#: 兜底站地址的**默认值**。必须在这里有一份：
+#: `tools/agent/config.mjs` 会在 Node 进程里写 `SHOUHENG_MAGPIE_BASE_URL`，
+#: 但本文件也会被 `python3 base/feishu_guard_ingest.py` **直接**调用（命令行、自证、运维脚本），
+#: 那时环境里根本没有这个变量 —— 没有默认值的话兜底站等于不存在，而失败现场看起来像
+#: 「模型全挂了」（§2.4.1 的同一形状：读不到 vs 真的没有，长得一样）。
+DEFAULT_MAGPIE_BASE_URL = "http://127.0.0.1:3425/v1"
+
+#: 图片与文案：**两站全 7 个模型**。图片与纯文本都不需要 audio，兜底站完全胜任。
+IMAGE_TEXT_FOUR_DIM_CHAIN: Tuple[Tuple[str, str], ...] = (
+    tuple(("vod", m) for m in VOD_FOUR_DIM_MODELS)
+    + tuple(("magpie", m) for m in TOKENHUB_FOUR_DIM_MODELS)
+)
+
+#: 视频：**只有 VOD 那 4 个 Gemini**。
+#:
+#: ★ 这是一条硬约束，不是偏好。视频四维的第三维是「音画一致性与符号」——
+#:   它必须听见口播。而 tokenhub 站那三个模型 `audio: 0`：把视频交给它们，
+#:   请求**不会报错**，它们会照着画面编出一份「口播说了什么」，
+#:   于是群里的视频卡看起来有第四维、实际是瞎的。
+#:   宁可这一条链短到只剩 4 个模型，也不许用看不见的东西填满它。
+VIDEO_FOUR_DIM_CHAIN: Tuple[Tuple[str, str], ...] = tuple(
+    ("vod", m) for m in VOD_FOUR_DIM_MODELS
+)
+
+
+def four_dim_chain(kinds: str) -> Tuple[Tuple[str, str], ...]:
+    """取一条四维链，并把 `MULTIMODAL_MODEL` 显式指定的模型排到第一位。
+
+    ★ 显式指定只**提前**，不**替换** —— 运维指定一个首选模型时，仍然要有回落。
+      替换掉的话，「指定错了一个名字」就等于整条链失效，而失败现场看起来像「模型全挂了」。
+    """
+    base = VIDEO_FOUR_DIM_CHAIN if kinds == "video" else IMAGE_TEXT_FOUR_DIM_CHAIN
+    want = (os.environ.get("MULTIMODAL_MODEL") or "").strip()
+    if not want:
+        return base
+    for station, model in base:
+        if model == want:
+            return ((station, model),) + tuple(p for p in base if p != (station, model))
+    # 不在这两组名单里的模型：按站归属猜一个站放最前，原链全部保留在后面。
+    guessed = "magpie" if want.startswith(("glm-", "minimax-")) else "vod"
+    return ((guessed, want),) + tuple(base)
+
+
+def _four_dim_station_client(station: str, model: str, timeout: float):
+    """给 (站, 模型) 建一个客户端；这一站配不出来就回 `None`（绝不抛）。"""
+    from tools.multimodal_client import GatewayClient, urllib_transport
+
+    base_env, key_env = FOUR_DIM_STATION_ENV[station]
+    base = (os.environ.get(base_env) or "").strip()
+    if not base:
+        return None
+    key = (os.environ.get(key_env) or "").strip()
+    if station == "magpie" and not key:
+        # 本机聚合代理自己持有上游凭据：没配 key 也要能发，否则兜底站等于不存在。
+        key = "magpie"
+    if not key:
+        return None
+    return GatewayClient(
+        gateway=station, base_url=base.rstrip("/"), api_key=key, model=model,
+        timeout=timeout, transport=urllib_transport, retry_attempts=1,
+    )
+
+
+def _four_dim_available(kinds: str) -> bool:
+    """这条链上有没有至少一站配得出客户端。没有就**不发起**任何外呼。"""
+    for station, model in four_dim_chain(kinds):
+        try:
+            if _four_dim_station_client(station, model, 1.0) is not None:
+                return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
+
+
+def _post_four_dim(chain: Tuple[Tuple[str, str], ...], build_payload, *, timeout: float):
+    """按链逐站逐模型发**一次**请求；第一个 HTTP 200 且有 body 的胜出。
+
+    返回 `(body_obj, model, station)`；整条链都没拿到 200 时返回 `None`。
+
+    ★ 每一跳只试一次（`retry_attempts=1`）：链本身就是重试。
+      每一跳再重试 3 次，最坏情况是 7 跳 × 3 次超时，一次送审会被拖到分钟级。
+    ★ 「这一站没配凭据」与「这个模型 429」必须分开：前者跳过该站，后者继续同站下一个模型。
+    """
+    for station, model in chain:
+        try:
+            client = _four_dim_station_client(station, model, timeout)
+        except Exception:  # noqa: BLE001
+            continue
+        if client is None:
+            continue
+        try:
+            payload = json.dumps(build_payload(model), ensure_ascii=False).encode("utf-8")
+            resp = client.transport(
+                client.endpoint(),
+                {"Content-Type": "application/json", "Authorization": f"Bearer {client.api_key}"},
+                payload,
+                timeout,
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        if resp.status != 200 or not resp.body:
+            continue
+        try:
+            body_obj = json.loads(resp.body)
+        except Exception:  # noqa: BLE001
+            continue
+        return body_obj, model, station
+    return None
+
+
+def _extract_json_block(body_obj: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """从 OpenAI 兼容响应里挖出模型吐的那一段 JSON。挖不出就回 `None`。"""
+    try:
+        content_str = (
+            ((body_obj.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+        ).strip()
+        s_idx, e_idx = content_str.find("{"), content_str.rfind("}")
+        if s_idx < 0 or e_idx <= s_idx:
+            return None
+        parsed = json.loads(content_str[s_idx:e_idx + 1])
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(parsed, dict) or not parsed.get("one_line"):
+        return None
+    return parsed
+
 
 def run_vlm_four_dim_audit(image_path: Path, ocr_text: str = "") -> Optional[Dict[str, Any]]:
     """调用多模态视觉大模型对图片做四维合规审查（图内文字OCR + 画面语义 + 视觉符号 + 区域级画面审计）。
@@ -794,15 +944,12 @@ def run_vlm_four_dim_audit(image_path: Path, ocr_text: str = "") -> Optional[Dic
     # 离线单测的 10×10 纯白合成夹具（<200 字节）不发起外呼，保持离线自证快速且零网络依赖
     if len(raw_bytes) < 200:
         return None
-    if not (os.environ.get("MULTIMODAL_VOD_API_TOKEN") or "").strip():
+    if not _four_dim_available("image"):
         return None
 
     try:
         import base64 as _b64
-        from tools.multimodal_client import GatewayClient
 
-        model = (os.environ.get("MULTIMODAL_MODEL") or "").strip() or "gemini-3.1-flash-lite"
-        client = GatewayClient.from_env("vod", model=model, timeout=60.0, retry_attempts=1)
         mime = _detect_image_mime(raw_bytes)
         b64 = _b64.b64encode(raw_bytes).decode("ascii")
         ocr_hint = (ocr_text or "").strip()[:600]
@@ -831,34 +978,26 @@ def run_vlm_four_dim_audit(image_path: Path, ocr_text: str = "") -> Optional[Dic
             '  "copy_paste_snippet": "可直接复制给设计师贴在图上的合规免责声明或替换文案（英文广告给英文+中文对照，中文广告给中文）"\n'
             "}"
         )
-        payload = json.dumps({
-            "model": model,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
-                ],
-            }],
-            "temperature": 0,
-        }, ensure_ascii=False).encode("utf-8")
-        resp = client.transport(
-            client.endpoint(),
-            {"Content-Type": "application/json", "Authorization": f"Bearer {client.api_key}"},
-            payload,
-            60.0,
+        got = _post_four_dim(
+            four_dim_chain("image"),
+            lambda m: {
+                "model": m,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                    ],
+                }],
+                "temperature": 0,
+            },
+            timeout=60.0,
         )
-        if resp.status != 200 or not resp.body:
+        if got is None:
             return None
-        body_obj = json.loads(resp.body)
-        content_str = (
-            ((body_obj.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-        ).strip()
-        s_idx, e_idx = content_str.find("{"), content_str.rfind("}")
-        if s_idx < 0 or e_idx <= s_idx:
-            return None
-        parsed = json.loads(content_str[s_idx:e_idx + 1])
-        if not isinstance(parsed, dict) or not parsed.get("one_line"):
+        body_obj, model, station = got
+        parsed = _extract_json_block(body_obj)
+        if parsed is None:
             return None
         raw_rows = parsed.get("region_rows")
         region_rows = []
@@ -873,6 +1012,7 @@ def run_vlm_four_dim_audit(image_path: Path, ocr_text: str = "") -> Optional[Dic
         return {
             "status": "ok",
             "model": model,
+            "station": station,
             "overall": str(parsed.get("overall") or "需人工确认").strip(),
             "short_title": str(parsed.get("short_title") or "").strip(),
             "one_line": str(parsed.get("one_line") or "").strip(),
@@ -909,15 +1049,12 @@ def run_vlm_video_four_dim_audit(video_path: Path) -> Optional[Dict[str, Any]]:
     # 离线单测的小夹具（<200 字节）不发起外呼
     if len(raw_bytes) < 200 or len(raw_bytes) > 24 * 1024 * 1024:
         return None
-    if not (os.environ.get("MULTIMODAL_VOD_API_TOKEN") or "").strip():
+    if not _four_dim_available("video"):
         return None
 
     try:
         import base64 as _b64
-        from tools.multimodal_client import GatewayClient
 
-        model = (os.environ.get("MULTIMODAL_MODEL") or "").strip() or "gemini-3.1-flash-lite"
-        client = GatewayClient.from_env("vod", model=model, timeout=90.0, retry_attempts=1)
         b64 = _b64.b64encode(raw_bytes).decode("ascii")
         prompt = (
             "你是一名跨境电商与母婴视频广告合规审核员。请同时看视频画面并听音轨口播，做【视频四维合规审查】。\n"
@@ -943,34 +1080,26 @@ def run_vlm_video_four_dim_audit(video_path: Path) -> Optional[Dict[str, Any]]:
             '  "copy_paste_snippet": "可直接复制给剪辑师加在视频底部的合规免责字幕或替换口播词"\n'
             "}"
         )
-        payload = json.dumps({
-            "model": model,
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "video_url", "video_url": {"url": f"data:video/mp4;base64,{b64}"}},
-                ],
-            }],
-            "temperature": 0,
-        }, ensure_ascii=False).encode("utf-8")
-        resp = client.transport(
-            client.endpoint(),
-            {"Content-Type": "application/json", "Authorization": f"Bearer {client.api_key}"},
-            payload,
-            90.0,
+        got = _post_four_dim(
+            four_dim_chain("video"),
+            lambda m: {
+                "model": m,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "video_url", "video_url": {"url": f"data:video/mp4;base64,{b64}"}},
+                    ],
+                }],
+                "temperature": 0,
+            },
+            timeout=90.0,
         )
-        if resp.status != 200 or not resp.body:
+        if got is None:
             return None
-        body_obj = json.loads(resp.body)
-        content_str = (
-            ((body_obj.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-        ).strip()
-        s_idx, e_idx = content_str.find("{"), content_str.rfind("}")
-        if s_idx < 0 or e_idx <= s_idx:
-            return None
-        parsed = json.loads(content_str[s_idx:e_idx + 1])
-        if not isinstance(parsed, dict) or not parsed.get("one_line"):
+        body_obj, model, station = got
+        parsed = _extract_json_block(body_obj)
+        if parsed is None:
             return None
         raw_rows = parsed.get("region_rows")
         region_rows = []
@@ -986,6 +1115,7 @@ def run_vlm_video_four_dim_audit(video_path: Path) -> Optional[Dict[str, Any]]:
             "status": "ok",
             "media_kind": "video",
             "model": model,
+            "station": station,
             "overall": str(parsed.get("overall") or "需人工确认").strip(),
             "short_title": str(parsed.get("short_title") or "").strip(),
             "one_line": str(parsed.get("one_line") or "").strip(),
@@ -1255,8 +1385,8 @@ def run_llm_text_four_dim_audit(
     第一段是**确定性**的：只看引擎已经给出的 findings、品线解析与正文特征词，
     不联网、不要凭据，因此离线与模型故障时都拿得到完整四维。
 
-    第二段是可选润色：`MULTIMODAL_VOD_API_TOKEN` 在场且正文够长时，请多模态网关
-    把四句话写得更像人话（标题、卡点、怎么改、三维描述、明细行、替换件）。
+    第二段是可选润色：`IMAGE_TEXT_FOUR_DIM_CHAIN` 上任何一站配得出客户端且正文够长时，
+    请多模态网关把四句话写得更像人话（标题、卡点、怎么改、三维描述、明细行、替换件）。
     润色**任何一步失败整段丢弃**，回落第一段 —— 卡片不会因为模型挂了而消失，
     也不会因为模型编了而说错覆盖范围。
     """
@@ -1267,16 +1397,12 @@ def run_llm_text_four_dim_audit(
     body = (text or "").strip()
     if not body or len(body) < 20:
         return det
-    if not (os.environ.get("MULTIMODAL_VOD_API_TOKEN") or "").strip():
+    if not _four_dim_available("text"):
         return det
     if os.environ.get("SHOUHENG_TEXT_LLM_AUDIT") == "0":
         return det
 
     try:
-        from tools.multimodal_client import GatewayClient
-
-        model = (os.environ.get("MULTIMODAL_MODEL") or "").strip() or "gemini-3.1-flash-lite"
-        client = GatewayClient.from_env("vod", model=model, timeout=35.0, retry_attempts=1)
         prompt = (
             "你是一名跨境电商与母婴广告合规审核员。下面是一段待审广告文案，"
             "已由规则引擎给出命中清单。请在此基础上写【文案四维体检】。\n"
@@ -1304,28 +1430,20 @@ def run_llm_text_four_dim_audit(
             '  "copy_paste_snippet": "可直接复制回广告的合规替换文案或免责贴条（英文文案给英文+中文说明，中文文案给中文）"\n'
             "}"
         )
-        payload = json.dumps({
-            "model": model,
-            "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
-            "temperature": 0,
-        }, ensure_ascii=False).encode("utf-8")
-        resp = client.transport(
-            client.endpoint(),
-            {"Content-Type": "application/json", "Authorization": f"Bearer {client.api_key}"},
-            payload,
-            35.0,
+        got = _post_four_dim(
+            four_dim_chain("text"),
+            lambda m: {
+                "model": m,
+                "messages": [{"role": "user", "content": [{"type": "text", "text": prompt}]}],
+                "temperature": 0,
+            },
+            timeout=35.0,
         )
-        if resp.status != 200 or not resp.body:
+        if got is None:
             return det
-        body_obj = json.loads(resp.body)
-        content_str = (
-            ((body_obj.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-        ).strip()
-        s_idx, e_idx = content_str.find("{"), content_str.rfind("}")
-        if s_idx < 0 or e_idx <= s_idx:
-            return det
-        parsed = json.loads(content_str[s_idx:e_idx + 1])
-        if not isinstance(parsed, dict) or not parsed.get("one_line"):
+        body_obj, model, station = got
+        parsed = _extract_json_block(body_obj)
+        if parsed is None:
             return det
 
         raw_rows = parsed.get("region_rows")
@@ -1354,6 +1472,7 @@ def run_llm_text_four_dim_audit(
         enriched["claim_status"], enriched["claim_summary"] = enriched["scene_status"], enriched["scene_semantics"]
         enriched["platform_status"], enriched["platform_summary"] = enriched["symbol_status"], enriched["visual_symbols"]
         enriched["model"] = model
+        enriched["station"] = station
         enriched["status"] = "ok"
         # ★ 空证据不许被模型升级成拦截：标签不是 BLOCK、引擎零命中、正文也没有任何
         #   功效/安全特征词时，「发现违规需修改」没有任何输入支撑 —— 它比依据大。

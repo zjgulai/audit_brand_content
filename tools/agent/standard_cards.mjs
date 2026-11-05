@@ -284,6 +284,7 @@ export function buildOpsDigestCard({
   timingTrend = null,
   ruleGapRanking = null,
   gapUnattributed = null,
+  releaseReadiness = null,
 } = {}) {
   const total = cases.length;
   const blockCount = cases.filter((c) => c.label === 'BLOCK').length;
@@ -367,6 +368,31 @@ export function buildOpsDigestCard({
     }
     if (gapUnattributed && Number(gapUnattributed.n) > 0) {
       reasoningLines.push(`· 另有 ${gapUnattributed.n} 条分歧待归因控制点`);
+    }
+  }
+
+  if (releaseReadiness) {
+    // ★ 只放**一行**在这里：日报的读者是运营负责人，不是运维。
+    //   三个数各带分母，读的人一眼能判「这个百分比底下有多少样本」——
+    //   只写「99%」而不写「99/100」是发布准入最常见的那种假精确。
+    const rr = releaseReadiness;
+    const seg = [];
+    const cs = rr.cardSuccessRate;
+    if (cs && cs.rate != null) {
+      seg.push(`卡片送达 ${Math.round(cs.rate * 1000) / 10}%（${cs.ok}/${cs.total}）`);
+    }
+    const kb = rr.kbHitRate;
+    if (kb && kb.rate != null) {
+      seg.push(`知识库/规则命中 ${Math.round(kb.rate * 1000) / 10}%（${kb.hit}/${kb.total}）`);
+    }
+    const lat = rr.latency;
+    if (lat && lat.p50Ms != null) {
+      seg.push(`整体 P50 ${lat.p50Ms}ms · P90 ${lat.p90Ms}ms`);
+    }
+    if (seg.length) {
+      reasoningLines.push('', '【Agent 发布准入指标】');
+      reasoningLines.push(`· ${seg.join(' · ')}`);
+      reasoningLines.push(`· 结论：${rr.ready ? '三项准入判据全部达标' : '有准入判据未达标'}（口径：${lat?.note ?? '见各分项'}）`);
     }
   }
 

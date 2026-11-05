@@ -59,7 +59,23 @@ T('A9 仓内一条真文件 → **不**命中', secretPathHit('PMO/守衡-架构
 T('A10 工作区内的相对路径 → **不**命中', secretPathHit('./tools/agent/tools.mjs') === null, '');
 
 /* ── C② 已知的误报陷阱：模糊匹配 `token` 就会在这里红 ──────────────────── */
-const CTOKENS = 'research/governance/_evidence/R2/_tools/pylibs/pycparser/ply/ctokens.py';
+/**
+ * 那个误报陷阱（含 `token` 却不是凭据）。
+ *
+ * ★ 原先写死 `research/governance/_evidence/R2/_tools/pylibs/pycparser/ply/ctokens.py`，
+ *   而 `.gitignore:51` 把整个 _evidence 目录排除 —— 该文件**从来没进过版本库**，
+ *   只在主工作副本里存在。于是这条反向对照在任何一个 worktree / CI 检出里
+ *   都因为「文件不存在」而红，读起来像闸门误拦，实际是判据依赖了一个未跟踪的文件。
+ *   现在先找那个陷阱，找不到就退回仓内**已跟踪**的同类文件名（`design_tokens.*`）——
+ *   它同样含 `token`，同样必须放行，而它一定在盘上。
+ */
+const CTOKENS_CANDIDATES = [
+  'research/governance/_evidence/R2/_tools/pylibs/pycparser/ply/ctokens.py',
+  'web/scripts/check_design_tokens.mjs',
+  'web/src/styles/tokens.css',
+];
+const CTOKENS = CTOKENS_CANDIDATES.find((rel) => fs.existsSync(path.join(REPO_ROOT, rel)))
+  ?? CTOKENS_CANDIDATES[CTOKENS_CANDIDATES.length - 1];
 T('C2 ★ pycparser 的 `ctokens.py`（含 token）→ **不许**命中（第一版判据死在这）',
   secretPathHit(CTOKENS) === null, String(secretPathHit(CTOKENS)));
 T('C3 ★ 仓内一批 `.env.example`（是样例不是凭据）→ **不许**命中',

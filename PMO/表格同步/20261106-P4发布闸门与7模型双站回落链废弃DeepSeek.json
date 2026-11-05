@@ -1,0 +1,19 @@
+{
+  "事项名称": "彻底废弃 DeepSeek + 接入 VOD 与 TokenHub/Magpie 7模型两级跨站回落链 + P4 业务群分层发布闸门与日报准入三指标",
+  "关联执行票": "P4 发布准入与 7 模型双站回落链（废弃 DeepSeek）",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "1）彻底废弃 DeepSeek 并建立 VOD + TokenHub/Magpie 7模型两级跨站回落链：tools/agent/config.mjs 移除 DEEPSEEK_API_KEY 与 api.deepseek.com，接入 VOD 主站（gemini-3.1-flash-lite → 3.5-flash → 3.7-flash → 3.8-flash）与 TokenHub/Magpie 异构兜底站（glm-5.3-flash → minimax-m3.1-flash → glm-5.3-flashx，通过本机 magpie.app 127.0.0.1:3425/v1 聚合路由）；tools/agent/llm.mjs 新增 resolveModelEndpoint 按模型选站，修复 chatWithFallback 遇 401/402/403 直接 break 掐断跨站回落的 Bug（改为按站判死并立即跨站切换）；base/feishu_guard_ingest.py 同步配置 IMAGE_TEXT_FOUR_DIM_CHAIN（7模型）与 VIDEO_FOUR_DIM_CHAIN（严格限定支持 audio 的 4 个 VOD Gemini 模型，防止无音轨模型瞎编口播）；tools/agent/llm_health_watch.mjs 切换为 VOD + TokenHub/Magpie + 本地引擎三栏巡检。2）P4 业务正式群分层发布闸门与准入指标：tools/agent/push_policy.mjs 新增 classifyChatTier、checkChannelPolicy（业务正式群放行 reactive_audit/quick_ack，硬拦 scheduled_digest/proactive_ops_alert；测试群四类全放）与 buildReleaseReadinessMetrics（带分母的卡片送达率、知识库/规则命中率、加权 P50/P90 进 P-1 日报）。",
+  "验收标准": "1) node tools/agent/feishu_guard_ingest.test.mjs 106/106 全绿 rc=0（含新增 N1–N6、H6b 双站 7 模型回落、跨站 402 自动切换、视频仅限 Gemini 音轨模型与分层放行自证）；2) node tools/verify_cards.mjs 266/266 全绿 rc=0；3) node tools/agent/golden_56_replay.test.mjs 58/58 全绿 rc=0；4) node tools/agent/llm_errors.test.mjs 19/19 全绿 rc=0；5) node tools/agent/secret_path.test.mjs 27/27 全绿 rc=0；6) python3 tools/verify_model_selection.py --controls 全绿 rc=0；7) python3 tools/verify_depad.py 0 被填充 rc=0。",
+  "状态依据": "1) 全部 10 个核心模块与自证测试已在主工作区验证全绿；2) 与并行知识库任务零文件冲突。"
+}

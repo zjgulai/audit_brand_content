@@ -1,13 +1,19 @@
 /**
- * llm.mjs —— DeepSeek 调用层（OpenAI 兼容协议）
+ * llm.mjs —— 对话层调用（OpenAI 兼容协议）
  *
  * 只做三件事：发请求、按错误类型重试、把用量记下来。
  * 不做业务判断 —— 业务判断在 agent.mjs。
+ *
+ * 两个中转站共 7 个模型：`vod` 站（Gemini 4 个，五模态全通）为主，
+ * `tokenhub` 站（GLM / MiniMax 3 个，无 audio）为异构兜底。DeepSeek 已下线。
+ * 地址与 key 的解析只此一处（`resolveModelEndpoint`）。
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { config, LOG_DIR } from './config.mjs';
+import {
+  config, LOG_DIR, VOD_BASE_URL, MAGPIE_LOCAL_BASE_URL, TOKENHUB_BASE_URL,
+} from './config.mjs';
 
 export const stats = {
   calls: 0, retries: 0, failures: 0,
@@ -163,14 +169,14 @@ export function keyFingerprint(key = config.llm.apiKey) {
   return crypto.createHash('sha256').update(String(key ?? '')).digest('hex').slice(0, 8);
 }
 
-async function post(pathname, body, { timeoutMs = 120_000 } = {}) {
-  const url = `${config.llm.baseUrl.replace(/\/$/, '')}${pathname}`;
+async function post(pathname, body, { timeoutMs = 120_000, baseUrl, apiKey } = {}) {
+  const url = `${String(baseUrl ?? config.llm.baseUrl).replace(/\/$/, '')}${pathname}`;
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const r = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.llm.apiKey}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey ?? config.llm.apiKey}` },
       body: JSON.stringify(body),
       signal: ac.signal,
     });
@@ -205,22 +211,33 @@ function recordUsage(model, usage) {
  * @returns {Promise<{ok:boolean, message?:object, finishReason?:string, usage?:object,
  *                    error?:string, layer?:string, chain?:Array, attempts?:Array, retryable?:boolean}>}
  */
-export async function chat(messages, { tools, model = config.llm.model, maxTokens = config.llm.maxTokens,
-                                       temperature = 0.3, jsonMode = false } = {}) {
+export async function chat(messages, opts = {}) {
+  const {
+    tools, model = config.llm.model, maxTokens = config.llm.maxTokens,
+    temperature = 0.3, jsonMode = false, maxRetries = null, endpoint = null,
+  } = opts;
   const body = { model, messages, max_tokens: maxTokens, temperature };
   if (tools?.length) { body.tools = tools; body.tool_choice = 'auto'; }
   if (jsonMode) body.response_format = { type: 'json_object' };
 
+  // 地址与 key 由模型决定，不由调用点决定 —— 一处解析，两个出口（chat / chatWithFallback）共用。
+  const ep = endpoint ?? resolveModelEndpoint(model);
+  body.model = ep.model;
+
+  // ★ 回落链里每换一个模型就重试 4 次，等于一次回复最多要等 7×4 个退避周期。
+  //   所以 `chatWithFallback` 传 1：单模型只试一次，快失败、快换站。
+  const maxAttempt = Number.isFinite(maxRetries) ? Math.max(0, maxRetries) : 3;
+
   const attempts = [];
   let delay = 800;
-  for (let attempt = 0; attempt <= 3; attempt++) {
+  for (let attempt = 0; attempt <= maxAttempt; attempt++) {
     if (attempt > 0) { stats.retries++; await new Promise((r) => setTimeout(r, delay)); delay *= 2; }
     stats.calls++;
     try {
-      const res = await post('/chat/completions', body);
+      const res = await post('/chat/completions', body, { baseUrl: ep.baseUrl, apiKey: ep.apiKey });
 
       if (res.ok && res.json?.choices?.length) {
-        recordUsage(model, res.json.usage);
+        recordUsage(body.model, res.json.usage);
         const choice = res.json.choices[0];
         return { ok: true, message: choice.message, finishReason: choice.finish_reason, usage: res.json.usage };
       }
@@ -235,13 +252,13 @@ export async function chat(messages, { tools, model = config.llm.model, maxToken
         stats.failures++;
         return finishFailure({ error: `HTTP ${res.status} code=${code}: ${msg}`, layer: 'HTTP',
                                chain: httpChain(res.status, code, msg), attempts, retryable: false,
-                               model, baseUrl: config.llm.baseUrl });
+                               model: body.model, baseUrl: ep.baseUrl });
       }
-      if (attempt === 3) {
+      if (attempt === maxAttempt) {
         stats.failures++;
         return finishFailure({ error: `重试耗尽 HTTP ${res.status} code=${code}: ${msg}`, layer: 'HTTP',
                                chain: httpChain(res.status, code, msg), attempts, retryable: true,
-                               model, baseUrl: config.llm.baseUrl });
+                               model: body.model, baseUrl: ep.baseUrl });
       }
     } catch (e) {
       const desc = describeError(e);
@@ -250,51 +267,175 @@ export async function chat(messages, { tools, model = config.llm.model, maxToken
       attempts.push({ n: attempt + 1, kind: 'transport', layer: desc.layer, why: desc.why,
                       code: desc.chain.find((h) => h.code)?.code ?? null,
                       error: `${isTimeout ? '请求超时' : '网络错误'}: ${e?.message ?? e}` });
-      if (attempt === 3) {
+      if (attempt === maxAttempt) {
         stats.failures++;
         return finishFailure({
           // ★ 层名在最前面：`DNS/ENOTFOUND · …`。**不许**再把四种情况写成同一句 `网络错误: fetch failed`。
           error: `${desc.layer} 层失败（${isTimeout ? '请求超时' : '网络错误'}）：${desc.summary}`,
           layer: desc.layer, chain: desc.chain, attempts, retryable: true,
-          model, baseUrl: config.llm.baseUrl });
+          model: body.model, baseUrl: ep.baseUrl });
       }
     }
   }
   stats.failures++;
   return finishFailure({ error: '未知失败（循环意外退出）', layer: '未知', chain: [], attempts,
-                         retryable: false, model, baseUrl: config.llm.baseUrl });
+                         retryable: false, model: body.model, baseUrl: ep.baseUrl });
 }
 
 /** 收口：**一次失败恰好落一行** `llm_failures.jsonl`（原先哪里都不留痕）。 */
-function finishFailure({ error, layer, chain, attempts, retryable, model, baseUrl }) {
+function finishFailure({ error, layer, chain, attempts, retryable, model, baseUrl, apiKey }) {
   const out = { ok: false, error, layer, chain, attempts, retryable, model };
   recordFailure({ model, base_url: baseUrl, layer, retryable, n_attempts: attempts.length,
-                  attempts, chain, key_fp: keyFingerprint() });
+                  attempts, chain, key_fp: keyFingerprint(apiKey ?? config.llm.apiKey) });
   return out;
 }
 
 /**
- * 对话层多模型回落链（同网关按序切换，防单模型 429 限流或维护导致群内失联）。
+ * 主流梯队（本机 magpie 的 `vod` 站：五模态全通，text/image/audio/video/pdf + tool_call）。
+ *
+ * ★ 顺序 = 回落顺序。前两个是日常主力（快、便宜），3.7/3.8 是「前两个都 429 时的备胎」。
  */
-export const FALLBACK_MODELS = Object.freeze([
+export const VOD_MODELS = Object.freeze([
   'gemini-3.1-flash-lite',
   'gemini-3.5-flash',
+  'gemini-3.7-flash',
   'gemini-3.8-flash',
 ]);
 
+/**
+ * 异构兜底梯队（tokenhub / magpie 站：text/image/video + tool_call，**不含 audio**）。
+ *
+ * ★ 「异构」是这一梯队存在的理由：主流四个全是同一家 Gemini，同一次上游故障会一起挂。
+ *   GLM 与 MiniMax 是另一家，故障面不重合。
+ * ★ 不含 audio 是硬事实，不是偏好：`glm-5.3-flash` 在清单里 `audio: 0`。
+ *   所以视频的音画对齐**只能**走 VOD —— 见 `base/feishu_guard_ingest.py` 的 `VIDEO_FOUR_DIM_CHAIN`。
+ */
+export const TOKENHUB_MODELS = Object.freeze([
+  'glm-5.3-flash',
+  'minimax-m3.1-flash',
+  'glm-5.3-flashx',
+]);
+
+/**
+ * 完整 7 模型主备回落链：主流 4 个 VOD Gemini → 兜底 3 个 GLM / MiniMax。
+ *
+ * ★ DeepSeek 已彻底废弃（2026-11-06）。它不是「暂时不用」，是从这条链上删除：
+ *   链上留一个已停用的模型，等于每次回落都先浪费一次超时。
+ */
+export const FALLBACK_MODELS = Object.freeze([
+  ...VOD_MODELS,
+  ...TOKENHUB_MODELS,
+]);
+
+/** 一个模型属于哪一站。`null` = 不认识的模型（不许猜站，猜错就是一次 404）。 */
+export function stationOf(model) {
+  const m = String(model ?? '').trim();
+  const bare = m.includes('/') ? m.slice(m.indexOf('/') + 1) : m;
+  if (m.startsWith('vod/') || VOD_MODELS.includes(bare) || bare.startsWith('gemini-')) return 'vod';
+  if (m.startsWith('tokenhub/') || TOKENHUB_MODELS.includes(bare)
+      || bare.startsWith('glm-') || bare.startsWith('minimax-')) return 'tokenhub';
+  return null;
+}
+
+/**
+ * 「主站地址是否由人接管」。
+ *
+ * ★ 读**当前值**，不读加载时冻结的 `config.llm.baseUrlOverridden`。两者差一次事故：
+ *   那个标志在 import 期就固定了，而测试与运维脚本是在**运行期**改 `config.llm.baseUrl`
+ *   把请求指向本机回环的。用冻结标志判，改过的 baseUrl 会被当成「未接管」，
+ *   于是请求被重新分派到 VOD 真地址 —— 而现场看起来像「回环假服务器没被访问到」。
+ *
+ * ★ 比的是**模块常量**，不是 `cfg.vodBaseUrl` / `cfg.magpieBaseUrl`。后者是各站的
+ *   **路由目标**，会被调用方按站改写（自证把某站指到回环假服务器就是这么做的）；
+ *   拿可变字段当「默认值」比，改写一个站就会被误判成「有人接管了主站」，
+ *   于是全部模型挤到同一个地址 —— 分站逻辑静默失效，而整条链看起来还在跑。
+ */
+function isBaseUrlOverridden(cfg) {
+  if (cfg.baseUrlOverridden) return true;
+  const cur = String(cfg.baseUrl ?? '').replace(/\/$/, '');
+  if (!cur) return false;
+  const stationDefaults = [VOD_BASE_URL, MAGPIE_LOCAL_BASE_URL, TOKENHUB_BASE_URL]
+    .map((u) => String(u ?? '').replace(/\/$/, ''));
+  return !stationDefaults.includes(cur);
+}
+
+/**
+ * 模型 → `{ baseUrl, apiKey, model }`。**纯函数**，不碰网络、不读环境变量。
+ *
+ * 三条规则：
+ *   1. 调方显式指定了 `SHOUHENG_LLM_BASE_URL` → 全部走它（有人接管，就不再分站）；
+ *   2. `vod` 站有 key → 直连 VOD；没 key → 走本机 magpie 代理，模型名加 `vod/` 前缀
+ *      （代理靠前缀选上游站）；
+ *   3. `tokenhub` 站有 key 且**显式要直连**才走官方地址；默认走本机 magpie 代理由带裸模型名。
+ *      理由是实测：官方直连今天对 `glm-5.3-flash` 回 402（免费额度耗尽），代理回 200。
+ *
+ * ★ 为什么「没 key 时不发请求」也算一条规则：`Authorization: Bearer ` 空串换回来的
+ *   永远是 401，而 401 会让整条链在第一个模型就停下 —— 看起来像「所有模型都坏了」。
+ */
+export function resolveModelEndpoint(model, cfg = config.llm) {
+  const raw = String(model ?? '').trim() || String(cfg.model ?? '').trim();
+  if (isBaseUrlOverridden(cfg)) {
+    return { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, model: raw, station: stationOf(raw) };
+  }
+  const station = stationOf(raw);
+  const bare = raw.includes('/') ? raw.slice(raw.indexOf('/') + 1) : raw;
+
+  if (station === 'tokenhub') {
+    if (cfg.tokenhubApiKey) {
+      return { baseUrl: cfg.tokenhubBaseUrl, apiKey: cfg.tokenhubApiKey, model: bare, station };
+    }
+    return { baseUrl: cfg.magpieBaseUrl, apiKey: 'magpie', model: bare, station };
+  }
+  // 认不出的模型按主流站处理：默认站是 VOD，把模型名原样交给它比拒答更有用。
+  if (cfg.vodApiKey) {
+    return { baseUrl: cfg.vodBaseUrl, apiKey: cfg.vodApiKey, model: bare, station: station ?? 'vod' };
+  }
+  return { baseUrl: cfg.magpieBaseUrl, apiKey: 'magpie', model: `vod/${bare}`, station: station ?? 'vod' };
+}
+
+/**
+ * 全链回落：7 个模型按 `FALLBACK_MODELS` 顺序试，第一个成功的胜出。
+ *
+ * ── ★ 这里原先有一个把整条链掐断的分支，2026-11-06 删掉
+ *
+ * 原代码在每次失败后读最后一次尝试的 HTTP 状态，`401/402/403` 时直接 `break`，
+ * 注释写的是「整把 Key 没钱或失效，换同网关另一个模型也一样」。
+ * 那句话在**单网关**时代成立；换成两站 7 模型之后它就不成立了，而且是**反的**：
+ *
+ *   · `vod` 直连 402（这一站余额耗尽）时，`tokenhub/magpie` 那三个模型**完全可用**；
+ *   · 那个 `break` 让它们一次都没被试过，整条链在第一个模型就返回失败，
+ *     上层于是走本地引擎兜底 —— 群里看到的是「模型全挂了」，而实际上有 3 个活的。
+ *
+ * 所以现在的判据是**按站**而不是按状态码：一站被判死就跳过该站剩下的模型，
+ * 继续下一站。换站这件事必须发生，否则「异构兜底」只是配置里的一句装饰。
+ *
+ * ★ 跨站成功时 `modelUsed` / `stationUsed` / `fallbackFrom` 三个字段都要留：
+ *   没有它们，「这次结论是哪一版模型给的」在报告里查不出来。
+ */
 export async function chatWithFallback(messages, opts = {}) {
   const primary = opts.model || config.llm.model;
   const chain = [primary, ...FALLBACK_MODELS.filter((m) => m !== primary)];
   let lastRes = null;
+  const deadStations = new Set();     // 401/402/403 = 凭据/额度层面，换同站模型不会好
+  const tried = [];
+
   for (const model of chain) {
-    const r = await chat(messages, { ...opts, model });
-    if (r.ok) return { ...r, modelUsed: model };
+    const ep = resolveModelEndpoint(model, config.llm);
+    const station = ep.station ?? stationOf(model) ?? 'unknown';
+    if (deadStations.has(station)) {
+      tried.push({ model, station, skipped: 'station_dead' });
+      continue;
+    }
+    const r = await chat(messages, { ...opts, model, endpoint: ep, maxRetries: 1 });
+    tried.push({ model, station, ok: r.ok, status: r.attempts?.[r.attempts.length - 1]?.status ?? null });
+    if (r.ok) {
+      return { ...r, modelUsed: model, stationUsed: station, fallbackFrom: tried.slice(0, -1) };
+    }
     lastRes = r;
-    // 若是 401/402（整把 Key 没钱或失效），换同网关另一个模型也一样，直接跳出由上层走本地生产引擎直出卡片兜底
     const status = r.attempts?.[r.attempts.length - 1]?.status;
-    if (status === 401 || status === 402 || status === 403) break;
+    if (status === 401 || status === 402 || status === 403) deadStations.add(station);
   }
-  return lastRes;
+  return { ...lastRes, triedAll: tried };
 }
 
 /** 便捷：纯文本问答，无工具 */

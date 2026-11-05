@@ -16,7 +16,8 @@ import {
   buildOpsDigestCard,
   prepareScheduledPush,
 } from './standard_cards.mjs';
-import { TEST_GROUP_CHAT_ID } from './push_policy.mjs';
+import { TEST_GROUP_CHAT_ID, buildReleaseReadinessMetrics } from './push_policy.mjs';
+import { readEntries as readOutboundEntries } from './outbound.mjs';
 
 const execFileP = promisify(execFile);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -126,13 +127,36 @@ export async function collectOpsDigestCard({
   }
 
   const precedent = stats.precedent ?? {};
+  const cases = stats.cases ?? [];
+
+  // 发布准入指标：卡片送达率读外发台账，命中率读本周期案件，耗时读已聚合的趋势行。
+  // ★ 台账读不到时 `readEntries` 回 `missing:true` 而不是抛；此时分母为 0，
+  //   指标自己会写明「本项不参与准入判定」，不会伪装成 100%。
+  let outboundEntries = [];
+  let outboundNote = '';
+  try {
+    const led = readOutboundEntries();
+    outboundEntries = led.entries ?? [];
+    if (led.missing) outboundNote = '（外发台账不存在，送达率本项不参与判定）';
+    else if (led.truncated) outboundNote = '（台账过大只读了尾部，送达率按尾部窗口计）';
+  } catch (e) {
+    outboundNote = `（外发台账读不出：${e?.message ?? e}，送达率本项不参与判定）`;
+  }
+
+  const releaseReadiness = buildReleaseReadinessMetrics({
+    cases,
+    timingTrend: stats.trend ?? null,
+    outboundEntries,
+  });
+
   const card = buildOpsDigestCard({
     periodLabel,
-    cases: stats.cases ?? [],
+    cases,
     timingTrend: stats.trend ?? null,
     ruleGapRanking: precedent.ok ? (precedent.ranking ?? []) : [],
     gapUnattributed: precedent.ok ? (precedent.unattributed ?? null) : null,
+    releaseReadiness,
   });
   const prepared = prepareScheduledPush(card, { targetChatId });
-  return { ok: true, untested: false, ...prepared, stats };
+  return { ok: true, untested: false, ...prepared, stats, releaseReadiness, outboundNote };
 }

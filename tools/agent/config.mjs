@@ -97,11 +97,33 @@ function loadLarkCred() {
   return { appId: j.app_id, appSecret: j.app_secret };
 }
 
+/**
+ * 三个中转站的地址。**唯一写死在这里** —— 上层按模型挑站，不许各自抄一份 URL。
+ *
+ * ★ 本机 magpie 是一个聚合代理：它在 `127.0.0.1:3425/v1` 上同时暴露
+ *   `vod/*` 与 `tokenhub/*` 两组模型，代理自己持有上游凭据。2026-11-06 实测：
+ *   `glm-5.3-flash` / `minimax-m3.1-flash` / `gemini-3.1-flash-lite` 直连该地址均回 200，
+ *   而**官方 tokenhub 直连**（`tokenhub.tencentmaas.com`）对同一批模型回 402（免费额度耗尽）。
+ *   所以「兜底站」默认落在代理上，直连只在有 key 且被显式选中时才走。
+ */
+export const MAGPIE_LOCAL_BASE_URL =
+  process.env.SHOUHENG_MAGPIE_BASE_URL || 'http://127.0.0.1:3425/v1';
+export const VOD_BASE_URL =
+  process.env.MULTIMODAL_VOD_BASE_URL || 'https://mmu.vod-qcloud.com/v1';
+export const TOKENHUB_BASE_URL =
+  process.env.MULTIMODAL_TOKENHUB_BASE_URL || 'https://tokenhub.tencentmaas.com/v1';
+
 function loadLlmCred() {
-  const vodKey = process.env.VOD_API_KEY || readDshCredential('VOD_API_KEY');
+  const vodKey = process.env.VOD_API_KEY
+    || process.env.MULTIMODAL_VOD_API_TOKEN
+    || readDshCredential('VOD_API_KEY');
+  const tokenhubKey = process.env.TOKENHUB_API_KEY
+    || process.env.MULTIMODAL_TOKENHUB_API_KEY
+    || readDshCredential('TOKENHUB_API_KEY');
+
   if (vodKey) {
     if (!process.env.MULTIMODAL_VOD_BASE_URL) {
-      process.env.MULTIMODAL_VOD_BASE_URL = 'https://mmu.vod-qcloud.com/v1';
+      process.env.MULTIMODAL_VOD_BASE_URL = VOD_BASE_URL;
     }
     if (!process.env.MULTIMODAL_VOD_API_TOKEN) {
       process.env.MULTIMODAL_VOD_API_TOKEN = vodKey;
@@ -110,21 +132,41 @@ function loadLlmCred() {
       process.env.MULTIMODAL_MODEL = 'gemini-3.1-flash-lite';
     }
   }
-  if (vodKey && !process.env.SHOUHENG_LLM_BASE_URL) {
+  // 本机 magpie 聚合代理：python 侧的四维审查要能从环境里拿到它。
+  // ★ 指向的是**聚合代理**，不是 tokenhub 官方（官方直连今天实测 402，代理 200）。
+  if (!process.env.SHOUHENG_MAGPIE_BASE_URL) {
+    process.env.SHOUHENG_MAGPIE_BASE_URL = MAGPIE_LOCAL_BASE_URL;
+  }
+
+  // 两个站各自解析出来的 key 一并带回去。**不在这里改读 env** —— 从凭据文件读到的
+  // 那一把不在 env 里，二次读 env 会把 DSH 凭据静默丢掉，表现为「配了 key 却仍走代理」。
+  const keys = { vodApiKey: vodKey || '', tokenhubApiKey: tokenhubKey || '' };
+
+  if (process.env.SHOUHENG_LLM_BASE_URL) {
     return {
-      apiKey: vodKey,
-      baseUrl: 'https://mmu.vod-qcloud.com/v1',
+      ...keys,
+      apiKey: process.env.SHOUHENG_LLM_API_KEY || vodKey || tokenhubKey || 'magpie',
+      baseUrl: process.env.SHOUHENG_LLM_BASE_URL,
       model: process.env.SHOUHENG_LLM_MODEL || 'gemini-3.1-flash-lite',
     };
   }
-  const dsKey = process.env.DEEPSEEK_API_KEY
-    || readDshCredential('DEEPSEEK_API_KEY')
-    || vodKey
-    || (() => { throw new Error('未找到 VOD_API_KEY 或 DEEPSEEK_API_KEY（环境变量与 DSH 凭据库均无）'); })();
+  if (vodKey) {
+    return {
+      ...keys,
+      apiKey: vodKey,
+      baseUrl: VOD_BASE_URL,
+      model: process.env.SHOUHENG_LLM_MODEL || 'gemini-3.1-flash-lite',
+    };
+  }
+  // 一个 key 都没有时不再抛错：本地 magpie 代理不需要真 key（它自己持有上游凭据）。
+  // ★ 这里原先抛「未找到 VOD_API_KEY 或 DEEPSEEK_API_KEY」—— 而 DeepSeek 已废弃，
+  //   那句话会把排查方向指向一个已经不存在的通道。
+  console.warn('[cfg] 未找到 VOD_API_KEY / TOKENHUB_API_KEY，改走本机 magpie 聚合代理');
   return {
-    apiKey: dsKey,
-    baseUrl: process.env.SHOUHENG_LLM_BASE_URL || 'https://api.deepseek.com',
-    model: process.env.SHOUHENG_LLM_MODEL || 'deepseek-flash',
+    ...keys,
+    apiKey: 'magpie',
+    baseUrl: MAGPIE_LOCAL_BASE_URL,
+    model: process.env.SHOUHENG_LLM_MODEL || 'gemini-3.1-flash-lite',
   };
 }
 
@@ -136,6 +178,18 @@ export const config = {
     apiKey: _llmCred.apiKey,
     baseUrl: _llmCred.baseUrl,
     model: _llmCred.model,
+    /**
+     * 各站的地址与 key。`llm.mjs` 的 `resolveModelEndpoint()` 只读这四个字段，
+     * 按模型挑站 —— 于是「换一个模型」不会同时换错 key 或换错地址。
+     * 空串 = 这一站没有可用凭据（走下一条兜底路径，而不是发一次注定 401 的请求）。
+     */
+    vodBaseUrl: VOD_BASE_URL,
+    vodApiKey: _llmCred.vodApiKey,
+    magpieBaseUrl: MAGPIE_LOCAL_BASE_URL,
+    tokenhubBaseUrl: TOKENHUB_BASE_URL,
+    tokenhubApiKey: _llmCred.tokenhubApiKey,
+    /** 主站地址是否由环境变量显式指定 —— 显式指定时不按模型分站，全部走它。 */
+    baseUrlOverridden: Boolean(process.env.SHOUHENG_LLM_BASE_URL),
     /** 单会话保留的最大历史轮数（超出后由记忆层压缩） */
     maxTurns: Number(process.env.SHOUHENG_MAX_TURNS || 24),
     /**
