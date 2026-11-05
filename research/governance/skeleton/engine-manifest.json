@@ -1,7 +1,7 @@
 {
   "$schema_version": "engine-manifest-v1",
-  "generated_at": "2026-11-05T08:17:51+00:00",
-  "engine_version": "de00e7028bdc9e6c",
+  "generated_at": "2026-11-05T10:20:00+00:00",
+  "engine_version": "7a31add54610ef2f",
   "code_version": "d811f61fa4e1f79e",
   "artifacts": {
     "rules": {
@@ -64,12 +64,12 @@
     },
     "product_lines": {
       "file": "product-lines-v1.json",
-      "bytes": 10559,
-      "sha256": "6d107c7bf855c7987a197434b9c288cf273c860fd47cef292e51350a08829bb7",
+      "bytes": 12296,
+      "sha256": "15905b6698dd34a28f5cf865a5237f7c2b9575f251a3c2cfa8100be7e9e26f64",
       "why": "品线取值域（产品所有）与规则→品线归属（待填）",
       "counts": {
         "status": "partially_confirmed",
-        "values": 10,
+        "values": 9,
         "placeholders": 2,
         "rules_scoped": 0
       }

@@ -84,8 +84,8 @@ function runGuardPy(args, extraEnv = {}) {
 
 {
   const b1 = runGuardPy(['--text', 'Lightweight baby stroller for travel', '--message-id', 'om_b1']);
-  T('B1 关键词自动识别品线：stroller → 婴儿车（inferred_keyword）',
-    b1.ok && b1.product_line === '婴儿车'
+  T('B1 关键词自动识别品线：stroller → 推车（inferred_keyword）',
+    b1.ok && b1.product_line === '推车'
       && b1.product_line_resolution?.status === 'inferred_keyword',
     JSON.stringify(b1.product_line_resolution));
 

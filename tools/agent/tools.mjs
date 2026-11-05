@@ -757,7 +757,7 @@ register('judge_copy', {
             enum: ['free_text', 'ad_text', 'structured_json', 'feishu_doc', 'landing_url'],
             description: '输入载体类型：默认 free_text；广告双字段用 ad_text；Shopify 商品 JSON 用 structured_json；飞书云文档链接用 feishu_doc；落地页链接用 landing_url。',
           },
-          product_line: { type: 'string', description: '品线（五选一：吸奶器 / 婴儿车 / 背带 / 温奶器 / 哺乳内衣）。未提供时自动按内容关键词识别，仍无法识别时回落默认「吸奶器」并在 product_line_resolution 中标注。' },
+          product_line: { type: 'string', description: '品线（五选一：吸奶器 / 推车 / 背带 / 温奶器 / 哺乳内衣）。未提供时自动按内容关键词识别，仍无法识别时回落默认「吸奶器」并在 product_line_resolution 中标注。' },
           content_stage: { type: 'string', enum: ['brief', 'final_content'], description: '内容阶段：brief（提纲/初稿）或 final_content（成稿）。未提供时自动推断或按从严口径 final_content 建案。' },
           url: { type: 'string', description: '落地页 URL 或飞书文档链接（配合 landing_url 或 feishu_doc）。' },
           doc_token: { type: 'string', description: '飞书云文档 token 或完整链接（配合 feishu_doc）。' },
@@ -861,7 +861,7 @@ register('workbench_case_status', {
         properties: {
           case_id: { type: 'string', description: '要查的具体工作台案件编号，形如 case-4a5c13b861889db1ead3。不传则按过滤条件列出最近案件队列。' },
           status_filter: { type: 'string', description: '可选状态过滤：unassigned（待领单）/ claimed（复核中）/ reviewed（已复核）/ released（已签发）/ closed（已结案）。' },
-          product_line: { type: 'string', description: '可选品线过滤（吸奶器 / 婴儿车 / 背带 / 温奶器 / 哺乳内衣）。' },
+          product_line: { type: 'string', description: '可选品线过滤（吸奶器 / 推车 / 背带 / 温奶器 / 哺乳内衣）。' },
           limit: { type: 'integer', description: '列表模式最多返回条数，默认 10，上限 50。' },
         },
         required: [],
