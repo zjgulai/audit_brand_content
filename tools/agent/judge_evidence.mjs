@@ -129,10 +129,37 @@ function phrasesFromEngine(judgeResult) {
  * ★ 它们的地位比引擎命中低一档，`status` 会据此区分（probe_empty ≠ none）。
  *
  * 切法：先按「非字母数字」切子句（标点、空格、换行都算边界），然后
- *   · 含中文的子句：整句（中文没有词边界，切碎了反而切错）—— 超过 12 个字才截断
+ *   · 含中文的子句：见下面的 PROBE_CJK_CHARS 说明 —— **不是整句截断**
  *   · 纯英文的子句：≥4 个字符、且不在虚词表里的单词
  * 全部查不到时不许断言「库里没有」，所以这里的取舍只影响召回率，不影响正确性。
+ *
+ * ★★ 2026-11-06 修正：原先中文子句是「整句，超过 12 字才截断」，而截断是
+ *   `[...c].slice(0, 12)` —— **只取头部**。这条分片库用的是 FTS5 trigram，
+ *   匹配要求查询串在正文里**连续出现**；12 字的连续串几乎不可能命中，
+ *   而它又顶掉了 cap，导致一个能命中的短词都没被查过。
+ *
+ *   实测（本地库，3_措辞表达库）：
+ *     原句「这款吸奶器能有效预防乳腺炎」
+ *       旧行为 → 探针「这款吸奶器能有效预防乳腺」(12 字) → 0 命中 → probe_empty
+ *       库里「预防乳腺炎」(5 字) 单独查 → 3 命中
+ *   → 探针通道对**任何**超过 12 字的中文子句都是结构性失效，
+ *     而 status 会照实报 probe_empty，所以它不会说谎，只是永远帮不上忙。
+ *
+ *   新切法：长中文子句按 PROBE_CJK_CHARS 的窗口**滑窗均匀取样**，
+ *   而不是截头。窗口长度是**实测**出来的，不是拍的（本地库 3_措辞表达库）：
+ *
+ *       4 字「预防乳腺」        → 3 命中
+ *       5 字「预防乳腺炎」      → 3 命中
+ *       7 字「有效预防乳腺炎」  → 0 命中
+ *      10 字 / 13 字           → 0 命中
+ *
+ *   所以：整句 ≤ PROBE_CJK_KEEP_SHORT 字时**原样保留**（5 字还能命中，
+ *   切碎反而丢语义），超过才滑窗，窗口取 4 字。
+ *   取样点均匀铺满整句，避免只覆盖前几个词 —— 「只取头部」正是原 bug。
  */
+const PROBE_CJK_CHARS = 4;
+const PROBE_CJK_KEEP_SHORT = 5;
+
 export function probePhrases(text, cap = MAX_WORDING_QUERIES) {
   const out = [];
   const seen = new Set();
@@ -148,7 +175,19 @@ export function probePhrases(text, cap = MAX_WORDING_QUERIES) {
   for (const c of clauses) {
     if (out.length >= cap) break;
     if (hasCJK(c)) {
-      if (charLen(c) >= MIN_QUERY_CHARS) push([...c].slice(0, 12).join(''));
+      const cp = [...c];
+      if (cp.length < MIN_QUERY_CHARS) continue;
+      if (cp.length <= PROBE_CJK_KEEP_SHORT) {
+        push(c);
+        continue;
+      }
+      // 滑窗均匀取样：窗口数 = ceil(len/W)，取样点等距铺满整句。
+      const need = Math.min(cap - out.length, Math.ceil(cp.length / PROBE_CJK_CHARS));
+      const stride = need > 1 ? (cp.length - PROBE_CJK_CHARS) / (need - 1) : 0;
+      for (let i = 0; i < need && out.length < cap; i++) {
+        const start = Math.round(i * stride);
+        push(cp.slice(start, start + PROBE_CJK_CHARS).join(''));
+      }
     } else if (c.length >= 4 && !STOPWORDS.has(c.toLowerCase())) {
       push(c);
     }

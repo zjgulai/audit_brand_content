@@ -236,6 +236,48 @@ T('E1 配额快照路径落在临时状态目录（不是仓内 PMO/shouheng-sta
     same, `${JSON.stringify(beforeReal)} → ${JSON.stringify(after)}`);
 }
 
+/* ── F. 试探词切法：长中文子句不许「截头」── */
+{
+  // ★ 2026-11-06 加这一段的原因：probePhrases 原先对超过 12 字的中文子句做
+  //   `[...c].slice(0, 12)` —— **只取头部**。分片库用 FTS5 trigram，匹配要求
+  //   查询串在正文里连续出现，于是 12 字连续串几乎不可能命中，而它还顶掉了 cap，
+  //   结果一个能命中的短词都没被查过。这条通道对任何长中文子句都是结构性失效。
+  //
+  //   实测（本地库 3_措辞表达库）：「这款吸奶器能有效预防乳腺炎」
+  //     旧 → 探针「这款吸奶器能有效预防乳腺」(12字) → 0 命中 → probe_empty
+  //     库里「预防乳腺炎」(5字) 单查 → 3 命中
+  //
+  //   这些断言**不联网、不依赖那个库**：它们只钉「切法」这件事本身。
+  const { probePhrases } = await import(pathToFileURL(path.join(REPO_ROOT, 'tools/agent/judge_evidence.mjs')).href);
+
+  const longCJK = '这款吸奶器能有效预防乳腺炎';
+  const probes = probePhrases(longCJK, 5);
+
+  // F1 每个探针都短到能在正文里连续出现（≤4 字），而不是 12 字长串
+  T('F1 ★ 长中文子句的探针必须是短窗（≤4 字），不是 12 字长串',
+    probes.length > 0 && probes.every((p) => [...p].length <= 4),
+    probes.map((p) => `${p}(${[...p].length})`).join(' | '));
+
+  // F2 尾部内容必须被覆盖到 —— 「只取头部」正是原 bug 的形状。
+  //    用一个只出现在句尾的词做探针：旧实现永远取不到它。
+  T('F2 ★ 探针必须覆盖句尾（不许只取头部）',
+    probes.some((p) => '乳腺炎'.includes(p) || p.includes('乳腺') || p.includes('腺炎')),
+    probes.join(' | '));
+
+  // F3 反向对照：短句（≤4 字）原样保留，不许被滑窗切碎。
+  //    没有这一条，「切得越碎越安全」的错误改法也能全绿。
+  const short = probePhrases('预防乳腺炎', 5);
+  T('F3 ★ 反向对照：≤4 字的中文子句原样保留，不被切碎',
+    short.length === 1 && short[0] === '预防乳腺炎',
+    short.join(' | '));
+
+  // F4 反向对照：英文子句仍按单词切（原行为不许被这次改动带坏）
+  const en = probePhrases('Clinically proven relief', 5);
+  T('F4 ★ 反向对照：英文子句仍按单词切',
+    en.includes('Clinically') && en.includes('proven') && en.includes('relief'),
+    en.join(' | '));
+}
+
 /* ── 出口 ───────────────────────────────────────────────────────────── */
 server.close();
 const nFail = res.filter((x) => !x.ok).length;
