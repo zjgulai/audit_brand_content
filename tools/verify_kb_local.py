@@ -288,6 +288,34 @@ def seg_N(db: Path) -> None:
           f"exit={p.returncode}")
     shutil.rmtree(empty_dir, ignore_errors=True)
 
+    # ★ 2026-11-05：台账必须能**分辨调用方**。
+    #   起因是一次真实误判：我把 `pid`（服务自己 os.getpid()）当成调用方 id，
+    #   拿 Guard 的 node 进程 id 去 grep，得到 0，于是说「Guard 没连上」——
+    #   而链路一直是通的。判据从一开始就不可能对。
+    #   现在台账记 `caller`（客户端发 X-KB-Caller），这条断言守着它还在。
+    with Server(db) as base:
+        import urllib.request as _u
+        log = Path(tempfile.mkdtemp()) / "acc.jsonl"
+        # 起一个把台账指到临时文件的实例会更好，但 Server 不支持传环境；
+        # 这里直接查**真实台账末尾**，并要求它含 caller 字段。
+        req = _u.Request(f"{base}/openapi/v1/kb/{urllib.request.quote(COLL_STD)}/retrieve?q=healthcare&topK=1",
+                         headers={"X-KB-Caller": "verify_kb_local#probe"})
+        _u.urlopen(req, timeout=5).read()
+        real_log = Path(os.environ.get("KB_LOCAL_ACCESS_LOG")
+                        or (Path.home() / ".shouheng" / "kb-local" / "access.jsonl"))
+        has_caller = False
+        if real_log.exists():
+            for line in real_log.read_text(encoding="utf-8").splitlines()[-20:]:
+                try:
+                    if json.loads(line).get("caller") == "verify_kb_local#probe":
+                        has_caller = True
+                        break
+                except Exception:               # noqa: BLE001
+                    continue
+        check("N4", "★ 访问台账记得出**调用方**（caller），不是记服务自己的 pid",
+              has_caller,
+              f"台账 {real_log} 末尾没找到 caller=verify_kb_local#probe")
+
     # quota 恒 null：客户端读到 null 会说「来源 none」，不许说「余额 0」
     conn = sqlite3.connect(str(db)) if db.exists() else None
     if conn:

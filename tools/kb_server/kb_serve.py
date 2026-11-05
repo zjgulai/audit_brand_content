@@ -239,7 +239,14 @@ class Handler(BaseHTTPRequestHandler):
                     "at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
                     "path": path, "q": q, "status": status, "hits": n,
                     "ua": (self.headers.get("User-Agent") or "")[:60],
-                    "pid": os.getpid(),
+                    # ★ 2026-11-05 更正：这个字段原名叫 `pid`，而它是**服务自己的**
+                    #   `os.getpid()`，不是调用方的。我第一次用它验证「Guard 有没有连上」
+                    #   时，拿 Guard 的 node 进程 id 去 grep 它，得到 0，于是错误地
+                    #   下了「未测」的结论 —— **判据写错了，不是链路不通**。
+                    #   改成 `server_pid` 之后这个误解就不会再发生；
+                    #   调用方是谁看 `caller`。
+                    "server_pid": os.getpid(),
+                    "caller": (self.headers.get("X-KB-Caller") or "unknown")[:40],
                 }, ensure_ascii=False) + "\n")
         except Exception:                       # noqa: BLE001
             # 台账写不进去不该让检索失败。但这条**不许静默**——

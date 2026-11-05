@@ -70,6 +70,12 @@ const CRED_PATH = process.env.SHOUHENG_KB_CRED_PATH
   ? path.resolve(process.env.SHOUHENG_KB_CRED_PATH)
   : path.join(os.homedir(), '.dsh', 'credentials', 'shouheng-kb.json');
 
+/**
+ * 告诉服务端「谁在查」。写进 `X-KB-Caller`，落进访问台账的 `caller` 字段。
+ * 判据：进程名 + pid。两个进程用同一份代码时，只有它能分辨是哪一次。
+ */
+const CALLER = `${(process.argv[1] ? path.basename(process.argv[1]) : 'node')}#${process.pid}`;
+
 /** topK 实测上限：50。60 会返回 TOPK_TOO_LARGE。 */
 export const TOPK_MAX = 50;
 export const TOPK_DEFAULT = 10;
@@ -381,7 +387,13 @@ async function request(url, { auth, timeoutMs = 20_000, retries = 3 } = {}) {
     let res;
     try {
       res = await fetch(url, {
-        headers: auth === 'bearer' ? { Authorization: `Bearer ${cred.apiKey}` } : {},
+        headers: {
+          ...(auth === 'bearer' ? { Authorization: `Bearer ${cred.apiKey}` } : {}),
+          // ★ 2026-11-05：把「谁在查」告诉服务端，它才能记进访问台账。
+          //   起因是我用服务端 pid 去比对调用方进程 id，得到 0，误判成「没连上」——
+          //   那个读数从一开始就不可能对。台账里有 caller，这个问题就不再靠猜。
+          'X-KB-Caller': CALLER,
+        },
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (e) {

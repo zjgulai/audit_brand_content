@@ -117,14 +117,45 @@ export const hr = () => ({ tag: 'hr' });
  * 注意 rows 的每一项是**对象**不是数组：{列名: 值}，列名须与 columns[].name 一致。
  */
 export function table(columns, rows) {
+  const cols = columns.map((c) => (typeof c === 'string'
+    ? { name: c, display_name: c, data_type: 'text' }
+    : { data_type: 'text', ...c }));
+  const names = cols.map((c) => c.name);
+
+  // ★ 2026-11-05：每一行的值都**强制成一个字符串**，并按 columns 的顺序重建行。
+  //
+  //   起因是一次真实的发送失败（飞书回 `200909 column idx:2`，整卡被拒、
+  //   降级成纯文本）。结构复现了十几次都没复现出来 —— 所以**根因未定**。
+  //   但有一类成因是确定的：飞书的 table 单元格只吃标量。
+  //   一旦某个值是数组或对象（例如上游某个字段本身就是多选/富文本），
+  //   飞书会把它当成**多列**，于是报 `column idx:N` ——
+  //   而本地 `validateCard` 只查「列名在不在 columns 里」，查不到这一层。
+  //
+  //   所以这里做两件事，都是**无论根因是什么都该有**的：
+  //     ① 值一律 String() 化（数组会被 join，对象会被 JSON 化，都不是标量）
+  //     ② 行按 columns 重建，多余键丢掉、缺的键补空 —— 行宽恒等于列数
+  //
+  //   ②同时消掉了一个更隐蔽的可能：对象行若带了 columns 里没有的键，
+  //   本地校验会红（列名不在 columns 里），但那是在 build() 里抛；
+  //   而**值本身是数组**这一条，本地校验一直是绿的。
+  const cell = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    // 数组/对象不是标量。飞书会把它读成多列或多值 —— 这是 `column idx:N` 的已知成因。
+    if (Array.isArray(v)) return v.map((x) => (x === null || x === undefined ? '' : String(x))).join('、');
+    return JSON.stringify(v);
+  };
+
   return {
     tag: 'table',
-    columns: columns.map((c) => (typeof c === 'string'
-      ? { name: c, display_name: c, data_type: 'text' }
-      : { data_type: 'text', ...c })),
-    rows: rows.map((r) => (Array.isArray(r)
-      ? Object.fromEntries(columns.map((c, i) => [typeof c === 'string' ? c : c.name, r[i] ?? '']))
-      : r)),
+    columns: cols,
+    rows: rows.map((r) => {
+      const src = Array.isArray(r)
+        ? Object.fromEntries(names.map((n, i) => [n, r[i]]))
+        : (r ?? {});
+      return Object.fromEntries(names.map((n) => [n, cell(src[n])]));
+    }),
   };
 }
 
@@ -462,7 +493,25 @@ export function validateCard(c) {
           const names = new Set((el.columns ?? []).map((x) => x.name));
           el.rows.forEach((r, j) => {
             if (Array.isArray(r)) E(`${q}.rows[${j}]`, 'rows 的每一项必须是对象 {列名: 值}；传数组会被服务端拒绝');
-            else for (const k of Object.keys(r)) if (!names.has(k)) E(`${q}.rows[${j}].${k}`, `列名 ${k} 不在 columns 里（${[...names].join('/')}）`);
+            else {
+              for (const k of Object.keys(r)) {
+                if (!names.has(k)) {
+                  E(`${q}.rows[${j}].${k}`, `列名 ${k} 不在 columns 里（${[...names].join('/')}）`);
+                  continue;
+                }
+                // ★ 2026-11-05：值必须是**标量**。飞书 table 的单元格只吃标量；
+                //   值是数组/对象时，服务端把它读成多列，报 `200909 column idx:N`，
+                //   整卡被拒 → 降级成纯文本。而这条校验此前只查列名，一直绿着。
+                //   `table()` 已经在构造时标量化，这里守的是**绕过 table() 的另一条路**
+                //   （手写卡片对象、上游直接塞数组）。L8b 反向对照守着这条断言。
+                const v = r[k];
+                if (Array.isArray(v) || (v !== null && typeof v === 'object')) {
+                  E(`${q}.rows[${j}].${k}`,
+                    `单元格值必须是标量，收到 ${Array.isArray(v) ? 'array' : 'object'}`
+                    + ` —— 飞书会把它读成多列，报 column idx:N 并拒掉整张卡`);
+                }
+              }
+            }
           });
         }
         if (el.rows?.length > 30) W(`${q}.rows`, `${el.rows.length} 行，群消息里过长；建议拆卡或折叠`);
