@@ -11,11 +11,15 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import { config, stateDir } from './config.mjs';
 import { buildSystemPrompt } from './persona.mjs';
 import * as llm from './llm.mjs';
 import * as mem from './memory.mjs';
 import * as feishu from './feishu.mjs';
+import * as outbound from './outbound.mjs';
 import { TOOL_SCHEMAS, executeTool, runtimeContext, runWithContext, toolNames } from './tools.mjs';
 import { detectTruncation, annotateTruncation, tailOf } from './truncate.mjs';
 import { parentIdOf, alreadyInHistory, buildQuoteBlock } from './thread.mjs';
@@ -23,6 +27,20 @@ import { foldInto } from './outbound.mjs';
 import { recall as recallMemories } from './nmem_recall.mjs';
 import { formatDirectAuditCardReply, consumePendingTurnVerdict } from './prd53.mjs';
 import * as judgeEvidence from './judge_evidence.mjs';
+
+const execFileP = promisify(execFile);
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/**
+ * 话题复核走哪个解释器。与本仓库其余 Python 调用点同口径：
+ * 有 `.venv/bin/python` 就用它，没有就退 `python3`。
+ */
+const REVIEW_PY = (() => {
+  const venvPy = path.join(REPO_ROOT, '.venv', 'bin', 'python');
+  try { return fs.existsSync(venvPy) ? venvPy : 'python3'; } catch { return 'python3'; }
+})();
+/** 复核入口脚本。 */
+const REVIEW_SCRIPT = path.join(REPO_ROOT, 'base', 'feishu_guard_ingest.py');
 
 /* ─────────────────── 去重：见过的事件不再处理 ─────────────────── */
 // 惰性求值：测试需要把状态目录指到不可写路径来验证失败分支，
@@ -351,6 +369,87 @@ export function mergeMultiImageAudit(gotList, messageId) {
   };
 }
 
+/**
+ * 这一轮是不是**在话题里对某条审查卡下复核指令**？纯函数，可单独验。
+ *
+ * 群里已经收到带单号的审查卡。复核员看见「这条是误报」，最自然的动作是在那条卡下
+ * 回一句，而不是切去工作台找单号。这个函数只回答「要不要接这一句」，不执行任何写。
+ *
+ * ## 单号从哪来（两个来源，缺一不可）
+ *
+ *   1. 这一句自己带了单号 —— 直接读；
+ *   2. 回复的那条**是我们发出去的审查卡** —— 从**外发台账**里回读它。
+ *
+ * ★ 第 2 条是这条链路能不能成立的关键。`feishu.getMessage(parentId)` 对
+ *   `msg_type=interactive` 只回一段占位文案（飞书不返回卡片正文，见 `bodyToText`
+ *   的 `interactive` 分支），所以「从上文卡里读单号」这条路**读不到**。
+ *   而台账里存着我们**实际发出去的那段话**，单号就在里面。
+ *
+ * ## 为什么要先要求「有上文」再认指令
+ *
+ * 「确认」这两个字在群里太常见（确认一下时间、确认收货）。只凭这一句就结案，
+ * 会把人随口一句话当成结案命令。所以判据是：**既认得出动作，又指得出单号**。
+ *
+ * @param {string} question    这一轮对方说的话（已剥 @）
+ * @param {{parentText?:string|null}} ctx 上文正文（从台账或消息回读拿到）
+ * @returns {{action:'confirm'|'overturn'|'revise', caseId:string, notes:string}|null}
+ */
+export function parseThreadReviewCommand(question, { parentText = null } = {}) {
+  const q = String(question ?? '').trim();
+  if (!q) return null;
+
+  const CASE_RE = /case-[0-9a-f]{16,24}/;
+  const inQuestion = q.match(CASE_RE);
+  const inParent = String(parentText ?? '').match(CASE_RE);
+  const caseId = (inQuestion ?? inParent)?.[0] ?? null;
+  if (!caseId) return null;
+
+  // 剥掉单号本身，剩下的才是理由/说明
+  const rest = q.replace(CASE_RE, ' ').trim();
+
+  // ★ 判据是**整句里出现哪些词**，不是「以哪个词开头」。
+  //   第一版写成 `^(?:误报|推翻|…)`，于是「误报推翻：…」只吃掉了「误报」、
+  //   把「推翻」留在说明里；而更要命的是「确认这是误报，推翻」匹配不上任何一条，
+  //   落到 null —— 复核员以为撤掉了，案件其实原封不动。
+  //
+  // ★ 优先级：推翻 > 退回 > 确认。
+  //   「确认这是误报」两个词都在，它的意思是**确认「机器判错了」**，即推翻。
+  //   按「确认」先判会得到**相反**的动作，而对一条已经发出去的结论，
+  //   判反的代价不对称（该撤的变成放行）。
+  const OVERTURN = /(?:误报|推翻|改判(?:为)?(?:通过|放行)?|不算违规|没问题[，,\s]*可?放行)/;
+  const REVISE = /(?:要改|需修改|要求修改|退回|打回)/;
+  const CONFIRM = /(?:确认(?:放行|违规|拦截|无误)|同意(?:结论|初筛)|复核通过|结案)/;
+
+  const action = OVERTURN.test(rest) ? 'overturn'
+    : REVISE.test(rest) ? 'revise'
+      : CONFIRM.test(rest) ? 'confirm'
+        : null;
+  if (!action) return null;
+
+  // 说明 = 剥掉**所有**指令词与标点之后的剩余。
+  //
+  // ★ 必须全局剥（带 `g`），不能只 replace 一次：实测「误报推翻：…」里
+  //   `OVERTURN` 先吃掉「误报」，剩「推翻：这是引用反例说明」—— 一个只 replace
+  //   一次的实现于是把「推翻」当成了理由交出去。理由里混进指令词，读的人会以为
+  //   复核员自己写了两个字。空就空着，宁可让下游看到空，也不要一句假理由。
+  const stripAll = (t, re) => t.replace(new RegExp(re.source, 'g'), ' ');
+  let notes = stripAll(stripAll(stripAll(rest, OVERTURN), REVISE), CONFIRM)
+    .replace(/^[：:，,、\s]+/, '')
+    .replace(/[：:，,、\s]+$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  // 「确认这是误报，推翻」剥完剩「确认这是」—— 指令词被拆在两处写，单次 replace 抓不到。
+  // ★ 只剥**后面紧跟标点或已到句尾**的残留，绝不按前缀剥：
+  //   按前缀剥会把「这是引用反例说明」的「这是」也吃掉，而那是真内容。
+  //   「确认这是」单列成一条，因为它是指令词被拆在两处写之后剩下的整段。
+  const RESIDUE = /^(?:确认这是|确认|这是|那是|是|为|这个|那个)(?=[：:，,、\s]|$)/;
+  for (let i = 0; i < 6 && RESIDUE.test(notes); i++) {
+    notes = notes.replace(RESIDUE, '').replace(/^[：:，,、\s]+/, '');
+  }
+  notes = notes.trim();
+  return { action, caseId, notes };
+}
+
 /* ─────────────────── 主处理函数 ─────────────────── */
 /**
  * 处理一条飞书消息，返回要发出的回复文本（不负责发送）。
@@ -411,11 +510,23 @@ export async function handleMessage(event, { force = false } = {}) {
   //     · 下载失败 / 太大 / 二进制伪装 → 状态分开说，不许合并成「读不到」。
   //   落盘根在仓外且 0700，处理完立即删除（见 feishu.ingestAttachment）。
   let mediaAuditGot = null;
+  // ★ Office 附件抽出来的正文单独存一份：它既要进用户轮（模型能看到原文），
+  //   又要在后面直接送审出卡。两处用的是**同一次**抽取结果 —— 重抽一次
+  //   会让「模型看到的」与「送审的」可能是两份不同的字（大文件尤其）。
+  let officeIngested = null;
   if (msg.message_type !== 'text') {
     if (msg.message_type === 'post' && rawText.trim()) {
       // post 富文本内嵌图片：单图走既有链路；多图（组图 / A+ 页 / 轮播图）并行四维审查后合并成一张卡片
       const inlineImgKeys = feishu.extractPostImageKeys(msg.content);
       if (inlineImgKeys.length > 1) {
+        // ★ 组图是并行几张，最慢那张决定出卡时间。回执先发，理由同视频。
+        if (process.env.SHOUHENG_QUICK_ACK !== '0' && msg.chat_id && msg.message_id) {
+          try {
+            await feishu.sendQuickAckCard(msg.chat_id, msg.message_id, {
+              mediaKind: `组图（${inlineImgKeys.length} 张）`,
+            });
+          } catch { /* 同视频：不兜底 */ }
+        }
         const gotList = await Promise.all(inlineImgKeys.map((key, idx) =>
           feishu.ingestAttachment({
             ...msg,
@@ -436,10 +547,23 @@ export async function handleMessage(event, { force = false } = {}) {
       }
       ({ display, mentions } = feishu.resolveMentions(rawText, msg.mentions));
     } else if (feishu.ATTACHMENT_TYPES.has(msg.message_type)) {
+      // ★ 视频判定要走多模态，实测十几秒到几十秒。这段时间群里什么都不发生，
+      //   发件人会以为没收到。先回一张「已接单」，结论卡随后就到。
+      //   `SHOUHENG_QUICK_ACK=0` 可关掉（群里连续重发同一条时不想刷两张卡）。
+      if (msg.message_type === 'media' && process.env.SHOUHENG_QUICK_ACK !== '0'
+          && msg.chat_id && msg.message_id) {
+        try {
+          await feishu.sendQuickAckCard(msg.chat_id, msg.message_id, {
+            mediaKind: '视频',
+            fileName: feishu.parseAttachment(msg).fileName ?? '',
+          });
+        } catch { /* 回执发不出去不是事故 —— 结论卡随后就到 */ }
+      }
       const got = await feishu.ingestAttachment(msg);
       if (got.status === 'ingested') {
         // 附件正文作为**用户轮**进入上下文。必须显式标成不可信输入：
         // 文件里可以写「忽略以上指令」，而那不是用户说的话。
+        if (got.reason === 'attachment_office_ingested') officeIngested = got;
         rawText = attachmentTurnText(got);
       } else if (got.status === 'image_judged' || got.status === 'image_judge_failed') {
         // 图片判定结果（含失败/未审查）作为用户轮交给模型转述；
@@ -595,6 +719,69 @@ export async function handleMessage(event, { force = false } = {}) {
       }
     }
 
+    // ── 5.6 话题里的复核指令（2026-11-05 加）
+    //
+    // 审查卡已经带着单号发进群了。复核员看见「这条是误报」，最自然的动作是在那条卡下
+    // 回一句 —— 而这条路径原先不存在，群里说什么都不改案件状态。
+    //
+    // ★ 单号**不能只从 parentText 取**：`feishu.getMessage` 对 `msg_type=interactive`
+    //   只回一段占位文案（飞书不返回卡片正文）。所以还要翻**外发台账**：
+    //   那里存着我们**实际发出去的那段话**，单号就在里面。
+    // ★ 三种情形日志里要长得不一样（取不到 ≠ 没有）：指令没认出来 / 认出来但找不到单号 /
+    //   认出来且找到了。第一种是常态，后两种各记一行。
+    if (question && msg.message_id) {
+      let parentTextForReview = null;
+      if (parentId) {
+        try {
+          const led = outbound.readEntries();
+          const hit = (led.entries ?? []).find((e) => (e.message_ids ?? []).includes(parentId));
+          if (hit?.text) parentTextForReview = hit.text;
+        } catch { parentTextForReview = null; }
+      }
+      const cmd = parseThreadReviewCommand(question, { parentText: parentTextForReview });
+      if (cmd) {
+        const t0 = Date.now();
+        const args = [
+          '--review-case', cmd.caseId,
+          '--review-action', cmd.action,
+          '--review-notes', cmd.notes || '',
+          '--sender-open-id', senderOpenId || '',
+        ];
+        let rev = null;
+        try {
+          const { stdout } = await execFileP(REVIEW_PY, [REVIEW_SCRIPT, ...args], {
+            cwd: REPO_ROOT, encoding: 'utf8', timeout: 60_000,
+            env: { ...process.env },
+          });
+          rev = JSON.parse(String(stdout).trim().split('\n').pop());
+        } catch (e) {
+          // 子进程非 0 退出时 stdout 里仍是那段 JSON —— 优先用它，别把结构化错误丢掉。
+          const raw = String(e?.stdout ?? '').trim().split('\n').pop();
+          try { rev = raw ? JSON.parse(raw) : null; } catch { rev = null; }
+          if (!rev) rev = { ok: false, error: `${e?.name ?? 'Error'}: ${e?.message ?? e}` };
+        }
+        toolTrace = [{ tool: 'thread_review', ok: !!rev?.ok, ms: Date.now() - t0 }];
+        const { buildReceiptReply } = await import('./prd53.mjs');
+        const replyText = buildReceiptReply({
+          caseId: cmd.caseId,
+          action: cmd.action,
+          result: rev,
+        });
+        mem.append(sess, { role: 'assistant', content: replyText });
+        mem.save(sess);
+        console.log(`[agent] ⊙ 话题复核 ${cmd.action} · ${cmd.caseId} → ok=${!!rev?.ok}（${Date.now() - t0}ms）`);
+        return {
+          reply: replyText,
+          reason: 'ok',
+          sessionKey: key,
+          meta: {
+            toolTrace,
+            thread_review: { action: cmd.action, case_id: cmd.caseId, ok: !!rev?.ok },
+          },
+        };
+      }
+    }
+
     const userTurn = chatType === 'group' ? `【${senderName}】${question}` : question;
     const turnContent = parentBlock ? `${parentBlock}\n\n${userTurn}` : userTurn;
     // ★ `force`（补发）时**不重复 append 同一个用户轮**：上一轮失败前已经 append 过一次
@@ -656,6 +843,31 @@ export async function handleMessage(event, { force = false } = {}) {
       reply = formatDirectAuditCardReply({ mediaGot: mediaAuditGot });
       if (reply) {
         mem.append(sess, { role: 'assistant', content: reply });
+      }
+    }
+
+    // ★ 第 2.5 项：Office 附件（.docx / .xlsx）抽出来的正文 → 直接送审并直出四维卡。
+    //
+    //   为什么与图片/视频同级、而不是交给模型转述：用户发一份文档进群，意图就是
+    //   「审这个」。走模型的话，模型可能先解释一遍、再挑几句审 —— 而四维表就没了。
+    //   这与 2026-11-05 那 13 条「调了工具却用自己排版回答」是同一个病。
+    //
+    //   ★ 判据只看 `reason`，不看文件后缀：后缀在入站时已经被 `isOfficeAttachment`
+    //     用过一次了；这里再判一次等于把同一件事定义在两个地方（AGENTS.md §2.5 那条的变体）。
+    if (reply === null && !mediaAuditGot && officeIngested?.text?.trim()) {
+      const t0 = Date.now();
+      const out = await executeTool('judge_copy', JSON.stringify({
+        text: officeIngested.text, carrier: 'free_text',
+      }));
+      toolTrace.push({ tool: 'judge_copy', ok: out.ok, ms: Date.now() - t0 });
+      if (out.ok && out.result && !out.result.error) {
+        const direct = formatDirectAuditCardReply({ textJudgeResult: out.result });
+        if (direct) {
+          consumePendingTurnVerdict();   // 结论行已进卡片抬头，别让信封再叠一条
+          reply = direct;
+          mem.append(sess, { role: 'assistant', content: direct });
+          console.log(`[agent] ↩ Office 附件「${officeIngested.name}」已抽正文 ${officeIngested.chars} 字并直出四维卡`);
+        }
       }
     }
 

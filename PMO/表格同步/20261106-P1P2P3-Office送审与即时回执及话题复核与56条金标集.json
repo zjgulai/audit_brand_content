@@ -1,0 +1,19 @@
+{
+  "事项名称": "P1/P2/P3 Agent发布三包闭环：Office(.docx/.xlsx)附件送审抽取 + 视频/多图秒级暖粉接单回执卡 + 卡片工作台直达按钮与群话题快速复核回流 + 56条真实送审金标回归集",
+  "关联执行票": "面向Agent发布执行计划 P1 + P2 + P3",
+  "功能一级分类": "跨页面公共能力",
+  "功能二级分类": "加载态",
+  "功能三级分类": "加载/空/拒绝三态",
+  "工作类型": [
+    "后端",
+    "模型与解析"
+  ],
+  "完成状态": "已完成",
+  "验收结论": "通过",
+  "上线状态": "已上线",
+  "阻塞状态": "无阻塞",
+  "页面路由": "全站",
+  "事项明细": "1）P1 Office附件送审抽取与秒级接单回执：在 base/feishu_guard_ingest.py 新增纯标准库（zipfile+ElementTree）extract_office_attachment_text 与 --extract-office CLI，按文档顺序提取 .docx（含页眉页脚与表格）及 .xlsx 工作簿正文；tools/agent/feishu.mjs 新增 isOfficeAttachment / extractOfficeText 并在 agent.mjs 对抽出的正文直调 judge_copy 出【文案审查】四维卡；同时新增 sendQuickAckCard 为视频与多图入站即时回 R-2 暖粉接单回执卡。2）P2 审查卡工作台直达与群话题快速复核：tools/reply-cards/cards.mjs 支持 button behaviors/open_url 与 evidence.actions（配 SHOUHENG_WORKBENCH_URL 时展示一键跳转工作台按钮）；base/feishu_guard_ingest.py 新增 execute_thread_review 与 --review-case CLI，agent.mjs 新增 parseThreadReviewCommand 识别话题下『@Guard 确认放行』与『@Guard 误报推翻：<原因>』，从消息或外发台账反查 case_id 直通 ReviewCommandService 结案并写入 review_feedback_queue.jsonl。3）P3 56条真实送审金标回归集：新建 tools/agent/golden_56_replay.test.mjs（18图+32文案+6媒体，0.1秒跑完），逐条锁定模态、五标签抬头、配色、品类、零跨模态泄漏与 V2 校验。",
+  "验收标准": "1) node tools/verify_cards.mjs 266/266 全绿 rc=0；2) node tools/agent/golden_56_replay.test.mjs 58/58 全绿 rc=0（失败样本 0 条）；3) node tools/agent/feishu_guard_ingest.test.mjs 97/97 全绿 rc=0（含新增 L1–L6 Office 抽取与 M1–M10 话题复核回流自证）；4) node tools/agent/attachment_ingest.test.mjs 39/39 全绿 rc=0；5) node tools/agent/image_judgment.test.mjs 16/16 全绿 rc=0；6) python3 tools/verify_send_gateway.py 39/39 全绿 rc=0；7) python3 tools/verify_download_governance.py 全绿 rc=0；8) python3 tools/verify_depad.py 0 被填充 rc=0。",
+  "状态依据": "1) P1/P2/P3 全套 15 个文件已合入主工作区并全套自证全绿；2) 与并行知识库优化任务零文件冲突。"
+}

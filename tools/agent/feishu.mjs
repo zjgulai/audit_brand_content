@@ -9,6 +9,7 @@
 import * as Lark from '@larksuiteoapi/node-sdk';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config, attachmentDir } from './config.mjs';
 import { appendLifecycle } from './attachment_lifecycle.mjs';
 import {
@@ -36,8 +37,12 @@ if (client?.httpInstance?.defaults) {
 }
 
 /** 机器人显示名（名字匹配用）。集中定义，避免多处硬编码写成不一致的字面量 */
-export const BOT_NAME = '守衡';
-export const BOT_NAMES = new Set(['守衡', 'Guard']);
+// ★ 2026-11-05：飞书应用正式名已是 Guard（cli_aa600ebeed38dccf）。
+//   BOT_NAME 是「模型在群历史里看到自己」时用的名字，必须与人格一致 ——
+//   否则 persona 说「你是 Guard」、历史说「守衡(你自己)」，模型会当成两个人。
+//   `守衡` 保留在 BOT_NAMES 里是**向后兼容**：旧群的 @ 记号和历史消息里还是它。
+export const BOT_NAME = 'Guard';
+export const BOT_NAMES = new Set(['Guard', '守衡']);
 export const BOT_OPEN_IDS = new Set([
   config.lark.appId,
   'ou_c5c35c6322ac7b763fb62354aa4f3eb6', // Guard (cli_aa600ebeed38dccf)
@@ -390,6 +395,71 @@ export function isTextAttachment(fileName) {
 }
 
 /**
+ * Office 附件：`.docx` / `.xlsx`。**刻意不并入 `isTextAttachment`**。
+ *
+ * 判据是「能不能直接按 UTF-8 读」—— Office 文件是 zip 包，按文本读只会得到乱码。
+ * 它们有自己的一条路（`extract_office_attachment_text`），所以是**另一类**，
+ * 不是「文本类多两种后缀」。合并会让 `isTextAttachment('a.docx')` 变 true，
+ * 而那条分支紧接着就是 `fs.readFileSync(...).toString('utf8')`。
+ */
+export const OFFICE_ATTACHMENT_EXT = new Set(['.docx', '.xlsx']);
+
+export function isOfficeAttachment(fileName) {
+  return OFFICE_ATTACHMENT_EXT.has(path.extname(String(fileName ?? '')).toLowerCase());
+}
+
+/**
+ * 调 Python 的 Office 抽取入口。**默认实现**，可被替换以便自证不跑子进程。
+ *
+ * 走 `.venv/bin/python`；没有它就退 `python3`（与本仓库其余 Python 调用点同口径）。
+ */
+async function execOfficeExtractDefault(filePath) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const venvPy = path.join(repoRoot, '.venv', 'bin', 'python');
+  const py = fs.existsSync(venvPy) ? venvPy : 'python3';
+  const { stdout } = await promisify(execFile)(
+    py,
+    [path.join(repoRoot, 'base', 'feishu_guard_ingest.py'), '--extract-office', String(filePath)],
+    { encoding: 'utf8', timeout: 60_000, maxBuffer: 32 * 1024 * 1024 },
+  );
+  return JSON.parse(String(stdout).trim().split('\n').pop());
+}
+
+/**
+ * 把抽取器的输出归一成**只有三种终态**，让调用方不必猜。
+ *
+ * ★ `runner_error` 与 `parse_error` 必须分开：前者是我这边（子进程没起来、
+ *   JSON 打不出来），后者是文件本身。混成一个会让「我坏了」读成「你的文件坏了」，
+ *   而这正是 `image_judge_failed` 那条链路踩过的坑（未审查 ≠ 不支持 ≠ 没内容）。
+ *
+ * @returns {Promise<{ok:true, text:string}|{ok:false, failure_kind:'empty'|'parse_error'|'runner_error', error:string}>}
+ */
+export async function extractOfficeText(filePath, { run = execOfficeExtractDefault } = {}) {
+  let out;
+  try {
+    out = await run(filePath);
+  } catch (e) {
+    return { ok: false, failure_kind: 'runner_error', error: `${e?.message ?? e}` };
+  }
+  if (out?.ok && typeof out.text === 'string' && out.text.trim()) {
+    return { ok: true, text: out.text };
+  }
+  if (out?.failure_kind === 'empty') {
+    return { ok: false, failure_kind: 'empty', error: String(out.error ?? '文档内未提取到可读文字') };
+  }
+  if (out?.failure_kind === 'parse_error' || out?.failure_kind === 'unsupported') {
+    return { ok: false, failure_kind: 'parse_error', error: String(out.error ?? '解析失败') };
+  }
+  // 形状不认识 → 那不是文件的问题，是我们这一层读错了它的输出（§2.4.1）。
+  return {
+    ok: false, failure_kind: 'runner_error',
+    error: `抽取器返回的形状不认识：${JSON.stringify(out).slice(0, 200)}`,
+  };
+}
+
+/**
  * 下载消息里的资源文件。**这是本仓库新增的飞书下载调用点**，
  * 已在 `tools/download_callers.json` 登记（DG-1），落盘根必须在仓外（DG-2）。
  *
@@ -513,11 +583,12 @@ export async function ingestAttachment(msg, {
   }
   const isImage = a.type === 'image';
   const isVideo = a.type === 'media';
+  const isOffice = !isImage && !isVideo && isOfficeAttachment(a.fileName);
   // ★ 图片侧**合成**的 failure_kind 只能落在 ContentUnit/ReviewIR 的合法域：
   //   fetch_error / parse_error / empty / unsupported。
   //   下载失败/超限 → fetch_error；空文件 → empty；入口/解析失败 → parse_error。
   //   自由值会让下游契约校验直接拒绝，且不会有人读得懂它属于哪一档。
-  if (!isImage && !isVideo && !isTextAttachment(a.fileName)) {
+  if (!isImage && !isVideo && !isOffice && !isTextAttachment(a.fileName)) {
     return finish('unsupported_type', { reason: 'attachment_type_unparsed', ...baseMeta,
              reply: `附件「${name}」我收到了，但这类文件的内容解析**这条链路还没接上**。`
                   + '这是能力边界，不是权限问题，也不是「不让下载」—— 下载是允许的。\n'
@@ -652,6 +723,35 @@ export async function ingestAttachment(msg, {
         judgment: compactJudgment(judged.judgment),
         summary, reply: summary,
         ...(judged.ok ? {} : { error: judged.error ?? 'unknown' }),
+      });
+    }
+    if (isOffice) {
+      const extracted = await extractOfficeText(dest);
+      if (!extracted.ok) {
+        // ★ 三种失败必须分开说，因为它们要用户做的下一件事不同：
+        //   empty → 文件读到了、里面真的没字；parse_error → 文件解不开（重发）；
+        //   runner_error → 我这边跑抽取器坏了（不是文件的问题）。
+        const summary = extracted.failure_kind === 'empty'
+          ? `附件「${name}」取到了，但文档里没提取到可读文字（可能只有图片/图表）。`
+            + '**这是文件里没有字，不是「不让读」，也不是「读不了」。**'
+            + '请把要审的文字贴过来，或转成飞书云文档发我。'
+          : extracted.failure_kind === 'parse_error'
+            ? `附件「${name}」取到了，但打不开（${extracted.error}）。`
+              + '**这是文件本身的问题，不是权限问题。**请另存成新的 .docx/.xlsx 重发，或把文字贴过来。'
+            : `附件「${name}」的正文抽取这一步抛了（${extracted.error}）。`
+              + '**是我这边的抽取器出了问题，不是文件的问题，也不是权限问题。**';
+        return finish('office_parse_failed', {
+          reason: `attachment_office_${extracted.failure_kind}`, ...baseMeta, size: got.size,
+          parse_status: 'failed',
+          failure_kind: extracted.failure_kind === 'empty' ? 'empty' : 'parse_error',
+          summary, reply: summary,
+        });
+      }
+      const truncated = [...extracted.text].length > maxChars;
+      const text = truncated ? [...extracted.text].slice(0, maxChars).join('') : extracted.text;
+      return finish('ingested', {
+        reason: 'attachment_office_ingested', ...baseMeta,
+        size: got.size, chars: [...text].length, truncated, text,
       });
     }
     const buf = fs.readFileSync(dest);
@@ -794,7 +894,7 @@ export async function replyCard(messageId, card) {
 }
 
 /** 发一条「正在处理」提示，返回其 message_id 以便后续撤回或更新 */
-export async function sendTyping(chatId, text = '（守衡正在处理…）') {
+export async function sendTyping(chatId, text = '（Guard 正在处理…）') {
   try {
     const r = await client.im.message.create({
       params: { receive_id_type: 'chat_id' },
@@ -809,6 +909,58 @@ export async function recallMessage(messageId) {
   if (!messageId) return false;
   try { await client.im.message.delete({ path: { message_id: messageId } }); return true; }
   catch { return false; }
+}
+
+/**
+ * 重媒体（视频 / 组图）的**即时收件回执卡**。
+ *
+ * ★ 为什么在 `ingestAttachment` 之外另开一个出口：视频判定要走多模态，
+ *   实测十几秒；组图是并行几张。这段时间里群里什么都不发生，
+ *   发件人会以为没收到。回执把「已接单」与「结论」分开成两条消息。
+ *
+ * ★ 它**只尝试一次、不兜底**（与 `replyCard` 同一条纪律）：兜底只能有一处。
+ *   回执发不出去不是事故 —— 结论卡随后就到，所以这里失败只记一条日志。
+ *
+ * ★ 卡片由 `standard_cards.buildQuickReceiptCard` 建，本函数不拼卡片结构：
+ *   字段与白名单是本仓库唯一一处被测过的形状（`verify_cards` 全段都盯着它）。
+ *
+ * @param {string} chatId    会话 id（写入外发台账用；消息本身是 reply 到 messageId）
+ * @param {string} messageId 被回复的那条消息（引用关系）
+ * @returns {Promise<{ok:boolean, messageId?:string|null, mode:string, error?:string}>}
+ */
+export async function sendQuickAckCard(chatId, messageId, { mediaKind = '视频', fileName = '' } = {}) {
+  if (!messageId) return { ok: false, mode: 'quick-ack-skipped', error: '缺少 messageId' };
+  let card;
+  try {
+    const { buildQuickReceiptCard } = await import('./standard_cards.mjs');
+    card = buildQuickReceiptCard({ mediaKind, fileName });
+  } catch (e) {
+    return { ok: false, mode: 'quick-ack-failed', error: `建卡失败：${e?.message ?? e}` };
+  }
+  try {
+    const r = await client.im.message.reply({
+      path: { message_id: messageId },
+      data: { msg_type: 'interactive', content: JSON.stringify(card) },
+    });
+    const id = r?.data?.message_id ?? null;
+    // ★ 进外发台账：这条是守衡**对群里说出去的话**，不进台账就等于
+    //   「它不知道自己在 14:37 问过什么」那个事故再来一次（§2.4.3 / verify_outbound D 段）。
+    try {
+      const outbound = await import('./outbound.mjs');
+      outbound.recordSend?.({
+        chatId, source: 'reply', mode: 'quick-receipt-card',
+        replyTo: messageId, ok: true, messageIds: id ? [id] : [],
+        text: `【已接单】正在审查你的${mediaKind}`,
+      });
+    } catch { /* 台账写不进去不影响回执已经发出这件事 */ }
+    return { ok: true, messageId: id, mode: 'quick-receipt-card' };
+  } catch (e) {
+    const d = e?.response?.data;
+    return {
+      ok: false, mode: 'quick-ack-failed',
+      error: d ? `code=${d.code} ${String(d.msg ?? '').slice(0, 140)}` : String(e?.message ?? e),
+    };
+  }
 }
 
 /* ─────────────────────────── 读取 ─────────────────────────── */

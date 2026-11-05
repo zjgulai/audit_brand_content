@@ -1311,6 +1311,264 @@ print(json.dumps({"lines_count": len(lines), "precedent": stats["precedent"]}, e
   }
 }
 
+/* ── M. 话题复核：群内「确认放行 / 误报推翻」落到权威与判例回流 ─────────── */
+{
+  const agentMod = await import('./agent.mjs');
+  const prd53Mod = await import('./prd53.mjs');
+  const cardsMod = await import('../reply-cards/cards.mjs');
+  const envMod = await import('../reply-cards/envelope.mjs');
+
+  const CID = 'case-c6f4d1420fc5d4155a52';
+
+  // M1 指令解析：动作判反的代价不对称（该撤的变成放行），所以逐个钉住。
+  const P = { parentText: `【文案审查 · 需修改】x 单号 ${CID}` };
+  const parsed = (q) => agentMod.parseThreadReviewCommand(q, P);
+  T('M1 指令解析：误报推翻 / 确认放行 / 要改 三态分清，且说明里不混指令词',
+    parsed('误报推翻：这是引用反例说明，不是我们的宣称')?.action === 'overturn'
+      && parsed('误报推翻：这是引用反例说明，不是我们的宣称')?.notes === '这是引用反例说明，不是我们的宣称'
+      && parsed('确认放行')?.action === 'confirm'
+      && parsed('要改：把 Hospital Grade 删掉')?.action === 'revise'
+      && parsed('要改：把 Hospital Grade 删掉')?.notes === '把 Hospital Grade 删掉',
+    JSON.stringify(parsed('误报推翻：这是引用反例说明，不是我们的宣称')));
+
+  // M2 ★ 反向对照：同一句里两个词都在时，**必须**判成推翻。
+  //    按「确认」先判会得到相反动作，而群里已经看到过那张卡了。
+  T('M2 ★ 反向对照：「确认这是误报，推翻」判成 overturn（不是 confirm）',
+    parsed('确认这是误报，推翻')?.action === 'overturn',
+    JSON.stringify(parsed('确认这是误报，推翻')));
+
+  // M3 判据必须同时要求「有指令」与「指得出单号」——
+  //    「确认」在群里太常见，只凭这一句就结案会把人随口一句话当成命令。
+  T('M3 只认得出动作、指不出单号 → 不接（不结案）',
+    agentMod.parseThreadReviewCommand('确认放行', { parentText: null }) === null
+      && agentMod.parseThreadReviewCommand('确认一下明天开会时间', P) === null
+      && agentMod.parseThreadReviewCommand('', P) === null
+      && agentMod.parseThreadReviewCommand(`确认放行 ${CID}`, {})?.caseId === CID,
+    '');
+
+  // M4 执行点：Python 端真跑一次（临时 workbench 根），三态各验一遍。
+  const pyBin2 = fs.existsSync(path.join(REPO_ROOT, '.venv', 'bin', 'python'))
+    ? path.join(REPO_ROOT, '.venv', 'bin', 'python')
+    : 'python3';
+  const wbRoot = path.join(tmpRoot, 'wb-thread');
+  const ingestOnce = (msgId, text) => JSON.parse(execFileSync(pyBin2, [
+    GUARD_PY, '--carrier', 'free_text', '--text', text, '--message-id', msgId,
+    '--sender-open-id', 'ou-1', '--json', '--brief',
+  ], {
+    cwd: REPO_ROOT, encoding: 'utf8', timeout: 120_000,
+    env: { ...process.env, SHOUHENG_STATE_DIR: tmpState, SHOUHENG_KB_ENABLED: '0',
+           SHOUHENG_WORKBENCH_DATA_ROOT: wbRoot },
+  }));
+
+  const review = (cid, action, notes = '') => {
+    let out;
+    try {
+      out = execFileSync(pyBin2, [
+        GUARD_PY, '--review-case', cid, '--review-action', action,
+        '--review-notes', notes, '--sender-open-id', 'ou-1',
+      ], {
+        cwd: REPO_ROOT, encoding: 'utf8', timeout: 120_000,
+        env: { ...process.env, SHOUHENG_STATE_DIR: tmpState, SHOUHENG_KB_ENABLED: '0',
+               SHOUHENG_WORKBENCH_DATA_ROOT: wbRoot },
+      });
+    } catch (e) { out = e?.stdout ?? ''; }
+    return JSON.parse(String(out).trim().split('\n').pop());
+  };
+
+  const c1 = ingestOnce('om_thread_1', 'Our pump is Hospital Grade.');
+  const r1 = review(c1.case_id, 'overturn', '引用反例说明，不是我们的宣称');
+  const qPath = path.join(wbRoot, 'review_feedback_queue.jsonl');
+  const qLines = fs.existsSync(qPath)
+    ? fs.readFileSync(qPath, 'utf8').split('\n').filter((x) => x.trim()) : [];
+  T('M4 推翻结案真的落账：状态 closed、版本 +1、判例入队，且队列里能指到这条案件',
+    c1.ok && r1.ok && r1.verdict === 'overturn' && r1.status === 'closed'
+      && r1.to_version > r1.from_version
+      && r1.precedent?.queued === true
+      && qLines.some((l) => JSON.parse(l).case_id === c1.case_id),
+    JSON.stringify({ case: c1.case_id, r1: { ok: r1.ok, status: r1.status, prec: r1.precedent } }));
+
+  const r2 = review(c1.case_id, 'confirm');
+  T('M5 已结案的再复核 → 明确拒绝（不是静默成功）',
+    r2.ok === false && r2.already_closed === true, JSON.stringify(r2).slice(0, 160));
+
+  const c2 = ingestOnce('om_thread_2', 'Momcozy wearable breast pump, comfortable design.');
+  const r3 = review(c2.case_id, 'confirm');
+  T('M6 确认放行：人机一致时**不**产生判例回流（没有分歧可记）',
+    r3.ok === true && r3.verdict === 'agree' && r3.precedent?.queued === false,
+    JSON.stringify({ label: c2.label, prec: r3.precedent }));
+
+  const r4 = review(c2.case_id, 'revise', '把宣称删掉');
+  T('M7 「要求修改」如实说要去工作台，不假装成功',
+    r4.ok === false && r4.needs_workbench === true && /工作台/.test(r4.next_step ?? ''),
+    JSON.stringify(r4).slice(0, 160));
+
+  const r5 = review('case-00000000000000000000', 'confirm');
+  T('M8 找不到单号 → not_found（与「已结案」「跑挂了」分得开）',
+    r5.ok === false && r5.not_found === true, JSON.stringify(r5).slice(0, 140));
+
+  const r6 = review(c1.case_id, 'overturn', '');
+  T('M9 推翻必须写理由 —— 空理由被拒（判例回流里唯一能被人读懂的就是它）',
+    r6.ok === false && /理由/.test(r6.error ?? ''), JSON.stringify(r6).slice(0, 140));
+
+  // M10 回执卡：四种结果各自成卡、过本地校验、过信封同一把尺（L6 那条教训）。
+  const RECEIPT_STATES = {
+    ok: { ok: true, precedent: { queued: true } },
+    noprec: { ok: true, precedent: { queued: false } },
+    closed: { ok: false, already_closed: true },
+    notfound: { ok: false, not_found: true },
+    crash: { ok: false, error: 'AuthorityConflict: version_conflict' },
+  };
+  const problems = [];
+  for (const [name, res] of Object.entries(RECEIPT_STATES)) {
+    const txt = prd53Mod.buildReceiptReply({ caseId: CID, action: 'overturn', result: res });
+    const shaped = envMod.toCardOrText(txt);
+    if (shaped.mode !== 'card' || shaped.dropped) { problems.push(`${name}: 被信封降级 (${shaped.mode})`); continue; }
+    const card = cardsMod.build('receipt', JSON.parse(txt.split('\n')[1]));
+    if (!cardsMod.validateCard(card).ok) problems.push(`${name}: 卡片校验不过`);
+    if (/已通过|无需处理/.test(shaped.text)) problems.push(`${name}: 出现禁词`);
+  }
+  T('M10 复核回执卡：五种结果都成卡、过校验、过信封（不出现「已通过」这类禁词）',
+    problems.length === 0, problems.join('；'));
+}
+
+/* ── L. Office 附件（.docx / .xlsx）正文抽取与重媒体回执 ────────────────── */
+{
+  const pyBin = fs.existsSync(path.join(REPO_ROOT, '.venv', 'bin', 'python'))
+    ? path.join(REPO_ROOT, '.venv', 'bin', 'python')
+    : 'python3';
+  const officeTmp = path.join(tmpRoot, 'office');
+  fs.mkdirSync(officeTmp, { recursive: true });
+
+  /** 造一份最小 OOXML。用 python 的 zipfile（stdlib），不引第三方包。 */
+  const makeZip = (dest, parts) => {
+    const script = `
+import json, sys, zipfile
+with zipfile.ZipFile(sys.argv[1], 'w') as z:
+    for name, body in json.loads(sys.argv[2]).items():
+        z.writestr(name, body)
+`;
+    execFileSync(pyBin, ['-c', script, dest, JSON.stringify(parts)], { encoding: 'utf8' });
+  };
+
+  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  const S = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+  const docxXml = (body) =>
+    `<?xml version="1.0"?><w:document xmlns:w="${W}"><w:body>${body}</w:body></w:document>`;
+
+  const extract = (p) => {
+    const out = execFileSync(pyBin, [GUARD_PY, '--extract-office', p], {
+      cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, SHOUHENG_STATE_DIR: tmpState },
+    });
+    return JSON.parse(out);
+  };
+
+  // L1: 段落 + 表格按**文档顺序**抽，不重复。
+  //     ★ 反向形状在这里：第一版「先收表格、再收段落」会把表格里的 <w:p> 收两遍，
+  //     实测两行表格的 docx 抽出 4 行。这条断言盯的就是「恰好 3 行且顺序对」。
+  const d1 = path.join(officeTmp, 'order.docx');
+  makeZip(d1, {
+    'word/document.xml': docxXml(
+      '<w:p><w:r><w:t>开头一段</w:t></w:r></w:p>'
+      + '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>规格</w:t></w:r></w:p></w:tc>'
+      + '<w:tc><w:p><w:r><w:t>28.2%</w:t></w:r></w:p></w:tc></w:tr></w:tbl>'
+      + '<w:p><w:r><w:t>结尾一段</w:t></w:r></w:p>',
+    ),
+  });
+  const r1 = extract(d1);
+  T('L1 docx：段落与表格按文档顺序抽出、且表格不被重复收一遍',
+    r1.ok === true && r1.text === '开头一段\n规格 | 28.2%\n结尾一段' && r1.ext === '.docx',
+    JSON.stringify(r1));
+
+  // L2: header / footer 也收。
+  const d2 = path.join(officeTmp, 'hdr.docx');
+  makeZip(d2, {
+    'word/document.xml': docxXml('<w:p><w:r><w:t>正文</w:t></w:r></w:p>'),
+    'word/header1.xml': `<w:hdr xmlns:w="${W}"><w:p><w:r><w:t>页眉声明</w:t></w:r></w:p></w:hdr>`,
+    'word/footer2.xml': `<w:ftr xmlns:w="${W}"><w:p><w:r><w:t>页脚免责</w:t></w:r></w:p></w:ftr>`,
+  });
+  const r2 = extract(d2);
+  T('L2 docx：header / footer 也进正文（免责声明常写在那里，漏了会误判成「没说」）',
+    r2.ok === true && r2.text.includes('页眉声明') && r2.text.includes('页脚免责'),
+    JSON.stringify(r2.text));
+
+  // L3: xlsx sharedStrings + inlineStr + 数值；空格子占位不丢列位。
+  const x1 = path.join(officeTmp, 'table.xlsx');
+  makeZip(x1, {
+    'xl/sharedStrings.xml':
+      `<?xml version="1.0"?><sst xmlns="${S}"><si><t>品名</t></si><si><t>M5</t></si>`
+      + `<si><r><t>超声</t></r><r><t>波清洗</t></r></si></sst>`,
+    'xl/worksheets/sheet1.xml':
+      `<?xml version="1.0"?><worksheet xmlns="${S}"><sheetData>`
+      + '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+      + '<row r="2"><c r="A2" t="inlineStr"><is><t>价格</t></is></c><c r="B2"><v>199</v></c></row>'
+      + '<row r="3"><c r="A3" t="s"><v>2</v></c><c r="B3"/><c r="C3" t="inlineStr"><is><t>无</t></is></c></row>'
+      + '</sheetData></worksheet>',
+  });
+  const r3 = extract(x1);
+  T('L3 xlsx：共享字符串（含富文本 run）/ 内联串 / 数值都对；行中空格子占位、行尾空格子去掉',
+    r3.ok === true && r3.text === '品名 | M5\n价格 | 199\n超声波清洗 |  | 无' && r3.ext === '.xlsx',
+    JSON.stringify(r3.text));
+
+  // L4: 三种失败必须**长得不一样**。
+  const dEmpty = path.join(officeTmp, 'empty.docx');
+  makeZip(dEmpty, { 'word/document.xml': docxXml('<w:p/>') });
+  const dBad = path.join(officeTmp, 'bad.docx');
+  fs.writeFileSync(dBad, 'this is not a zip at all');
+  const dBadExt = path.join(officeTmp, 'x.pdf');
+  fs.writeFileSync(dBadExt, 'x');
+  const eEmpty = extract(dEmpty);
+  const eBad = extract(dBad);
+  const eExt = extract(dBadExt);
+  T('L4 三种失败分得开：empty（文件里真没字）/ parse_error（解不开）/ unsupported（不是这两种后缀）',
+    eEmpty.ok === false && eEmpty.failure_kind === 'empty'
+      && eBad.ok === false && eBad.failure_kind === 'parse_error'
+      && eExt.ok === false && eExt.failure_kind === 'unsupported',
+    JSON.stringify({ empty: eEmpty.failure_kind, bad: eBad.failure_kind, ext: eExt.failure_kind }));
+
+  // L5: 入站链路真的接上了 —— `ingestAttachment` 对 .docx 返回 ingested + office 的 reason。
+  //     ★ 这一条是「执行点」：L1–L3 证的是抽取器对，这一条证的是它**被调到了**。
+  const savedAttachDir = process.env.SHOUHENG_ATTACHMENT_DIR;
+  process.env.SHOUHENG_ATTACHMENT_DIR = path.join(tmpRoot, 'attachments-office');
+  const savedGet2 = feishu.client.im.v1.messageResource.get;
+  const docxBytes = fs.readFileSync(d1);
+  feishu.client.im.v1.messageResource.get = async () => ({
+    headers: { 'content-length': String(docxBytes.length) },
+    writeFile: async (p) => { fs.writeFileSync(p, docxBytes); return p; },
+    getReadableStream: () => ({ destroy() {} }),
+  });
+  let officeGot = null;
+  try {
+    officeGot = await feishu.ingestAttachment({
+      message_id: 'om_office_e2e',
+      message_type: 'file',
+      content: JSON.stringify({ file_key: 'fk_office', file_name: 'ad.docx' }),
+    });
+  } finally {
+    feishu.client.im.v1.messageResource.get = savedGet2;
+    if (savedAttachDir === undefined) delete process.env.SHOUHENG_ATTACHMENT_DIR;
+    else process.env.SHOUHENG_ATTACHMENT_DIR = savedAttachDir;
+  }
+  T('L5 执行点：.docx 入站走抽取链路，返回 ingested + attachment_office_ingested（且临时目录已删）',
+    officeGot?.status === 'ingested'
+      && officeGot.reason === 'attachment_office_ingested'
+      && officeGot.text.includes('28.2%')
+      && fs.readdirSync(path.join(tmpRoot, 'attachments-office')).length === 0,
+    JSON.stringify({ status: officeGot?.status, reason: officeGot?.reason }));
+
+  // L6: 反向对照：**不接** Office 的旧判定没被放宽。
+  //     `.docx` 不许被 `isTextAttachment` 认成文本 —— 认成文本就意味着后面
+  //     紧接着 `fs.readFileSync(...).toString('utf8')`，得到一堆 zip 乱码当正文。
+  const ofcMod = feishu;
+  T('L6 ★ 反向对照：.docx/.xlsx 仍**不算**「可直接按 UTF-8 读」，另有 isOfficeAttachment 单列一类',
+    ofcMod.isTextAttachment('a.docx') === false
+      && ofcMod.isTextAttachment('a.xlsx') === false
+      && ofcMod.isOfficeAttachment('a.docx') === true
+      && ofcMod.isOfficeAttachment('a.xlsx') === true
+      && ofcMod.isOfficeAttachment('a.pdf') === false
+      && ofcMod.isOfficeAttachment(null) === false,
+    '');
+}
+
 try { fs.rmSync(tmpRoot, { recursive: true, force: true }); } catch {}
 
 const nFail = res.filter((x) => !x.ok).length;

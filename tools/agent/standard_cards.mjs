@@ -34,6 +34,29 @@ function clean(s) {
   return plainify(String(s ?? '')).trim();
 }
 
+/**
+ * 把四维 payload 上的 `actionUrl` 变成 `evidence` 卡片认的一个按钮。
+ *
+ * ★ 只在**有地址时**才放按钮：`renderFourDimAuditPayload` 在没有
+ *   `SHOUHENG_WORKBENCH_URL` 时根本不产 `actionUrl`，所以这条分支
+ *   在未部署的环境里恒为空 —— 群里不会出现点不动的按钮。
+ * ★ 按钮文字不提域名、不提「工作台」以外的系统名（出站边界闸会拦系统名）。
+ */
+function withWorkbenchAction(payload) {
+  if (!payload) return payload;
+  const url = payload.actionUrl;
+  if (!url) return payload;
+  return {
+    ...payload,
+    actions: [{
+      tag: 'button',
+      text: { tag: 'plain_text', content: String(payload.actionLabel ?? '去工作台看这条').slice(0, 100) },
+      type: 'primary',
+      behaviors: [{ type: 'open_url', default_url: url }],
+    }],
+  };
+}
+
 /* ═══════════════════ 一、五张被动回复卡（R-1 ~ R-5） ═══════════════════ */
 
 /**
@@ -50,7 +73,7 @@ export function buildAuditResultCard({ mediaGot = null, textJudgeResult = null }
     if (!spec) return null;
 
     if (fd && fd.one_line) {
-      return build('evidence', renderFourDimAuditPayload({
+      const payload = renderFourDimAuditPayload({
         modality: spec.key,
         fd,
         label: rawLabel,
@@ -61,7 +84,8 @@ export function buildAuditResultCard({ mediaGot = null, textJudgeResult = null }
         productLineNote: mediaGot.product_line_resolution?.note ?? null,
         evChain: mediaGot.evidence_chain,
         cleanFn: clean,
-      }));
+      });
+      return build('evidence', withWorkbenchAction(payload));
     }
 
     // 与四维卡同一个判据（`classifyAuditState`），不另写一份状态映射。
@@ -102,7 +126,7 @@ export function buildAuditResultCard({ mediaGot = null, textJudgeResult = null }
       findings: Array.isArray(r.findings) ? r.findings.filter((f) => f && f.status !== 'candidate') : [],
       cleanFn: clean,
     });
-    return payload ? build('evidence', payload) : null;
+    return payload ? build('evidence', withWorkbenchAction(payload)) : null;
   }
 
   return null;

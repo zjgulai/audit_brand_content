@@ -252,11 +252,22 @@ export function collapsible(title, inner, expanded = false) {
 
 /**
  * 按钮（探针 10/10：裸放，不要 action 容器）。
- * ★ 诚实声明：**回执没接住**。ws_daemon 收到 card.action.trigger 只记日志，
+ * ★ 诚实声明：**回调没接住**。ws_daemon 收到 card.action.trigger 只记日志，
  * 不做任何事。所以 value 里带上明确意图，等回调真的接通了再谈交互。
+ *
+ * `url` 给的是**跳转型**按钮（`behaviors: [{ type: 'open_url', default_url }]`），
+ * 与回调型互不影响：不带 url 时与旧版逐字相同，所以既有卡片零变化。
+ *
+ * ⚠️ `behaviors` 这一层**本仓库没有探针读数**（`PMO/logs/card_probe.jsonl`
+ *   只证过「裸 button 不带 behaviors」能发出去）。飞书官方文档写明 2.0 的按钮
+ *   用它做跳转，但「文档这么写」与「这个租户发得出」是两件事（§2.2 第 2 条：
+ *   判错一个元素是**整卡被拒**，不是降级）。所以 `validateCard` 对它给的是
+ *   警告而不是静默放行，调用方必须自己决定要不要赌这一把。
  */
-export function button(label, value = {}, type = 'default') {
-  return { tag: 'button', text: t(label), type, value };
+export function button(label, value = {}, type = 'default', url = null) {
+  const el = { tag: 'button', text: t(label), type, value };
+  if (url) el.behaviors = [{ type: 'open_url', default_url: String(url) }];
+  return el;
 }
 
 /* ═══════════════════════════ 十类模版 ═══════════════════════════ */
@@ -391,6 +402,10 @@ export function evidence(d = {}) {
     els.push(collapsible(hasCount ? `${g.title} · ${g.count}` : String(g.title ?? ''), [s(g.content)], g.expanded ?? false));
   }
   if (d.fields?.length) els.push(fieldRow(d.fields));
+  // 跳转/操作按钮。裸放（探针 10/10 证过），由调用方决定给不给。
+  if (Array.isArray(d.actions) && d.actions.length) {
+    els.push(...d.actions.filter((a) => a && a.tag === 'button'));
+  }
   if (d.boundary) els.push(hr(), md(s(d.boundary)));
   const tpl = d.tone && TEMPLATES.includes(d.tone) ? d.tone : TONE['evidence'];
   return card(tpl, s(d.title ?? '证据'), d.subtitle, els);
@@ -518,6 +533,24 @@ export function validateCard(c) {
       }
       if (tag === 'button') {
         if (el.text?.tag !== 'plain_text') E(`${q}.text`, '按钮文字必须是 { tag: "plain_text", content }');
+        if (el.behaviors !== undefined) {
+          if (!Array.isArray(el.behaviors) || !el.behaviors.length) {
+            E(`${q}.behaviors`, 'behaviors 必须是数组；空数组等于没配交互，不如不写');
+          } else {
+            for (const [j, b] of el.behaviors.entries()) {
+              if (b?.type !== 'open_url') {
+                E(`${q}.behaviors[${j}].type`, `本仓库只放行 open_url（收到 ${JSON.stringify(b?.type)}）`);
+                continue;
+              }
+              const u = String(b?.default_url ?? '');
+              if (!/^https?:\/\//.test(u)) {
+                E(`${q}.behaviors[${j}].default_url`, `必须是 http(s) 绝对地址（收到 ${JSON.stringify(u)}）`);
+              }
+            }
+            // ★ 警告而不是通过：这一层没有本仓库的探针读数（见 button() 的注释）。
+            W(`${q}.behaviors`, 'behaviors/open_url 只有飞书文档依据，本仓库**没有实测读数**；发之前先小范围试一张');
+          }
+        }
         // 探针 7/7 的实测：包一层 action 会被整卡拒绝，所以这里明确要求裸放
         W(`${q}`, '按钮回调在 ws_daemon 里只记日志、未接住（诚实声明，别让模版假装能交互）');
       }

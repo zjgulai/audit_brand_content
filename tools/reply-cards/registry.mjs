@@ -370,6 +370,7 @@ export const REGISTRY = [
       snippet: '灰底带里的一整段可直接复制的替换件（推 **images、文案、视频** 审查卡）。',
       snippetLabel: '灰底带的小标题。缺省是「给设计的贴条」；审查卡按模态填。',
       fields: '可选。',
+      actions: '可选。按钮数组，裸放 elements 里。**只放行 open_url 跳转型**（跳去工作台看这条案件）。',
       boundary: '可选。',
     },
     sample: {

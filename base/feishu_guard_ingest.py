@@ -29,6 +29,8 @@ import re
 import subprocess
 import sys
 import time
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -68,28 +70,48 @@ VALID_PRODUCT_LINES: Tuple[str, ...] = (
 TEXT_CARRIERS: Tuple[str, ...] = ("free_text", "ad_text", "structured_json", "feishu_doc", "landing_url")
 
 #: 五条品线的确定性识别词表（按特异性排序；英文词要求词边界避免子串误判）
+#: 品线的确定性识别词表。**键必须是 9 族之一** —— 推断循环遍历的是
+#: `VALID_PRODUCT_LINES`，键写成三级分类（如「推车」）就永远查不到。
+#:
+#: ★ 2026-11-05：取值域收敛到 GTM 品线 9 族之后，原先这张表的键
+#:   （推车/背带/温奶器/哺乳内衣）全部成为孤儿键 —— 实测后果：
+#:   `stroller` 识别不出推车、`nursing bra` 识别不出内衣，一律回落成吸奶器。
+#:   现在按族重建，三级分类的词统一并进它所属的族（归属依据见
+#:   research/governance/品线映射-v1.md §2.2）。
 PRODUCT_LINE_KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "吸奶器": (
         "吸奶器", "吸乳器", "吸乳", "集奶器", "喇叭罩",
         "breast pump", "pumping", "lactation", "flange",
         "s12 pro", "s9 pro", "m5", "m6", "m9", "v1 pro", "v2 pro",
     ),
-    "哺乳内衣": (
-        "哺乳内衣", "哺乳文胸", "孕妇内衣", "授乳内衣",
+    "服纺": (
+        "哺乳内衣", "哺乳文胸", "孕妇内衣", "授乳内衣", "文胸", "运动内衣", "塑身服",
         "nursing bra", "maternity bra", "pumping bra", "hands-free bra",
+        "内衣", "家居服",
     ),
-    "推车": (
-        "推车", "婴儿车", "伞车", "溜娃神器",
+    "家纺": (
+        "推车", "婴儿车", "婴儿推车", "伞车", "溜娃神器",
+        "背带", "腰凳", "背巾", "孕妇枕", "哺乳枕", "襁褓睡袋", "床品", "四件套",
         "stroller", "baby wagon", "pram", "pushchair",
-    ),
-    "背带": (
-        "背带", "腰凳", "背巾",
         "baby carrier", "infant carrier", "baby wrap", "hipseat", "hip seat",
     ),
-    "温奶器": (
+    "喂养": (
         "温奶器", "暖奶器", "热奶器", "恒温壶", "调奶器",
-        "bottle warmer", "milk warmer", "water warmer",
+        "奶瓶", "消毒器", "奶瓶清洗机", "吸奶器配件", "储奶袋",
+        "bottle warmer", "milk warmer", "water warmer", "bottle sterilizer",
     ),
+    "婴幼儿": (
+        "婴儿背带", "婴儿秋千", "电动秋千", "高脚椅", "餐椅", "监视器", "尿布桶",
+        "婴儿监护", "摇椅", "安抚椅", "吸鼻器",
+        "baby monitor", "high chair", "baby swing",
+    ),
+    "孕产": ("孕产", "孕妇", "孕期", "产妇", "pregnancy pillow", "maternity"),
+    "护肤": ("护肤", "面霜", "身体乳", "洗面奶", "精华", "skincare", "lotion"),
+    "快消": (
+        "牙胶", "牙刷", "婴儿湿巾", "湿巾", "纸尿裤", "拉拉裤", "洗护套装",
+        "沐浴片", "沐浴炸弹", "teether", "diaper", "wipes",
+    ),
+    "家居": ("家居", "收纳", "除甲醛"),
 }
 
 #: 进件失败 / 解析失败的回退标签与处置层。
@@ -111,6 +133,183 @@ HTTP_URL_RE = re.compile(r"https?://[^\s<>\"'`]+")
 def _is_inside_repo(p: Path) -> bool:
     resolved = p.expanduser().resolve()
     return resolved == REPO_ROOT or REPO_ROOT in resolved.parents
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Office 附件正文抽取（.docx / .xlsx）—— 纯 stdlib，不引第三方包
+# ══════════════════════════════════════════════════════════════════════
+
+#: 抽取到的正文行之间用这个分隔。**不用空行**：
+#: 空行在渲染成卡片 markdown 时会被折叠掉，而用户要看到的是「原文哪里断的」。
+_OFFICE_LINE_SEP = "\n"
+
+#: WordprocessingML 命名空间。`w:` 前缀在每个文件里可能绑到不同的 URI，
+#: 所以**按 URI 匹配**，不按前缀 —— 手写/转换器产出的 docx 前缀并不统一。
+_W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+#: SpreadsheetML 命名空间（xlsx）。
+_S_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+
+def _docx_part_text(xml_bytes: bytes) -> List[str]:
+    """从一个 document/header/footer 部件里按段落取文本。
+
+    ★ 为什么要按 `<w:p>` 分组而不是 `itertext()` 全捞：
+    全捞会把表格里两格间的换行、以及 `<w:tab/>` 全糊成一行，
+    而「哪一句挨着哪一句」正是文案审查要看的东西（一句搭配另一句才构成宣称）。
+    ★ 表格行 `<w:tr>` 单独成行、单元格之间用 ` | ` 隔开，
+    与 xlsx 的口径一致 —— 同一次审查里两种表格长得不该不一样。
+    """
+    root = ET.fromstring(xml_bytes)
+    out: List[str] = []
+
+    # ★ 按**文档顺序**走，不按「先表格再段落」。
+    #   文档顺序是文案审查要看的：一句宣称作标题、表格给它数字、
+    #   下一段再补条件 —— 打乱之后读到的是另一件事。
+    #   做法是一个显式栈：遇到 `<w:tbl>` 就地整块转成行，不再往里走；
+    #   其余节点递归，遇到 `<w:p>` 收一段。这样表格里的段落不会被再收一遍
+    #   （原先按 id 去重也行，但那只治重复、治不了顺序）。
+    def walk(el) -> None:
+        tag = el.tag
+        if tag == f"{_W_NS}tbl":
+            for tr in el.findall(f"{_W_NS}tr"):
+                cells = []
+                for tc in tr.findall(f"{_W_NS}tc"):
+                    cells.append("".join(t.text or "" for t in tc.iter(f"{_W_NS}t")).strip())
+                row = " | ".join(cells).strip()
+                if row.strip(" |"):
+                    out.append(row)
+            return
+        if tag == f"{_W_NS}p":
+            text = "".join(t.text or "" for t in el.iter(f"{_W_NS}t")).strip()
+            if text:
+                out.append(text)
+            return
+        for child in el:
+            walk(child)
+
+    walk(root)
+    return out
+
+
+def _xlsx_shared_strings(zf: zipfile.ZipFile) -> List[str]:
+    """读 `xl/sharedStrings.xml`。不存在时返回空表（不是错误：内联字符串的表格没有这个部件）。"""
+    try:
+        raw = zf.read("xl/sharedStrings.xml")
+    except KeyError:
+        return []
+    root = ET.fromstring(raw)
+    strings: List[str] = []
+    for si in root.iter(f"{_S_NS}si"):
+        # `<si>` 里可能是 `<t>`，也可能是一串富文本 `<r><t>` —— 全要。
+        strings.append("".join(t.text or "" for t in si.iter(f"{_S_NS}t")))
+    return strings
+
+
+def _xlsx_sheet_text(xml_bytes: bytes, shared: List[str]) -> List[str]:
+    """一个 sheet 部件 → 每行一段，非空单元格用 ` | ` 隔开。"""
+    root = ET.fromstring(xml_bytes)
+    rows: List[str] = []
+    for row in root.iter(f"{_S_NS}row"):
+        cells: List[str] = []
+        for c in row.findall(f"{_S_NS}c"):
+            t = c.get("t")
+            if t == "s":
+                # 共享字符串：`<v>` 是索引
+                v = c.find(f"{_S_NS}v")
+                idx_txt = (v.text or "").strip() if v is not None else ""
+                try:
+                    val = shared[int(idx_txt)]
+                except (ValueError, IndexError):
+                    val = ""
+            elif t == "inlineStr":
+                is_el = c.find(f"{_S_NS}is")
+                val = "".join(x.text or "" for x in is_el.iter(f"{_S_NS}t")) if is_el is not None else ""
+            else:
+                # 数值 / 公式结果 / 布尔：都落在 `<v>`
+                v = c.find(f"{_S_NS}v")
+                val = (v.text or "") if v is not None else ""
+            val = str(val).strip()
+            if not val and t != "inlineStr":
+                # ★ 空格子不占位，否则每行尾部会拖一串 ` | | |`。
+                #   但**行中**的空格子要保留占位 —— 否则第 3 列的值会挪到第 2 列，
+                #   读表的人会把「199 元套装」读成「199 元单价」。
+                cells.append(None if val == "" else val)
+                continue
+            cells.append(val)
+        while cells and cells[-1] is None:
+            cells.pop()
+        if not cells:
+            continue
+        line = " | ".join(x or "" for x in cells).strip()
+        if line.strip(" |"):
+            rows.append(line)
+    return rows
+
+
+def extract_office_attachment_text(file_path: Path) -> Dict[str, Any]:
+    """抽取 .docx / .xlsx 的可读正文。**纯 stdlib**（zipfile + ElementTree）。
+
+    返回三种形状，彼此**不许冒充**（与 `ingestAttachment` 的 failure_kind 同口径）：
+
+        {"ok": True,  "text": ..., "chars": n, "ext": ".docx"}
+        {"ok": False, "failure_kind": "empty",       "error": "文档内未提取到可读文字"}
+        {"ok": False, "failure_kind": "parse_error", "error": ...}
+
+    ★ 为什么 `empty` 与 `parse_error` 必须分开：前者是「文件读到了、里面真的没字」
+      （例如只有一张图片的 docx），后者是「文件根本解不开」（坏 zip / 不是 OOXML）。
+      对用户的意思完全不同：前者要他补正文，后者要他重发文件。
+    """
+    p = Path(file_path)
+    ext = p.suffix.lower()
+    if ext not in (".docx", ".xlsx"):
+        return {"ok": False, "failure_kind": "unsupported",
+                "error": f"extract_office_attachment_text 只处理 .docx / .xlsx，收到 {ext or '（无扩展名）'}"}
+
+    try:
+        with zipfile.ZipFile(p) as zf:
+            if ext == ".docx":
+                parts = ["word/document.xml"]
+                for name in zf.namelist():
+                    if re.match(r"word/(header|footer)\d*\.xml$", name):
+                        parts.append(name)
+                lines: List[str] = []
+                found_any = False
+                for name in parts:
+                    try:
+                        raw = zf.read(name)
+                    except KeyError:
+                        continue
+                    found_any = True
+                    lines.extend(_docx_part_text(raw))
+                if not found_any:
+                    return {"ok": False, "failure_kind": "parse_error",
+                            "error": "这个 .docx 里没有 word/document.xml —— 它可能不是 Word 文档，或已被改过后缀"}
+            else:
+                shared = _xlsx_shared_strings(zf)
+                sheets = sorted(n for n in zf.namelist()
+                                if re.match(r"xl/worksheets/sheet\d*\.xml$", n))
+                if not sheets:
+                    return {"ok": False, "failure_kind": "parse_error",
+                            "error": "这个 .xlsx 里没有 xl/worksheets/sheet*.xml —— 它可能不是 Excel 工作簿"}
+                lines = []
+                for name in sheets:
+                    lines.extend(_xlsx_sheet_text(zf.read(name), shared))
+    except zipfile.BadZipFile as exc:
+        return {"ok": False, "failure_kind": "parse_error",
+                "error": f"不是有效的 Office 压缩包（{exc}）—— 可能文件损坏，或后缀是改的"}
+    except ET.ParseError as exc:
+        return {"ok": False, "failure_kind": "parse_error",
+                "error": f"XML 解析失败（{exc}）—— 文件内容不是合法的 OOXML"}
+    except OSError as exc:
+        return {"ok": False, "failure_kind": "parse_error",
+                "error": f"读不到文件（{exc}）"}
+
+    text = _OFFICE_LINE_SEP.join(x for x in (s.strip() for s in lines) if x).strip()
+    if not text:
+        return {"ok": False, "failure_kind": "empty",
+                "error": "文档内未提取到可读文字（可能只有图片、图表或空表格）"}
+    return {"ok": True, "text": text, "chars": len(text), "ext": ext}
 
 
 def workbench_data_root(env: Optional[Dict[str, str]] = None) -> Path:
@@ -1664,6 +1863,171 @@ def query_workbench_case(
     }
 
 
+def _precedent_row_exists(queue_path: Path, case_id: str) -> Optional[bool]:
+    """队列里有没有这个案件的判例回流行。
+
+    ★ 返回 `Optional[bool]`：`None` 是**未测**（队列读不出来 / 有坏行），
+      与 `False`（读出来了、确实没有）必须分得开 —— 前者我不能说「没入队」。
+    """
+    try:
+        if not queue_path.exists():
+            return False
+        bad = 0
+        for line in queue_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                bad += 1
+                continue
+            if isinstance(rec, dict) and rec.get("case_id") == case_id:
+                return True
+        return None if bad else False
+    except OSError:
+        return None
+
+
+def execute_thread_review(
+    *,
+    case_id: str,
+    action: str,
+    notes: str = "",
+    actor_id: str = "",
+    tenant: str = DEFAULT_TENANT,
+    data_root: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """群里对某条审查卡回一句「确认放行 / 误报推翻」，就地把它落到权威与判例回流。
+
+    ## 为什么要在群里做这件事
+
+    审查卡已经带着单号发进群了。复核员看见「这条误报」，最自然的动作是在那条卡下
+    回一句 —— 而不是切到工作台、找到单号、点三下。今天这条路径**不存在**：
+    群里说什么都不改变案件状态，复核员只能去工作台。
+
+    ## action 三态，映射到 reducer 真实认识的 verdict
+
+    reducer 里 `review_and_close` 的 `verdict` **只有两个值**（`agree` / `overturn`），
+    语义是「我认不认机器给的判定」。所以：
+
+        confirm  → agree      认可机器结论并结案
+        overturn → overturn   推翻（≠ 机器结论 → 由 ReviewCommandService 写进判例回流队列）
+        revise   → 不调 review_and_close，返回「要改内容」的路径提示
+
+    ★ `revise` **刻意不做一个看起来像成功的写**：「要求修改」在这套权威里是
+      `submit_review` + `conclusion.verdict_choice=revise` 的形状，需要一个已认领的
+      草稿态。在本函数里硬凑一个，会产出「命令说成功、案件状态却停在原处」——
+      比明确拒绝更糟。所以它如实返回一条**可执行的替代路径**。
+
+    ## 零副作用
+
+    `data_root` 不给时走 `workbench_data_root()`（生产）；测试给临时目录。
+    判例回流队列同理：给了 `data_root` 就落在它下面，**不进仓**
+    （`research/governance/_evidence/` 是被跟踪的真实队列，自证不许往里写，§2.4.4）。
+    """
+    cid = str(case_id or "").strip()
+    if not cid:
+        return {"ok": False, "error": "缺少 case_id"}
+    act = str(action or "").strip().lower()
+    if act not in ("confirm", "overturn", "revise"):
+        return {"ok": False, "error": f"不认识的复核动作 {action!r}；只接受 confirm / overturn / revise"}
+    notes_txt = str(notes or "").strip()
+    if act in ("overturn",) and not notes_txt:
+        # 推翻机器结论必须留下理由 —— 它是判例回流里唯一能被人读懂的那部分。
+        return {"ok": False, "error": "推翻机器结论必须写理由（── 例如「这是引用反例说明，不是我们的宣称」）"}
+
+    root = data_root if data_root is not None else workbench_data_root()
+    authority_dir = root / "authority"
+    projection_db = root / "db" / "review.db"
+    if not authority_dir.exists():
+        return {"ok": False, "error": f"工作台权威目录不存在（{authority_dir}）—— 还没建过任何案件"}
+    authority_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    projection_db.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+
+    lease = WriterLease(authority_dir / "writer.lock")
+    try:
+        lease.acquire()
+        authority = BusinessEventStore(authority_dir, lease=lease)
+        projection = ProjectionStore(projection_db)
+        # ★ 判例回流队列跟着 `data_root` 走。
+        #   `ReviewCommandService` 不给 feedback_queue 时**根本不记判例**
+        #   （见它对 None 的处理），所以这里必须显式给一个；
+        #   给的路径必须是**这个 data_root 之下**，否则自证会往仓里那份
+        #   被跟踪的真实队列追加行 —— 跑一次测试改一次生产数据（§2.4.4）。
+        feedback_queue = root / "review_feedback_queue.jsonl"
+        service = ReviewCommandService(authority, projection, feedback_queue=feedback_queue)
+
+        state = authority.state(cid)
+        if not isinstance(state, dict) or not state.get("case_id"):
+            return {"ok": False, "not_found": True,
+                    "error": f"未找到案件 {cid} —— 权威事件流里没有这个单号（核对单号是否完整）"}
+        version = int(state.get("version") or 0)
+        if version < 1:
+            return {"ok": False, "not_found": True,
+                    "error": f"案件 {cid} 还没进过任何版本（版本 {version}），不能复核"}
+        if act == "revise":
+            return {
+                "ok": False, "needs_workbench": True, "case_id": cid,
+                "error": "「要求修改」要先把内容改完再重新送审，群里这一句改不了正文。",
+                "next_step": f"去工作台把单号 {cid} 领单并写修改意见；改完之后重新发一条送审即可建新单。",
+            }
+
+        if state.get("status") == "closed":
+            return {"ok": False, "already_closed": True,
+                    "error": f"案件 {cid} 已结案（版本 {version}）—— 再结一次没有意义"}
+
+        principal = {
+            "id": (actor_id or "feishu:guard").strip() or "feishu:guard",
+            "tenant": tenant,
+            "roles": ["submitter", "dp3"],
+            "product_lines": list(VALID_PRODUCT_LINES),
+        }
+        verdict = "agree" if act == "confirm" else "overturn"
+        # 幂等键必须**跟着动作走**：同一版本上用同一个键重放不重复写，
+        # 但 confirm 与 overturn 是两个不同的决定，共用一个键会让第二个被当成重放。
+        idem = f"thread-review:{cid}:v{version}:{act}"
+
+        out = service.execute(
+            aggregate_id=cid,
+            command="review_and_close",
+            actor={"principal_id": principal["id"], "tenant_id": principal["tenant"]},
+            expected_version=version,
+            payload={"verdict": verdict, "review_notes": notes_txt or "群内话题复核"},
+            idempotency_key=idem,
+        )
+        result = (out or {}).get("result") or {}
+        # ★ `_record_precedent_after` 的返回值**没有**挂回 response（见它的注释：
+        #   永不抛、不回滚权威、不改 http_status）。所以这里不能读 `result["precedent"]`
+        #   然后报「没入队」—— 那是把「我没读到」说成「没有」。
+        #   判据改成**直接回读队列**：这个 case 的 formal 记录在不在里面。
+        queued = _precedent_row_exists(root / "review_feedback_queue.jsonl", cid)
+        return {
+            "ok": True,
+            "case_id": cid,
+            "action": act,
+            "verdict": verdict,
+            "from_version": version,
+            "to_version": result.get("version"),
+            "status": result.get("status") or "closed",
+            "release_status": (result.get("release") or {}).get("status"),
+            # 判例回流：读**队列本身**，不读命令的返回值（见上一条注释）。
+            # 三种情形必须分得开：入了 / 本来就不该入 / 队列读不出来（未测）。
+            "precedent": {
+                "queued": queued,
+                "queue_path": str(root / "review_feedback_queue.jsonl"),
+            },
+            "workbench_data_root": str(root),
+        }
+    except Exception as exc:  # noqa: BLE001
+        # 这里不吞类型：读的人要能分清「案件状态冲突」与「我这侧崩了」。
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    finally:
+        try:
+            lease.release()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="飞书 Guard 统一生产审查与工作台建案入口")
     p.add_argument("--carrier", default="free_text",
@@ -1690,8 +2054,32 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--list-cases", action="store_true", help="列出工作台案件队列摘要")
     p.add_argument("--status-filter", help="配合 --list-cases 按案件状态过滤（如 unassigned/claimed/reviewed/released）")
     p.add_argument("--limit", type=int, default=10, help="配合 --list-cases 返回条数上限（默认 10）")
+    p.add_argument("--extract-office", metavar="PATH",
+                   help="只抽取 .docx/.xlsx 正文并以 JSON 打印（不建案、不判审）")
+    p.add_argument("--review-case", metavar="CASE_ID",
+                   help="对已建案件执行一次人工复核结案（配合 --review-action）")
+    p.add_argument("--review-action", choices=("confirm", "overturn", "revise"),
+                   help="confirm=认可机器结论 / overturn=推翻（记误报判例）/ revise=要求修改（漏报回流）")
+    p.add_argument("--review-notes", default="", help="复核说明（进权威与判例回流）")
 
     args = p.parse_args(argv)
+
+    if args.extract_office:
+        print(json.dumps(extract_office_attachment_text(Path(args.extract_office)), ensure_ascii=False))
+        return 0
+
+    if args.review_case:
+        if not args.review_action:
+            print(json.dumps({"ok": False, "error": "给了 --review-case 就必须给 --review-action"}, ensure_ascii=False))
+            return 1
+        rres = execute_thread_review(
+            case_id=args.review_case,
+            action=args.review_action,
+            notes=args.review_notes or "",
+            actor_id=args.sender_open_id or "",
+        )
+        print(json.dumps(rres, ensure_ascii=False))
+        return 0 if rres.get("ok") else 1
 
     if args.query_case or args.list_cases:
         qres = query_workbench_case(

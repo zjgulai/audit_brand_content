@@ -238,3 +238,64 @@ export function formatDirectAuditCardReply({ mediaGot = null, textJudgeResult = 
 }
 
 
+/**
+ * 话题复核执行完之后，回给群里那张回执。
+ *
+ * ★ 三种结果必须**长得不一样**，因为复核员下一步做的事不同：
+ *   成功结案 / 本来就没法结（已结案、找不到单号）/ 我这边跑挂了。
+ *   合成一句「已处理」会让第一种掩盖后两种 —— 那正是本仓库反复记的那个病。
+ *
+ * ★ 用 `receipt` 类型：对方只需要知道「收到了、办没办成」。
+ *
+ * @param {{caseId:string, action:'confirm'|'overturn'|'revise', result:object|null}} p
+ * @returns {string} 卡片块文本
+ */
+export function buildReceiptReply({ caseId = null, action = 'confirm', result = null } = {}) {
+  const openTag = '[' + '[card:receipt]]';
+  const closeTag = '[' + '[/card]]';
+  const r = result && typeof result === 'object' ? result : null;
+  const ok = !!r?.ok;
+  const ACTION_ZH = { confirm: '确认放行', overturn: '误报推翻', revise: '要求修改' };
+  const verb = ACTION_ZH[action] ?? '复核';
+  const id = String(caseId ?? r?.case_id ?? '').trim() || '（无单号）';
+
+  // ★ 不谈配色/不写「已通过」：这几句话会被出站边界闸与语域规则同时检查。
+  //   成功了就说「已结案」，失败就照实说**哪一类**失败。
+  let verdict;
+  if (ok) {
+    verdict = action === 'overturn'
+      ? `已按「误报推翻」结案：单号 ${id}。机器结论作废，案件记入人工推翻。`
+      : `已按「确认放行」结案：单号 ${id}。`;
+  } else if (r?.needs_workbench) {
+    verdict = `这一句改不了正文：单号 ${id} 需要去工作台改。`;
+  } else if (r?.already_closed) {
+    verdict = `单号 ${id} 已经结过案了，这一句没有改动任何东西。`;
+  } else if (r?.not_found) {
+    verdict = `没找到单号 ${id}，这一句没有改动任何东西。`;
+  } else {
+    verdict = `这条复核没办成（单号 ${id}），原因见下。`;
+  }
+
+  const fields = [{ label: '动作', value: verb }, { label: '工作台单号', value: id }];
+  if (ok) {
+    const q = r?.precedent ?? {};
+    // 判例回流只有「入队 / 没入队」两种；`queued` 为 null 或缺失时不硬说成「没有」。
+    const prec = q.queued === true ? '已记入判例回流（周报的规则缺口榜会读到）'
+      : q.queued === false ? '本次未产生判例回流（人机结论一致，没有分歧可记）'
+        : '判例回流未测（队列读不出来）';
+    fields.push({ label: '判例回流', value: prec });
+  } else if (r?.error) {
+    fields.push({ label: '原因', value: String(r.error).slice(0, 120) });
+  }
+
+  const note = ok
+    ? '如果这条不该结，去工作台把单号重新打开即可。'
+    : (r?.next_step ? String(r.next_step).slice(0, 160) : '这次没有改动案件状态，可以补一句再说一次。');
+
+  return `${openTag}\n${JSON.stringify({
+    title: ok ? '【复核已落账】' : '【复核没办成】',
+    verdict,
+    fields,
+    note,
+  })}\n${closeTag}`;
+}

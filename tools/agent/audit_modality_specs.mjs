@@ -163,6 +163,26 @@ export function foreignTokensFor(key) {
 const asText = (x) => (x === null || x === undefined ? '' : String(x).trim());
 const IDENTITY = (x) => asText(x);
 
+/**
+ * 工作台单号的直达链接。**没有配置就返回 null**，绝不编一个域名出来。
+ *
+ * 两个来源，按优先级：
+ *   1. `SHOUHENG_WORKBENCH_URL`（部署后才有的东西：目标域名 `ca.luteos.site`）
+ *   2. 都没有 → null，卡片上就不放按钮
+ *
+ * ★ 为什么不写死默认地址：这个仓库是公开的，而工作台**还没部署**
+ *   （部署目标记录在案，但部署本身需要另行授权）。写死一个地址等于给
+ *   群里发一个打不开的按钮 —— 那比没有按钮更糟：读者会以为是权限问题。
+ */
+export function workbenchCaseUrl(caseId) {
+  const id = asText(caseId);
+  if (!id) return null;
+  const base = String(process.env.SHOUHENG_WORKBENCH_URL ?? '').trim();
+  if (!base) return null;
+  if (!/^https?:\/\//.test(base)) return null;   // 配错了就不给按钮，不要发半截地址
+  return `${base.replace(/\/+$/, '')}/cases/${encodeURIComponent(id)}`;
+}
+
 function badgeOf(fd, statusField, clean) {
   const v = asText(fd?.[statusField]);
   return v ? `【${clean(v)}】` : '';
@@ -375,6 +395,11 @@ export function renderFourDimAuditPayload({
     rows,
     ...(snippet ? { snippet: clean(snippet), snippetLabel: spec.snippetLabel } : {}),
     fields,
+    // 工作台直达。**没有配置就不放**（见 workbenchCaseUrl 的注释）——
+    // 发一个打不开的按钮，读者会以为是权限问题，实际只是没部署。
+    ...(workbenchCaseUrl(caseId)
+      ? { actionLabel: '去工作台看这条', actionUrl: workbenchCaseUrl(caseId) }
+      : {}),
     boundary: spec.boundary,
   };
 }

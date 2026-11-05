@@ -610,6 +610,59 @@ head('L 发送链 · 降级链完整且不重复投递');
     no('L3 onMessage 不碰形态', 'onMessage 里也在碰形态（toCardOrText / shaped.*）—— 两处定形态，群里格式会随机');
   } else ok('L3 onMessage 只记日志，不碰形态');
 
+  // ══════════════════════════════════════════════════════════════
+  // L8 表格单元格必须是**标量**
+  //
+  // ★ 2026-11-05：一次真实发送失败，飞书回
+  //     `200909 column idx:2`（整卡被拒 → 降级成纯文本）
+  //   结构复现十几次都没复现出来，**根因未定**。
+  //   但有一类成因是确定的：**飞书 table 的单元格只吃标量**。
+  //   值是数组/对象时，飞书会把它读成多列 → `column idx:N`；
+  //   而本地原有的校验只查「列名在不在 columns 里」，这一层一直是绿的。
+  //
+  // 所以这里断言两件事，缺一条都还会漏：
+  //   L8a 构造层：喂一个**数组值**，出来必须是字符串（不是数组）
+  //   L8b 反向对照：直接构造一个带数组值的坏卡绕过 `table()`，
+  //       本地校验**必须红** —— 否则守卫只在构造路径上，绕过去就没了
+  // ══════════════════════════════════════════════════════════════
+  {
+    const { table: mkTable, validateCard: vCard } = await import('./reply-cards/cards.mjs');
+
+    // L8a：构造层标量化
+    const t1 = mkTable(['项', '值'], [{ 项: 'a', 值: ['x', 'y'] }]);
+    const v0 = t1.rows[0].值;
+    if (typeof v0 !== 'string') no('L8a 表格单元格标量化', `数组值没被转成字符串（实际 ${typeof v0}：${JSON.stringify(v0)}）—— 飞书会把它读成多列，报 column idx:N`);
+    else ok('L8a 表格单元格标量化（数组 → 字符串）');
+
+    // L8a-2：行宽必须恒等于列数（多余键丢掉、缺的补空）
+    const t2 = mkTable(['A', 'B'], [{ A: '1', B: '2', 多余: 'x' }]);
+    const keys2 = Object.keys(t2.rows[0]);
+    if (keys2.length !== 2) no('L8a-2 行宽归一', `行有 ${keys2.length} 个键，列只有 2 个 —— 多余键会让飞书报 column idx`);
+    else ok('L8a-2 行宽归一（多余键已丢）');
+
+    // L8b：反向对照 —— 绕过 table() 直接塞数组值，本地校验必须红
+    const badCard = {
+      schema: '2.0', config: { update_multi: true },
+      header: { title: { tag: 'plain_text', content: 't' }, template: 'green' },
+      body: { elements: [{
+        tag: 'table',
+        columns: [{ name: 'a', display_name: 'a', data_type: 'text' },
+                  { name: 'b', display_name: 'b', data_type: 'text' }],
+        rows: [{ a: 'ok', b: ['x', 'y'] }],     // ← 数组值，正是飞书会拒的形态
+      }] },
+    };
+    const v = vCard(badCard);
+    if (v.ok) no('L8b ★ 反向对照：数组值必须被本地校验拦下', '带数组值的表格过了本地校验 —— 守卫只在构造路径上，绕过 table() 就没了；而飞书会拒这张卡');
+    else ok('L8b ★ 反向对照：数组值被本地校验拦下');
+
+    // L8b-2：正对照 —— 标量值的同一张卡必须过（否则 L8b 可能只是恒真）
+    const goodCard = JSON.parse(JSON.stringify(badCard));
+    goodCard.body.elements[0].rows[0].b = 'x、y';
+    const v2 = vCard(goodCard);
+    if (!v2.ok) no('L8b-2 正对照：标量值的同一张卡必须过', `拒绝理由：${v2.errors.map(e => e.msg).join('；')} —— L8b 可能只是恒真`);
+    else ok('L8b-2 正对照：标量值的同一张卡通过');
+  }
+
   // L4 形态与搬迁必须落到日志里 —— 否则调模版只能靠重跑猜
   for (const [name, re] of [['卡片形态', /🃏 卡片/], ['搬迁记录', /↪ /], ['语域命中', /语域 /], ['降级原因', /卡片降级为文本/]]) {
     if (!re.test(daemon)) no(`L4 ${name} 记进日志`, '日志里看不到这一项，出问题无法归因');
