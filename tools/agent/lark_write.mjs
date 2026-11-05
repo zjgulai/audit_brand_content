@@ -634,7 +634,7 @@ export async function createRecords(ctx, appToken, table, records) {
       const ids = (r.data.records ?? []).map((x) => x.record_id);
       // ② 回读：按返回的 id 取回来，逐字段比
       const back = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-        { path: { app_token: appToken, table_id: t.table_id }, params: { record_ids: ids } });
+        { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: ids } });
       if (!back.ok) {
         return { record_ids: ids, readback: 'untested',
           readback_detail: `写入返回 ${ids.length} 个 id，但回读失败（${back.msg}）—— `
@@ -674,7 +674,7 @@ export async function updateRecords(ctx, appToken, table, records) {
       //    ★ 读不到旧值就**不改**：盖掉的那个值如果没搬走，就永远搬不走了。
       const before = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
         { path: { app_token: appToken, table_id: t.table_id },
-          params: { record_ids: payload.map((p) => p.record_id) } });
+          data: { record_ids: payload.map((p) => p.record_id) } });
       if (!before.ok) {
         return bad('snapshot_failed',
           `改之前读不到这些记录的旧值（${before.msg}）—— 没搬走旧值就不改，已中止`);
@@ -690,7 +690,7 @@ export async function updateRecords(ctx, appToken, table, records) {
 
       const back = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
         { path: { app_token: appToken, table_id: t.table_id },
-          params: { record_ids: payload.map((p) => p.record_id) } });
+          data: { record_ids: payload.map((p) => p.record_id) } });
       if (!back.ok) {
         return { ledger_extra: { pre_image: pre.snapshot }, readback: 'untested',
           readback_detail: '改完回读失败 —— 「改成了没有」我答不了，这是未测' };
@@ -720,7 +720,7 @@ export async function deleteRecords(ctx, appToken, table, recordIds, { confirmed
   // ★ 两段式的第一段：把「要删哪几条、那几条长什么样」摆出来给人看
   if (!confirmed) {
     const peek = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-      { path: { app_token: appToken, table_id: t.table_id }, params: { record_ids: ids } });
+      { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: ids } });
     const sample = peek.ok
       ? (peek.data.records ?? []).slice(0, 3).map((r) => {
         const f = r.fields ?? {};
@@ -743,7 +743,7 @@ export async function deleteRecords(ctx, appToken, table, recordIds, { confirmed
       //      而空数组 = 合法的「零条」→ 判定通过 → 照删。
       //      **「读不到」被 `?? []` 变成了「没有」。** 现在读不到就直接中止。
       const before = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-        { path: { app_token: appToken, table_id: t.table_id }, params: { record_ids: ids } });
+        { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: ids } });
       if (!before.ok) {
         return bad('snapshot_failed',
           `删之前读不到这些记录的旧值（${before.msg}）—— 搬不走就不删，已中止`);
@@ -760,7 +760,7 @@ export async function deleteRecords(ctx, appToken, table, recordIds, { confirmed
         { path: { app_token: appToken, table_id: t.table_id }, data: { records: ids } });
       if (!r.ok) return { ...r, ledger_extra: { pre_image: snap.snapshot } };
       const back = await call(C().bitable.appTableRecord.batchGet.bind(C().bitable.appTableRecord),
-        { path: { app_token: appToken, table_id: t.table_id }, params: { record_ids: ids } });
+        { path: { app_token: appToken, table_id: t.table_id }, data: { record_ids: ids } });
       // 回读失败 → 未测；回读成功且一条都不剩 → consistent
       if (!back.ok) {
         return { ledger_extra: { pre_image: snap.snapshot }, readback: 'untested',

@@ -288,7 +288,7 @@ await ta('B8 ★★ 正向对照：条件齐全时 batchDelete 必须真的被�
     'appTable.list': API_OK({ items: TABLES }),
     'appTableRecord.batchGet': (args) => {
       // 第一次读旧值返回 2 条；删完之后再读返回空
-      const want = args?.params?.record_ids ?? [];
+      const want = args?.data?.record_ids ?? [];
       const seen = hit('appTableRecord.batchGet');
       return seen <= 1
         ? API_OK({ records: want.map((id) => ({ record_id: id, fields: { A: 'old' } })) })
@@ -473,7 +473,7 @@ await ta('D10 ★★ 正向对照：另一条消息确认 → batchDelete 真的
   const { cl, hit } = mkClient({
     'appTable.list': API_OK({ items: TABLES }),
     'appTableRecord.batchGet': (args) => {
-      const want = args?.params?.record_ids ?? [];
+      const want = args?.data?.record_ids ?? [];
       return hit('appTableRecord.batchGet') <= 2      // 提议读 1 次 + 执行前快照 1 次
         ? API_OK({ records: want.map((id) => ({ record_id: id, fields: { A: 'old' } })) })
         : API_OK({ records: [] });
