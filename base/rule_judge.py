@@ -60,6 +60,22 @@ class InvalidRuleSnapshot(RuleJudgeError):
     pass
 
 
+def _cjk(ch):
+    return "一" <= ch <= "鿿"
+
+
+def _is_wordish(ch):
+    return ch.isalnum() or ch == "_"
+
+
+def _compile_keyword_regex(kw):
+    """编译关键词正则：非 CJK 词首字符要求左词首边界，避免 `cure` 误命中 `secure` / `mercure`。"""
+    escaped = re.escape(kw)
+    if kw and _is_wordish(kw[0]) and not _cjk(kw[0]):
+        return re.compile(r"(?<![^\W_])" + escaped, re.IGNORECASE | re.UNICODE)
+    return re.compile(escaped, re.IGNORECASE | re.UNICODE)
+
+
 def _compile_rule(rule, registry):
     """校验并编译一条规则；返回内部结构。permit / disabled 由调用方先跳过。"""
     if not isinstance(rule, dict):
@@ -99,7 +115,7 @@ def _compile_rule(rule, registry):
         raise InvalidRuleSnapshot(
             "%s: match.require_context 必须是非空字符串数组" % rule_key)
 
-    kw_res = [re.compile(re.escape(k), re.IGNORECASE | re.UNICODE) for k in keywords]
+    kw_res = [_compile_keyword_regex(k) for k in keywords]
     ctx_res = [re.compile(re.escape(item), re.IGNORECASE | re.UNICODE)
                for item in require_context]
 

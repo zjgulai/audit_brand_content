@@ -44,7 +44,7 @@ try:
     from control_points import (
         ControlPointRegistry, UnknownControlCode, DeprecatedControlCode)
     from rule_judge import (
-        RuleJudge, InvalidSeverity, validate_hit, HIT_FIELDS)
+        RuleJudge, InvalidSeverity, validate_hit, HIT_FIELDS, _compile_keyword_regex)
 except Exception as e:  # noqa: BLE001
     print("❌ 导入 base/control_points.py / base/rule_judge.py 失败：%s" % e)
     sys.exit(1)
@@ -143,6 +143,16 @@ def main():
     # 无关文本 0 命中（不是恒过/恒拦的反向对照）
     clean = "新品上市：售价 199 元，容量 240ml，适合 0-6 个月宝宝。"
     T("B11 无关文本 0 命中", judge.judge(clean) == [], str(judge.judge(clean)))
+
+    # 英文词首边界：secure / securely / mercure 不许误命中 cure；cure / cures 仍命中
+    secure_text = "a secure 2.4GHz local connection that fits securely, millimètres de mercure (mmHg)."
+    T("B11b 英文词首边界：secure / securely / mercure 0 命中（不误触 cure）",
+      judge.judge(secure_text) == [], str(judge.judge(secure_text)))
+    cure_prefix = judge.judge("It cures mastitis and treats pain.")
+    T("B11c 英文词首边界：cures / treats 前缀屈折词正常命中 H01",
+      any(h["control_code"] == "H01" and h["quote"].lower() == "cures" for h in cure_prefix)
+      and any(h["control_code"] == "H01" and h["quote"].lower() == "treats" for h in cure_prefix),
+      str(cure_prefix))
 
     # control_code 过滤：只跑指定码，且未知码拒收
     mixed = "can cure disease，也能预防乳腺炎"
@@ -280,7 +290,7 @@ def main():
             spans = []
             for keyword in match.get("keywords") or []:
                 spans.extend((m.start(), m.end()) for m in
-                             re.compile(re.escape(keyword), re.I | re.U).finditer(text_value)
+                             _compile_keyword_regex(keyword).finditer(text_value)
                              if m.end() > m.start())
             for pattern in match.get("patterns") or []:
                 spans.extend((m.start(), m.end()) for m in
